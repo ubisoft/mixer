@@ -1,13 +1,18 @@
 import socket
 import select
 import threading
+
+import os
+import sys
+sys.path.append(os.getcwd())
 import common
+
 
 TIMEOUT = 60.0
 HOST = ''
 PORT = 12800
 
-class Client:
+class Connection:
     def __init__(self, socket, address):
         self.socket = socket
         self.address = address
@@ -23,34 +28,42 @@ class Client:
         with common.Mutex() as _:
             room = rooms.get(roomName)
             if room is None:
+                print ("Create room : " + roomName)
                 room = Room(roomName)
                 rooms[roomName] = room
             room.addClient(self)
             self.room = room
 
+    def listRooms(self):
+        data = common.encodeStringArray(list(rooms.keys()))
+        command = common.Command(common.MessageType.LIST_ROOMS, data)
+        self.commands.append(command)
             
     def run(self):
         while(True):
             try:
-                messageType, data = common.readMessage(self.socket)
+                command = common.readMessage(self.socket)
             except common.ClientDisconnectedException:
                 break
 
-            if messageType is not None:
-            
-                if messageType == common.MessageType.ROOM:
-                    self.joinRoom(data.decode())
+            if command is not None:
+                if command.type == common.MessageType.JOIN_ROOM:
+                    self.joinRoom(command.data.decode())
                     
-                elif messageType.value > common.MessageType.COMMAND.value:
+                elif command.type == common.MessageType.LIST_ROOMS:
+                    self.listRooms()
+
+                # Other commands
+                elif command.type.value > common.MessageType.COMMAND.value:
                     if self.room is not None:               
-                        self.room.addCommand(common.Command(messageType, data), self)
+                        self.room.addCommand(command, self)
                     else:
                         print("COMMAND received but no room was joined")
 
             if len(self.commands) > 0:
                 with common.Mutex() as _:
                     for command in self.commands:
-                        common.writeMessage(self.socket, command.type, command.data)
+                        common.writeMessage(self.socket, command)
                     self.commands = []
 
         self.close()
@@ -61,8 +74,7 @@ class Client:
     def close(self):
         if self.room is not None:
             self.room.removeClient(self)
-        try:
-            self.socket.send(b"Disconnect")
+        try:            
             self.socket.close()
         except Exception:
             pass
@@ -77,15 +89,24 @@ class Room:
     def addClient(self, client):
         print (f"Add Client {client.address} to Room {self.name}")
         self.clients.append(client)
-        for command in self.commands:
-            client.addCommand(command)            
+        if len(self.clients) == 1:
+            command = common.Command(common.MessageType.CONTENT)
+            client.addCommand(command)
+        else:
+            command = common.Command(common.MessageType.CLEAR_CONTENT)
+            client.addCommand(command)
+            
+            for command in self.commands:
+                client.addCommand(command)
+            
 
     def removeClient(self, client):
         print (f"Remove Client {client.address} from Room {self.name}")
         self.clients.remove(client)
         if len(self.clients) == 0:
             with common.Mutex() as _:
-                del rooms[self.name]   
+                del rooms[self.name]
+                print ("room " + self.name + " deleted")  
 
     def addCommand(self, command, sender):
         with common.Mutex() as _:
@@ -104,9 +125,9 @@ def runServer():
 
     print(f"Listening on port {PORT}")
     while True:
-        newClient = connection.accept()
-        print(f"New client {newClient[1]}")
-        Client(*newClient)
+        newConnection = connection.accept()
+        print(f"New connection {newConnection[1]}")
+        Connection(*newConnection)
 
     connection.close()
 
