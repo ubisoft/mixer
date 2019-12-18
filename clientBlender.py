@@ -543,9 +543,8 @@ class ClientBlender(Client):
         binaryMaterialNames = common.intToBytes(size, 4)
         for material in self.CurrentBuffers.materials:
             binaryMaterialNames += common.intToBytes(len(material),4) + material
-
-        meshName = meshName.encode()
-        return common.intToBytes(len(meshName),4) + meshName + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
+        
+        return common.encodeString(meshName) + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
 
     def sendMesh(self, obj):
         mesh = obj.data
@@ -556,9 +555,8 @@ class ClientBlender(Client):
 
     def getMeshConnectionBuffers(self, obj, meshName):
         # geometry path
-        path = self.getObjectPath(obj).encode()
-        meshName = meshName.encode()
-        return common.intToBytes(len(path),4) + path + common.intToBytes(len(meshName),4) + meshName    
+        path = self.getObjectPath(obj)
+        return common.encodeString(path) + common.encodeString(meshName)    
 
     def sendMeshConnection(self, obj):
         mesh = obj.data

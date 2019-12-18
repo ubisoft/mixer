@@ -42,7 +42,7 @@ class VRtistConnectProperties(bpy.types.PropertyGroup):
     room_index: bpy.props.IntProperty()  # index in the list of rooms
     advanced: bpy.props.BoolProperty(default=False)
     remoteServerIsUp: bpy.props.BoolProperty(default=False)
-
+    VRtist: bpy.props.StringProperty(name="VRtist", default="D:/unity/VRtist/Build/VRtist.exe")
 
 def updateParams(obj):
     if not hasattr(obj, "data") or obj.data is None:
@@ -240,7 +240,7 @@ def getRooms(force=False):
 class VRtistRoomListUpdateOperator(bpy.types.Operator):
     bl_idname = "scene.vrtistroomlistupdate"
     bl_label = "VRtist Update Room List"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {'REGISTER'}
 
     def execute(self, context):
         getRooms(force=True)
@@ -316,7 +316,7 @@ def set_handlers(connect: bool):
 class VRtistCreateRoomOperator(bpy.types.Operator):
     bl_idname = "scene.vrtistcreateroom"
     bl_label = "VRtist Create Room"
-    bl_options = {'REGISTER', 'UNDO'}   
+    bl_options = {'REGISTER'}   
 
     def execute(self, context):
         connected = shareData.client is not None and shareData.client.isConnected()
@@ -371,7 +371,7 @@ def server_is_up(address, port):
 class VRtistJoinRoomOperator(bpy.types.Operator):
     bl_idname = "scene.vrtistjoinroom"
     bl_label = "VRtist Join Room"
-    bl_options = {'REGISTER', 'UNDO'}   
+    bl_options = {'REGISTER'}   
 
     def execute(self, context):
         global rooms_cache
@@ -429,7 +429,7 @@ class VRtistJoinRoomOperator(bpy.types.Operator):
 class VRtistSendSelectionOperator(bpy.types.Operator):
     bl_idname = "scene.vrtistsendselection"
     bl_label = "VRtist Send Selection"
-    bl_options = {'REGISTER', 'UNDO'}   
+    bl_options = {'REGISTER'}   
 
     def execute(self, context): 
         if shareData.client is None:
@@ -449,16 +449,11 @@ class VRtistSendSelectionOperator(bpy.types.Operator):
 
         return {'FINISHED'}
 
-class VRtistProperties(bpy.types.PropertyGroup):
-    VRtist: bpy.props.StringProperty(name="VRtist", default="D:/unity/VRtist/Build/VRtist.exe")
-    Exchange: bpy.props.StringProperty(name="Exchange", default="D:/unity/VRtist/Build/tmp")
 
 class VRtistOperator(bpy.types.Operator):
     bl_idname = "scene.vrtist"
     bl_label = "VRtist"
-    bl_options = {'REGISTER', 'UNDO'}
-    
-    #vrtist = bpy.data.scenes[0].vrtist.VRtist
+    bl_options = {'REGISTER'}
     
     def execute(self, context):
         vrtistconnect =  bpy.data.scenes[0].vrtistconnect
@@ -470,6 +465,6 @@ class VRtistOperator(bpy.types.Operator):
         hostname = "localhost"
         if not shareData.isLocal:
             hostname = vrtistconnect.host
-        args = [bpy.data.scenes[0].vrtist.VRtist, "--room",room, "--hostname", hostname, "--port", str(vrtistconnect.port)]
+        args = [bpy.data.scenes[0].vrtistconnect.VRtist, "--room",room, "--hostname", hostname, "--port", str(vrtistconnect.port)]
         subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.STDOUT, shell=False)
         return {'FINISHED'}    

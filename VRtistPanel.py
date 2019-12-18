@@ -47,7 +47,7 @@ class VRtistPanel(bpy.types.Panel):
             if scene.vrtistconnect.advanced:
                 col.prop(scene.vrtistconnect, "host", text="Host")
                 col.prop(scene.vrtistconnect, "port", text="Port")
-                col.prop(scene.vrtist, "VRtist", text="VRtist Path")
+                col.prop(scene.vrtistconnect, "VRtist", text="VRtist Path")
 
         else:            
             row.operator("scene.vrtistjoinroom", text="Leave Room")

@@ -108,9 +108,18 @@ class Room:
                 del rooms[self.name]
                 print ("room " + self.name + " deleted")  
 
+    def mergeCommands(self, command):
+        commandType = command.type
+        commandPath = common.decodeString(command.data,0)[0]
+        if len(self.commands) > 0:
+            storedCommand = self.commands[-1]
+            if commandType == storedCommand.type and commandPath == common.decodeString(storedCommand.data,0)[0]:
+                self.commands.pop()
+        self.commands.append(command)
+
     def addCommand(self, command, sender):
         with common.Mutex() as _:
-            self.commands.append(command)
+            self.mergeCommands(command)
             for client in self.clients:
                 if client != sender:
                     client.addCommand(command)

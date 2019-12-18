@@ -29,14 +29,12 @@ def register():
 
     bpy.utils.register_class(vrtistOperators.ROOM_UL_ItemRenderer)
     bpy.utils.register_class(vrtistOperators.VRtistOperator)
-    bpy.utils.register_class(vrtistOperators.VRtistProperties)
     bpy.utils.register_class(vrtistOperators.VRtistRoomItem)
     bpy.utils.register_class(vrtistOperators.VRtistConnectProperties)
     bpy.utils.register_class(vrtistOperators.VRtistCreateRoomOperator)
     bpy.utils.register_class(vrtistOperators.VRtistRoomListUpdateOperator)
     bpy.utils.register_class(vrtistOperators.VRtistSendSelectionOperator)
     bpy.utils.register_class(vrtistOperators.VRtistJoinRoomOperator)
-    bpy.types.Scene.vrtist = bpy.props.PointerProperty(type=vrtistOperators.VRtistProperties)
     bpy.types.Scene.vrtistconnect = bpy.props.PointerProperty(type=vrtistOperators.VRtistConnectProperties)
     bpy.utils.register_class(VRtistPanel.VRtistPanel)
 
@@ -46,14 +44,12 @@ def register():
 def unregister():
     bpy.utils.unregister_class(VRtistPanel.VRtistPanel)
     del bpy.types.Scene.vrtistconnect
-    del bpy.types.Scene.vrtist
     bpy.utils.unregister_class(vrtistOperators.VRtistSendSelectionOperator)
     bpy.utils.unregister_class(vrtistOperators.VRtistConnectProperties)
     bpy.utils.unregister_class(vrtistOperators.VRtistCreateRoomOperator)
     bpy.utils.unregister_class(vrtistOperators.VRtistRoomListUpdateOperator)
     bpy.utils.unregister_class(vrtistOperators.VRtistJoinRoomOperator)
     bpy.utils.unregister_class(vrtistOperators.VRtistRoomItem)
-    bpy.utils.unregister_class(vrtistOperators.VRtistProperties)
     bpy.utils.unregister_class(vrtistOperators.VRtistOperator)
     bpy.utils.unregister_class(vrtistOperators.ROOM_UL_ItemRenderer)
 
