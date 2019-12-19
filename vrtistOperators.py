@@ -35,14 +35,14 @@ class VRtistRoomItem(bpy.types.PropertyGroup):
 
 class VRtistConnectProperties(bpy.types.PropertyGroup):
     #host: bpy.props.StringProperty(name="Host", default="lgy-wks-052279")
-    host: bpy.props.StringProperty(name="Host", default="localhost")
+    host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST","localhost"))
     port: bpy.props.IntProperty(name="Port", default=PORT)
     room: bpy.props.StringProperty(name="Room", default=os.getlogin())
     rooms: bpy.props.CollectionProperty(name="Rooms", type=VRtistRoomItem)
     room_index: bpy.props.IntProperty()  # index in the list of rooms
     advanced: bpy.props.BoolProperty(default=False)
     remoteServerIsUp: bpy.props.BoolProperty(default=False)
-    VRtist: bpy.props.StringProperty(name="VRtist", default="D:/unity/VRtist/Build/VRtist.exe")
+    VRtist: bpy.props.StringProperty(name="VRtist", default=os.environ.get("VRTIST_EXE","D:/unity/VRtist/Build/VRtist.exe"))
 
 def updateParams(obj):
     if not hasattr(obj, "data") or obj.data is None:
