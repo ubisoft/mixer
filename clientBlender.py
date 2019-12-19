@@ -704,10 +704,14 @@ class ClientBlender(Client):
             except queue.Empty:
                 return 0.01
             else:
+                self.receivedCommandsProcessed = True
+
                 if command.type == common.MessageType.LIST_ROOMS:
                     self.buildListRooms(command.data)
+                    self.receivedCommandsProcessed = False
                 elif command.type == common.MessageType.CONTENT:
                     self.sendSceneContent()
+                    self.receivedCommandsProcessed = False
                 elif command.type == common.MessageType.CLEAR_CONTENT:
                     self.clearContent()
                 elif command.type == common.MessageType.MESH:
@@ -733,7 +737,5 @@ class ClientBlender(Client):
                 elif command.type == common.MessageType.RESTORE_FROM_TRASH:
                     self.buildRestoreFromTrash(command.data)
 
-
-                self.receivedCommandsProcessed = True
                 self.receivedCommands.task_done()
           

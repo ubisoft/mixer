@@ -255,12 +255,16 @@ class ROOM_UL_ItemRenderer(UIList):
 def clear_scene_content():
     set_handlers(False)
 
-    for obj in bpy.context.scene.objects:
-        if obj.type == 'MESH':
-            obj.select_set(True)
-        else:
-            obj.select_set(False)
-        bpy.ops.object.delete()
+    collections = []
+    objs = []
+    for collection in bpy.data.collections:
+        collections.append(collection)
+        for obj in collection.objects:
+            if obj.type == 'MESH' or obj.type == 'LIGHT' or obj.type == 'CAMERA':
+                objs.append(obj)
+
+    for obj in objs:        
+        bpy.data.objects.remove(obj, do_unlink=True)
 
     for block in bpy.data.meshes:
         if block.users == 0:
@@ -277,6 +281,9 @@ def clear_scene_content():
     for block in bpy.data.images:
         if block.users == 0:
             bpy.data.images.remove(block)
+
+    for collection in collections:
+        bpy.data.collections.remove(collection)
 
     set_handlers(True)
 
