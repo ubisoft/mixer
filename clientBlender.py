@@ -97,23 +97,20 @@ class ClientBlender(Client):
         ob = self.getOrCreatePath(path)
         if not ob:
             return None
-        if type(ob.data) is not type(data):
-            # morph to desired type
-            parent = ob.parent
-            name = ob.name
 
-            # cannot simply replace objects data
-            # needs to destroy and re create it
-            self.removeSyncObject(ob)
-            bpy.data.objects.remove(ob, do_unlink=True)
-            ob = bpy.data.objects.new(name,data)            
-            collection = self.getOrCreateCollection()
-            collection.objects.link(ob)
-            ob.parent = parent
-            self.addSyncObject(ob)
-        else:
-            # only updates data
-            ob.data = data
+        parent = ob.parent
+        name = ob.name
+
+        # cannot simply replace objects data
+        # needs to destroy and re create it
+        self.removeSyncObject(ob)
+        bpy.data.objects.remove(ob, do_unlink=True)
+        ob = bpy.data.objects.new(name,data)            
+        collection = self.getOrCreateCollection()
+        collection.objects.link(ob)
+        ob.parent = parent
+        self.addSyncObject(ob)
+
 
     def getOrCreateCamera(self, cameraName):
         if cameraName in self.cameras:
