@@ -13,6 +13,8 @@ PORT = 12800
 
 class Client:
     def __init__(self, host = HOST, port = PORT):
+        self.host = host
+        self.port = port
         self.receivedCommands = queue.Queue()
         self.pendingCommands = queue.Queue()
         self.applyTransformCallback = None
@@ -25,7 +27,6 @@ class Client:
         except Exception as e:
             print("Connection error ",e)
             self.socket = None
-            pass
 
         if self.socket:
             self.threadAlive = True
@@ -34,14 +35,14 @@ class Client:
         else:
             self.thread = None
 
-    def __del__(self): 
-        if not self.socket is None:
+    def __del__(self):
+        if self.socket is not None:
             self.disconnect()
 
     def disconnect(self):
         if self.thread is not None:
             self.threadAlive = False
-            self.thread.join()            
+            self.thread.join()
 
         if self.socket:
             self.socket.shutdown(socket.SHUT_RDWR)
@@ -60,7 +61,7 @@ class Client:
         common.writeMessage(self.socket,common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0) )
 
     def send(self, data):
-        with common.Mutex() as _:
+        with common.mutex:
             self.socket.send(data)
 
     def run(self):
@@ -73,12 +74,12 @@ class Client:
                 print("Connection lost")
                 self.socket = None
                 break
-                
-            if command is not None:                
-                with common.Mutex() as _:
+
+            if command is not None:
+                with common.mutex:
                     self.receivedCommands.put(command)
 
-            with common.Mutex() as _:
+            with common.mutex:
                 while True:
                     try:
                         command = self.pendingCommands.get_nowait()
@@ -93,7 +94,7 @@ class Client:
 
     def blenderExists(self):
         return True
-  
+
 
 # For tests
 if __name__ == '__main__':
@@ -111,6 +112,6 @@ if __name__ == '__main__':
             client.addCommand(common.Command(common.MessageType.TRANSFORM, encodedMsg[9:]))
         if msg.startswith("Delete"):
             client.addCommand(common.Command(common.MessageType.DELETE, encodedMsg[6:]))
-        elif msg.startswith("Room"): 
-            client.joinRoom(msg[4:])       
+        elif msg.startswith("Room"):
+            client.joinRoom(msg[4:])
 

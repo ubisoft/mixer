@@ -4,7 +4,9 @@ import select
 import socket
 import struct
 
-mutex = threading.Lock()
+
+mutex = threading.RLock()
+
 
 class MessageType(Enum):
     JOIN_ROOM = 1
@@ -13,6 +15,10 @@ class MessageType(Enum):
     LIST_ROOMS = 4
     CONTENT = 5
     CLEAR_CONTENT = 6
+    DELETE_ROOM = 7
+    CLEAR_ROOM = 8
+    LIST_ROOM_CLIENTS = 9
+    LIST_CLIENTS = 10
     COMMAND = 100
     TRANSFORM = 101
     DELETE = 102
@@ -25,7 +31,7 @@ class MessageType(Enum):
     DUPLICATE = 109
     SEND_TO_TRASH = 110
     RESTORE_FROM_TRASH = 111
-    
+
 class LightType(Enum):
     SPOT = 0 # directly mapped from Unity enum
     SUN = 1
@@ -105,7 +111,7 @@ def decodeStringArray(data, index):
     count = bytesToInt(data[index:index+4])
     index = index + 4
     values = []
-    for i in range(count):
+    for _ in range(count):
         string, index  = decodeString(data, index)
         values.append(string)
     return values, index
@@ -115,7 +121,7 @@ def decodeArray(data, index, schema, inc):
     start = index+4
     end = start
     values = []
-    for i in range(count):
+    for _ in range(count):
         end = start+inc
         values.append(struct.unpack(schema, data[start:end]))
         start = end
@@ -128,7 +134,7 @@ def decodeIntArray(data, index):
     count = bytesToInt(data[index:index+4])
     start = index+4
     values = []
-    for i in range(count):
+    for _ in range(count):
         end = start+4
         values.extend(struct.unpack('I', data[start:end]))
         start = end
@@ -154,7 +160,7 @@ def readMessage(socket):
         try:
             msg = socket.recv(14)
             if len(msg) < 14:
-                raise ClientDisconnectedException()                
+                raise ClientDisconnectedException()
             frameSize = bytesToInt(msg[:8])
             commandId = bytesToInt(msg[8:12])
             messageType = bytesToInt(msg[12:])
@@ -186,18 +192,11 @@ def writeMessage(socket, command):
     currentIndex = 0
     while remainingSize > 0:
         _,w,_ = select.select([],[socket],[],0.0001)
-        if len(w) > 0:                
+        if len(w) > 0:
             sent = socket.send(buffer[currentIndex:])
             remainingSize -= sent
             currentIndex += sent
 
-class Mutex:
-    def __enter__(self):
-        mutex.acquire()
-        return mutex
-
-    def __exit__(self ,type, value, traceback):
-        mutex.release()
 
 class Command:
     _id = 100
@@ -207,5 +206,5 @@ class Command:
         self.id = commandId
         if commandId == 0:
             self.id = Command._id
-            Command._id += 1        
+            Command._id += 1
 
