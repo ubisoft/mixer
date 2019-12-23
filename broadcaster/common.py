@@ -54,6 +54,19 @@ def bytesToInt(value):
 def intToMessageType(value):
     return MessageType(value)
 
+def encodeBool(value):
+    if value:        
+        return intToBytes(1, 4)
+    else:
+        return intToBytes(0, 4)
+
+def decodeBool(data, index):
+    value = bytesToInt(data[index:index+4])
+    if value == 1:
+        return True, index+4
+    else:
+        return False, index+4
+
 def encodeString(value):
     encodedValue = value.encode()
     return intToBytes(len(encodedValue),4) + encodedValue
@@ -90,10 +103,13 @@ def decodeVector3(data, index):
     return struct.unpack('3f', data[index:index+3*4]), index+3*4
 
 def encodeColor(value):
-    return struct.pack('3f', *(value[0], value[1], value[2]))
+    if len(value) == 3:
+        return struct.pack('4f', *(value[0], value[1], value[2], 1.0))
+    else:
+        return struct.pack('4f', *(value[0], value[1], value[2], value[3]))
 
 def decodeColor(data, index):
-    return struct.unpack('3f', data[index:index+3*4]), index+3*4
+    return struct.unpack('4f', data[index:index+4*4]), index+4*4
 
 def encodeVector4(value):
     return struct.pack('4f', *(value.x, value.y, value.z, value.w))

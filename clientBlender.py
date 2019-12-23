@@ -170,7 +170,8 @@ class ClientBlender(Client):
         else:
             light.use_shadow = False
 
-        light.color, start = common.decodeVector3(data, start)
+        color, start = common.decodeColor(data, start)
+        light.color = (color[0], color[1], color[2])
         light.energy, start = common.decodeFloat(data, start)
         if lightType == common.LightType.SPOT.value:
             light.spot_size, start = common.decodeFloat(data, start)
@@ -312,25 +313,60 @@ class ClientBlender(Client):
         material = self.getOrCreateMaterial(materialName)
         nodes = material.node_tree.nodes
         # Get a principled node
-        principled = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
+        principled = None
+        if nodes:
+            for n in nodes:
+                if n.type == 'BSDF_PRINCIPLED':
+                    principled = n
+                    break
 
         if not principled:
             print("Cannot find Principled BSDF node")
             return            
 
-        basecolor = struct.unpack('3f', data[start: start + 3*4])
-        start = start + 3 * 4
-        metallic = struct.unpack('f', data[start: start + 4])
-        start = start + 4
-        roughness = struct.unpack('f', data[start: start + 4])
+        index = start
+        hasBaseColorTexture, index = common.decodeBool(data, index)
+        if hasBaseColorTexture:
+            fileName, index = common.decodeString(data, index)
+            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
+            texImage.image = bpy.data.images.load(fileName)            
+            material.node_tree.links.new(principled.inputs['Base Color'], texImage.outputs['Color'])
+        else:
+            baseColor, index = common.decodeColor(data, index)
+            material.diffuse_color = ( baseColor[0], baseColor[1], baseColor[2], 1)
+            principled.inputs['Base Color'].default_value = material.diffuse_color
 
-        material.diffuse_color = ( basecolor[0], basecolor[1], basecolor[2], 1)
-        material.metallic = metallic[0]
-        material.roughness = roughness[0]
+        hasMetallicTexture, index = common.decodeBool(data, index)
+        if hasMetallicTexture:
+            fileName, index = common.decodeString(data, index)
+            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
+            texImage.image = bpy.data.images.load(fileName)        
+            texImage.image.colorspace_settings.name = 'Non-Color'    
+            material.node_tree.links.new(principled.inputs['Metallic'], texImage.outputs['Color'])                        
+        else:
+            material.metallic, index = common.decodeFloat(data, index)
+            principled.inputs['Metallic'].default_value = material.metallic
 
-        principled.inputs['Base Color'].default_value = material.diffuse_color
-        principled.inputs['Metallic'].default_value = material.metallic
-        principled.inputs['Roughness'].default_value = material.roughness
+        hasRoughnessTexture, index = common.decodeBool(data, index)
+        if hasRoughnessTexture:
+            fileName, index = common.decodeString(data, index)
+            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
+            texImage.image = bpy.data.images.load(fileName)        
+            texImage.image.colorspace_settings.name = 'Non-Color'    
+            material.node_tree.links.new(principled.inputs['Roughness'], texImage.outputs['Color'])                        
+        else:
+            material.roughness, index = common.decodeFloat(data, index)
+            principled.inputs['Roughness'].default_value = material.roughness
+
+        hasNormalTexture, index = common.decodeBool(data, index)
+        if hasNormalTexture:
+            fileName, index = common.decodeString(data, index)
+            normalMap = material.node_tree.nodes.new('ShaderNodeNormalMap')
+            material.node_tree.links.new(principled.inputs['Normal'], normalMap.outputs['Normal'])  
+            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
+            texImage.image = bpy.data.images.load(fileName)        
+            texImage.image.colorspace_settings.name = 'Non-Color'    
+            material.node_tree.links.new(normalMap.inputs['Color'], texImage.outputs['Color'])
 
     def buildRename(self,data):
         oldPath, index = common.decodeString(data, 0)
@@ -414,31 +450,82 @@ class ClientBlender(Client):
         transformBuffer = self.getTransformBuffer(obj)
         self.addCommand(common.Command(common.MessageType.TRANSFORM, transformBuffer, 0))
 
+    def getTexture(self, inputs):
+        if len(inputs.links) == 1:
+            connectedNode = inputs.links[0].from_node
+            if type(connectedNode).__name__ == 'ShaderNodeTexImage':
+                image = connectedNode.image
+                return bpy.path.abspath(image.filepath)
+        return None
+
     def getMaterialBuffer(self, material):
         name = material.name
+        buffer = common.encodeString(name)
         principled = None
         # Get the nodes in the node tree
         if material.node_tree:
             nodes = material.node_tree.nodes
-            # Get a principled node
-            principled = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
+            # Get a principled node            
+            if nodes:
+                for n in nodes:
+                    if n.type == 'BSDF_PRINCIPLED':
+                        principled = n
+                        break
+            #principled = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
         if principled is None:
             baseColor = (0.8,0.8,0.8)
             metallic = 0.0
             roughness = 0.5
+            buffer += common.encodeBool(False) + common.encodeColor(baseColor)
+            buffer += common.encodeBool(False) + common.encodeFloat(metallic)
+            buffer += common.encodeBool(False) + common.encodeFloat(roughness)
+            buffer += common.encodeBool(False)
         else:
             # Get the slot for 'base color'
             baseColorInput = principled.inputs['Base Color'] #Or principled.inputs[0]
             # Get its default value (not the value from a possible link)
             baseColor = baseColorInput.default_value
+            baseColorTexture = self.getTexture(baseColorInput)
 
             metallicInput = principled.inputs['Metallic'] 
-            metallic = metallicInput.default_value
+            metallic = 0            
+            metallicTexture = self.getTexture(metallicInput)
+            if len(metallicInput.links) == 0:
+                metallic = metallicInput.default_value
 
             roughnessInput = principled.inputs['Roughness']
-            roughness = roughnessInput.default_value
+            roughness = 1
+            roughnessTexture = self.getTexture(roughnessInput)
+            if len(roughnessInput.links) == 0:
+                roughness = roughnessInput.default_value
 
-        return common.encodeString(name) + common.encodeColor(baseColor) + common.encodeFloat(metallic) + common.encodeFloat(roughness)
+            normalInput = principled.inputs['Normal']
+            normalTexture = None
+            if len(normalInput.links) == 1:
+                normalMap = normalInput.links[0].from_node
+                colorInput = normalMap.inputs["Color"]
+                normalTexture = self.getTexture(colorInput)
+            
+            if baseColorTexture:
+                buffer += common.encodeBool(True) + common.encodeString(baseColorTexture)
+            else:
+                buffer += common.encodeBool(False) + common.encodeColor(baseColor)
+
+            if metallicTexture:
+                buffer += common.encodeBool(True) + common.encodeString(metallicTexture)
+            else:
+                buffer += common.encodeBool(False) + common.encodeFloat(metallic)
+
+            if roughnessTexture:
+                buffer += common.encodeBool(True) + common.encodeString(roughnessTexture)
+            else:
+                buffer += common.encodeBool(False) + common.encodeFloat(roughness)
+
+            if normalTexture:
+                buffer += common.encodeBool(True) + common.encodeString(normalTexture)
+            else:
+                buffer += common.encodeBool(False)
+        return buffer
 
     def getMaterialBuffers(self, obj):
         try:
@@ -607,7 +694,10 @@ class ClientBlender(Client):
             return None
         color = light.color
         power = light.energy
-        shadow = light.use_shadow
+        if bpy.context.scene.render.engine == 'CYCLES':
+            shadow = light.cycles.cast_shadow
+        else:
+            shadow = light.use_shadow
         
         spotBlend = 10.0
         spotSize = 0.0
