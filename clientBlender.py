@@ -329,7 +329,10 @@ class ClientBlender(Client):
         if hasBaseColorTexture:
             fileName, index = common.decodeString(data, index)
             texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
-            texImage.image = bpy.data.images.load(fileName)            
+            try:
+                texImage.image = bpy.data.images.load(fileName)            
+            except:
+                pass
             material.node_tree.links.new(principled.inputs['Base Color'], texImage.outputs['Color'])
         else:
             baseColor, index = common.decodeColor(data, index)
@@ -340,8 +343,12 @@ class ClientBlender(Client):
         if hasMetallicTexture:
             fileName, index = common.decodeString(data, index)
             texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
-            texImage.image = bpy.data.images.load(fileName)        
-            texImage.image.colorspace_settings.name = 'Non-Color'    
+            try:
+                texImage.image = bpy.data.images.load(fileName)
+                texImage.image.colorspace_settings.name = 'Non-Color' 
+            except:
+                print ("could not load : " + fileName)
+                pass               
             material.node_tree.links.new(principled.inputs['Metallic'], texImage.outputs['Color'])                        
         else:
             material.metallic, index = common.decodeFloat(data, index)
@@ -351,8 +358,12 @@ class ClientBlender(Client):
         if hasRoughnessTexture:
             fileName, index = common.decodeString(data, index)
             texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
-            texImage.image = bpy.data.images.load(fileName)        
-            texImage.image.colorspace_settings.name = 'Non-Color'    
+            try:
+                texImage.image = bpy.data.images.load(fileName)
+                texImage.image.colorspace_settings.name = 'Non-Color' 
+            except:
+                print ("could not load : " + fileName)
+                pass               
             material.node_tree.links.new(principled.inputs['Roughness'], texImage.outputs['Color'])                        
         else:
             material.roughness, index = common.decodeFloat(data, index)
@@ -364,8 +375,12 @@ class ClientBlender(Client):
             normalMap = material.node_tree.nodes.new('ShaderNodeNormalMap')
             material.node_tree.links.new(principled.inputs['Normal'], normalMap.outputs['Normal'])  
             texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
-            texImage.image = bpy.data.images.load(fileName)        
-            texImage.image.colorspace_settings.name = 'Non-Color'    
+            try:
+                texImage.image = bpy.data.images.load(fileName)
+                texImage.image.colorspace_settings.name = 'Non-Color'
+            except:
+                print ("could not load : " + fileName)
+                pass                
             material.node_tree.links.new(normalMap.inputs['Color'], texImage.outputs['Color'])
 
     def buildRename(self,data):
