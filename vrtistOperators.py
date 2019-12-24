@@ -45,10 +45,14 @@ class VRtistConnectProperties(bpy.types.PropertyGroup):
     VRtist: bpy.props.StringProperty(name="VRtist", default=os.environ.get("VRTIST_EXE","D:/unity/VRtist/Build/VRtist.exe"))
 
 def updateParams(obj):
-    if not hasattr(obj, "data") or obj.data is None:
+    if not hasattr(obj, "data"):
         return
-    typename = obj.data.bl_rna.name
-    if typename != 'Camera' and typename != 'Mesh' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
+    
+    typename = obj.bl_rna.name
+    if obj.data:
+        typename = obj.data.bl_rna.name
+    
+    if  typename != 'Camera' and typename != 'Mesh' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light':
         return
 
     if typename == 'Camera':
@@ -63,10 +67,14 @@ def updateParams(obj):
 
 
 def updateTransform(obj):
-    if not hasattr(obj, "data") or not obj.data:
+    if not hasattr(obj, "data"):
         return
-    typename = obj.data.bl_rna.name
-    if typename != 'Camera' and typename != 'Mesh' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light':
+
+    typename = obj.bl_rna.name   
+    if obj.data:
+        typename = obj.data.bl_rna.name
+
+    if typename != 'Object' and typename != 'Camera' and typename != 'Mesh' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light':
         return
     shareData.client.sendTransform(obj)
 
@@ -148,12 +156,13 @@ def sendSceneDataToServer(scene):
     for update in shareData.depsgraph.updates:
         obj = update.id.original
         
-        if hasattr(obj,"data") and obj.data: # transform            
+        typename = obj.bl_rna.name
+        if (hasattr(obj,"data") and obj.data): # transform            
             typename = obj.data.bl_rna.name
-            if typename != 'Camera' and typename != 'Mesh' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
-                continue
 
-            container[obj.data] = obj
+        if typename == 'Object' or typename == 'Camera' or typename == 'Mesh' or typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light':
+            if hasattr(obj, "data"):
+                container[obj.data] = obj
             if shareData.client.isObjectSync(obj): # is it a new object, if yes assign parameters (mesh, light params etc.) ?
                 updates[obj] = False
             else:

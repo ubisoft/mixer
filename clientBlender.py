@@ -24,9 +24,10 @@ class ClientBlender(Client):
 
         self.syncObjects = {} # object name / object path
         self.objectNames = {} # object name / object
+        self.textures = set()
 
         self.callbacks = {}
-        self.blenderPID = os.getpid()    
+        self.blenderPID = os.getpid()        
 
     def blenderExists(self):      
         # Hack, check if a window still exists
@@ -303,6 +304,20 @@ class ClientBlender(Client):
         material.use_nodes = True 
         return material
 
+    def buildTexture(self, principled, material, channel, isColor, data, index):
+        fileName, index = common.decodeString(data, index)
+        if len(fileName) > 0:
+            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
+            try:
+                texImage.image = bpy.data.images.load(fileName)
+                if not isColor:
+                    texImage.image.colorspace_settings.name = 'Non-Color' 
+            except:
+                pass
+            material.node_tree.links.new(principled.inputs[channel], texImage.outputs['Color'])
+        return index
+
+
     def buildMaterial(self, data):
         materialNameLength = common.bytesToInt(data[:4])
         start = 4
@@ -325,53 +340,26 @@ class ClientBlender(Client):
             return            
 
         index = start
-        hasBaseColorTexture, index = common.decodeBool(data, index)
-        if hasBaseColorTexture:
-            fileName, index = common.decodeString(data, index)
-            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
-            try:
-                texImage.image = bpy.data.images.load(fileName)            
-            except:
-                pass
-            material.node_tree.links.new(principled.inputs['Base Color'], texImage.outputs['Color'])
-        else:
-            baseColor, index = common.decodeColor(data, index)
-            material.diffuse_color = ( baseColor[0], baseColor[1], baseColor[2], 1)
-            principled.inputs['Base Color'].default_value = material.diffuse_color
 
-        hasMetallicTexture, index = common.decodeBool(data, index)
-        if hasMetallicTexture:
-            fileName, index = common.decodeString(data, index)
-            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
-            try:
-                texImage.image = bpy.data.images.load(fileName)
-                texImage.image.colorspace_settings.name = 'Non-Color' 
-            except:
-                print ("could not load : " + fileName)
-                pass               
-            material.node_tree.links.new(principled.inputs['Metallic'], texImage.outputs['Color'])                        
-        else:
-            material.metallic, index = common.decodeFloat(data, index)
-            principled.inputs['Metallic'].default_value = material.metallic
+        # Base Color
+        baseColor, index = common.decodeColor(data, index)
+        material.diffuse_color = ( baseColor[0], baseColor[1], baseColor[2], 1)
+        principled.inputs['Base Color'].default_value = material.diffuse_color        
+        index = self.buildTexture(principled, material, 'Base Color', True, data, index )
 
-        hasRoughnessTexture, index = common.decodeBool(data, index)
-        if hasRoughnessTexture:
-            fileName, index = common.decodeString(data, index)
-            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
-            try:
-                texImage.image = bpy.data.images.load(fileName)
-                texImage.image.colorspace_settings.name = 'Non-Color' 
-            except:
-                print ("could not load : " + fileName)
-                pass               
-            material.node_tree.links.new(principled.inputs['Roughness'], texImage.outputs['Color'])                        
-        else:
-            material.roughness, index = common.decodeFloat(data, index)
-            principled.inputs['Roughness'].default_value = material.roughness
+        # Metallic
+        material.metallic, index = common.decodeFloat(data, index)
+        principled.inputs['Metallic'].default_value = material.metallic
+        index = self.buildTexture(principled, material, 'Metallic', False, data, index )
 
-        hasNormalTexture, index = common.decodeBool(data, index)
-        if hasNormalTexture:
-            fileName, index = common.decodeString(data, index)
+        # Roughness
+        material.roughness, index = common.decodeFloat(data, index)
+        principled.inputs['Roughness'].default_value = material.roughness
+        index = self.buildTexture(principled, material, 'Roughness', False, data, index )
+
+        # Normal
+        fileName, index = common.decodeString(data, index)
+        if len(fileName) > 0:
             normalMap = material.node_tree.nodes.new('ShaderNodeNormalMap')
             material.node_tree.links.new(principled.inputs['Normal'], normalMap.outputs['Normal'])  
             texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
@@ -465,12 +453,40 @@ class ClientBlender(Client):
         transformBuffer = self.getTransformBuffer(obj)
         self.addCommand(common.Command(common.MessageType.TRANSFORM, transformBuffer, 0))
 
+    def buildTextureFile(self, data):
+        path, index = common.decodeString(data, 0)
+        if not os.path.exists(path):
+            size, index = common.decodeInt(data, index)
+            try:
+                f = open(path, "wb")
+                f.write(data[index:index+size])
+                f.close()
+                self.textures.add(path)
+            except:
+                print("Could not write : " + path)
+
+    def sendTextureFile(self, path):
+        if path in self.textures:
+            return
+        if os.path.exists(path):
+            nameBuffer = common.encodeString(path)
+            try:
+                f = open(path, "rb")
+                data = f.read()
+                f.close()
+                self.textures.add(path)
+                self.addCommand(common.Command(common.MessageType.TEXTURE, nameBuffer + common.encodeInt(len(data)) + data, 0))
+            except:
+                print ("Could not read : " + path)        
+
     def getTexture(self, inputs):
         if len(inputs.links) == 1:
             connectedNode = inputs.links[0].from_node
             if type(connectedNode).__name__ == 'ShaderNodeTexImage':
                 image = connectedNode.image
-                return bpy.path.abspath(image.filepath)
+                path = bpy.path.abspath(image.filepath)
+                self.sendTextureFile(path)
+                return path
         return None
 
     def getMaterialBuffer(self, material):
@@ -491,10 +507,10 @@ class ClientBlender(Client):
             baseColor = (0.8,0.8,0.8)
             metallic = 0.0
             roughness = 0.5
-            buffer += common.encodeBool(False) + common.encodeColor(baseColor)
-            buffer += common.encodeBool(False) + common.encodeFloat(metallic)
-            buffer += common.encodeBool(False) + common.encodeFloat(roughness)
-            buffer += common.encodeBool(False)
+            buffer += common.encodeColor(baseColor) + common.encodeString("")
+            buffer += common.encodeFloat(metallic) + common.encodeString("")
+            buffer += common.encodeFloat(roughness) + common.encodeString("")
+            buffer += common.encodeString("")
         else:
             # Get the slot for 'base color'
             baseColorInput = principled.inputs['Base Color'] #Or principled.inputs[0]
@@ -518,28 +534,33 @@ class ClientBlender(Client):
             normalTexture = None
             if len(normalInput.links) == 1:
                 normalMap = normalInput.links[0].from_node
-                colorInput = normalMap.inputs["Color"]
-                normalTexture = self.getTexture(colorInput)
+                if "Color" in normalMap.inputs:
+                    colorInput = normalMap.inputs["Color"]
+                    normalTexture = self.getTexture(colorInput)
             
+            buffer += common.encodeColor(baseColor)
             if baseColorTexture:
-                buffer += common.encodeBool(True) + common.encodeString(baseColorTexture)
+                buffer += common.encodeString(baseColorTexture)
             else:
-                buffer += common.encodeBool(False) + common.encodeColor(baseColor)
+                buffer += common.encodeString("")
 
+            buffer += common.encodeFloat(metallic)
             if metallicTexture:
-                buffer += common.encodeBool(True) + common.encodeString(metallicTexture)
+                buffer += common.encodeString(metallicTexture)
             else:
-                buffer += common.encodeBool(False) + common.encodeFloat(metallic)
+                buffer += common.encodeString("")
 
+            buffer += common.encodeFloat(roughness)
             if roughnessTexture:
-                buffer += common.encodeBool(True) + common.encodeString(roughnessTexture)
+                buffer += common.encodeString(roughnessTexture)
             else:
-                buffer += common.encodeBool(False) + common.encodeFloat(roughness)
+                buffer += common.encodeString("")
 
             if normalTexture:
-                buffer += common.encodeBool(True) + common.encodeString(normalTexture)
+                buffer += common.encodeString(normalTexture)
             else:
-                buffer += common.encodeBool(False)
+                buffer += common.encodeString("")
+
         return buffer
 
     def getMaterialBuffers(self, obj):
@@ -838,6 +859,8 @@ class ClientBlender(Client):
                     self.buildSendToTrash(command.data)
                 elif command.type == common.MessageType.RESTORE_FROM_TRASH:
                     self.buildRestoreFromTrash(command.data)
+                elif command.type == common.MessageType.TEXTURE:
+                    self.buildTextureFile(command.data)
 
                 self.receivedCommands.task_done()
           

@@ -31,6 +31,7 @@ class MessageType(Enum):
     DUPLICATE = 109
     SEND_TO_TRASH = 110
     RESTORE_FROM_TRASH = 111
+    TEXTURE = 112
 
 class LightType(Enum):
     SPOT = 0 # directly mapped from Unity enum
