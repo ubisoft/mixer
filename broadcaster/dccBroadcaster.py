@@ -56,7 +56,7 @@ class Connection:
         with common.mutex:
             room = rooms.get(name)
             if room is not None:
-                command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, common.encodeStringArray(room.clients))
+                command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, common.encodeStringArray([f'{client.address[0]}:{client.address[1]}' for client in room.clients]))
                 self.commands.append(command)
 
     def listClients(self):
