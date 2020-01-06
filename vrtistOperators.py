@@ -116,7 +116,8 @@ def onUndoRedoPost(scene):
             del shareData.client.syncObjects[name]
 
     for name in shareData.client.objectNames:
-        shareData.client.objectNames[name] = bpy.data.objects[name]
+        if name in bpy.data.objects:
+            shareData.client.objectNames[name] = bpy.data.objects[name]
         
     materials = set({})
     for obj in bpy.context.selected_objects:
@@ -131,6 +132,7 @@ def onUndoRedoPost(scene):
         updateParams(obj)
         updateTransform(obj)
 
+    shareData.client.internalUpdate()
     shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
 
 
@@ -151,36 +153,31 @@ def sendSceneDataToServer(scene):
 
     # parse modifications
     container = {}
-    updates = {}
     materials = set({})
+    transforms = set()
+    data = set()    
     for update in shareData.depsgraph.updates:
-        obj = update.id.original
+        obj = update.id.original        
         
         typename = obj.bl_rna.name
-        if (hasattr(obj,"data") and obj.data): # transform            
-            typename = obj.data.bl_rna.name
-
-        if typename == 'Object' or typename == 'Camera' or typename == 'Mesh' or typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light':
-            if hasattr(obj, "data"):
+        if typename == 'Object':
+            if hasattr(obj, 'data'):
                 container[obj.data] = obj
-            if shareData.client.isObjectSync(obj): # is it a new object, if yes assign parameters (mesh, light params etc.) ?
-                updates[obj] = False
-            else:
-                updates[obj] = True
-        else: # data
-            if obj.bl_rna.name == 'Material':
-                materials.add(obj)
-            elif obj in container:
-                parent = container[obj]
-                updates[parent] = True
+            transforms.add(obj)
+        if typename == 'Material':
+            materials.add(obj)
+        if typename == typename == 'Camera' or typename == 'Mesh' or typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light':
+            data.add(obj)
 
     for material in materials:
         shareData.client.sendMaterial(material)
     
-    for item in updates:
-        if updates[item]:
-            updateParams(item)
-        updateTransform(item)
+    for d in data:
+        if d in container:
+            updateParams(container[d])
+
+    for t in transforms:
+        updateTransform(t)
 
 
 rooms_cache = None

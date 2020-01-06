@@ -42,6 +42,36 @@ class ClientBlender(Client):
     def addCallback(self, name, func):
         self.callbacks[name] = func
 
+    def internalUpdate(self):
+        meshNames = []
+        for meshName in self.meshs:
+            meshNames.append(meshName)
+        
+        self.meshs = {}
+        self.meshMapping = {}
+        for meshName in meshNames:
+            if meshName in bpy.data.meshes:
+                meshData = bpy.data.meshes[meshName]
+                self.meshs[meshName] = meshData
+                self.meshMapping[meshData] = meshName
+
+        cameraNames = []
+        for cameraName in self.cameras:
+            cameraNames.append(cameraName)
+        self.cameras = {}
+        for cameraName in cameraNames:
+            if cameraName in bpy.data.cameras:
+                self.cameras[cameraName] = bpy.data.cameras[cameraName]
+
+        lightNames = []
+        for lightName in self.lights:
+            lightNames.append(lightName)
+        self.lights = {}
+        for lightName in lightNames:
+            if lightName in bpy.data.lights:
+                self.lights[lightName] = bpy.data.lights[lightName]
+
+
     # adds object to synchronized object list
     def addSyncObject(self, obj):
         name = obj.name
