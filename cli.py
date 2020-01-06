@@ -20,7 +20,7 @@ class CliClient(client.Client):
             if len(rooms) == 0:
                 print('No rooms')
             else:
-                print(f'{len(rooms)} room(s):\n  - ')
+                print(f'{len(rooms)} room(s):\n  - ', end='')
                 print('\n  - '.join(rooms))
 
         command = common.Command(common.MessageType.LIST_ROOMS)
@@ -40,7 +40,7 @@ class CliClient(client.Client):
             if len(clients) == 0:
                 print(f'No clients in "{name}" room')
             else:
-                print(f'{len(clients)} client(s) in "{name}" room:\n  - ')
+                print(f'{len(clients)} client(s) in "{name}" room:\n  - ', end='')
                 print('\n  - '.join(clients))
 
         command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, name.encode())
@@ -52,7 +52,7 @@ class CliClient(client.Client):
             if len(clients) == 0:
                 print('No clients')
             else:
-                print(f'{len(clients)} client(s):\n  - ')
+                print(f'{len(clients)} client(s):\n  - ', end='')
                 print('\n  - '.join(clients))
 
         command = common.Command(common.MessageType.LIST_CLIENTS)
@@ -92,6 +92,8 @@ def process_room_command(args):
             client = CliClient(args)
             for name in args.name:
                 client.deleteRoom(name)
+        else:
+            print('Expected one or more room names')
 
     elif args.command == 'clear':
         count = len(args.name)
@@ -99,6 +101,8 @@ def process_room_command(args):
             client = CliClient(args)
             for name in args.name:
                 client.clearRoom(name)
+        else:
+            print('Expected one or more room names')
 
     elif args.command == 'clients':
         count = len(args.name)
@@ -106,6 +110,8 @@ def process_room_command(args):
             client = CliClient(args)
             for name in args.name:
                 client.listRoomClients(name)
+        else:
+            print('Expected one or more room names')
 
     if client:
         client.disconnect()
@@ -130,8 +136,8 @@ parser.add_argument('--timeout', help='Timeout for server response', default=TIM
 
 # Room commands are relative to... a room!
 room_parser = sub_parsers.add_parser('room', help='Rooms related commands')
-room_parser.add_argument('command', help='Command', choices=('list', 'delete', 'clear', 'clients'))
-room_parser.add_argument('name', help='Room name', nargs='*')
+room_parser.add_argument('command', help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.', choices=('list', 'delete', 'clear', 'clients'))
+room_parser.add_argument('name', help='Room name. You can specify multiple room names separated by spaces.', nargs='*')
 room_parser.set_defaults(func=process_room_command)
 
 # Client commands are relative to a client independently of any room
@@ -139,6 +145,6 @@ client_parser = sub_parsers.add_parser('client', help='Clients related commands'
 client_parser.add_argument('command', help='', choices=('list', 'disconnect'))
 client_parser.set_defaults(func=process_client_command)
 
-#args = parser.parse_args(['room', 'list'])
 args = parser.parse_args()
-args.func(args)
+if hasattr(args, 'func'):
+    args.func(args)
