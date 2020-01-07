@@ -452,8 +452,11 @@ class ClientBlender(Client):
         obj = self.getOrCreatePath(path)
 
         self.removeSyncObject(obj)
-        collection = self.getOrCreateCollection()
-        collection.objects.unlink(obj)
+        collections = obj.users_collection
+        for collection in collections:
+            collection.objects.unlink(obj)
+        #collection = self.getOrCreateCollection()
+        #collection.objects.unlink(obj)
         trashCollection = self.getOrCreateCollection("__Trash__")
         trashCollection.hide_viewport = True
         trashCollection.objects.link(obj)
