@@ -372,9 +372,9 @@ class ClientBlender(Client):
         index = start
         
         # Transmission ( 1 - opacity)
-        material.transmission, index = common.decodeFloat(data, index)
-        material.transmission = 1 - material.transmission
-        principled.inputs['Transmission'].default_value = material.transmission
+        transmission, index = common.decodeFloat(data, index)
+        transmission = 1 - transmission
+        principled.inputs['Transmission'].default_value = transmission
         fileName, index = common.decodeString(data, index)
         if len(fileName) > 0:
             invert = material.node_tree.nodes.new('ShaderNodeInvert')
