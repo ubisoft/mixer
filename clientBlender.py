@@ -370,6 +370,23 @@ class ClientBlender(Client):
             return            
 
         index = start
+        
+        # Transmission ( 1 - opacity)
+        material.transmission, index = common.decodeFloat(data, index)
+        material.transmission = 1 - material.transmission
+        principled.inputs['Transmission'].default_value = material.transmission
+        fileName, index = common.decodeString(data, index)
+        if len(fileName) > 0:
+            invert = material.node_tree.nodes.new('ShaderNodeInvert')
+            material.node_tree.links.new(principled.inputs['Transmission'], invert.outputs['Color'])  
+            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
+            try:
+                texImage.image = bpy.data.images.load(fileName)
+                texImage.image.colorspace_settings.name = 'Non-Color'
+            except:
+                print ("could not load : " + fileName)
+                pass                
+            material.node_tree.links.new(invert.inputs['Color'], texImage.outputs['Color'])
 
         # Base Color
         baseColor, index = common.decodeColor(data, index)
@@ -540,11 +557,25 @@ class ClientBlender(Client):
             baseColor = (0.8,0.8,0.8)
             metallic = 0.0
             roughness = 0.5
+            opacity = 1.0
+            buffer += common.encodeFloat(opacity) + common.encodeString("")
             buffer += common.encodeColor(baseColor) + common.encodeString("")
             buffer += common.encodeFloat(metallic) + common.encodeString("")
             buffer += common.encodeFloat(roughness) + common.encodeString("")
             buffer += common.encodeString("")
         else:
+            
+            opacityInput = principled.inputs['Transmission']
+            opacity = 1.0
+            opacityTexture = None
+            if len(opacityInput.links) == 1:
+                invert = opacityInput.links[0].from_node
+                if "Color" in invert.inputs:
+                    colorInput = invert.inputs["Color"]
+                    opacityTexture = self.getTexture(colorInput)
+            else:
+                opacity = 1.0 - opacityInput.default_value
+
             # Get the slot for 'base color'
             baseColorInput = principled.inputs['Base Color'] #Or principled.inputs[0]
             # Get its default value (not the value from a possible link)
@@ -570,7 +601,12 @@ class ClientBlender(Client):
                 if "Color" in normalMap.inputs:
                     colorInput = normalMap.inputs["Color"]
                     normalTexture = self.getTexture(colorInput)
-            
+                        
+            buffer += common.encodeFloat(opacity)
+            if opacityTexture:
+                buffer += common.encodeString(opacityTexture)
+            else:
+                buffer += common.encodeString("")            
             buffer += common.encodeColor(baseColor)
             if baseColorTexture:
                 buffer += common.encodeString(baseColorTexture)
