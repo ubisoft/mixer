@@ -418,6 +418,11 @@ class ClientBlender(Client):
                 pass                
             material.node_tree.links.new(normalMap.inputs['Color'], texImage.outputs['Color'])
 
+        # Emission
+        emission, index = common.decodeColor(data, index)
+        principled.inputs['Emission'].default_value = emission
+        index = self.buildTexture(principled, material, 'Emission', False, data, index )
+
     def buildRename(self,data):
         oldPath, index = common.decodeString(data, 0)
         newPath, index = common.decodeString(data, index)
@@ -558,11 +563,13 @@ class ClientBlender(Client):
             metallic = 0.0
             roughness = 0.5
             opacity = 1.0
+            emissionColor = (0.0,0.0,0.0)
             buffer += common.encodeFloat(opacity) + common.encodeString("")
             buffer += common.encodeColor(baseColor) + common.encodeString("")
             buffer += common.encodeFloat(metallic) + common.encodeString("")
             buffer += common.encodeFloat(roughness) + common.encodeString("")
             buffer += common.encodeString("")
+            buffer += common.encodeColor(emissionColor) + common.encodeString("")
         else:
             
             opacityInput = principled.inputs['Transmission']
@@ -601,6 +608,12 @@ class ClientBlender(Client):
                 if "Color" in normalMap.inputs:
                     colorInput = normalMap.inputs["Color"]
                     normalTexture = self.getTexture(colorInput)
+
+            emissionInput = principled.inputs['Emission']
+            # Get its default value (not the value from a possible link)
+            emission = emissionInput.default_value
+            emissionTexture = self.getTexture(emissionInput)
+
                         
             buffer += common.encodeFloat(opacity)
             if opacityTexture:
@@ -627,6 +640,12 @@ class ClientBlender(Client):
 
             if normalTexture:
                 buffer += common.encodeString(normalTexture)
+            else:
+                buffer += common.encodeString("")
+
+            buffer += common.encodeColor(emission)
+            if emissionTexture:
+                buffer += common.encodeString(emissionTexture)
             else:
                 buffer += common.encodeString("")
 
