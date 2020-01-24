@@ -22,9 +22,11 @@ class ClientBlender(Client):
         self.cameras = {}
         self.lights = {}
 
+        self.syncObjectsVisibility = {}
         self.syncObjects = {} # object name / object path
         self.objectNames = {} # object name / object
         self.textures = set()
+        self.currentSceneName = ""
 
         self.callbacks = {}
         self.blenderPID = os.getpid()        
@@ -77,12 +79,13 @@ class ClientBlender(Client):
         name = obj.name
         self.syncObjects[name] = self.getObjectPath(obj)
         self.objectNames[name] = obj
+        self.syncObjectsVisibility[name] = obj.visible_get()
 
     # removes object from synchronized object list
-    def removeSyncObject(self, obj):
-        name = obj.name
+    def removeSyncObject(self, name):
         del self.syncObjects[name]
         del self.objectNames[name]
+        del self.syncObjectsVisibility[name]
 
     # returns True if obj is synchronizes
     def isObjectSync(self, obj):
@@ -134,7 +137,7 @@ class ClientBlender(Client):
 
         # cannot simply replace objects data
         # needs to destroy and re create it
-        self.removeSyncObject(ob)
+        self.removeSyncObject(ob.name)
         bpy.data.objects.remove(ob, do_unlink=True)
         ob = bpy.data.objects.new(name,data)            
         collection = self.getOrCreateCollection()
@@ -314,7 +317,8 @@ class ClientBlender(Client):
         objectPath, start = common.decodeString(data, start)                
         position, start = common.decodeVector3(data, start)
         rotation, start = common.decodeVector4(data, start)
-        scale, start = common.decodeVector3(data, start)            
+        scale, start = common.decodeVector3(data, start)     
+        visible, start = common.decodeBool(data, start)
 
         try:
             obj = self.getOrCreatePath(objectPath)
@@ -323,6 +327,7 @@ class ClientBlender(Client):
             return
         if obj:
             self.setTransform(obj, position, rotation, scale)
+            obj.hide_viewport = not visible
 
     def getOrCreateMaterial(self, materialName):
         if materialName in bpy.data.materials:
@@ -430,8 +435,7 @@ class ClientBlender(Client):
         oldName = oldPath.split('/')[-1]
         newName = newPath.split('/')[-1]
         obj = self.objectNames[oldName]
-        del self.objectNames[oldName]
-        del self.syncObjects[oldName]
+        self.removeSyncObject(oldName)
         obj.name = newName
         self.objectNames[newName] = obj
         self.syncObjects[newName] = newPath
@@ -466,14 +470,14 @@ class ClientBlender(Client):
         except KeyError:
             # Object doesn't exist anymore
             return
-        self.removeSyncObject(obj)
+        self.removeSyncObject(obj.name)
         bpy.data.objects.remove(obj, do_unlink=True)
 
     def buildSendToTrash(self, data):
         path, _ = common.decodeString(data, 0)
         obj = self.getOrCreatePath(path)
 
-        self.removeSyncObject(obj)
+        self.removeSyncObject(obj.name)
         collections = obj.users_collection
         for collection in collections:
             collection.objects.unlink(obj)
@@ -501,11 +505,12 @@ class ClientBlender(Client):
         translate = obj.matrix_local.to_translation()
         quaternion = obj.matrix_local.to_quaternion()
         scale = obj.matrix_local.to_scale()
-        return common.encodeString(path) + common.encodeVector3(translate) + common.encodeVector4(quaternion) + common.encodeVector3(scale)
+        visible = obj.visible_get()
+        return common.encodeString(path) + common.encodeVector3(translate) + common.encodeVector4(quaternion) + common.encodeVector3(scale) + common.encodeBool(visible)
 
     def sendTransform(self, obj):
         self.addSyncObject(obj)
-        transformBuffer = self.getTransformBuffer(obj)
+        transformBuffer = self.getTransformBuffer(obj)        
         self.addCommand(common.Command(common.MessageType.TRANSFORM, transformBuffer, 0))
 
     def buildTextureFile(self, data):
@@ -840,8 +845,8 @@ class ClientBlender(Client):
     def sendLight(self, obj):
         lightBuffer = self.getLightBuffer(obj)
         if lightBuffer:
-            self.addCommand(common.Command(common.MessageType.LIGHT, lightBuffer, 0))          
-
+            self.addCommand(common.Command(common.MessageType.LIGHT, lightBuffer, 0))
+    
     def sendDeletedRenamedReparentedObjects(self):
         # manage objects deleted
         objects = {}        
@@ -855,8 +860,7 @@ class ClientBlender(Client):
         for obj in objects:
             name = objects[obj]
             self.sendDelete(self.syncObjects[name])
-            del self.objectNames[name]
-            del self.syncObjects[name]
+            self.removeSyncObject(name)
             print ("Deleted " + name)
 
         # manage rename
@@ -869,8 +873,7 @@ class ClientBlender(Client):
                     print ("Renamed " + oldName + " " + newName)
                     oldPath = self.syncObjects[oldName]
                     newPath = self.getObjectPath(obj)
-                    del self.syncObjects[oldName]
-                    del self.objectNames[oldName]
+                    self.removeSyncObject(oldName)
                     self.syncObjects[newName] = newPath
                     self.objectNames[newName] = obj
                     self.sendRename(oldPath, newPath)

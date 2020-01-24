@@ -62,8 +62,9 @@ def updateParams(obj):
         shareData.client.sendLight(obj)
 
     if typename == 'Mesh':
-        shareData.client.sendMesh(obj)
-        shareData.client.sendMeshConnection(obj)
+        if obj.mode == 'OBJECT':
+            shareData.client.sendMesh(obj)
+            shareData.client.sendMeshConnection(obj)
 
 
 def updateTransform(obj):
@@ -78,19 +79,49 @@ def updateTransform(obj):
         return
     shareData.client.sendTransform(obj)
 
+def leave_current_room():
+    shareData.currentRoom = None
+    set_handlers(False)
+
+    if bpy.app.timers.is_registered(shareData.client.networkConsumer):
+        bpy.app.timers.unregister(shareData.client.networkConsumer)
+
+    if shareData.client is not None:
+        shareData.client.disconnect()
+        del(shareData.client)
+        shareData.client = None
+    VRtistRoomListUpdateOperator.rooms_cached = False
+
 @persistent
 def onLoad(scene):
     connected = shareData.client is not None and shareData.client.isConnected()
     if connected:
-        set_handlers(False)
+        leave_current_room()
 
-        if bpy.app.timers.is_registered(shareData.client.networkConsumer):
-            bpy.app.timers.unregister(shareData.client.networkConsumer)
+def updateSceneChanged():
+    prevObjects = set()
+    for objName in shareData.client.objectNames:
+        prevObjects.add(shareData.client.objectNames[objName])
 
-        if shareData.client is not None:
-            shareData.client.disconnect()
-            del(shareData.client)
-            shareData.client = None
+    objects = set()
+    for obj in bpy.context.scene.objects:
+        if not obj in prevObjects or shareData.client.syncObjectsVisibility[obj.name] != obj.visible_get():
+            objects.add(obj)
+
+        if obj in prevObjects:
+            prevObjects.remove(obj)
+    
+    # hide previous scene objects
+    for obj in prevObjects:
+        updateTransform(obj)
+
+    # Show and send data of new objects of new scene
+    for obj in objects:
+        updateParams(obj)
+        updateTransform(obj)
+
+    shareData.client.currentSceneName = bpy.context.scene.name
+
 
 @persistent
 def onUndoRedoPre(scene):
@@ -112,8 +143,7 @@ def onUndoRedoPost(scene):
     for name in shareData.selectedObjectsNames:
         if name not in nameSet and name not in bpy.data.objects:
             shareData.client.sendDelete(shareData.client.syncObjects[name])
-            del shareData.client.objectNames[name]
-            del shareData.client.syncObjects[name]
+            shareData.client.removeSyncObject(name)
 
     for name in shareData.client.objectNames:
         if name in bpy.data.objects:
@@ -128,7 +158,19 @@ def onUndoRedoPost(scene):
     for material in materials:                
         shareData.client.sendMaterial(material)
 
+    objs = set()
+
     for obj in bpy.context.selected_objects:
+        objs.add(obj)
+
+    # manage visibility
+    for name in shareData.client.objectNames:
+        obj = shareData.client.objectNames[name]
+        visible = obj.visible_get()
+        if visible != shareData.client.syncObjectsVisibility[name]:
+            objs.add(obj)
+    
+    for obj in objs:
         updateParams(obj)
         updateTransform(obj)
 
@@ -145,6 +187,10 @@ def sendSceneDataToServer(scene):
     if shareData.client.receivedCommandsProcessed:
         shareData.client.receivedCommandsProcessed = False
         return
+
+    if shareData.client.currentSceneName != bpy.context.scene.name:
+        updateSceneChanged()
+        return
     
     if not hasattr(bpy.context,"active_object") or (bpy.context.active_object and bpy.context.active_object.mode != 'OBJECT'):
         return
@@ -155,19 +201,30 @@ def sendSceneDataToServer(scene):
     container = {}
     materials = set({})
     transforms = set()
-    data = set()    
+    data = set()
+    sceneChanged = False
     for update in shareData.depsgraph.updates:
         obj = update.id.original        
         
         typename = obj.bl_rna.name
+        if typename == 'Scene':
+            sceneChanged = True
         if typename == 'Object':
             if hasattr(obj, 'data'):
                 container[obj.data] = obj
             transforms.add(obj)
         if typename == 'Material':
             materials.add(obj)
-        if typename == typename == 'Camera' or typename == 'Mesh' or typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light':
+        if typename == 'Camera' or typename == 'Mesh' or typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light':
             data.add(obj)
+
+    # collection show/hide
+    if sceneChanged:
+        for name in shareData.client.objectNames:
+            obj = shareData.client.objectNames[name]
+            visible = obj.visible_get()
+            if visible != shareData.client.syncObjectsVisibility[name]:
+                transforms.add(obj)
 
     for material in materials:
         shareData.client.sendMaterial(material)
@@ -294,10 +351,13 @@ def clear_scene_content():
     set_handlers(True)
 
 def send_scene_content():
+    shareData.client.currentSceneName = bpy.context.scene.name
+
     for material in bpy.data.materials:
         shareData.client.sendMaterial(material)
 
     for obj in bpy.context.scene.objects:
+        #print(obj.instance_type)
         updateParams(obj)
         updateTransform(obj)
 
@@ -392,16 +452,7 @@ class VRtistJoinRoomOperator(bpy.types.Operator):
         shareData.currentRoom = None
         connected = shareData.client is not None and shareData.client.isConnected()
         if connected:
-            set_handlers(False)
-
-            if bpy.app.timers.is_registered(shareData.client.networkConsumer):
-                bpy.app.timers.unregister(shareData.client.networkConsumer)
-
-            if shareData.client is not None:
-                shareData.client.disconnect()
-                del(shareData.client)
-                shareData.client = None
-            VRtistRoomListUpdateOperator.rooms_cached = False
+            leave_current_room()
         else:
             shareData.isLocal = False
             try:
