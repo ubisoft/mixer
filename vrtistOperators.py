@@ -745,11 +745,13 @@ class VRtistCreateRoomOperator(bpy.types.Operator):
             VRtistRoomListUpdateOperator.rooms_cached = False
         return {'FINISHED'}
 
-def start_local_server():
+
+def start_local_server(self):
     dir_path = Path(__file__).parent
-    pythonPath = Path(sys.argv[0]).parent / (str(bpy.app.version[0]) + "." + str(bpy.app.version[1])) / 'python' / 'bin' / 'python'
     serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
-    shareData.localServerProcess = subprocess.Popen([str(pythonPath), str(serverPath)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT, shell=False)
+    shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(
+        serverPath)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+
 
 def server_is_up(address, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
