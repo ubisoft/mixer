@@ -5,11 +5,11 @@ from . import vrtistOperators
 
 class VRtistPanel(bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
-    bl_label = "VRtist Panel"
-    bl_idname = "OBJECT_PT_vrtist"
-    bl_space_type = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context = "scene"
+    bl_label = "VRtist"
+    bl_idname = "VRTIST_PT_settings"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "VRtist"
 
     def draw(self, context):
         layout = self.layout

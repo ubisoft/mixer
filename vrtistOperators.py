@@ -709,7 +709,7 @@ def set_handlers(connect: bool):
 class VRtistCreateRoomOperator(bpy.types.Operator):
     bl_idname = "scene.vrtistcreateroom"
     bl_label = "VRtist Create Room"
-    bl_options = {'REGISTER'}   
+    bl_options = {'REGISTER'}
 
     def execute(self, context):
         connected = shareData.client is not None and shareData.client.isConnected()

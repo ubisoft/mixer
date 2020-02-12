@@ -51,3 +51,9 @@ $RECYCLE.BIN/
 *.zip
 *.7z
 *.rar
+
+# Virtual envs
+.venv
+
+# VS Code
+.vscode
