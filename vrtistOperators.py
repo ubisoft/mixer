@@ -746,7 +746,7 @@ class VRtistCreateRoomOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-def start_local_server(self):
+def start_local_server():
     dir_path = Path(__file__).parent
     serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
     shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(
