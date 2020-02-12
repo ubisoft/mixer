@@ -2,8 +2,8 @@ import time
 import queue
 import argparse
 
-import broadcaster.common as common
-import broadcaster.client as client
+import common
+import client
 
 
 TIMEOUT = 10  # in seconds
@@ -116,6 +116,7 @@ def process_room_command(args):
     if client:
         client.disconnect()
 
+
 def process_client_command(args):
     client = None
 
@@ -136,7 +137,8 @@ parser.add_argument('--timeout', help='Timeout for server response', default=TIM
 
 # Room commands are relative to... a room!
 room_parser = sub_parsers.add_parser('room', help='Rooms related commands')
-room_parser.add_argument('command', help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.', choices=('list', 'delete', 'clear', 'clients'))
+room_parser.add_argument('command', help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.', choices=(
+    'list', 'delete', 'clear', 'clients'))
 room_parser.add_argument('name', help='Room name. You can specify multiple room names separated by spaces.', nargs='*')
 room_parser.set_defaults(func=process_room_command)
 
