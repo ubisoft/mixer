@@ -1,6 +1,6 @@
 import os
 import bpy
-from . import vrtistOperators
+from . import operators
 
 
 class ROOM_UL_ItemRenderer(bpy.types.UIList):
@@ -27,9 +27,9 @@ class VRtistPanel(bpy.types.Panel):
 
         row = layout.column()
         row.operator("scene.vrtist", text="Launch VRTist")
-        row.operator(vrtistOperators.VRtistSayHello.bl_idname, text="Say Hello")
+        row.operator(operators.VRtistSayHello.bl_idname, text="Say Hello")
 
-        connected = vrtistOperators.shareData.client is not None and vrtistOperators.shareData.client.isConnected()
+        connected = operators.shareData.client is not None and operators.shareData.client.isConnected()
         if not connected:
 
             # Room list

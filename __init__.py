@@ -1,5 +1,5 @@
-from . import VRtistPanel
-from . import vrtistOperators
+from . import ui
+from . import operators
 import bpy
 import atexit
 
@@ -21,25 +21,25 @@ def refreshRoomListHack():
 
 def cleanup():
     try:
-        if vrtistOperators.shareData.localServerProcess:
-            vrtistOperators.shareData.localServerProcess.kill()
+        if operators.shareData.localServerProcess:
+            operators.shareData.localServerProcess.kill()
     except Exception:
         pass
 
 
 def register():
-    vrtistOperators.register()
-    VRtistPanel.register()
+    operators.register()
+    ui.register()
 
-    bpy.types.Scene.vrtistconnect = bpy.props.PointerProperty(type=vrtistOperators.VRtistConnectProperties)
+    bpy.types.Scene.vrtistconnect = bpy.props.PointerProperty(type=operators.VRtistConnectProperties)
 
     bpy.app.timers.register(refreshRoomListHack, first_interval=0)
     atexit.register(cleanup)
 
 
 def unregister():
-    vrtistOperators.unregister()
-    VRtistPanel.unregister()
+    operators.unregister()
+    ui.unregister()
 
     del bpy.types.Scene.vrtistconnect
 
