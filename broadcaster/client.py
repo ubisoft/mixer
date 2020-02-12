@@ -19,6 +19,7 @@ class Client:
         self.pendingCommands = queue.Queue()
         self.applyTransformCallback = None
         self.receivedCommandsProcessed = False
+        self.blockSignals = False
 
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
