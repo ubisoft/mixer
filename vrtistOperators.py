@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import shutil
+import logging
 from pathlib import Path
 
 import bpy
@@ -15,6 +16,12 @@ from bpy.types import UIList
 HOST = 'localhost'
 PORT = 12800
 
+
+logger = logging.Logger("VRtist")
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+logger.addHandler(handler)
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 
 class TransformStruct:
     def __init__(self, translate, quaternion, scale, visible):
@@ -591,11 +598,6 @@ class VRtistRoomListUpdateOperator(bpy.types.Operator):
         updateListRoomsProperty()
         return {'FINISHED'} 
 
-class ROOM_UL_ItemRenderer(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        split = layout.row()
-        split.label(text=item.name) # avoids renaming the item by accident
-
 def clear_scene_content():
     set_handlers(False)
 
@@ -854,4 +856,33 @@ class VRtistOperator(bpy.types.Operator):
             hostname = vrtistconnect.host
         args = [bpy.data.scenes[0].vrtistconnect.VRtist, "--room",room, "--hostname", hostname, "--port", str(vrtistconnect.port)]
         subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.STDOUT, shell=False)
-        return {'FINISHED'}    
+        return {'FINISHED'}
+
+
+class VRtistSayHello(bpy.types.Operator):
+    bl_idname = "vrtist.say_hello"
+    bl_label = "VRtist Say Hello"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        logger.info("I say hello")
+        return {'FINISHED'}
+
+classes = (
+    VRtistOperator,
+    VRtistRoomItem,
+    VRtistConnectProperties,
+    VRtistCreateRoomOperator,
+    VRtistRoomListUpdateOperator,
+    VRtistSendSelectionOperator,
+    VRtistJoinRoomOperator,
+    VRtistSayHello,
+)
+
+def register():
+    for _ in classes:
+        bpy.utils.register_class(_)
+
+def unregister():
+    for _ in classes:
+        bpy.utils.unregister_class(_)

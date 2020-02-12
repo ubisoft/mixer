@@ -1,22 +1,23 @@
+from . import VRtistPanel
+from . import vrtistOperators
 import bpy
 import atexit
 
 bl_info = {
-    "name" : "VRtist",
-    "author" : "Ubisoft",
-    "description" : "VR manipultation",
-    "blender" : (2 ,80, 0),
-    "location" : "",
-    "warning" : "",
-    "category" : "Generic"
+    "name": "VRtist",
+    "author": "Ubisoft",
+    "description": "VR manipultation",
+    "blender": (2, 80, 0),
+    "location": "",
+    "warning": "",
+    "category": "Generic"
 }
 
-from . import vrtistOperators
-from . import VRtistPanel
 
 def refreshRoomListHack():
     bpy.ops.scene.vrtistroomlistupdate()
     return None
+
 
 def cleanup():
     try:
@@ -25,37 +26,26 @@ def cleanup():
     except Exception:
         pass
 
-def register():    
 
-    bpy.utils.register_class(vrtistOperators.ROOM_UL_ItemRenderer)
-    bpy.utils.register_class(vrtistOperators.VRtistOperator)
-    bpy.utils.register_class(vrtistOperators.VRtistRoomItem)
-    bpy.utils.register_class(vrtistOperators.VRtistConnectProperties)
-    bpy.utils.register_class(vrtistOperators.VRtistCreateRoomOperator)
-    bpy.utils.register_class(vrtistOperators.VRtistRoomListUpdateOperator)
-    bpy.utils.register_class(vrtistOperators.VRtistSendSelectionOperator)
-    bpy.utils.register_class(vrtistOperators.VRtistJoinRoomOperator)
+def register():
+    vrtistOperators.register()
+    VRtistPanel.register()
+
     bpy.types.Scene.vrtistconnect = bpy.props.PointerProperty(type=vrtistOperators.VRtistConnectProperties)
-    bpy.utils.register_class(VRtistPanel.VRtistPanel)
 
     bpy.app.timers.register(refreshRoomListHack, first_interval=0)
     atexit.register(cleanup)
-    
+
+
 def unregister():
-    bpy.utils.unregister_class(VRtistPanel.VRtistPanel)
+    vrtistOperators.unregister()
+    VRtistPanel.unregister()
+
     del bpy.types.Scene.vrtistconnect
-    bpy.utils.unregister_class(vrtistOperators.VRtistSendSelectionOperator)
-    bpy.utils.unregister_class(vrtistOperators.VRtistConnectProperties)
-    bpy.utils.unregister_class(vrtistOperators.VRtistCreateRoomOperator)
-    bpy.utils.unregister_class(vrtistOperators.VRtistRoomListUpdateOperator)
-    bpy.utils.unregister_class(vrtistOperators.VRtistJoinRoomOperator)
-    bpy.utils.unregister_class(vrtistOperators.VRtistRoomItem)
-    bpy.utils.unregister_class(vrtistOperators.VRtistOperator)
-    bpy.utils.unregister_class(vrtistOperators.ROOM_UL_ItemRenderer)
 
     cleanup()
     atexit.unregister(cleanup)
-    
+
+
 if __name__ == "__main__":
     register()
-    
