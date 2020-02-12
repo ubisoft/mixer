@@ -161,11 +161,12 @@ class Room:
 
     def mergeCommands(self, command):
         commandType = command.type
-        commandPath = common.decodeString(command.data,0)[0]
-        if len(self.commands) > 0:
-            storedCommand = self.commands[-1]
-            if commandType == storedCommand.type and commandPath == common.decodeString(storedCommand.data,0)[0]:
-                self.commands.pop()
+        if commandType.value > common.MessageType.OPTIMIZED_COMMANDS.value:
+            commandPath = common.decodeString(command.data,0)[0]
+            if len(self.commands) > 0:
+                storedCommand = self.commands[-1]
+                if commandType == storedCommand.type and commandPath == common.decodeString(storedCommand.data,0)[0]:
+                    self.commands.pop()
         self.commands.append(command)
 
     def addCommand(self, command, sender):
