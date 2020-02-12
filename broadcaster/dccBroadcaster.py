@@ -1,16 +1,18 @@
+import common
 import socket
 import select
 import threading
+import logging
 
 import os
 import sys
 sys.path.append(os.getcwd())
-import common
 
 
 TIMEOUT = 60.0
 HOST = ''
 PORT = 12800
+
 
 class Connection:
     def __init__(self, socket, address):
@@ -28,7 +30,7 @@ class Connection:
         with common.mutex:
             room = rooms.get(roomName)
             if room is None:
-                print ("Create room : " + roomName)
+                logging.info(f"Room {roomName} does not exist. Creating it.")
                 room = Room(roomName)
                 rooms[roomName] = room
             room.addClient(self)
@@ -56,7 +58,8 @@ class Connection:
         with common.mutex:
             room = rooms.get(name)
             if room is not None:
-                command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, common.encodeStringArray([f'{client.address[0]}:{client.address[1]}' for client in room.clients]))
+                command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, common.encodeStringArray(
+                    [f'{client.address[0]}:{client.address[1]}' for client in room.clients]))
                 self.commands.append(command)
 
     def listClients(self):
@@ -76,6 +79,8 @@ class Connection:
                 break
 
             if command is not None:
+                logging.info(f"client {self.address}: {command.type} received")
+
                 if command.type == common.MessageType.JOIN_ROOM:
                     self.joinRoom(command.data.decode())
 
@@ -99,7 +104,7 @@ class Connection:
                     if self.room is not None:
                         self.room.addCommand(command, self)
                     else:
-                        print("COMMAND received but no room was joined")
+                        logging.error("COMMAND received but no room was joined")
 
             if len(self.commands) > 0:
                 with common.mutex:
@@ -119,7 +124,8 @@ class Connection:
             self.socket.close()
         except Exception:
             pass
-        print (f"{self.address} closed")
+        logging.info(f"{self.address} closed")
+
 
 class Room:
     def __init__(self, roomName):
@@ -128,7 +134,7 @@ class Room:
         self.commands = []
 
     def addClient(self, client):
-        print (f"Add Client {client.address} to Room {self.name}")
+        logging.info(f"Add Client {client.address} to Room {self.name}")
         self.clients.append(client)
         if len(self.clients) == 1:
             command = common.Command(common.MessageType.CONTENT)
@@ -146,26 +152,26 @@ class Room:
         self.clients = []
         with common.mutex:
             del rooms[self.name]
-            print(f'Room {self.name} deleted')
+            logging.info(f'Room {self.name} deleted')
 
     def clear(self):
         self.commands = []
 
     def removeClient(self, client):
-        print (f"Remove Client {client.address} from Room {self.name}")
+        logging.info(f"Remove Client {client.address} from Room {self.name}")
         self.clients.remove(client)
         if len(self.clients) == 0:
             with common.mutex:
                 del rooms[self.name]
-                print (f'No more clients in room "{self.name}". Room deleted')
+                logging.info(f'No more clients in room "{self.name}". Room deleted')
 
     def mergeCommands(self, command):
         commandType = command.type
         if commandType.value > common.MessageType.OPTIMIZED_COMMANDS.value:
-            commandPath = common.decodeString(command.data,0)[0]
+            commandPath = common.decodeString(command.data, 0)[0]
             if len(self.commands) > 0:
                 storedCommand = self.commands[-1]
-                if commandType == storedCommand.type and commandPath == common.decodeString(storedCommand.data,0)[0]:
+                if commandType == storedCommand.type and commandPath == common.decodeString(storedCommand.data, 0)[0]:
                     self.commands.pop()
         self.commands.append(command)
 
@@ -179,17 +185,22 @@ class Room:
 
 rooms = {}
 
+
 def runServer():
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.bind((HOST, PORT))
     connection.listen(1000)
 
-    print(f"Listening on port {PORT}")
+    logging.info(f"Listening on port {PORT}")
     while True:
         newConnection = connection.accept()
-        print(f"New connection {newConnection[1]}")
+        logging.info(f"New connection {newConnection[1]}")
         Connection(*newConnection)
 
     connection.close()
+
+
+logging.basicConfig(
+    format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 runServer()
