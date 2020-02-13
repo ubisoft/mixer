@@ -405,7 +405,7 @@ def updateObjectsData():
                 container[obj.data] = obj
             transforms.add(obj)
 
-        if typename == 'Camera' or typename == 'Mesh' or typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light':
+        if typename == 'Camera' or typename == 'Mesh' or typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light' or typename == 'Grease Pencil':
             data.add(obj)
 
         if typename == 'Material':
