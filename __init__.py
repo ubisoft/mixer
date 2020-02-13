@@ -30,7 +30,7 @@ def cleanup():
 
 
 def register():
-    logger = logging.getLogger("DCCSync")
+    logger = logging.getLogger(__package__)
     if len(logger.handlers) == 0:
         logger.setLevel(logging.INFO)
         handler = logging.StreamHandler()

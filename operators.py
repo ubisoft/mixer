@@ -15,7 +15,7 @@ from bpy.types import UIList
 
 from .data import get_dcc_sync_props
 
-logger = logging.getLogger("DCC Sync")
+logger = logging.getLogger(__package__)
 
 class TransformStruct:
     def __init__(self, translate, quaternion, scale, visible):
