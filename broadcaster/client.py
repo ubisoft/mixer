@@ -8,11 +8,9 @@ try:
 except ImportError:
     import common
 
-HOST = "localhost"
-PORT = 12800
 
 class Client:
-    def __init__(self, host = HOST, port = PORT):
+    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         self.host = host
         self.port = port
         self.receivedCommands = queue.Queue()
@@ -26,7 +24,7 @@ class Client:
             self.socket.connect((host, port))
             print(f"Connection on port {port}")
         except Exception as e:
-            print("Connection error ",e)
+            print("Connection error ", e)
             self.socket = None
 
         if self.socket:
@@ -59,7 +57,7 @@ class Client:
         self.pendingCommands.put(command)
 
     def joinRoom(self, roomName):
-        common.writeMessage(self.socket,common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0) )
+        common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
 
     def send(self, data):
         with common.mutex:
@@ -115,4 +113,3 @@ if __name__ == '__main__':
             client.addCommand(common.Command(common.MessageType.DELETE, encodedMsg[6:]))
         elif msg.startswith("Room"):
             client.joinRoom(msg[4:])
-

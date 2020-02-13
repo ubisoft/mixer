@@ -10,8 +10,7 @@ sys.path.append(os.getcwd())
 
 
 TIMEOUT = 60.0
-HOST = ''
-PORT = 12800
+BINDING_HOST = ''
 
 
 class Connection:
@@ -188,7 +187,7 @@ rooms = {}
 
 def runServer():
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    connection.bind((HOST, PORT))
+    connection.bind((BINDING_HOST, common.DEFAULT_PORT))
     connection.listen(1000)
 
     logging.info(f"Listening on port {PORT}")

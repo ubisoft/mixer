@@ -1,6 +1,7 @@
 import os
 import bpy
 from . import operators
+from .data import get_dcc_sync_props
 
 
 class ROOM_UL_ItemRenderer(bpy.types.UIList):
@@ -9,61 +10,65 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):
         split.label(text=item.name)  # avoids renaming the item by accident
 
 
-class VRtistPanel(bpy.types.Panel):
+class SettingsPanel(bpy.types.Panel):
     """Creates a Panel in the Object properties window"""
-    bl_label = "VRtist"
-    bl_idname = "VRTIST_PT_settings"
+    bl_label = "DCC Sync"
+    bl_idname = "DCCSYNC_PT_settings"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "VRtist"
+    bl_category = "DCC Sync"
 
     def draw(self, context):
         layout = self.layout
 
-        scene = context.scene
+        dcc_sync_props = get_dcc_sync_props()
 
         row = layout.row()
         row.label(text="VRtist", icon='SCENE_DATA')
 
         row = layout.column()
-        row.operator("scene.vrtist", text="Launch VRTist")
-        row.operator(operators.VRtistSayHello.bl_idname, text="Say Hello")
+        row.operator(operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
+
+        row = layout.row()
+        row.label(text="DCC Sync", icon='SCENE_DATA')
+
+        row = layout.column()
 
         connected = operators.shareData.client is not None and operators.shareData.client.isConnected()
         if not connected:
 
             # Room list
             row = layout.row()
-            row.template_list("ROOM_UL_ItemRenderer", "", scene.vrtistconnect,
-                              "rooms", scene.vrtistconnect, "room_index", rows=4)
+            row.template_list("ROOM_UL_ItemRenderer", "", dcc_sync_props,
+                              "rooms", dcc_sync_props, "room_index", rows=4)
             # Join room
             col = row.column()
-            col.operator("scene.vrtistroomlistupdate", text="Refresh")
-            col.operator("scene.vrtistjoinroom", text="Join Room")
+            col.operator(operators.UpdateRoomListOperator.bl_idname, text="Refresh")
+            col.operator(operators.JoinOrLeaveRoomOperator.bl_idname, text="Join Room")
 
-            if scene.vrtistconnect.remoteServerIsUp:
+            if dcc_sync_props.remoteServerIsUp:
                 row = layout.row()
-                row.prop(scene.vrtistconnect, "room", text="Room")
-                row.operator('scene.vrtistcreateroom', text='Create Room')
+                row.prop(dcc_sync_props, "room", text="Room")
+                row.operator(operators.CreateRoomOperator.bl_idname, text='Create Room')
 
             col = layout.column()
             row = col.row()
-            row.prop(scene.vrtistconnect, "advanced",
-                     icon="TRIA_DOWN" if scene.vrtistconnect.advanced else "TRIA_RIGHT",
+            row.prop(dcc_sync_props, "advanced",
+                     icon="TRIA_DOWN" if dcc_sync_props.advanced else "TRIA_RIGHT",
                      icon_only=True, emboss=False)
             row.label(text="Advanced options")
-            if scene.vrtistconnect.advanced:
-                col.prop(scene.vrtistconnect, "host", text="Host")
-                col.prop(scene.vrtistconnect, "port", text="Port")
-                col.prop(scene.vrtistconnect, "VRtist", text="VRtist Path")
+            if dcc_sync_props.advanced:
+                col.prop(dcc_sync_props, "host", text="Host")
+                col.prop(dcc_sync_props, "port", text="Port")
+                col.prop(dcc_sync_props, "VRtist", text="VRtist Path")
 
         else:
-            row.operator("scene.vrtistjoinroom", text="Leave Room")
+            row.operator(operators.JoinOrLeaveRoomOperator.bl_idname, text="Leave Room")
 
 
 classes = (
     ROOM_UL_ItemRenderer,
-    VRtistPanel
+    SettingsPanel
 )
 
 

@@ -131,8 +131,8 @@ def process_client_command(args):
 parser = argparse.ArgumentParser(prog='cli', description='Command Line Interface for VRtist server')
 sub_parsers = parser.add_subparsers()
 
-parser.add_argument('--host', help='Host name', default=client.HOST)
-parser.add_argument('--port', help='Port', default=client.PORT)
+parser.add_argument('--host', help='Host name', default=common.DEFAULT_HOST)
+parser.add_argument('--port', help='Port', default=common.DEFAULT_PORT)
 parser.add_argument('--timeout', help='Timeout for server response', default=TIMEOUT)
 
 # Room commands are relative to... a room!
