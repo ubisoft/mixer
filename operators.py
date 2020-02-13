@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import shutil
+import logging
 from pathlib import Path
 
 import bpy
@@ -12,9 +13,9 @@ from .broadcaster import common
 from bpy.app.handlers import persistent
 from bpy.types import UIList
 
-HOST = 'localhost'
-PORT = 12800
+from .data import get_dcc_sync_props
 
+logger = logging.getLogger(__package__)
 
 class TransformStruct:
     def __init__(self, translate, quaternion, scale, visible):
@@ -50,7 +51,7 @@ class ShareData:
         self.objectsTransforms = {}
         self.objectsVisibilityChanged = set()
         self.objectsVisibility = {}
-        self.objects = []
+        self.objects = set()
 
     def clearLists(self):
         self.objectsAddedToCollection.clear()
@@ -62,22 +63,6 @@ class ShareData:
 
 
 shareData = ShareData()
-
-
-class VRtistRoomItem(bpy.types.PropertyGroup):
-    name: bpy.props.StringProperty(name="Name")
-
-
-class VRtistConnectProperties(bpy.types.PropertyGroup):
-    #host: bpy.props.StringProperty(name="Host", default="lgy-wks-052279")
-    host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST","localhost"))
-    port: bpy.props.IntProperty(name="Port", default=PORT)
-    room: bpy.props.StringProperty(name="Room", default=os.getlogin())
-    rooms: bpy.props.CollectionProperty(name="Rooms", type=VRtistRoomItem)
-    room_index: bpy.props.IntProperty()  # index in the list of rooms
-    advanced: bpy.props.BoolProperty(default=False)
-    remoteServerIsUp: bpy.props.BoolProperty(default=False)
-    VRtist: bpy.props.StringProperty(name="VRtist", default=os.environ.get("VRTIST_EXE","D:/unity/VRtist/Build/VRtist.exe"))
 
 def updateParams(obj):
     # send collection instances
@@ -124,7 +109,7 @@ def leave_current_room():
         shareData.client.disconnect()
         del(shareData.client)
         shareData.client = None
-    VRtistRoomListUpdateOperator.rooms_cached = False
+    UpdateRoomListOperator.rooms_cached = False
 
 @persistent
 def onLoad(scene):
@@ -524,10 +509,10 @@ rooms_cache = None
 getting_rooms = False
 
 def updateListRoomsProperty():
-    bpy.data.scenes[0].vrtistconnect.rooms.clear()
+    get_dcc_sync_props().rooms.clear()
     if rooms_cache:
         for room in rooms_cache:
-            item = bpy.data.scenes[0].vrtistconnect.rooms.add()
+            item = get_dcc_sync_props().rooms.add()
             item.name = room
 
 def onRooms(rooms):
@@ -549,10 +534,10 @@ def onRooms(rooms):
     getting_rooms = False
 
 def addLocalRoom(): 
-    bpy.data.scenes[0].vrtistconnect.rooms.clear()
-    localItem = bpy.data.scenes[0].vrtistconnect.rooms.add()
+    get_dcc_sync_props().rooms.clear()
+    localItem = get_dcc_sync_props().rooms.add()
     localItem.name = "Local"
-    VRtistRoomListUpdateOperator.rooms_cached = True
+    UpdateRoomListOperator.rooms_cached = True
 
 def getRooms(force=False):
     global getting_rooms, rooms_cache
@@ -562,12 +547,12 @@ def getRooms(force=False):
     if not force and rooms_cache:
         return
 
-    host = bpy.data.scenes[0].vrtistconnect.host
-    port = bpy.data.scenes[0].vrtistconnect.port  
+    host = get_dcc_sync_props().host
+    port = get_dcc_sync_props().port  
     shareData.roomListUpdateClient = None
     
     up = server_is_up(host, port)
-    bpy.data.scenes[0].vrtistconnect.remoteServerIsUp = up
+    get_dcc_sync_props().remoteServerIsUp = up
 
     if up:
         shareData.roomListUpdateClient = clientBlender.ClientBlender(host, port)
@@ -582,21 +567,6 @@ def getRooms(force=False):
 
     shareData.roomListUpdateClient.addCallback('roomsList', onRooms)
     shareData.roomListUpdateClient.sendListRooms()
-
-class VRtistRoomListUpdateOperator(bpy.types.Operator):
-    bl_idname = "scene.vrtistroomlistupdate"
-    bl_label = "VRtist Update Room List"
-    bl_options = {'REGISTER'}
-
-    def execute(self, context):
-        getRooms(force=True)
-        updateListRoomsProperty()
-        return {'FINISHED'} 
-
-class ROOM_UL_ItemRenderer(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        split = layout.row()
-        split.label(text=item.name) # avoids renaming the item by accident
 
 def clear_scene_content():
     set_handlers(False)
@@ -708,10 +678,29 @@ def set_handlers(connect: bool):
         print ("Error setting handlers")
 
 
-class VRtistCreateRoomOperator(bpy.types.Operator):
-    bl_idname = "scene.vrtistcreateroom"
-    bl_label = "VRtist Create Room"
-    bl_options = {'REGISTER'}   
+def start_local_server():
+    dir_path = Path(__file__).parent
+    serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
+    shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(
+        serverPath)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+
+
+def server_is_up(address, port):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect((address, port))
+        s.shutdown(socket.SHUT_RDWR)
+        s.close()
+        return True
+    except:
+        return False
+
+
+class CreateRoomOperator(bpy.types.Operator):
+    """Create a new room on DCC Sync server"""
+    bl_idname = "dcc_sync.create_room"
+    bl_label = "DCCSync Create Room"
+    bl_options = {'REGISTER'}
 
     def execute(self, context):
         connected = shareData.client is not None and shareData.client.isConnected()
@@ -727,13 +716,13 @@ class VRtistCreateRoomOperator(bpy.types.Operator):
                 shareData.client = None
         else:
             shareData.isLocal = False
-            room = bpy.data.scenes[0].vrtistconnect.room
-            host = bpy.data.scenes[0].vrtistconnect.host
-            port = bpy.data.scenes[0].vrtistconnect.port
+            room = get_dcc_sync_props().room
+            host = get_dcc_sync_props().host
+            port = get_dcc_sync_props().port
 
             shareData.client = clientBlender.ClientBlender(host, port)
-            shareData.client.addCallback('SendContent',send_scene_content)
-            shareData.client.addCallback('ClearContent',clear_scene_content)
+            shareData.client.addCallback('SendContent', send_scene_content)
+            shareData.client.addCallback('ClearContent', clear_scene_content)
             if not shareData.client.isConnected():
                     return {'CANCELLED'}
 
@@ -744,28 +733,14 @@ class VRtistCreateRoomOperator(bpy.types.Operator):
             shareData.currentRoom = room
 
             set_handlers(True)
-            VRtistRoomListUpdateOperator.rooms_cached = False
+            UpdateRoomListOperator.rooms_cached = False
         return {'FINISHED'}
 
-def start_local_server():
-    dir_path = Path(__file__).parent
-    pythonPath = Path(sys.argv[0]).parent / (str(bpy.app.version[0]) + "." + str(bpy.app.version[1])) / 'python' / 'bin' / 'python'
-    serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
-    shareData.localServerProcess = subprocess.Popen([str(pythonPath), str(serverPath)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT, shell=False)
 
-def server_is_up(address, port):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.connect((address, port))
-        s.shutdown(socket.SHUT_RDWR)
-        s.close()
-        return True
-    except:
-        return False    
-
-class VRtistJoinRoomOperator(bpy.types.Operator):
-    bl_idname = "scene.vrtistjoinroom"
-    bl_label = "VRtist Join Room"
+class JoinOrLeaveRoomOperator(bpy.types.Operator):
+    """Join a room, or leave the one that was already joined"""
+    bl_idname = "dcc_sync.join_or_leave_room"
+    bl_label = "DCCSync Join or Leave Room"
     bl_options = {'REGISTER'}   
 
     def execute(self, context):
@@ -780,23 +755,23 @@ class VRtistJoinRoomOperator(bpy.types.Operator):
 
             shareData.isLocal = False
             try:
-                roomIndex = bpy.data.scenes[0].vrtistconnect.room_index
-                room = bpy.data.scenes[0].vrtistconnect.rooms[roomIndex].name
+                roomIndex = get_dcc_sync_props().room_index
+                room = get_dcc_sync_props().rooms[roomIndex].name
             except IndexError:
                 room = "Local"
 
             localServerIsUp = True
             if room == 'Local':
-                host = HOST
-                port = PORT
+                host = common.DEFAULT_HOST
+                port = common.DEFAULT_PORT
                 localServerIsUp = server_is_up(host, port)                
                 # Launch local server? if it doesn't exist
                 if not localServerIsUp:
                     start_local_server()
                 shareData.isLocal = True
             else:
-                host = bpy.data.scenes[0].vrtistconnect.host
-                port = bpy.data.scenes[0].vrtistconnect.port
+                host = get_dcc_sync_props().host
+                port = get_dcc_sync_props().port
 
             shareData.client = clientBlender.ClientBlender(host, port)
             shareData.client.addCallback('SendContent',send_scene_content)
@@ -814,9 +789,22 @@ class VRtistJoinRoomOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class VRtistSendSelectionOperator(bpy.types.Operator):
-    bl_idname = "scene.vrtistsendselection"
-    bl_label = "VRtist Send Selection"
+class UpdateRoomListOperator(bpy.types.Operator):
+    """Fetch and update the list of DCC Sync rooms"""
+    bl_idname = "dcc_sync.update_room_list"
+    bl_label = "DCCSync Update Room List"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        logger.info("UpdateRoomListOperator")
+        getRooms(force=True)
+        updateListRoomsProperty()
+        return {'FINISHED'}
+
+class SendSelectionOperator(bpy.types.Operator):
+    """Send current selection to DCC Sync server"""
+    bl_idname = "dcc_sync.send_selection"
+    bl_label = "DCCSync Send selection"
     bl_options = {'REGISTER'}   
 
     def execute(self, context): 
@@ -837,21 +825,38 @@ class VRtistSendSelectionOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class VRtistOperator(bpy.types.Operator):
-    bl_idname = "scene.vrtist"
-    bl_label = "VRtist"
+class LaunchVRtistOperator(bpy.types.Operator):
+    """Launch a VRtist instance"""
+    bl_idname = "vrtist.launch"
+    bl_label = "Launch VRtist"
     bl_options = {'REGISTER'}
     
     def execute(self, context):
-        vrtistconnect =  bpy.data.scenes[0].vrtistconnect
+        dcc_sync_props =  get_dcc_sync_props()
         room = shareData.currentRoom
         if not room:
-            bpy.ops.scene.vrtistjoinroom()
+            bpy.ops.dcc_sync.joinroom()
             room = shareData.currentRoom
 
         hostname = "localhost"
         if not shareData.isLocal:
             hostname = vrtistconnect.host
-        args = [bpy.data.scenes[0].vrtistconnect.VRtist, "--room",room, "--hostname", hostname, "--port", str(vrtistconnect.port)]
+        args = [dcc_sync_props.VRtist, "--room",room, "--hostname", hostname, "--port", str(vrtistconnect.port)]
         subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.STDOUT, shell=False)
-        return {'FINISHED'}    
+        return {'FINISHED'}
+
+classes = (
+    LaunchVRtistOperator,
+    CreateRoomOperator,
+    UpdateRoomListOperator,
+    SendSelectionOperator,
+    JoinOrLeaveRoomOperator,
+)
+
+def register():
+    for _ in classes:
+        bpy.utils.register_class(_)
+
+def unregister():
+    for _ in classes:
+        bpy.utils.unregister_class(_)

@@ -1,12 +1,21 @@
 import time
 import queue
 import argparse
+import logging
 
-import broadcaster.common as common
-import broadcaster.client as client
+import common
+import client
+
+logging.basicConfig(
+    format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 
 TIMEOUT = 10  # in seconds
+
+
+class ServerError(RuntimeError):
+    def __init__(self, message):
+        super().__init__(message)
 
 
 class CliClient(client.Client):
@@ -36,24 +45,25 @@ class CliClient(client.Client):
 
     def listRoomClients(self, name):
         def _printResult(command: common.Command):
-            clients, _ = common.decodeStringArray(command.data, 0)
+            clients, _ = common.decodeJson(command.data, 0)
             if len(clients) == 0:
                 print(f'No clients in "{name}" room')
             else:
-                print(f'{len(clients)} client(s) in "{name}" room:\n  - ', end='')
-                print('\n  - '.join(clients))
-
+                print(f'{len(clients)} client(s) in "{name}" room :')
+                for c in clients:
+                    print(f' - {c["ip"]}:{c["port"]} name = {c["name"]}')
         command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, name.encode())
         self.processCommand(command, _printResult)
 
     def listClients(self):
         def _printResult(command: common.Command):
-            clients, _ = common.decodeStringArray(command.data, 0)
+            clients, _ = common.decodeJson(command.data, 0)
             if len(clients) == 0:
                 print('No clients')
             else:
-                print(f'{len(clients)} client(s):\n  - ', end='')
-                print('\n  - '.join(clients))
+                print(f'{len(clients)} client(s):')
+                for c in clients:
+                    print(f' - {c["ip"]}:{c["port"]} name = {c["name"]} room = {c["room"]}')
 
         command = common.Command(common.MessageType.LIST_CLIENTS)
         self.processCommand(command, _printResult)
@@ -67,6 +77,8 @@ class CliClient(client.Client):
         if callback is not None:
             command = self.consume()
             if command:
+                if command.type == common.MessageType.SEND_ERROR:
+                    raise ServerError(common.decodeString(command.data, 0)[0])
                 callback(command)
 
     def consume(self):
@@ -82,61 +94,69 @@ class CliClient(client.Client):
 def process_room_command(args):
     client = None
 
-    if args.command == 'list':
-        client = CliClient(args)
-        client.listRooms()
-
-    elif args.command == 'delete':
-        count = len(args.name)
-        if count:
+    try:
+        if args.command == 'list':
             client = CliClient(args)
-            for name in args.name:
-                client.deleteRoom(name)
-        else:
-            print('Expected one or more room names')
+            client.listRooms()
 
-    elif args.command == 'clear':
-        count = len(args.name)
-        if count:
-            client = CliClient(args)
-            for name in args.name:
-                client.clearRoom(name)
-        else:
-            print('Expected one or more room names')
+        elif args.command == 'delete':
+            count = len(args.name)
+            if count:
+                client = CliClient(args)
+                for name in args.name:
+                    client.deleteRoom(name)
+            else:
+                print('Expected one or more room names')
 
-    elif args.command == 'clients':
-        count = len(args.name)
-        if count:
-            client = CliClient(args)
-            for name in args.name:
-                client.listRoomClients(name)
-        else:
-            print('Expected one or more room names')
+        elif args.command == 'clear':
+            count = len(args.name)
+            if count:
+                client = CliClient(args)
+                for name in args.name:
+                    client.clearRoom(name)
+            else:
+                print('Expected one or more room names')
 
-    if client:
-        client.disconnect()
+        elif args.command == 'clients':
+            count = len(args.name)
+            if count:
+                client = CliClient(args)
+                for name in args.name:
+                    client.listRoomClients(name)
+            else:
+                print('Expected one or more room names')
+    except ServerError as e:
+        logging.error(e)
+    finally:
+        if client:
+            client.disconnect()
+
 
 def process_client_command(args):
     client = None
 
-    if args.command == 'list':
-        client = CliClient(args)
-        client.listClients()
-
-    if client is not None:
-        client.disconnect()
+    try:
+        if args.command == 'list':
+            client = CliClient(args)
+            client.listClients()
+    except ServerError as e:
+        logging.error(e)
+    finally:
+        if client is not None:
+            client.disconnect()
 
 
 parser = argparse.ArgumentParser(prog='cli', description='Command Line Interface for VRtist server')
 sub_parsers = parser.add_subparsers()
 
-parser.add_argument('--host', help='Host name', default=client.HOST)
-parser.add_argument('--port', help='Port', default=client.PORT)
+parser.add_argument('--host', help='Host name', default=common.DEFAULT_HOST)
+parser.add_argument('--port', help='Port', default=common.DEFAULT_PORT)
 parser.add_argument('--timeout', help='Timeout for server response', default=TIMEOUT)
 
 # Room commands are relative to... a room!
 room_parser = sub_parsers.add_parser('room', help='Rooms related commands')
-room_parser.add_argument('command', help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.', choices=('list', 'delete', 'clear', 'clients'))
+room_parser.add_argument('command', help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.', choices=(
+    'list', 'delete', 'clear', 'clients'))
 room_parser.add_argument('name', help='Room name. You can specify multiple room names separated by spaces.', nargs='*')
 room_parser.set_defaults(func=process_room_command)
 

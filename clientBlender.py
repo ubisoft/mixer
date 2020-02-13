@@ -5,17 +5,14 @@ import ctypes
 _STILL_ACTIVE = 259
 
 from .broadcaster.client import Client
+from .broadcaster import common
 import bpy
 import bmesh
 import struct
 import queue
-from .broadcaster import common
-
-HOST = "localhost"
-PORT = 12800
 
 class ClientBlender(Client):
-    def __init__(self, host = HOST, port = PORT):
+    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(host, port)
 
         self.objectNames = {} # object name / object
