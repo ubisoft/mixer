@@ -51,7 +51,7 @@ class ShareData:
         self.objectsTransforms = {}
         self.objectsVisibilityChanged = set()
         self.objectsVisibility = {}
-        self.objects = []
+        self.objects = set()
 
     def clearLists(self):
         self.objectsAddedToCollection.clear()
