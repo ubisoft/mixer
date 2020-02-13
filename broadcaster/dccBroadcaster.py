@@ -3,6 +3,7 @@ import socket
 import select
 import threading
 import logging
+import time
 
 import os
 import sys
@@ -12,13 +13,18 @@ sys.path.append(os.getcwd())
 TIMEOUT = 60.0
 BINDING_HOST = ''
 
+SHUTDOWN = False
+
 
 class Connection:
+    """ Represent a connection with a client """
+
     def __init__(self, socket, address):
         self.socket = socket
         self.address = address
+        self.clientname = None
         self.room = None
-        self.commands = []
+        self.commands = []  # Pending commands to send to the client
         self.start()
 
     def start(self):
@@ -57,21 +63,25 @@ class Connection:
         with common.mutex:
             room = rooms.get(name)
             if room is not None:
-                command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, common.encodeStringArray(
-                    [f'{client.address[0]}:{client.address[1]}' for client in room.clients]))
-                self.commands.append(command)
-
-    def listClients(self):
-        clients = set()
-        with common.mutex:
-            for room in rooms.values():
-                for client in room.clients:
-                    clients.add(client)
-            command = common.Command(common.MessageType.LIST_CLIENTS, common.encodeStringArray(clients))
+                command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, common.encodeJson(room.getClients()))
+            else:
+                command = common.Command(common.MessageType.SEND_ERROR, common.encodeString(f'No room named {name}.'))
             self.commands.append(command)
 
+    def listClients(self):
+        with common.mutex:
+            clients = []
+            for room in rooms.values():
+                clients += room.getClients()
+            command = common.Command(common.MessageType.LIST_CLIENTS, common.encodeJson(clients))
+            self.commands.append(command)
+
+    def setClientName(self, name):
+        self.clientname = name
+
     def run(self):
-        while(True):
+        global SHUTDOWN
+        while not SHUTDOWN:
             try:
                 command = common.readMessage(self.socket)
             except common.ClientDisconnectedException:
@@ -97,6 +107,9 @@ class Connection:
 
                 elif command.type == common.MessageType.LIST_CLIENTS:
                     self.listClients()
+
+                elif command.type == common.MessageType.SET_CLIENT_NAME:
+                    self.setClientName(command.data.decode())
 
                 # Other commands
                 elif command.type.value > common.MessageType.COMMAND.value:
@@ -145,6 +158,10 @@ class Room:
             for command in self.commands:
                 client.addCommand(command)
 
+    def getClients(self):
+        return [dict(ip=client.address[0], port=client.address[1],
+                     name=client.clientname, room=self.name) for client in self.clients]
+
     def close(self):
         command = common.Command(common.MessageType.LEAVE_ROOM, common.encodeString(self.name))
         self.addCommand(command, None)
@@ -186,16 +203,29 @@ rooms = {}
 
 
 def runServer():
+    global SHUTDOWN
+
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.bind((BINDING_HOST, common.DEFAULT_PORT))
+    connection.setblocking(0)
     connection.listen(1000)
 
-    logging.info(f"Listening on port {PORT}")
+    logging.info(f"Listening on port {common.DEFAULT_PORT}")
     while True:
-        newConnection = connection.accept()
-        logging.info(f"New connection {newConnection[1]}")
-        Connection(*newConnection)
+        try:
+            newConnection = connection.accept()
+            logging.info(f"New connection {newConnection[1]}")
+            Connection(*newConnection)
+        except KeyboardInterrupt:
+            break
+        except BlockingIOError:
+            try:
+                time.sleep(60.0 / 1000.0)
+            except KeyboardInterrupt:
+                break
 
+    logging.info("Shutting down server")
+    SHUTDOWN = True
     connection.close()
 
 

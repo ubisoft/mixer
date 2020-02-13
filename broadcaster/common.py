@@ -3,6 +3,7 @@ import threading
 import select
 import socket
 import struct
+import json
 
 
 mutex = threading.RLock()
@@ -22,6 +23,8 @@ class MessageType(Enum):
     CLEAR_ROOM = 8
     LIST_ROOM_CLIENTS = 9
     LIST_CLIENTS = 10
+    SET_CLIENT_NAME = 11
+    SEND_ERROR = 12
     COMMAND = 100
     DELETE = 101
     CAMERA = 102
@@ -108,6 +111,15 @@ def decodeString(data, index):
     end = start+stringLength
     value = data[start:end].decode()
     return value, end
+
+
+def encodeJson(value: dict):
+    return encodeString(json.dumps(value))
+
+
+def decodeJson(data, index):
+    value, end = decodeString(data, index)
+    return json.loads(value), end
 
 
 def encodeFloat(value):
@@ -250,7 +262,19 @@ def readMessage(socket):
     return None
 
 
-def writeMessage(socket, command):
+class Command:
+    _id = 100
+
+    def __init__(self, commandType: MessageType, data=b'', commandId=0):
+        self.data = data or b''
+        self.type = commandType
+        self.id = commandId
+        if commandId == 0:
+            self.id = Command._id
+            Command._id += 1
+
+
+def writeMessage(socket, command: Command):
     if not socket:
         return
     size = intToBytes(len(command.data), 8)
@@ -266,15 +290,3 @@ def writeMessage(socket, command):
             sent = socket.send(buffer[currentIndex:])
             remainingSize -= sent
             currentIndex += sent
-
-
-class Command:
-    _id = 100
-
-    def __init__(self, commandType, data=b'', commandId=0):
-        self.data = data or b''
-        self.type = commandType
-        self.id = commandId
-        if commandId == 0:
-            self.id = Command._id
-            Command._id += 1
