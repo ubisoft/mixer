@@ -16,6 +16,7 @@ from bpy.types import UIList
 from .data import get_dcc_sync_props
 
 logger = logging.getLogger(__package__)
+logger.setLevel(logging.INFO)
 
 
 class TransformStruct:
@@ -112,7 +113,6 @@ def leave_current_room():
         shareData.client.disconnect()
         del(shareData.client)
         shareData.client = None
-    UpdateRoomListOperator.rooms_cached = False
 
 
 @persistent
@@ -546,19 +546,21 @@ getting_rooms = False
 
 
 def updateListRoomsProperty():
-    get_dcc_sync_props().rooms.clear()
+    logger.debug("updateListRoomsProperty() cache : %s", rooms_cache)
+    props = get_dcc_sync_props()
+    props.rooms.clear()
+    props.joinRoomEnabled = False
     if rooms_cache:
         for room in rooms_cache:
             item = get_dcc_sync_props().rooms.add()
             item.name = room
+            props.joinRoomEnabled = True
 
 
 def onRooms(rooms):
+    logger.debug("onRooms()")
     global getting_rooms, rooms_cache
-    if not "Local" in rooms:
-        rooms_cache = ["Local"] + rooms
-    else:
-        rooms_cache = [] + rooms
+    rooms_cache = rooms
 
     connected = shareData.roomListUpdateClient is not None and shareData.roomListUpdateClient.isConnected()
     if connected:
@@ -570,13 +572,6 @@ def onRooms(rooms):
 
     updateListRoomsProperty()
     getting_rooms = False
-
-
-def addLocalRoom():
-    get_dcc_sync_props().rooms.clear()
-    localItem = get_dcc_sync_props().rooms.add()
-    localItem.name = "Local"
-    UpdateRoomListOperator.rooms_cached = True
 
 
 def getRooms(force=False):
@@ -598,7 +593,6 @@ def getRooms(force=False):
         shareData.roomListUpdateClient = clientBlender.ClientBlender(host, port)
 
     if not up or not shareData.roomListUpdateClient.isConnected():
-        rooms_cache = ["Local"]
         return
 
     getting_rooms = True
@@ -747,7 +741,21 @@ class CreateRoomOperator(bpy.types.Operator):
     bl_label = "DCCSync Create Room"
     bl_options = {'REGISTER'}
 
+    @classmethod
+    def poll(cls, context):
+        return bool(get_dcc_sync_props().room)
+
     def execute(self, context):
+        host = get_dcc_sync_props().host
+        port = get_dcc_sync_props().port
+        if not server_is_up(host, port):
+            start_local_server()
+
+        attempts = 0
+        while not server_is_up(host, port) and attemps < 10:
+            attempts += 1
+            sleep(0.2)
+
         connected = shareData.client is not None and shareData.client.isConnected()
         if connected:
             set_handlers(False)
@@ -778,7 +786,6 @@ class CreateRoomOperator(bpy.types.Operator):
             shareData.currentRoom = room
 
             set_handlers(True)
-            UpdateRoomListOperator.rooms_cached = False
         return {'FINISHED'}
 
 
@@ -788,35 +795,33 @@ class JoinOrLeaveRoomOperator(bpy.types.Operator):
     bl_label = "DCCSync Join or Leave Room"
     bl_options = {'REGISTER'}
 
+    def _connected(self) -> bool:
+        return shareData.client is not None and shareData.client.isConnected()
+
+    @classmethod
+    def poll(self, context):
+        if not JoinOrLeaveRoomOperator._connected(self):
+            roomIndex = get_dcc_sync_props().room_index
+            return roomIndex < len(get_dcc_sync_props().rooms)
+
+        return True
+
     def execute(self, context):
         global rooms_cache
 
         shareData.currentRoom = None
-        connected = shareData.client is not None and shareData.client.isConnected()
-        if connected:
+        if self._connected():
             leave_current_room()
         else:
             updateCurrentData()
 
             shareData.isLocal = False
-            try:
-                roomIndex = get_dcc_sync_props().room_index
-                room = get_dcc_sync_props().rooms[roomIndex].name
-            except IndexError:
-                room = "Local"
+            roomIndex = get_dcc_sync_props().room_index
+            room = get_dcc_sync_props().rooms[roomIndex].name
 
             localServerIsUp = True
-            if room == 'Local':
-                host = common.DEFAULT_HOST
-                port = common.DEFAULT_PORT
-                localServerIsUp = server_is_up(host, port)
-                # Launch local server? if it doesn't exist
-                if not localServerIsUp:
-                    start_local_server()
-                shareData.isLocal = True
-            else:
-                host = get_dcc_sync_props().host
-                port = get_dcc_sync_props().port
+            host = get_dcc_sync_props().host
+            port = get_dcc_sync_props().port
 
             shareData.client = clientBlender.ClientBlender(host, port)
             shareData.client.addCallback('SendContent', send_scene_content)
@@ -843,7 +848,18 @@ class UpdateRoomListOperator(bpy.types.Operator):
     def execute(self, context):
         logger.info("UpdateRoomListOperator")
         getRooms(force=True)
+
+        # getRooms() enqueues a LIST_ROOMS command and a timer callback, but the room list UI
+        # is never updated before the operator button looses focus. Cousl not fuigureout how
+        # to use tag_redraw() to overcome this
+        import time
+        if context.window is not None:
+            context.window.cursor_set("WAIT")
+        time.sleep(1)
+        if context.window is not None:
+            context.window.cursor_set("DEFAULT")
         updateListRoomsProperty()
+
         return {'FINISHED'}
 
 

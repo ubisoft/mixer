@@ -1,3 +1,4 @@
+import logging
 import queue
 import struct
 import bmesh
@@ -9,6 +10,10 @@ import os
 import platform
 import ctypes
 _STILL_ACTIVE = 259
+
+
+logger = logging.getLogger(__package__)
+logger.setLevel(logging.INFO)
 
 
 class ClientBlender(Client):
@@ -1043,6 +1048,7 @@ class ClientBlender(Client):
             except queue.Empty:
                 return 0.01
             else:
+                logger.debug("networkConsumer() %s", command.type)
                 self.blockSignals = True
                 self.receivedCommandsProcessed = True
 

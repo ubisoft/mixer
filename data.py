@@ -3,10 +3,6 @@ import os
 from .broadcaster import common
 
 
-def get_dcc_sync_props():
-    return bpy.context.window_manager.dcc_sync
-
-
 class RoomItem(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name")
 
@@ -20,8 +16,13 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
     room_index: bpy.props.IntProperty()  # index in the list of rooms
     advanced: bpy.props.BoolProperty(default=False)
     remoteServerIsUp: bpy.props.BoolProperty(default=False)
+    joinRoomEnabled: bpy.props.BoolProperty(default=False)
     VRtist: bpy.props.StringProperty(name="VRtist", default=os.environ.get(
         "VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe"))
+
+
+def get_dcc_sync_props() -> DCCSyncProperties:
+    return bpy.context.window_manager.dcc_sync
 
 
 classes = (

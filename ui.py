@@ -2,6 +2,12 @@ import os
 import bpy
 from . import operators
 from .data import get_dcc_sync_props
+import logging
+
+logger = logging.Logger(__name__)
+logging.basicConfig(
+    format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger.setLevel(logging.INFO)
 
 
 class ROOM_UL_ItemRenderer(bpy.types.UIList):
@@ -19,6 +25,7 @@ class SettingsPanel(bpy.types.Panel):
     bl_category = "DCC Sync"
 
     def draw(self, context):
+        logger.debug("SettingsPanel::draw()")
         layout = self.layout
 
         dcc_sync_props = get_dcc_sync_props()
@@ -46,10 +53,9 @@ class SettingsPanel(bpy.types.Panel):
             col.operator(operators.UpdateRoomListOperator.bl_idname, text="Refresh")
             col.operator(operators.JoinOrLeaveRoomOperator.bl_idname, text="Join Room")
 
-            if dcc_sync_props.remoteServerIsUp:
-                row = layout.row()
-                row.prop(dcc_sync_props, "room", text="Room")
-                row.operator(operators.CreateRoomOperator.bl_idname, text='Create Room')
+            row = layout.row()
+            row.prop(dcc_sync_props, "room", text="Room")
+            row.operator(operators.CreateRoomOperator.bl_idname, text='Create Room')
 
             col = layout.column()
             row = col.row()
@@ -63,7 +69,8 @@ class SettingsPanel(bpy.types.Panel):
                 col.prop(dcc_sync_props, "VRtist", text="VRtist Path")
 
         else:
-            row.operator(operators.JoinOrLeaveRoomOperator.bl_idname, text="Leave Room")
+            row.operator(operators.JoinOrLeaveRoomOperator.bl_idname,
+                         text=f"Leave Room : {operators.shareData.currentRoom}")
 
 
 classes = (
