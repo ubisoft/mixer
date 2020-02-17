@@ -35,7 +35,7 @@ class Connection:
         with common.mutex:
             room = rooms.get(roomName)
             if room is None:
-                logging.info(f"Room {roomName} does not exist. Creating it.")
+                logging.info("Room %s does not exist. Creating it.", roomName)
                 room = Room(roomName)
                 rooms[roomName] = room
             room.addClient(self)
@@ -88,7 +88,7 @@ class Connection:
                 break
 
             if command is not None:
-                logging.info(f"client {self.address}: {command.type} received")
+                logging.info("client % s: % s: % s received", self.address[0], self.address[1], command.type)
 
                 if command.type == common.MessageType.JOIN_ROOM:
                     self.joinRoom(command.data.decode())
@@ -136,7 +136,7 @@ class Connection:
             self.socket.close()
         except Exception:
             pass
-        logging.info(f"{self.address} closed")
+        logging.info("%s closed",  self.address)
 
 
 class Room:
@@ -146,7 +146,7 @@ class Room:
         self.commands = []
 
     def addClient(self, client):
-        logging.info(f"Add Client {client.address} to Room {self.name}")
+        logging.info("Add Client % s to Room % s", client.address, self.name)
         self.clients.append(client)
         if len(self.clients) == 1:
             command = common.Command(common.MessageType.CONTENT)
@@ -168,18 +168,18 @@ class Room:
         self.clients = []
         with common.mutex:
             del rooms[self.name]
-            logging.info(f'Room {self.name} deleted')
+            logging.info("Room % s deleted", self.name)
 
     def clear(self):
         self.commands = []
 
     def removeClient(self, client):
-        logging.info(f"Remove Client {client.address} from Room {self.name}")
+        logging.info("Remove Client % s from Room % s", client.address, self.name)
         self.clients.remove(client)
         if len(self.clients) == 0:
             with common.mutex:
                 del rooms[self.name]
-                logging.info(f'No more clients in room "{self.name}". Room deleted')
+                logging.info("No more clients in room \"%s\". Room deleted", self.name)
 
     def mergeCommands(self, command):
         commandType = command.type
@@ -210,11 +210,11 @@ def runServer():
     connection.setblocking(0)
     connection.listen(1000)
 
-    logging.info(f"Listening on port {common.DEFAULT_PORT}")
+    logging.info("Listening on port % s", common.DEFAULT_PORT)
     while True:
         try:
             newConnection = connection.accept()
-            logging.info(f"New connection {newConnection[1]}")
+            logging.info("New connection %s", newConnection[1])
             Connection(*newConnection)
         except KeyboardInterrupt:
             break
