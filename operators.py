@@ -726,8 +726,14 @@ def set_handlers(connect: bool):
 def start_local_server():
     dir_path = Path(__file__).parent
     serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
+
+    if get_dcc_sync_props().showServerConsole:
+        args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
+    else:
+        args = {'stdout': subprocess.PIPE, 'stderr': subprocess.STDOUT}
+
     shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(
-        serverPath)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+        serverPath)], shell=False, **args)
 
 
 def server_is_up(address, port):
