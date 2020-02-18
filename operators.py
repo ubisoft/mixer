@@ -17,6 +17,7 @@ from .data import get_dcc_sync_props
 
 logger = logging.getLogger(__package__)
 
+
 class TransformStruct:
     def __init__(self, translate, quaternion, scale, visible):
         self.translate = translate
@@ -64,6 +65,7 @@ class ShareData:
 
 shareData = ShareData()
 
+
 def updateParams(obj):
     # send collection instances
     if obj.instance_type == 'COLLECTION':
@@ -76,8 +78,8 @@ def updateParams(obj):
     typename = obj.bl_rna.name
     if obj.data:
         typename = obj.data.bl_rna.name
-    
-    if  typename != 'Camera' and typename != 'Mesh' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
+
+    if typename != 'Camera' and typename != 'Mesh' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
         return
 
     if typename == 'Camera':
@@ -98,6 +100,7 @@ def updateParams(obj):
 def updateTransform(obj):
     shareData.client.sendTransform(obj)
 
+
 def leave_current_room():
     shareData.currentRoom = None
     set_handlers(False)
@@ -111,11 +114,13 @@ def leave_current_room():
         shareData.client = None
     UpdateRoomListOperator.rooms_cached = False
 
+
 @persistent
 def onLoad(scene):
     connected = shareData.client is not None and shareData.client.isConnected()
     if connected:
         leave_current_room()
+
 
 def updateSceneChanged():
     shareData.client.sendSetCurrentScene(bpy.context.scene.name)
@@ -130,13 +135,15 @@ def updateSceneChanged():
 
     shareData.client.currentSceneName = bpy.context.scene.name
 
+
 class CollectionInfo:
-    def __init__(self, hide_viewport, instance_offset, children, parent, objects = None):
+    def __init__(self, hide_viewport, instance_offset, children, parent, objects=None):
         self.hide_viewport = hide_viewport
         self.instance_offset = instance_offset
         self.children = children
         self.parent = parent
         self.objects = objects or []
+
 
 def getCollection(collectionName):
     if collectionName in bpy.data.collections:
@@ -144,6 +151,7 @@ def getCollection(collectionName):
     if bpy.context.scene.collection.name == collectionName:
         return bpy.context.scene.collection
     return None
+
 
 def getParentCollection(collectionName):
     if collectionName in bpy.context.scene.collection.children:
@@ -153,12 +161,13 @@ def getParentCollection(collectionName):
             return col
     return None
 
+
 def updateCollectionsState():
     newCollectionsNames = set([bpy.context.scene.collection.name] + [x.name for x in bpy.data.collections])
     oldCollectionsNames = set(shareData.collectionsInfo.keys())
 
     shareData.collectionsAdded = newCollectionsNames - oldCollectionsNames
-    shareData.collectionsRemoved = oldCollectionsNames - newCollectionsNames    
+    shareData.collectionsRemoved = oldCollectionsNames - newCollectionsNames
 
     shareData.collectionsAddedToCollection.clear()
     shareData.collectionsRemovedFromCollection.clear()
@@ -168,12 +177,12 @@ def updateCollectionsState():
             continue
         oldChildren = set(collectionInfo.children)
         newChildren = set([x.name for x in collection.children])
-        
+
         for x in newChildren - oldChildren:
-            shareData.collectionsAddedToCollection.add( (getParentCollection(x).name, x) )
+            shareData.collectionsAddedToCollection.add((getParentCollection(x).name, x))
 
         for x in oldChildren - newChildren:
-            shareData.collectionsRemovedFromCollection.add( (shareData.collectionsInfo[x].parent, x) )
+            shareData.collectionsRemovedFromCollection.add((shareData.collectionsInfo[x].parent, x))
 
         newObjects = set([x.name for x in collection.objects])
         oldObjects = set([shareData.objectsRenamed.get(x, x) for x in collectionInfo.objects])
@@ -192,33 +201,38 @@ def updateCollectionsInfo():
 
     # Master Collection (scene dependent)
     collection = bpy.context.scene.collection
-    children = [x.name for x in collection.children]        
-    shareData.collectionsInfo[collection.name] = CollectionInfo(collection.hide_viewport, collection.instance_offset, children, None, [x.name for x in collection.objects])
+    children = [x.name for x in collection.children]
+    shareData.collectionsInfo[collection.name] = CollectionInfo(
+        collection.hide_viewport, collection.instance_offset, children, None, [x.name for x in collection.objects])
     for child in collection.children:
-        shareData.collectionsInfo[child.name] =  CollectionInfo(child.hide_viewport, child.instance_offset, [x.name for x in child.children], collection.name)
+        shareData.collectionsInfo[child.name] = CollectionInfo(child.hide_viewport, child.instance_offset, [
+                                                               x.name for x in child.children], collection.name)
 
     # All other collections (all scenes)
     for collection in bpy.data.collections:
         if not shareData.collectionsInfo.get(collection.name):
-            shareData.collectionsInfo[collection.name] = CollectionInfo(collection.hide_viewport, collection.instance_offset, [x.name for x in collection.children], None)
+            shareData.collectionsInfo[collection.name] = CollectionInfo(collection.hide_viewport, collection.instance_offset, [
+                                                                        x.name for x in collection.children], None)
         for child in collection.children:
-            shareData.collectionsInfo[child.name] =  CollectionInfo(child.hide_viewport, child.instance_offset, [x.name for x in child.children], collection.name)
+            shareData.collectionsInfo[child.name] = CollectionInfo(child.hide_viewport, child.instance_offset, [
+                                                                   x.name for x in child.children], collection.name)
 
     # Store collections objects (already done for master collection above)
     for collection in bpy.data.collections:
         shareData.collectionsInfo[collection.name].objects = [x.name for x in collection.objects]
 
+
 def updateObjectsState():
     objects = set([x.name for x in bpy.data.objects])
     shareData.objectsAdded = objects - shareData.objects
     shareData.objectsRemoved = shareData.objects - objects
-    
+
     if len(shareData.objectsAdded) == 1 and len(shareData.objectsRemoved) == 1:
         shareData.objectsRenamed[list(shareData.objectsRemoved)[0]] = list(shareData.objectsAdded)[0]
         shareData.objectsAdded.clear()
         shareData.objectsRemoved.clear()
         return
-    
+
     for objName, visible in shareData.objectsVisibility.items():
         newObj = bpy.data.objects.get(objName)
         if newObj and visible != newObj.hide_viewport:
@@ -228,7 +242,7 @@ def updateObjectsState():
         newObj = bpy.data.objects.get(objName)
         if not newObj:
             continue
-        newObjParent = "" if newObj.parent==None else newObj.parent.name            
+        newObjParent = "" if newObj.parent == None else newObj.parent.name
         if newObjParent != parent:
             shareData.objectsReparented.add(objName)
 
@@ -239,9 +253,10 @@ def updateObjectsState():
         matrix = newObj.matrix_local
         t = matrix.to_translation()
         r = matrix.to_quaternion()
-        s = matrix.to_scale()        
+        s = matrix.to_scale()
         if t != transform[0] or r != transform[1] or s != transform[2]:
             shareData.objectsTransformed.add(objName)
+
 
 def updateObjectsInfo():
     shareData.objects = set([x.name for x in bpy.data.objects])
@@ -254,30 +269,35 @@ def updateObjectsInfo():
         t = matrix.to_translation()
         r = matrix.to_quaternion()
         s = matrix.to_scale()
-        shareData.objectsTransforms[obj.name] = (t,r,s)
+        shareData.objectsTransforms[obj.name] = (t, r, s)
+
 
 def updateCurrentData():
     updateCollectionsInfo()
     updateObjectsInfo()
 
+
 def isInObjectMode():
-    return hasattr(bpy.context,"active_object") and (not bpy.context.active_object or bpy.context.active_object.mode == 'OBJECT')
+    return hasattr(bpy.context, "active_object") and (not bpy.context.active_object or bpy.context.active_object.mode == 'OBJECT')
+
 
 def removeObjectsFromCollections():
     changed = False
     for collectionName in shareData.objectsRemovedFromCollection:
         objectNames = shareData.objectsRemovedFromCollection.get(collectionName)
         for objName in objectNames:
-            shareData.client.sendRemoveObjectFromCollection(collectionName,objName)
+            shareData.client.sendRemoveObjectFromCollection(collectionName, objName)
             changed = True
     return changed
+
 
 def removeCollectionsFromCollections():
     changed = False
     for item in shareData.collectionsRemovedFromCollection:
-        shareData.client.sendRemoveCollectionFromCollection(item[0], item[1])      
-        changed = True  
+        shareData.client.sendRemoveCollectionFromCollection(item[0], item[1])
+        changed = True
     return changed
+
 
 def removeCollections():
     changed = False
@@ -285,6 +305,7 @@ def removeCollections():
         shareData.client.sendCollectionRemoved(collection)
         changed = True
     return changed
+
 
 def addObjects():
     changed = False
@@ -296,6 +317,7 @@ def addObjects():
             changed = True
     return changed
 
+
 def addCollections():
     changed = False
     for item in shareData.collectionsAdded:
@@ -303,21 +325,24 @@ def addCollections():
         changed = True
     return changed
 
+
 def addCollectionsToCollections():
     changed = False
     for item in shareData.collectionsAddedToCollection:
-        shareData.client.sendAddCollectionToCollection(item[0], item[1])   
-        changed = True  
-    return changed   
+        shareData.client.sendAddCollectionToCollection(item[0], item[1])
+        changed = True
+    return changed
+
 
 def addObjectsToCollections():
     changed = False
     for collectionName in shareData.objectsAddedToCollection:
         objectNames = shareData.objectsAddedToCollection.get(collectionName)
         for objectName in objectNames:
-            shareData.client.sendAddObjectToCollection(collectionName,objectName)
+            shareData.client.sendAddObjectToCollection(collectionName, objectName)
             changed = True
     return changed
+
 
 def updateCollectionsParameters():
     changed = False
@@ -329,6 +354,7 @@ def updateCollectionsParameters():
                 changed = True
     return changed
 
+
 def createSceneObjects():
     changed = False
     for objName in shareData.objectsAdded:
@@ -338,6 +364,7 @@ def createSceneObjects():
             changed = True
     return changed
 
+
 def deleteSceneObjects():
     changed = False
     for objName in shareData.objectsRemoved:
@@ -345,12 +372,14 @@ def deleteSceneObjects():
         changed = True
     return changed
 
+
 def renameObjects():
     changed = False
     for oldName, newName in shareData.objectsRenamed.items():
-        shareData.client.sendRenamedObjects(oldName, newName)  
-        changed = True  
+        shareData.client.sendRenamedObjects(oldName, newName)
+        changed = True
     return changed
+
 
 def updateObjectsVisibility():
     changed = False
@@ -360,6 +389,7 @@ def updateObjectsVisibility():
             changed = True
     return changed
 
+
 def updateObjectsTransforms():
     changed = False
     for objName in shareData.objectsTransformed:
@@ -367,6 +397,7 @@ def updateObjectsTransforms():
             updateTransform(bpy.data.objects[objName])
             changed = True
     return changed
+
 
 def reparentObjects():
     changed = False
@@ -376,10 +407,11 @@ def reparentObjects():
             changed = True
     return changed
 
+
 def updateObjectsData():
     container = {}
     data = set()
-    transforms = set()   
+    transforms = set()
 
     for update in shareData.depsgraph.updates:
         obj = update.id.original
@@ -405,6 +437,7 @@ def updateObjectsData():
         if d in container:
             updateParams(container[d])
 
+
 @persistent
 def sendSceneDataToServer(scene):
     shareData.clearLists()
@@ -424,8 +457,8 @@ def sendSceneDataToServer(scene):
         return
 
     updateObjectsState()
-    updateCollectionsState()    
-    
+    updateCollectionsState()
+
     changed = False
     changed |= removeObjectsFromCollections()
     changed |= removeCollectionsFromCollections()
@@ -437,22 +470,23 @@ def sendSceneDataToServer(scene):
     changed |= updateCollectionsParameters()
     changed |= createSceneObjects()
     changed |= deleteSceneObjects()
-    changed |= renameObjects() 
-    changed |= updateObjectsVisibility() 
+    changed |= renameObjects()
+    changed |= updateObjectsVisibility()
     changed |= updateObjectsTransforms()
     changed |= reparentObjects()
 
     if not changed:
         shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
-        updateObjectsData()        
+        updateObjectsData()
 
     # update for next change
     updateCurrentData()
 
+
 @persistent
 def onUndoRedoPre(scene):
     #shareData.selectedObjectsNames = set()
-    #for obj in bpy.context.selected_objects:        
+    # for obj in bpy.context.selected_objects:
     #    shareData.selectedObjectsNames.add(obj.name)
     if not isInObjectMode():
         return
@@ -461,6 +495,7 @@ def onUndoRedoPre(scene):
 
     shareData.clearLists()
     updateCurrentData()
+
 
 @persistent
 def onUndoRedoPost(scene):
@@ -473,8 +508,8 @@ def onUndoRedoPost(scene):
         return
 
     updateObjectsState()
-    updateCollectionsState()    
-    
+    updateCollectionsState()
+
     removeObjectsFromCollections()
     removeCollectionsFromCollections()
     removeCollections()
@@ -485,8 +520,8 @@ def onUndoRedoPost(scene):
     updateCollectionsParameters()
     createSceneObjects()
     deleteSceneObjects()
-    renameObjects() 
-    updateObjectsVisibility() 
+    renameObjects()
+    updateObjectsVisibility()
     updateObjectsTransforms()
     reparentObjects()
 
@@ -497,16 +532,18 @@ def onUndoRedoPost(scene):
         if hasattr(obj, "data"):
             updateParams(obj)
         if hasattr(obj, "material_slots"):
-            for slot in obj.material_slots[:]:    
+            for slot in obj.material_slots[:]:
                 materials.add(slot.material)
 
-    for material in materials:                
+    for material in materials:
         shareData.client.sendMaterial(material)
 
     shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
-    
+
+
 rooms_cache = None
 getting_rooms = False
+
 
 def updateListRoomsProperty():
     get_dcc_sync_props().rooms.clear()
@@ -514,6 +551,7 @@ def updateListRoomsProperty():
         for room in rooms_cache:
             item = get_dcc_sync_props().rooms.add()
             item.name = room
+
 
 def onRooms(rooms):
     global getting_rooms, rooms_cache
@@ -533,11 +571,13 @@ def onRooms(rooms):
     updateListRoomsProperty()
     getting_rooms = False
 
-def addLocalRoom(): 
+
+def addLocalRoom():
     get_dcc_sync_props().rooms.clear()
     localItem = get_dcc_sync_props().rooms.add()
     localItem.name = "Local"
     UpdateRoomListOperator.rooms_cached = True
+
 
 def getRooms(force=False):
     global getting_rooms, rooms_cache
@@ -548,9 +588,9 @@ def getRooms(force=False):
         return
 
     host = get_dcc_sync_props().host
-    port = get_dcc_sync_props().port  
+    port = get_dcc_sync_props().port
     shareData.roomListUpdateClient = None
-    
+
     up = server_is_up(host, port)
     get_dcc_sync_props().remoteServerIsUp = up
 
@@ -568,6 +608,7 @@ def getRooms(force=False):
     shareData.roomListUpdateClient.addCallback('roomsList', onRooms)
     shareData.roomListUpdateClient.sendListRooms()
 
+
 def clear_scene_content():
     set_handlers(False)
 
@@ -579,7 +620,7 @@ def clear_scene_content():
             if obj.type == 'MESH' or obj.type == 'LIGHT' or obj.type == 'CAMERA':
                 objs.append(obj)
 
-    for obj in objs:        
+    for obj in objs:
         bpy.data.objects.remove(obj, do_unlink=True)
 
     for block in bpy.data.meshes:
@@ -603,6 +644,7 @@ def clear_scene_content():
 
     set_handlers(True)
 
+
 def isParentInCollection(collection, obj):
     parent = obj.parent
     while parent is not None:
@@ -611,17 +653,20 @@ def isParentInCollection(collection, obj):
         parent = parent.parent
     return False
 
+
 def send_collection_content(collection):
     for obj in collection.objects:
-        shareData.client.sendAddObjectToCollection(collection.name,obj.name)
+        shareData.client.sendAddObjectToCollection(collection.name, obj.name)
 
     for childCollection in collection.children:
         shareData.client.sendAddCollectionToCollection(collection.name, childCollection.name)
 
+
 def send_collections():
     for collection in bpy.data.collections:
         shareData.client.sendCollection(collection)
-        send_collection_content(collection)        
+        send_collection_content(collection)
+
 
 def send_scene_content():
     shareData.client.currentSceneName = bpy.context.scene.name
@@ -675,14 +720,20 @@ def set_handlers(connect: bool):
             bpy.app.handlers.redo_post.remove(onUndoRedoPost)
             shareData.depsgraph = None
     except:
-        print ("Error setting handlers")
+        print("Error setting handlers")
 
 
 def start_local_server():
     dir_path = Path(__file__).parent
     serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
+
+    if get_dcc_sync_props().showServerConsole:
+        args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
+    else:
+        args = {'stdout': subprocess.PIPE, 'stderr': subprocess.STDOUT}
+
     shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(
-        serverPath)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+        serverPath)], shell=False, **args)
 
 
 def server_is_up(address, port):
@@ -724,7 +775,7 @@ class CreateRoomOperator(bpy.types.Operator):
             shareData.client.addCallback('SendContent', send_scene_content)
             shareData.client.addCallback('ClearContent', clear_scene_content)
             if not shareData.client.isConnected():
-                    return {'CANCELLED'}
+                return {'CANCELLED'}
 
             if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
                 bpy.app.timers.register(shareData.client.networkConsumer)
@@ -741,7 +792,7 @@ class JoinOrLeaveRoomOperator(bpy.types.Operator):
     """Join a room, or leave the one that was already joined"""
     bl_idname = "dcc_sync.join_or_leave_room"
     bl_label = "DCCSync Join or Leave Room"
-    bl_options = {'REGISTER'}   
+    bl_options = {'REGISTER'}
 
     def execute(self, context):
         global rooms_cache
@@ -764,7 +815,7 @@ class JoinOrLeaveRoomOperator(bpy.types.Operator):
             if room == 'Local':
                 host = common.DEFAULT_HOST
                 port = common.DEFAULT_PORT
-                localServerIsUp = server_is_up(host, port)                
+                localServerIsUp = server_is_up(host, port)
                 # Launch local server? if it doesn't exist
                 if not localServerIsUp:
                     start_local_server()
@@ -774,10 +825,10 @@ class JoinOrLeaveRoomOperator(bpy.types.Operator):
                 port = get_dcc_sync_props().port
 
             shareData.client = clientBlender.ClientBlender(host, port)
-            shareData.client.addCallback('SendContent',send_scene_content)
-            shareData.client.addCallback('ClearContent',clear_scene_content)
+            shareData.client.addCallback('SendContent', send_scene_content)
+            shareData.client.addCallback('ClearContent', clear_scene_content)
             if not shareData.client.isConnected():
-                    return {'CANCELLED'}
+                return {'CANCELLED'}
             if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
                 bpy.app.timers.register(shareData.client.networkConsumer)
 
@@ -801,23 +852,24 @@ class UpdateRoomListOperator(bpy.types.Operator):
         updateListRoomsProperty()
         return {'FINISHED'}
 
+
 class SendSelectionOperator(bpy.types.Operator):
     """Send current selection to DCC Sync server"""
     bl_idname = "dcc_sync.send_selection"
     bl_label = "DCCSync Send selection"
-    bl_options = {'REGISTER'}   
+    bl_options = {'REGISTER'}
 
-    def execute(self, context): 
+    def execute(self, context):
         if shareData.client is None:
             return {'CANCELLED'}
-        
+
         selectedObjects = bpy.context.selected_objects
         for obj in selectedObjects:
             try:
-                for slot in obj.material_slots[:]:    
+                for slot in obj.material_slots[:]:
                     shareData.client.sendMaterial(slot.material)
             except:
-                print( 'materials not found' )
+                print('materials not found')
 
             updateParams(obj)
             updateTransform(obj)
@@ -830,9 +882,9 @@ class LaunchVRtistOperator(bpy.types.Operator):
     bl_idname = "vrtist.launch"
     bl_label = "Launch VRtist"
     bl_options = {'REGISTER'}
-    
+
     def execute(self, context):
-        dcc_sync_props =  get_dcc_sync_props()
+        dcc_sync_props = get_dcc_sync_props()
         room = shareData.currentRoom
         if not room:
             bpy.ops.dcc_sync.joinroom()
@@ -841,9 +893,10 @@ class LaunchVRtistOperator(bpy.types.Operator):
         hostname = "localhost"
         if not shareData.isLocal:
             hostname = vrtistconnect.host
-        args = [dcc_sync_props.VRtist, "--room",room, "--hostname", hostname, "--port", str(vrtistconnect.port)]
-        subprocess.Popen(args, stdout=subprocess.PIPE,stderr=subprocess.STDOUT, shell=False)
+        args = [dcc_sync_props.VRtist, "--room", room, "--hostname", hostname, "--port", str(vrtistconnect.port)]
+        subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
         return {'FINISHED'}
+
 
 classes = (
     LaunchVRtistOperator,
@@ -853,9 +906,11 @@ classes = (
     JoinOrLeaveRoomOperator,
 )
 
+
 def register():
     for _ in classes:
         bpy.utils.register_class(_)
+
 
 def unregister():
     for _ in classes:

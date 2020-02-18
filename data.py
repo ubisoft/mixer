@@ -20,6 +20,7 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
     room_index: bpy.props.IntProperty()  # index in the list of rooms
     advanced: bpy.props.BoolProperty(default=False)
     remoteServerIsUp: bpy.props.BoolProperty(default=False)
+    showServerConsole: bpy.props.BoolProperty(default=False)
     VRtist: bpy.props.StringProperty(name="VRtist", default=os.environ.get(
         "VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe"))
 
