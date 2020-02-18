@@ -106,10 +106,10 @@ def leave_current_room():
     shareData.currentRoom = None
     set_handlers(False)
 
-    if bpy.app.timers.is_registered(shareData.client.networkConsumer):
-        bpy.app.timers.unregister(shareData.client.networkConsumer)
-
     if shareData.client is not None:
+        if bpy.app.timers.is_registered(shareData.client.networkConsumer):
+            bpy.app.timers.unregister(shareData.client.networkConsumer)
+
         shareData.client.disconnect()
         del(shareData.client)
         shareData.client = None
