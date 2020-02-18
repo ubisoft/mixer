@@ -28,6 +28,7 @@ class TransformStruct:
 
 class ShareData:
     def __init__(self):
+        self.sessionId = 0  # For logging and debug
         self.client = None
         self.currentRoom = None
         self.isLocal = False
@@ -595,7 +596,8 @@ def getRooms(force=False):
     get_dcc_sync_props().remoteServerIsUp = up
 
     if up:
-        shareData.roomListUpdateClient = clientBlender.ClientBlender(host, port)
+        shareData.roomListUpdateClient = clientBlender.ClientBlender(
+            f"roomListUpdateClient {shareData.sessionId}", host, port)
 
     if not up or not shareData.roomListUpdateClient.isConnected():
         rooms_cache = ["Local"]
@@ -669,6 +671,8 @@ def send_collections():
 
 
 def send_scene_content():
+    logger.info("Sending scene content to server")
+
     shareData.client.currentSceneName = bpy.context.scene.name
 
     # First step : Send all Blender data (materials, objects, collection) existing in file
@@ -747,6 +751,21 @@ def server_is_up(address, port):
         return False
 
 
+def create_main_client(host: str, port: int, room: str):
+    shareData.sessionId += 1
+    shareData.client = clientBlender.ClientBlender(f"syncClient {shareData.sessionId}", host, port)
+    shareData.client.addCallback('SendContent', send_scene_content)
+    shareData.client.addCallback('ClearContent', clear_scene_content)
+    if not shareData.client.isConnected():
+        return {'CANCELLED'}
+    if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
+        bpy.app.timers.register(shareData.client.networkConsumer)
+
+    shareData.client.joinRoom(room)
+    shareData.currentRoom = room
+    set_handlers(True)
+
+
 class CreateRoomOperator(bpy.types.Operator):
     """Create a new room on DCC Sync server"""
     bl_idname = "dcc_sync.create_room"
@@ -771,19 +790,8 @@ class CreateRoomOperator(bpy.types.Operator):
             host = get_dcc_sync_props().host
             port = get_dcc_sync_props().port
 
-            shareData.client = clientBlender.ClientBlender(host, port)
-            shareData.client.addCallback('SendContent', send_scene_content)
-            shareData.client.addCallback('ClearContent', clear_scene_content)
-            if not shareData.client.isConnected():
-                return {'CANCELLED'}
+            create_main_client(host, port, room)
 
-            if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
-                bpy.app.timers.register(shareData.client.networkConsumer)
-
-            shareData.client.joinRoom(room)
-            shareData.currentRoom = room
-
-            set_handlers(True)
             UpdateRoomListOperator.rooms_cached = False
         return {'FINISHED'}
 
@@ -824,18 +832,7 @@ class JoinOrLeaveRoomOperator(bpy.types.Operator):
                 host = get_dcc_sync_props().host
                 port = get_dcc_sync_props().port
 
-            shareData.client = clientBlender.ClientBlender(host, port)
-            shareData.client.addCallback('SendContent', send_scene_content)
-            shareData.client.addCallback('ClearContent', clear_scene_content)
-            if not shareData.client.isConnected():
-                return {'CANCELLED'}
-            if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
-                bpy.app.timers.register(shareData.client.networkConsumer)
-
-            shareData.client.joinRoom(room)
-            set_handlers(True)
-
-            shareData.currentRoom = room
+            create_main_client(host, port, room)
 
         return {'FINISHED'}
 

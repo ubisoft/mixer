@@ -8,12 +8,17 @@ from mathutils import *
 import os
 import platform
 import ctypes
+import logging
 _STILL_ACTIVE = 259
+
+logger = logging.getLogger(__package__)
 
 
 class ClientBlender(Client):
-    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
+    def __init__(self, name, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(host, port)
+
+        self.name = name
 
         self.objectNames = {}  # object name / object
         self.textures = set()
@@ -1043,6 +1048,9 @@ class ClientBlender(Client):
             except queue.Empty:
                 return 0.01
             else:
+                logger.info("Client %s Command %s received (queue size = %d)",
+                            self.name, command.type, self.receivedCommands.qsize())
+
                 self.blockSignals = True
                 self.receivedCommandsProcessed = True
 
