@@ -8,12 +8,17 @@ from mathutils import *
 import os
 import platform
 import ctypes
+import logging
 _STILL_ACTIVE = 259
+
+logger = logging.getLogger(__package__)
 
 
 class ClientBlender(Client):
-    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
+    def __init__(self, name, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(host, port)
+
+        self.name = name
 
         self.objectNames = {}  # object name / object
         self.textures = set()
@@ -52,12 +57,13 @@ class ClientBlender(Client):
             bpy.context.scene.collection.children.link(collection)
         return bpy.data.collections[name]
 
-    def getOrCreatePath(self, path, collectionName="Collection"):
+    def getOrCreatePath(self, path, data, collectionName="Collection"):
         collection = self.getOrCreateCollection(collectionName)
         pathElem = path.split('/')
         parent = None
         ob = None
-        for elem in pathElem:
+        # Create or get parents
+        for elem in pathElem[:-1]:
             if elem not in bpy.data.objects:
                 ob = bpy.data.objects.new(elem, None)
                 collection.objects.link(ob)
@@ -65,22 +71,26 @@ class ClientBlender(Client):
                 ob = bpy.data.objects[elem]
             ob.parent = parent
             parent = ob
+        # Create or get object
+        elem = pathElem[-1]
+        if elem not in bpy.data.objects:
+            ob = bpy.data.objects.new(elem, data)
+            collection.objects.link(ob)
+        else:
+            ob = bpy.data.objects[elem]
         return ob
 
     def getOrCreateObjectData(self, path, data):
-        ob = self.getOrCreatePath(path)
+        ob = self.getOrCreatePath(path, data)
         if not ob:
-            return None
+            return None  # todo should not happen ? assert this ?
 
         parent = ob.parent
         name = ob.name
 
-        # cannot simply replace objects data
-        # needs to destroy and re create it
-        bpy.data.objects.remove(ob, do_unlink=True)
-        ob = bpy.data.objects.new(name, data)
         collection = self.getOrCreateCollection()
-        collection.objects.link(ob)
+        if not ob.name in collection.objects:
+            collection.objects.link(ob)
         ob.parent = parent
 
     def getOrCreateCamera(self, cameraName):
@@ -253,7 +263,7 @@ class ClientBlender(Client):
         visible, start = common.decodeBool(data, start)
 
         try:
-            obj = self.getOrCreatePath(objectPath)
+            obj = self.getOrCreatePath(objectPath, None)
         except KeyError:
             # Object doesn't exist anymore
             return
@@ -407,7 +417,7 @@ class ClientBlender(Client):
         collections = obj.users_collection
         for collection in collections:
             collection.objects.unlink(obj)
-        #collection = self.getOrCreateCollection()
+        # collection = self.getOrCreateCollection()
         # collection.objects.unlink(obj)
         trashCollection = self.getOrCreateCollection("__Trash__")
         trashCollection.hide_viewport = True
@@ -488,7 +498,7 @@ class ClientBlender(Client):
                     if n.type == 'BSDF_PRINCIPLED':
                         principled = n
                         break
-            #principled = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
+            # principled = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
         if principled is None:
             baseColor = (0.8, 0.8, 0.8)
             metallic = 0.0
@@ -1043,6 +1053,9 @@ class ClientBlender(Client):
             except queue.Empty:
                 return 0.01
             else:
+                logger.info("Client %s Command %s received (queue size = %d)",
+                            self.name, command.type, self.receivedCommands.qsize())
+
                 self.blockSignals = True
                 self.receivedCommandsProcessed = True
 
