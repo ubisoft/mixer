@@ -1,7 +1,7 @@
-import socket
-import select
-import threading
 import queue
+import select
+import socket
+import threading
 
 try:
     from . import common
@@ -59,6 +59,10 @@ class Client:
     def joinRoom(self, roomName):
         common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
 
+    def setClientName(self, userName):
+        common.writeMessage(self.socket, common.Command(
+            common.MessageType.SET_CLIENT_NAME, userName.encode('utf8'), 0))
+
     def send(self, data):
         with common.mutex:
             self.socket.send(data)
@@ -71,6 +75,8 @@ class Client:
                 command = common.readMessage(self.socket)
             except common.ClientDisconnectedException:
                 print("Connection lost")
+                command = common.Command(common.MessageType.CONNECTION_LOST)
+                self.receivedCommands.put(command)
                 self.socket = None
                 break
 

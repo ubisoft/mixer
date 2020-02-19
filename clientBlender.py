@@ -9,6 +9,7 @@ from mathutils import *
 import os
 import platform
 import ctypes
+from . import operators
 _STILL_ACTIVE = 259
 
 
@@ -1028,10 +1029,22 @@ class ClientBlender(Client):
     def sendListRooms(self):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
 
+    def clearListRooms(self):
+        # TODO
+        pass
+        # operators.updateListRoomsProperty(None)
+
     def buildListRooms(self, data):
         rooms, _ = common.decodeStringArray(data, 0)
         if 'roomsList' in self.callbacks:
             self.callbacks['roomsList'](rooms)
+
+    def clearListRoomClients(self):
+        operators.updateListUsersProperty(None)
+
+    def buildListRoomClients(self, data):
+        clients, _ = common.decodeJson(data, 0)
+        operators.updateListUsersProperty(clients)
 
     def sendSceneContent(self):
         if 'SendContent' in self.callbacks:
@@ -1048,12 +1061,19 @@ class ClientBlender(Client):
             except queue.Empty:
                 return 0.01
             else:
-                logger.debug("networkConsumer() %s", command.type)
+                logger.info("networkConsumer() %s", command.type)
                 self.blockSignals = True
                 self.receivedCommandsProcessed = True
 
                 if command.type == common.MessageType.LIST_ROOMS:
                     self.buildListRooms(command.data)
+                    self.receivedCommandsProcessed = False
+                elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
+                    self.buildListRoomClients(command.data)
+                    self.receivedCommandsProcessed = False
+                elif command.type == common.MessageType.CONNECTION_LOST:
+                    self.clearListRooms()
+                    self.clearListRoomClients()
                     self.receivedCommandsProcessed = False
                 elif command.type == common.MessageType.CONTENT:
                     self.sendSceneContent()

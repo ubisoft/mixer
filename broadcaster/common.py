@@ -25,6 +25,7 @@ class MessageType(Enum):
     LIST_CLIENTS = 10
     SET_CLIENT_NAME = 11
     SEND_ERROR = 12
+    CONNECTION_LOST = 12
     COMMAND = 100
     DELETE = 101
     CAMERA = 102
@@ -233,13 +234,13 @@ def decodeVector2Array(data, index):
     return decodeArray(data, index, '2f', 2*4)
 
 
-def readMessage(socket):
-    if not socket:
+def readMessage(sock: socket.socket):
+    if not sock:
         return None
-    r, _, _ = select.select([socket], [], [], 0.0001)
+    r, _, _ = select.select([sock], [], [], 0.0001)
     if len(r) > 0:
         try:
-            msg = socket.recv(14)
+            msg = sock.recv(14)
             if len(msg) < 14:
                 raise ClientDisconnectedException()
             frameSize = bytesToInt(msg[:8])
@@ -248,7 +249,7 @@ def readMessage(socket):
             currentSize = frameSize
             msg = b''
             while currentSize != 0:
-                tmp = socket.recv(currentSize)
+                tmp = sock.recv(currentSize)
                 msg += tmp
                 currentSize -= len(tmp)
             return Command(intToMessageType(messageType), msg, commandId)
@@ -274,7 +275,7 @@ class Command:
             Command._id += 1
 
 
-def writeMessage(socket, command: Command):
+def writeMessage(sock: socket.socket, command: Command):
     if not socket:
         return
     size = intToBytes(len(command.data), 8)
@@ -285,8 +286,8 @@ def writeMessage(socket, command: Command):
     remainingSize = len(buffer)
     currentIndex = 0
     while remainingSize > 0:
-        _, w, _ = select.select([], [socket], [], 0.0001)
+        _, w, _ = select.select([], [sock], [], 0.0001)
         if len(w) > 0:
-            sent = socket.send(buffer[currentIndex:])
+            sent = sock.send(buffer[currentIndex:])
             remainingSize -= sent
             currentIndex += sent
