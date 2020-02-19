@@ -47,7 +47,7 @@ class SettingsPanel(bpy.types.Panel):
         row = layout.column()
 
         connected = operators.shareData.client is not None and operators.shareData.client.isConnected()
-        if not connected:
+        if not connected or not operators.shareData.currentRoom:
 
             # Room list
             row = layout.row()

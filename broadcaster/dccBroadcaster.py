@@ -20,11 +20,11 @@ SHUTDOWN = False
 class Connection:
     """ Represent a connection with a client """
 
-    def __init__(self, server: 'Server', socket: socket, address):
+    def __init__(self, server: 'Server', socket: socket.socket, address):
         self.socket = socket
         self.address = address
-        self.clientname = None
-        self.room = None
+        self.clientname: str = None
+        self.room: 'Room' = None
         self.commands = []  # Pending commands to send to the client
         self._server = server
         self.start()
@@ -36,12 +36,13 @@ class Connection:
     def joinRoom(self, room_name: str):
         assert self.room is None
         with common.mutex:
-            room = self._server.get_room(room_name)
-            if room is None:
-                logging.info(f"Room {room_name} does not exist. Creating it.")
-                room = self._server.add_room(room_name)
-            self.room = room
-            room.addClient(self)
+            self._server.join_room(self, room_name)
+
+    def leaveRoom(self, room_name: str):
+        assert room_name == self.room.name
+        with common.mutex:
+            self._server.leave_room(self, room_name)
+            self.room = None
 
     def deleteRoom(self, room_name: str):
         assert room_name == self.room.name
@@ -55,13 +56,13 @@ class Connection:
             if room is not None:
                 room.clear()
 
-    def listRooms(self):
+    def sendListRooms(self):
         data = common.encodeStringArray(self._server.rooms_names())
         command = common.Command(common.MessageType.LIST_ROOMS, data)
         with common.mutex:
             self.commands.append(command)
 
-    def listRoomClients(self, room_name: str):
+    def sendListRoomClients(self, room_name: str):
         with common.mutex:
             room = self._server.get_room(room_name)
             if room is not None:
@@ -71,7 +72,7 @@ class Connection:
                                          common.encodeString(f'No room named {room_name}.'))
             self.commands.append(command)
 
-    def listClients(self):
+    def sendListClients(self):
         with common.mutex:
             clients = []
             for room in self._server.rooms():
@@ -97,8 +98,11 @@ class Connection:
                 if command.type == common.MessageType.JOIN_ROOM:
                     self.joinRoom(command.data.decode())
 
+                elif command.type == common.MessageType.LEAVE_ROOM:
+                    self.leaveRoom(command.data.decode())
+
                 elif command.type == common.MessageType.LIST_ROOMS:
-                    self.listRooms()
+                    self.sendListRooms()
 
                 elif command.type == common.MessageType.DELETE_ROOM:
                     self.deleteRoom(command.data.decode())
@@ -107,10 +111,10 @@ class Connection:
                     self.clearRoom(command.data.decode())
 
                 elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
-                    self.listRoomClients(command.data.decode())
+                    self.sendListRoomClients(command.data.decode())
 
                 elif command.type == common.MessageType.LIST_CLIENTS:
-                    self.listClients()
+                    self.sendListClients()
 
                 elif command.type == common.MessageType.SET_CLIENT_NAME:
                     self.setClientName(command.data.decode())
@@ -169,7 +173,7 @@ class Room:
 
     def broadcast_user_list(self):
         for connection in self._connections:
-            connection.listRoomClients(self.name)
+            connection.sendListRoomClients(self.name)
 
     def getClients(self):
         return [dict(ip=c.address[0], port=c.address[1],
@@ -216,6 +220,8 @@ class Room:
 class Server:
     def __init__(self):
         self._rooms: Mapping[str, Room] = {}
+        # Connections not joined to any room
+        self._homelessConnections: List[Connection] = []
 
     def get_room(self, room_name: str) -> Room:
         return self._rooms.get(room_name)
@@ -235,6 +241,28 @@ class Server:
                 del self._rooms[room_name]
                 logging.info(f'Room {room_name} deleted')
 
+    def join_room(self, connection: Connection, room_name: str):
+        room = self.get_room(room_name)
+        if room is None:
+            logging.info(f"Room {room_name} does not exist. Creating it.")
+            room = self.add_room(room_name)
+
+        peername = connection.socket.getpeername()
+        if peername in self._homelessConnections:
+            logging.debug("Reusing connection %s", peername)
+            del self._homelessConnections[peername]
+
+        room.addClient(connection)
+
+    def leave_room(self, connection: Connection, room_name: str):
+        room = self.get_room(room_name)
+        if room is None:
+            raise ValueError(f"Room not found {room_name})")
+        room.removeClient(connection)
+        peername = connection.socket.getpeername()
+        assert peername not in self._homelessConnections
+        self._homelessConnections[peername] = connection
+
     def rooms_names(self) -> List[str]:
         return self._rooms.keys()
 
@@ -244,6 +272,8 @@ class Server:
     def broadcast_user_list(self):
         for room in self._rooms.values():
             room.broadcast_user_list()
+        for connection in self._homelessConnections():
+            connection.broadcast_user_list()
 
     def run(self):
         global SHUTDOWN

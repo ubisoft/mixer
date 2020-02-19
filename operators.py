@@ -1,18 +1,13 @@
-import os
-import sys
 import subprocess
-import shutil
 import logging
-from typing import Mapping, Any
+import time
+from typing import Mapping
 from pathlib import Path
 
 import bpy
 import socket
-from mathutils import *
 from . import clientBlender
-from .broadcaster import common
 from bpy.app.handlers import persistent
-from bpy.types import UIList
 
 from .data import get_dcc_sync_props
 
@@ -106,14 +101,6 @@ def updateTransform(obj):
 def leave_current_room():
     shareData.currentRoom = None
     set_handlers(False)
-
-    if bpy.app.timers.is_registered(shareData.client.networkConsumer):
-        bpy.app.timers.unregister(shareData.client.networkConsumer)
-
-    if shareData.client is not None:
-        shareData.client.disconnect()
-        del(shareData.client)
-        shareData.client = None
 
 
 @persistent
@@ -243,7 +230,7 @@ def updateObjectsState():
         newObj = bpy.data.objects.get(objName)
         if not newObj:
             continue
-        newObjParent = "" if newObj.parent == None else newObj.parent.name
+        newObjParent = "" if newObj.parent is None else newObj.parent.name
         if newObjParent != parent:
             shareData.objectsReparented.add(objName)
 
@@ -262,7 +249,7 @@ def updateObjectsState():
 def updateObjectsInfo():
     shareData.objects = set([x.name for x in bpy.data.objects])
     shareData.objectsVisibility = dict((x.name, x.hide_viewport) for x in bpy.data.objects)
-    shareData.objectsParents = dict((x.name, x.parent.name if x.parent != None else "") for x in bpy.data.objects)
+    shareData.objectsParents = dict((x.name, x.parent.name if x.parent is not None else "") for x in bpy.data.objects)
 
     shareData.objectsTransforms = {}
     for obj in bpy.data.objects:
@@ -486,7 +473,7 @@ def sendSceneDataToServer(scene):
 
 @persistent
 def onUndoRedoPre(scene):
-    #shareData.selectedObjectsNames = set()
+    # shareData.selectedObjectsNames = set()
     # for obj in bpy.context.selected_objects:
     #    shareData.selectedObjectsNames.add(obj.name)
     if not isInObjectMode():
@@ -726,7 +713,7 @@ def set_handlers(connect: bool):
             bpy.app.handlers.undo_post.remove(onUndoRedoPost)
             bpy.app.handlers.redo_post.remove(onUndoRedoPost)
             shareData.depsgraph = None
-    except:
+    except Exception:
         print("Error setting handlers")
 
 
@@ -744,8 +731,12 @@ def server_is_up(address, port):
         s.shutdown(socket.SHUT_RDWR)
         s.close()
         return True
-    except:
+    except Exception:
         return False
+
+
+def isClientConnected():
+    return shareData.client is not None and shareData.client.isConnected()
 
 
 class CreateRoomOperator(bpy.types.Operator):
@@ -769,8 +760,7 @@ class CreateRoomOperator(bpy.types.Operator):
             attempts += 1
             time.sleep(0.2)
 
-        connected = shareData.client is not None and shareData.client.isConnected()
-        if connected:
+        if isClientConnected():
             set_handlers(False)
 
             if bpy.app.timers.is_registered(shareData.client.networkConsumer):
@@ -810,16 +800,14 @@ class JoinRoomOperator(bpy.types.Operator):
     bl_label = "DCCSync Join Room"
     bl_options = {'REGISTER'}
 
-    def _connected(self) -> bool:
-        return shareData.client is not None and shareData.client.isConnected()
-
     @classmethod
     def poll(self, context):
-        if not JoinRoomOperator._connected(self):
+        return True
+        if not isClientConnected():
             roomIndex = get_dcc_sync_props().room_index
             return roomIndex < len(get_dcc_sync_props().rooms)
 
-        return True
+        return False
 
     def execute(self, context):
         shareData.currentRoom = None
@@ -833,19 +821,20 @@ class JoinRoomOperator(bpy.types.Operator):
         host = props.host
         port = props.port
 
-        shareData.client = clientBlender.ClientBlender(host, port)
-        shareData.client.addCallback('SendContent', send_scene_content)
-        shareData.client.addCallback('ClearContent', clear_scene_content)
-        if not shareData.client.isConnected():
-            return {'CANCELLED'}
-        if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
-            bpy.app.timers.register(shareData.client.networkConsumer)
+        # The connection is kept alive after leaving the room
+        if not isClientConnected():
+            shareData.client = clientBlender.ClientBlender(host, port)
+            shareData.client.addCallback('SendContent', send_scene_content)
+            shareData.client.addCallback('ClearContent', clear_scene_content)
+            if not shareData.client.isConnected():
+                return {'CANCELLED'}
+            if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
+                bpy.app.timers.register(shareData.client.networkConsumer)
 
+        shareData.currentRoom = room
         shareData.client.joinRoom(room)
         shareData.client.setClientName(props.user)
         set_handlers(True)
-
-        shareData.currentRoom = room
 
         return {'FINISHED'}
 
@@ -855,9 +844,6 @@ class LeaveRoomOperator(bpy.types.Operator):
     bl_idname = "dcc_sync.leave_room"
     bl_label = "DCCSync Leave Room"
     bl_options = {'REGISTER'}
-
-    def _connected(self) -> bool:
-        return shareData.client is not None and shareData.client.isConnected()
 
     def execute(self, context):
         shareData.currentRoom = None
@@ -898,7 +884,7 @@ class SendSelectionOperator(bpy.types.Operator):
             try:
                 for slot in obj.material_slots[:]:
                     shareData.client.sendMaterial(slot.material)
-            except:
+            except Exception:
                 print('materials not found')
 
             updateParams(obj)
