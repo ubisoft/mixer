@@ -1068,8 +1068,8 @@ class ClientBlender(Client):
             except queue.Empty:
                 return 0.01
             else:
-                logger.info("Client %s Command %s received (queue size = %d)",
-                            self.name, command.type, self.receivedCommands.qsize())
+                logger.debug("Client %s Command %s received (queue size = %d)",
+                             self.name, command.type, self.receivedCommands.qsize())
 
                 self.blockSignals = True
                 self.receivedCommandsProcessed = True

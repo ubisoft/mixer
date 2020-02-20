@@ -89,7 +89,7 @@ class SettingsPanel(bpy.types.Panel):
                          text=f"Leave Room : {operators.shareData.currentRoom}")
             col.label(text="Room Users: ")
             col.template_list("USERS_UL_ItemRenderer", "", dcc_sync_props,
-                              "users", dcc_sync_props, "room_index", rows=4)
+                              "users", dcc_sync_props, "user_index", rows=4)
 
 
 classes = (

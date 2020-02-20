@@ -15,7 +15,6 @@ logger = logging.getLogger(__package__)
 logger.setLevel(logging.INFO)
 
 
-
 class TransformStruct:
     def __init__(self, translate, quaternion, scale, visible):
         self.translate = translate
@@ -29,7 +28,10 @@ class ShareData:
         self.sessionId = 0  # For logging and debug
         self.client: clientBlender.ClientBlender = None
         self.roomListUpdateClient: clientBlender.ClientBlender = None
-        self.currentRoom = None
+
+        # equivalent to handlers set
+        self.currentRoom: str = None
+
         self.isLocal = False
         self.localServerProcess = None
         self.selectedObjectsNames = []
@@ -100,16 +102,33 @@ def updateTransform(obj):
     shareData.client.sendTransform(obj)
 
 
-def leave_current_room():
-    shareData.currentRoom = None
-    set_handlers(False)
+def join_room(room_name: str):
+    assert shareData.currentRoom is None
+    shareData.currentRoom = room_name
+    shareData.client.joinRoom(room_name)
+    shareData.client.setClientName(get_dcc_sync_props().user)
+    # join a room <==> want to track local changes
+    set_handlers(True)
 
+
+def leave_current_room():
+    # room ==> client
+    assert not shareData.currentRoom or shareData.client
+    if shareData.currentRoom:
+        if shareData.client:
+            shareData.client.leaveRoom(shareData.currentRoom)
+        shareData.currentRoom = None
+        set_handlers(False)
+
+
+def is_joined():
+    connected = shareData.client is not None and shareData.client.isConnected()
+    return connected and shareData.currentRoom
 
 
 @persistent
 def onLoad(scene):
-    connected = shareData.client is not None and shareData.client.isConnected()
-    if connected:
+    if is_joined():
         leave_current_room()
 
 
@@ -577,8 +596,6 @@ def onRooms(rooms):
     getting_rooms = False
 
 
-
-
 def getRooms(force=False):
     global getting_rooms, rooms_cache
     if getting_rooms:
@@ -721,8 +738,8 @@ def set_handlers(connect: bool):
             bpy.app.handlers.undo_post.remove(onUndoRedoPost)
             bpy.app.handlers.redo_post.remove(onUndoRedoPost)
             shareData.depsgraph = None
-    except Exception:
-        print("Error setting handlers")
+    except Exception as e:
+        logger.error("Exception during set_handlers(%s) : %s", connect, e)
 
 
 def start_local_server():
@@ -753,20 +770,26 @@ def isClientConnected():
     return shareData.client is not None and shareData.client.isConnected()
 
 
-def create_main_client(host: str, port: int, room: str):
+def create_main_client(host: str, port: int):
+    assert shareData.client is None
     shareData.sessionId += 1
-    shareData.client = clientBlender.ClientBlender(f"syncClient {shareData.sessionId}", host, port)
+    client = clientBlender.ClientBlender(f"syncClient {shareData.sessionId}", host, port)
+    if not client.isConnected():
+        return False
+
+    shareData.client = client
     shareData.client.addCallback('SendContent', send_scene_content)
     shareData.client.addCallback('ClearContent', clear_scene_content)
-    if not shareData.client.isConnected():
-        return {'CANCELLED'}
     if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
         bpy.app.timers.register(shareData.client.networkConsumer)
 
-    shareData.client.joinRoom(room)
-    shareData.currentRoom = room
-    shareData.client.setClientName(props.user)
-    set_handlers(True)
+    return True
+
+
+#
+# TODO when blender quits, the worker thread remain active untim the server quits
+#
+#
 
 
 class CreateRoomOperator(bpy.types.Operator):
@@ -777,11 +800,16 @@ class CreateRoomOperator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return bool(get_dcc_sync_props().room)
+        props = get_dcc_sync_props()
+        return not shareData.currentRoom and bool(props.room)
 
     def execute(self, context):
-        host = get_dcc_sync_props().host
-        port = get_dcc_sync_props().port
+        assert not shareData.currentRoom
+        shareData.currentRoom = None
+
+        props = get_dcc_sync_props()
+        host = props.host
+        port = props.port
         if not server_is_up(host, port):
             start_local_server()
 
@@ -790,25 +818,14 @@ class CreateRoomOperator(bpy.types.Operator):
             attempts += 1
             time.sleep(0.2)
 
-        if isClientConnected():
-            set_handlers(False)
+        shareData.isLocal = False
+        if shareData.client and not shareData.client.isConnected:
+            shareData.client = None
+        if not shareData.client:
+            if not create_main_client(host, port):
+                return {'CANCELLED'}
 
-            if bpy.app.timers.is_registered(shareData.client.networkConsumer):
-                bpy.app.timers.unregister(shareData.client.networkConsumer)
-
-            if shareData.client is not None:
-                shareData.client.disconnect()
-                del(shareData.client)
-                shareData.client = None
-        else:
-            shareData.isLocal = False
-            props = get_dcc_sync_props()
-            room = props.room
-            host = props.host
-            port = props.port
-
-            create_main_client(host, port, room)
-
+        join_room(props.room)
         return {'FINISHED'}
 
 
@@ -820,14 +837,11 @@ class JoinRoomOperator(bpy.types.Operator):
 
     @classmethod
     def poll(self, context):
-        return True
-        if not isClientConnected():
-            roomIndex = get_dcc_sync_props().room_index
-            return roomIndex < len(get_dcc_sync_props().rooms)
-
-        return False
+        roomIndex = get_dcc_sync_props().room_index
+        return roomIndex < len(get_dcc_sync_props().rooms)
 
     def execute(self, context):
+        assert not shareData.currentRoom
         shareData.currentRoom = None
         updateCurrentData()
 
@@ -836,10 +850,15 @@ class JoinRoomOperator(bpy.types.Operator):
         roomIndex = props.room_index
         room = props.rooms[roomIndex].name
 
-        host = props.host
-        port = props.port
+        # TODO same code as CreateRoom
+        if shareData.client and not shareData.client.isConnected:
+            shareData.client = None
+        if not shareData.client:
+            if not create_main_client(props.host, props.port):
+                return {'CANCELLED'}
 
-        create_main_client(host, port, room)
+        join_room(room)
+        return {'FINISHED'}
 
 
 class LeaveRoomOperator(bpy.types.Operator):
@@ -849,7 +868,6 @@ class LeaveRoomOperator(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        shareData.currentRoom = None
         leave_current_room()
         return {'FINISHED'}
 

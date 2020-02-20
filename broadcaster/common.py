@@ -246,7 +246,7 @@ class Command:
             Command._id += 1
 
 
-def readMessage(socket) -> Command:
+def readMessage(sock: socket.socket) -> Command:
     if not sock:
         return None
     r, _, _ = select.select([sock], [], [], 0.0001)
@@ -264,6 +264,7 @@ def readMessage(socket) -> Command:
                 tmp = sock.recv(currentSize)
                 msg += tmp
                 currentSize -= len(tmp)
+
             return Command(intToMessageType(messageType), msg, commandId)
 
         except ClientDisconnectedException:

@@ -1,7 +1,7 @@
 import queue
-import select
 import socket
 import threading
+import logging
 
 try:
     from . import common
@@ -18,13 +18,15 @@ class Client:
         self.applyTransformCallback = None
         self.receivedCommandsProcessed = False
         self.blockSignals = False
-
+        self._local_address = None
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((host, port))
-            print(f"Connection on port {port}")
+            self._local_address = self.socket.getsockname()
+            logging.info("Connecting from local %s:%s to %s:%s",
+                         self._local_address[0], self._local_address[1], host, port)
         except Exception as e:
-            print("Connection error ", e)
+            logging.error("Connection error %s", e)
             self.socket = None
 
         if self.socket:
@@ -59,6 +61,9 @@ class Client:
     def joinRoom(self, roomName):
         common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
 
+    def leaveRoom(self, roomName):
+        common.writeMessage(self.socket, common.Command(common.MessageType.LEAVE_ROOM, roomName.encode('utf8'), 0))
+
     def setClientName(self, userName):
         common.writeMessage(self.socket, common.Command(
             common.MessageType.SET_CLIENT_NAME, userName.encode('utf8'), 0))
@@ -74,7 +79,7 @@ class Client:
                     break
                 command = common.readMessage(self.socket)
             except common.ClientDisconnectedException:
-                print("Connection lost")
+                logging.info("Connection lost for %s:%s", self.host, self.port)
                 command = common.Command(common.MessageType.CONNECTION_LOST)
                 self.receivedCommands.put(command)
                 self.socket = None

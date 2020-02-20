@@ -1,4 +1,5 @@
 import common
+# from broadcaster import common
 import socket
 import threading
 import logging
@@ -10,6 +11,7 @@ import os
 import sys
 sys.path.append(os.getcwd())
 
+logging.basicConfig(level=logging.INFO)
 
 TIMEOUT = 60.0
 BINDING_HOST = ''
@@ -27,7 +29,6 @@ class Connection:
         self.room: 'Room' = None
         self.commands = []  # Pending commands to send to the client
         self._server = server
-        self.start()
 
     def start(self):
         self.thread = threading.Thread(None, self.run)
@@ -36,7 +37,7 @@ class Connection:
     def joinRoom(self, room_name: str):
         assert self.room is None
         with common.mutex:
-            self._server.join_room(self, room_name)
+            self.room = self._server.join_room(self, room_name)
 
     def leaveRoom(self, room_name: str):
         assert room_name == self.room.name
@@ -138,8 +139,12 @@ class Connection:
         self.commands.append(command)
 
     def close(self):
+        # called on disconnection
         if self.room is not None:
             self.room.removeClient(self)
+        else:
+            self._server.remove_unjoined_client(self)
+
         try:
             self.socket.close()
         except Exception:
@@ -153,6 +158,9 @@ class Room:
         self._connections: List['Connection'] = []
         self.commands = []
         self._server: 'Server' = server
+
+    def client_count(self):
+        return len(self._connections)
 
     def addClient(self, connection: Connection):
         logging.info(f"Add Client {connection.address} to Room {self.name}")
@@ -176,8 +184,8 @@ class Room:
             connection.sendListRoomClients(self.name)
 
     def getClients(self):
-        return [dict(ip=c.address[0], port=c.address[1],
-                     name=c.clientname, room=self.name) for c in self._connections]
+        return [{'ip': c.address[0], 'port': c.address[1],
+                 'name': c.clientname, 'room': self.name} for c in self._connections]
 
     def close(self):
         command = common.Command(common.MessageType.LEAVE_ROOM, common.encodeString(self.name))
@@ -190,7 +198,7 @@ class Room:
         self.commands = []
 
     def removeClient(self, connection: Connection):
-        logging.info("Remove Client % s from Room % s", client.address, self.name)
+        logging.info("Remove Client % s from Room % s", connection.address, self.name)
         self._connections.remove(connection)
         if len(self._connections) == 0:
             self._server.delete_room(self.name)
@@ -219,9 +227,26 @@ class Room:
 
 class Server:
     def __init__(self):
+        Address = (str, str)
         self._rooms: Mapping[str, Room] = {}
         # Connections not joined to any room
-        self._homelessConnections: List[Connection] = []
+        self._unjoined_connections: Mapping[Address, Connection] = {}
+        self._shutdown = False
+
+    def shutdown(self):
+        # mostly for tests
+        self._shutdown = True
+
+    def client_count(self):
+        joined = 0
+        for room in self._rooms.values():
+            joined += room.client_count()
+        unjoined = len(self._unjoined_connections)
+        return (joined, unjoined)
+
+    def remove_unjoined_client(self, connection: Connection):
+        logging.debug("Server : removing unjoined client %s", connection.address)
+        del self._unjoined_connections[connection.address]
 
     def get_room(self, room_name: str) -> Room:
         return self._rooms.get(room_name)
@@ -241,27 +266,29 @@ class Server:
                 del self._rooms[room_name]
                 logging.info(f'Room {room_name} deleted')
 
-    def join_room(self, connection: Connection, room_name: str):
+    def join_room(self, connection: Connection, room_name: str) -> Room:
+        assert connection.room is None
         room = self.get_room(room_name)
         if room is None:
             logging.info(f"Room {room_name} does not exist. Creating it.")
             room = self.add_room(room_name)
 
-        peername = connection.socket.getpeername()
-        if peername in self._homelessConnections:
-            logging.debug("Reusing connection %s", peername)
-            del self._homelessConnections[peername]
+        peer = connection.address
+        if peer in self._unjoined_connections:
+            logging.debug("Reusing connection %s", peer)
+            del self._unjoined_connections[peer]
 
         room.addClient(connection)
+        return room
 
     def leave_room(self, connection: Connection, room_name: str):
         room = self.get_room(room_name)
         if room is None:
             raise ValueError(f"Room not found {room_name})")
         room.removeClient(connection)
-        peername = connection.socket.getpeername()
-        assert peername not in self._homelessConnections
-        self._homelessConnections[peername] = connection
+        peer = connection.address
+        assert peer not in self._unjoined_connections
+        self._unjoined_connections[peer] = connection
 
     def rooms_names(self) -> List[str]:
         return self._rooms.keys()
@@ -272,23 +299,25 @@ class Server:
     def broadcast_user_list(self):
         for room in self._rooms.values():
             room.broadcast_user_list()
-        for connection in self._homelessConnections():
+        for connection in self._unjoined_connections():
             connection.broadcast_user_list()
 
     def run(self):
         global SHUTDOWN
-
-        connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        connection.bind((BINDING_HOST, common.DEFAULT_PORT))
-        connection.setblocking(0)
-        connection.listen(1000)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind((BINDING_HOST, common.DEFAULT_PORT))
+        sock.setblocking(0)
+        sock.listen(1000)
 
         logging.info("Listening on port % s", common.DEFAULT_PORT)
-        while True:
+        while not self._shutdown:
             try:
-                sock = connection.accept()
-                Connection(self, *sock)
-                logging.info(f"New connection {sock[1]}")
+                (conn, remote_address) = sock.accept()
+                connection = Connection(self, conn, remote_address)
+                assert connection.address not in self._unjoined_connections
+                self._unjoined_connections[connection.address] = connection
+                connection.start()
+                logging.info(f"New connection from {remote_address}")
 
             except KeyboardInterrupt:
                 break
@@ -300,11 +329,12 @@ class Server:
 
         logging.info("Shutting down server")
         SHUTDOWN = True
-        connection.close()
+        sock.close()
 
 
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-server = Server()
-server.run()
+if __name__ == '__main__':
+    server = Server()
+    server.run()
