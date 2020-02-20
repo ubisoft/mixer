@@ -234,7 +234,19 @@ def decodeVector2Array(data, index):
     return decodeArray(data, index, '2f', 2*4)
 
 
-def readMessage(sock: socket.socket):
+class Command:
+    _id = 100
+
+    def __init__(self, commandType: MessageType, data=b'', commandId=0):
+        self.data = data or b''
+        self.type = commandType
+        self.id = commandId
+        if commandId == 0:
+            self.id = Command._id
+            Command._id += 1
+
+
+def readMessage(socket) -> Command:
     if not sock:
         return None
     r, _, _ = select.select([sock], [], [], 0.0001)
@@ -261,18 +273,6 @@ def readMessage(sock: socket.socket):
             raise ClientDisconnectedException()
 
     return None
-
-
-class Command:
-    _id = 100
-
-    def __init__(self, commandType: MessageType, data=b'', commandId=0):
-        self.data = data or b''
-        self.type = commandType
-        self.id = commandId
-        if commandId == 0:
-            self.id = Command._id
-            Command._id += 1
 
 
 def writeMessage(sock: socket.socket, command: Command):

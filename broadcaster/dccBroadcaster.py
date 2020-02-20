@@ -93,7 +93,7 @@ class Connection:
                 break
 
             if command is not None:
-                logging.info(f"client {self.address}: {command.type} received")
+                logging.info("client % s: % s: % s received", self.address[0], self.address[1], command.type)
 
                 if command.type == common.MessageType.JOIN_ROOM:
                     self.joinRoom(command.data.decode())
@@ -144,7 +144,7 @@ class Connection:
             self.socket.close()
         except Exception:
             pass
-        logging.info(f"{self.address} closed")
+        logging.info("%s closed",  self.address)
 
 
 class Room:
@@ -190,11 +190,11 @@ class Room:
         self.commands = []
 
     def removeClient(self, connection: Connection):
-        logging.info(f"Remove Client {connection.address} from Room {self.name}")
+        logging.info("Remove Client % s from Room % s", client.address, self.name)
         self._connections.remove(connection)
         if len(self._connections) == 0:
             self._server.delete_room(self.name)
-            logging.info(f'No more clients in room "{self.name}". Room deleted')
+            logging.info("No more clients in room \"%s\". Room deleted", self.name)
         else:
             logging.info(f'Connections left : "{len(self._connections)}".')
             self.broadcast_user_list()
@@ -283,7 +283,7 @@ class Server:
         connection.setblocking(0)
         connection.listen(1000)
 
-        logging.info(f"Listening on port {common.DEFAULT_PORT}")
+        logging.info("Listening on port % s", common.DEFAULT_PORT)
         while True:
             try:
                 sock = connection.accept()

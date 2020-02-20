@@ -81,6 +81,7 @@ class SettingsPanel(bpy.types.Panel):
                 col.prop(dcc_sync_props, "host", text="Host")
                 col.prop(dcc_sync_props, "port", text="Port")
                 col.prop(dcc_sync_props, "VRtist", text="VRtist Path")
+                col.prop(dcc_sync_props, "showServerConsole", text="Show server console")
 
         else:
             col = row.column()

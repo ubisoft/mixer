@@ -15,6 +15,7 @@ logger = logging.getLogger(__package__)
 logger.setLevel(logging.INFO)
 
 
+
 class TransformStruct:
     def __init__(self, translate, quaternion, scale, visible):
         self.translate = translate
@@ -25,6 +26,7 @@ class TransformStruct:
 
 class ShareData:
     def __init__(self):
+        self.sessionId = 0  # For logging and debug
         self.client: clientBlender.ClientBlender = None
         self.roomListUpdateClient: clientBlender.ClientBlender = None
         self.currentRoom = None
@@ -101,6 +103,7 @@ def updateTransform(obj):
 def leave_current_room():
     shareData.currentRoom = None
     set_handlers(False)
+
 
 
 @persistent
@@ -574,6 +577,8 @@ def onRooms(rooms):
     getting_rooms = False
 
 
+
+
 def getRooms(force=False):
     global getting_rooms, rooms_cache
     if getting_rooms:
@@ -590,7 +595,8 @@ def getRooms(force=False):
     get_dcc_sync_props().remoteServerIsUp = up
 
     if up:
-        shareData.roomListUpdateClient = clientBlender.ClientBlender(host, port)
+        shareData.roomListUpdateClient = clientBlender.ClientBlender(
+            f"roomListUpdateClient {shareData.sessionId}", host, port)
 
     if not up or not shareData.roomListUpdateClient.isConnected():
         return
@@ -663,6 +669,8 @@ def send_collections():
 
 
 def send_scene_content():
+    logger.info("Sending scene content to server")
+
     shareData.client.currentSceneName = bpy.context.scene.name
 
     # First step : Send all Blender data (materials, objects, collection) existing in file
@@ -720,8 +728,14 @@ def set_handlers(connect: bool):
 def start_local_server():
     dir_path = Path(__file__).parent
     serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
+
+    if get_dcc_sync_props().showServerConsole:
+        args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
+    else:
+        args = {'stdout': subprocess.PIPE, 'stderr': subprocess.STDOUT}
+
     shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(
-        serverPath)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+        serverPath)], shell=False, **args)
 
 
 def server_is_up(address, port):
@@ -737,6 +751,22 @@ def server_is_up(address, port):
 
 def isClientConnected():
     return shareData.client is not None and shareData.client.isConnected()
+
+
+def create_main_client(host: str, port: int, room: str):
+    shareData.sessionId += 1
+    shareData.client = clientBlender.ClientBlender(f"syncClient {shareData.sessionId}", host, port)
+    shareData.client.addCallback('SendContent', send_scene_content)
+    shareData.client.addCallback('ClearContent', clear_scene_content)
+    if not shareData.client.isConnected():
+        return {'CANCELLED'}
+    if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
+        bpy.app.timers.register(shareData.client.networkConsumer)
+
+    shareData.client.joinRoom(room)
+    shareData.currentRoom = room
+    shareData.client.setClientName(props.user)
+    set_handlers(True)
 
 
 class CreateRoomOperator(bpy.types.Operator):
@@ -777,20 +807,8 @@ class CreateRoomOperator(bpy.types.Operator):
             host = props.host
             port = props.port
 
-            shareData.client = clientBlender.ClientBlender(host, port)
-            shareData.client.addCallback('SendContent', send_scene_content)
-            shareData.client.addCallback('ClearContent', clear_scene_content)
-            if not shareData.client.isConnected():
-                return {'CANCELLED'}
+            create_main_client(host, port, room)
 
-            if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
-                bpy.app.timers.register(shareData.client.networkConsumer)
-
-            shareData.client.joinRoom(room)
-            shareData.client.setClientName(props.user)
-            shareData.currentRoom = room
-
-            set_handlers(True)
         return {'FINISHED'}
 
 
@@ -821,22 +839,7 @@ class JoinRoomOperator(bpy.types.Operator):
         host = props.host
         port = props.port
 
-        # The connection is kept alive after leaving the room
-        if not isClientConnected():
-            shareData.client = clientBlender.ClientBlender(host, port)
-            shareData.client.addCallback('SendContent', send_scene_content)
-            shareData.client.addCallback('ClearContent', clear_scene_content)
-            if not shareData.client.isConnected():
-                return {'CANCELLED'}
-            if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
-                bpy.app.timers.register(shareData.client.networkConsumer)
-
-        shareData.currentRoom = room
-        shareData.client.joinRoom(room)
-        shareData.client.setClientName(props.user)
-        set_handlers(True)
-
-        return {'FINISHED'}
+        create_main_client(host, port, room)
 
 
 class LeaveRoomOperator(bpy.types.Operator):
