@@ -56,7 +56,7 @@ class SettingsPanel(bpy.types.Panel):
 
             # Join room
             col = row.column()
-            col.operator(operators.UpdateRoomListOperator.bl_idname, text="Refresh")
+            col.operator(operators.ConnectOperator.bl_idname, text="Connect")
             col.operator(operators.JoinRoomOperator.bl_idname, text="Join Room")
 
             row = layout.row()

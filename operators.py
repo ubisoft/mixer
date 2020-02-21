@@ -27,7 +27,6 @@ class ShareData:
     def __init__(self):
         self.sessionId = 0  # For logging and debug
         self.client: clientBlender.ClientBlender = None
-        self.roomListUpdateClient: clientBlender.ClientBlender = None
 
         # equivalent to handlers set
         self.currentRoom: str = None
@@ -124,6 +123,12 @@ def leave_current_room():
 def is_joined():
     connected = shareData.client is not None and shareData.client.isConnected()
     return connected and shareData.currentRoom
+
+
+def disconnect():
+    # the socket has already been disconnected
+    assert shareData.client is not None and not shareData.client.isConnected()
+    shareData.client = None
 
 
 @persistent
@@ -551,18 +556,12 @@ def onUndoRedoPost(scene):
     shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
 
 
-rooms_cache = None
-getting_rooms = False
-
-
-def updateListRoomsProperty():
-    logger.debug("updateListRoomsProperty() cache : %s", rooms_cache)
+def updateListRoomsProperty(rooms):
     props = get_dcc_sync_props()
     props.rooms.clear()
-    if rooms_cache:
-        for room in rooms_cache:
-            item = get_dcc_sync_props().rooms.add()
-            item.name = room
+    for room in rooms:
+        item = get_dcc_sync_props().rooms.add()
+        item.name = room
 
 
 def updateListUsersProperty(clients: Mapping[str, str]):
@@ -577,53 +576,6 @@ def updateListUsersProperty(clients: Mapping[str, str]):
         display_name = display_name if display_name is not None else "<unnamed>"
         display_name = f"{display_name} ({client['ip']}:{client['port']})"
         item.name = display_name
-
-
-def onRooms(rooms):
-    logger.debug("onRooms()")
-    global getting_rooms, rooms_cache
-    rooms_cache = rooms
-
-    connected = shareData.roomListUpdateClient is not None and shareData.roomListUpdateClient.isConnected()
-    if connected:
-        if bpy.app.timers.is_registered(shareData.roomListUpdateClient.networkConsumer):
-            bpy.app.timers.unregister(shareData.roomListUpdateClient.networkConsumer)
-        shareData.roomListUpdateClient.disconnect()
-        del(shareData.roomListUpdateClient)
-        shareData.roomListUpdateClient = None
-
-    updateListRoomsProperty()
-    getting_rooms = False
-
-
-def getRooms(force=False):
-    global getting_rooms, rooms_cache
-    if getting_rooms:
-        return
-
-    if not force and rooms_cache:
-        return
-
-    host = get_dcc_sync_props().host
-    port = get_dcc_sync_props().port
-    shareData.roomListUpdateClient = None
-
-    up = server_is_up(host, port)
-    get_dcc_sync_props().remoteServerIsUp = up
-
-    if up:
-        shareData.roomListUpdateClient = clientBlender.ClientBlender(
-            f"roomListUpdateClient {shareData.sessionId}", host, port)
-
-    if not up or not shareData.roomListUpdateClient.isConnected():
-        return
-
-    getting_rooms = True
-    if not bpy.app.timers.is_registered(shareData.roomListUpdateClient.networkConsumer):
-        bpy.app.timers.register(shareData.roomListUpdateClient.networkConsumer)
-
-    shareData.roomListUpdateClient.addCallback('roomsList', onRooms)
-    shareData.roomListUpdateClient.sendListRooms()
 
 
 def clear_scene_content():
@@ -742,7 +694,16 @@ def set_handlers(connect: bool):
         logger.error("Exception during set_handlers(%s) : %s", connect, e)
 
 
-def start_local_server():
+def wait_for_server(host, port):
+    attempts = 0
+    max_attempts = 10
+    while not server_is_up(host, port) and attempts < max_attempts:
+        attempts += 1
+        time.sleep(0.2)
+    return attempts < max_attempts
+
+
+def start_local_server(wait_for_server=False):
     dir_path = Path(__file__).parent
     serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
 
@@ -786,12 +747,6 @@ def create_main_client(host: str, port: int):
     return True
 
 
-#
-# TODO when blender quits, the worker thread remain active untim the server quits
-#
-#
-
-
 class CreateRoomOperator(bpy.types.Operator):
     """Create a new room on DCC Sync server"""
     bl_idname = "dcc_sync.create_room"
@@ -806,25 +761,10 @@ class CreateRoomOperator(bpy.types.Operator):
     def execute(self, context):
         assert not shareData.currentRoom
         shareData.currentRoom = None
+        if not connect():
+            return {'CANCELLED'}
 
         props = get_dcc_sync_props()
-        host = props.host
-        port = props.port
-        if not server_is_up(host, port):
-            start_local_server()
-
-        attempts = 0
-        while not server_is_up(host, port) and attempts < 10:
-            attempts += 1
-            time.sleep(0.2)
-
-        shareData.isLocal = False
-        if shareData.client and not shareData.client.isConnected:
-            shareData.client = None
-        if not shareData.client:
-            if not create_main_client(host, port):
-                return {'CANCELLED'}
-
         join_room(props.room)
         return {'FINISHED'}
 
@@ -868,25 +808,36 @@ class LeaveRoomOperator(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     def execute(self, context):
+        props = get_dcc_sync_props()
+        props.rooms.clear()
         leave_current_room()
         return {'FINISHED'}
 
 
-class UpdateRoomListOperator(bpy.types.Operator):
+def connect():
+    props = get_dcc_sync_props()
+    if not server_is_up(props.host, props.port):
+        start_local_server(wait_for_server=True)
+        wait_for_server(props.host, props.port)
+
+    if not isClientConnected():
+        if not create_main_client(props.host, props.port):
+            return False
+
+    shareData.client.setClientName(props.user)
+    return True
+
+
+class ConnectOperator(bpy.types.Operator):
     """Fetch and update the list of DCC Sync rooms"""
-    bl_idname = "dcc_sync.update_room_list"
-    bl_label = "DCCSync Update Room List"
+    bl_idname = "dcc_sync.connect"
+    bl_label = "Connect to server"
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        global rooms_cache
-        logger.info("UpdateRoomListOperator")
-        props = get_dcc_sync_props()
-        props.users.clear()
-        rooms_cache = None
-        getRooms(force=True)
-        updateListRoomsProperty()
-
+        logger.info("ConnectOperator")
+        if not connect():
+            return {'CANCELLED'}
         return {'FINISHED'}
 
 
@@ -938,7 +889,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
 classes = (
     LaunchVRtistOperator,
     CreateRoomOperator,
-    UpdateRoomListOperator,
+    ConnectOperator,
     SendSelectionOperator,
     JoinRoomOperator,
     LeaveRoomOperator,

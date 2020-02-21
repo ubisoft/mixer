@@ -1036,22 +1036,17 @@ class ClientBlender(Client):
     def sendListRooms(self):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
 
-    def clearListRooms(self):
-        # TODO
-        pass
-        # operators.updateListRoomsProperty(None)
-
-    def buildListRooms(self, data):
-        rooms, _ = common.decodeStringArray(data, 0)
-        if 'roomsList' in self.callbacks:
-            self.callbacks['roomsList'](rooms)
-
-    def clearListRoomClients(self):
-        operators.updateListUsersProperty(None)
-
     def buildListRoomClients(self, data):
-        clients, _ = common.decodeJson(data, 0)
+        clients = []
+        if data is not None:
+            clients, _ = common.decodeJson(data, 0)
+        logger.info("ListRoom")
+        for client in clients:
+            logger.info("client %s", client)
+
         operators.updateListUsersProperty(clients)
+        rooms = {client['room'] for client in clients if client['room']}
+        operators.updateListRoomsProperty(rooms)
 
     def sendSceneContent(self):
         if 'SendContent' in self.callbacks:
@@ -1075,14 +1070,14 @@ class ClientBlender(Client):
                 self.receivedCommandsProcessed = True
 
                 if command.type == common.MessageType.LIST_ROOMS:
-                    self.buildListRooms(command.data)
+                    # self.buildListRooms(command.data)
                     self.receivedCommandsProcessed = False
                 elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
                     self.buildListRoomClients(command.data)
                     self.receivedCommandsProcessed = False
                 elif command.type == common.MessageType.CONNECTION_LOST:
-                    self.clearListRooms()
-                    self.clearListRoomClients()
+                    operators.disconnect()
+                    self.buildListRoomClients(None)
                     self.receivedCommandsProcessed = False
                 elif command.type == common.MessageType.CONTENT:
                     self.sendSceneContent()

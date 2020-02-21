@@ -16,11 +16,6 @@ bl_info = {
 }
 
 
-def refreshRoomListHack():
-    bpy.ops.dcc_sync.update_room_list()
-    return None
-
-
 def cleanup():
     try:
         if operators.shareData.localServerProcess:
@@ -41,23 +36,16 @@ def register():
     ui.register()
     data.register()
 
-    bpy.app.timers.register(refreshRoomListHack, first_interval=0)
     atexit.register(cleanup)
 
 
 def unregister():
     operators.leave_current_room()
 
-    if bpy.app.timers.is_registered(refreshRoomListHack):
-        bpy.app.timers.unregister(refreshRoomListHack)
-
     shareData = operators.shareData
     if shareData:
         if shareData.client and bpy.app.timers.is_registered(shareData.client.networkConsumer):
             bpy.app.timers.unregister(shareData.client.networkConsumer)
-
-        if shareData.roomListUpdateClient and bpy.app.timers.is_registered(shareData.roomListUpdateClient.networkConsumer):
-            bpy.app.timers.unregister(shareData.roomListUpdateClient.networkConsumer)
 
     operators.unregister()
     ui.unregister()
