@@ -10,7 +10,9 @@ except ImportError:
 
 
 class Client:
-    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
+    def __init__(self, name, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT, delegate=None):
+
+        self.name = name
         self.host = host
         self.port = port
         self.receivedCommands = queue.Queue()
@@ -19,6 +21,9 @@ class Client:
         self.receivedCommandsProcessed = False
         self.blockSignals = False
         self._local_address = None
+        self._delegate = delegate
+        self.socket = None
+
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((host, port))
@@ -58,19 +63,13 @@ class Client:
     def addCommand(self, command):
         self.pendingCommands.put(command)
 
-    def joinRoom(self, roomName):
-        common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
-
-    def leaveRoom(self, roomName):
-        common.writeMessage(self.socket, common.Command(common.MessageType.LEAVE_ROOM, roomName.encode('utf8'), 0))
+    def send(self, data):
+        with common.mutex:
+            self.socket.send(data)
 
     def setClientName(self, userName):
         common.writeMessage(self.socket, common.Command(
             common.MessageType.SET_CLIENT_NAME, userName.encode('utf8'), 0))
-
-    def send(self, data):
-        with common.mutex:
-            self.socket.send(data)
 
     def run(self):
         while(self.threadAlive):
@@ -102,13 +101,58 @@ class Client:
         self.threadAlive = False
         self.thread = None
 
+    def consume_one(self):
+        try:
+            command = self.receivedCommands.get_nowait()
+        except queue.Empty:
+            return None, None
+        else:
+            logging.debug("Client %s Command %s received (queue size = %d)",
+                          self.name, command.type, self.receivedCommands.qsize())
+
+            self.blockSignals = True
+            self.receivedCommandsProcessed = True
+
+            if command.type == common.MessageType.LIST_ROOMS:
+                if self._delegate:
+                    self._delegate.buildListRooms(command.data)
+                return command, True
+            elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
+                if self._delegate:
+                    clients, _ = common.decodeJson(command.data, 0)
+                    self._delegate.buildListRoomClients(clients)
+                return command, True
+            elif command.type == common.MessageType.CONNECTION_LOST:
+                if self._delegate:
+                    self._delegate.clearListRoomClients()
+                return command, True
+
+            return command, False
+
     def blenderExists(self):
         return True
 
 
+class TestClient(Client):
+    def __init__(self, *args, **kwargs):
+        super(TestClient, self).__init__("noname", *args, **kwargs)
+
+    def networkConsumer(self):
+        while True:
+            command, processed = super().consume_one()
+            if command is None:
+                return
+
+    def joinRoom(self, roomName):
+        common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
+
+    def leaveRoom(self, roomName):
+        common.writeMessage(self.socket, common.Command(common.MessageType.LEAVE_ROOM, roomName.encode('utf8'), 0))
+
+
 # For tests
 if __name__ == '__main__':
-    client = Client()
+    client = TestClient()
 
     while True:
         msg = input("> ")
