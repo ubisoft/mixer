@@ -1056,14 +1056,14 @@ class ClientBlender(Client):
 
     def networkConsumer(self):
         while True:
-            command, processed = Client.consume_one()
-            if command is None:
-                return 0.01
             self.blockSignals = True
             self.receivedCommandsProcessed = True
+            command, processed = self.consume_one()
+            if command is None:
+                return 0.01
 
             if processed:
-                # protocol command that was processed
+                # this was a room protocol command that was processed
                 self.receivedCommandsProcessed = False
             else:
                 if command.type == common.MessageType.CONTENT:

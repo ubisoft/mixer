@@ -136,6 +136,37 @@ class Test_Server(unittest.TestCase):
         self.assertCountEqual(d0.name_room, expected)
         self.assertCountEqual(d1.name_room, expected)
 
+    def test_join_one_room_two_clients_leave(self):
+        delay = self.delay
+        server = self._server
+
+        c0_name = 'c0_name'
+        c0_room = 'c0_room'
+
+        c1_name = 'c1_name'
+        c1_room = c0_room
+
+        d0 = Delegate()
+        c0 = TestClient(delegate=d0)
+        c0.joinRoom(c0_room)
+        c0.setClientName(c0_name)
+
+        d1 = Delegate()
+        c1 = TestClient(delegate=d1)
+        c1.joinRoom(c1_room)
+        c1.setClientName(c1_name)
+
+        c1.leaveRoom(c1_room)
+
+        delay()
+        c0.networkConsumer()
+        c1.networkConsumer()
+        expected = [(c0_name, c0_room)]
+        self.assertEqual(server.client_count(), (1, 1))
+        self.assertEqual(len(d0.name_room), 1)
+        self.assertCountEqual(d0.name_room, expected)
+        self.assertListEqual(d0.name_room, d1.name_room)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -67,6 +67,12 @@ class Client:
         with common.mutex:
             self.socket.send(data)
 
+    def joinRoom(self, roomName):
+        common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
+
+    def leaveRoom(self, roomName):
+        common.writeMessage(self.socket, common.Command(common.MessageType.LEAVE_ROOM, roomName.encode('utf8'), 0))
+
     def setClientName(self, userName):
         common.writeMessage(self.socket, common.Command(
             common.MessageType.SET_CLIENT_NAME, userName.encode('utf8'), 0))
@@ -142,12 +148,6 @@ class TestClient(Client):
             command, processed = super().consume_one()
             if command is None:
                 return
-
-    def joinRoom(self, roomName):
-        common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
-
-    def leaveRoom(self, roomName):
-        common.writeMessage(self.socket, common.Command(common.MessageType.LEAVE_ROOM, roomName.encode('utf8'), 0))
 
 
 # For tests
