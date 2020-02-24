@@ -19,9 +19,7 @@ logger.setLevel(logging.INFO)
 
 class ClientBlender(Client):
     def __init__(self, name, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
-        super(ClientBlender, self).__init__(host, port)
-
-        self.name = name
+        super(ClientBlender, self).__init__(name, host, port, delegate=self)
 
         self.objectNames = {}  # object name / object
         self.textures = set()
@@ -1049,8 +1047,7 @@ class ClientBlender(Client):
     def clearListRoomClients(self):
         operators.updateListUsersProperty(None)
 
-    def buildListRoomClients(self, data):
-        clients, _ = common.decodeJson(data, 0)
+    def buildListRoomClients(self, clients):
         operators.updateListUsersProperty(clients)
 
     def sendSceneContent(self):
@@ -1063,28 +1060,17 @@ class ClientBlender(Client):
 
     def networkConsumer(self):
         while True:
-            try:
-                command = self.receivedCommands.get_nowait()
-            except queue.Empty:
+            command, processed = Client.consume_one()
+            if command is None:
                 return 0.01
+            self.blockSignals = True
+            self.receivedCommandsProcessed = True
+
+            if processed:
+                # protocol command that was processed
+                self.receivedCommandsProcessed = False
             else:
-                logger.debug("Client %s Command %s received (queue size = %d)",
-                             self.name, command.type, self.receivedCommands.qsize())
-
-                self.blockSignals = True
-                self.receivedCommandsProcessed = True
-
-                if command.type == common.MessageType.LIST_ROOMS:
-                    self.buildListRooms(command.data)
-                    self.receivedCommandsProcessed = False
-                elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
-                    self.buildListRoomClients(command.data)
-                    self.receivedCommandsProcessed = False
-                elif command.type == common.MessageType.CONNECTION_LOST:
-                    self.clearListRooms()
-                    self.clearListRoomClients()
-                    self.receivedCommandsProcessed = False
-                elif command.type == common.MessageType.CONTENT:
+                if command.type == common.MessageType.CONTENT:
                     self.sendSceneContent()
                     self.receivedCommandsProcessed = False
 
