@@ -292,3 +292,12 @@ def writeMessage(sock: socket.socket, command: Command):
             sent = sock.send(buffer[currentIndex:])
             remainingSize -= sent
             currentIndex += sent
+
+
+def is_debugger_attached():
+    try:
+        import ptvsd
+        return ptvsd.is_attached()
+    except Exception:
+        pass
+    return False

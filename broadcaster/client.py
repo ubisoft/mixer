@@ -113,11 +113,8 @@ class Client:
         except queue.Empty:
             return None, None
         else:
-            logging.debug("Client %s Command %s received (queue size = %d)",
-                          self.name, command.type, self.receivedCommands.qsize())
-
-            self.blockSignals = True
-            self.receivedCommandsProcessed = True
+            logging.info("Client %s Command %s received (queue size = %d)",
+                         self.name, command.type, self.receivedCommands.qsize())
 
             if command.type == common.MessageType.LIST_ROOMS:
                 if self._delegate:
@@ -130,7 +127,7 @@ class Client:
                 return command, True
             elif command.type == common.MessageType.CONNECTION_LOST:
                 if self._delegate:
-                    self._delegate.clearListRoomClients()
+                    self._delegate.on_connection_lost()
                 return command, True
 
             return command, False

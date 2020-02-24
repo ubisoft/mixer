@@ -1,14 +1,13 @@
-#import common
-from broadcaster import common
+import sys
+import os
+from typing import List, ValuesView, Mapping, Any, Union
+import common
+#from broadcaster import common
 import socket
 import threading
 import logging
 import time
 
-from typing import List, ValuesView, Mapping, Any
-
-import os
-import sys
 sys.path.append(os.getcwd())
 
 logging.basicConfig(level=logging.INFO)
@@ -45,7 +44,7 @@ class Connection:
     def joinRoom(self, room_name: str):
         assert self.room is None
         with common.mutex:
-            self.room = self._server.join_room(self, room_name)
+            self._server.join_room(self, room_name)
 
     def leaveRoom(self, room_name: str):
         assert room_name == self.room.name
@@ -71,12 +70,19 @@ class Connection:
         with common.mutex:
             self.commands.append(command)
 
-    def sendListRoomClients(self, room_name: str):
+    def sendListRoomClients(self, room_name: str = None, client_ids: Union[Mapping, List[Mapping]] = None):
         with common.mutex:
-            if room_name is None:
-                ids = common.encodeJson([self.client_id()])
+            # ensure we use only one since each message ovewrites the previous one
+            # on the client
+            assert bool(room_name is not None) != bool(client_ids is not None)
+            command = None
+
+            if client_ids is not None:
+                client_ids = client_ids if isinstance(client_ids, list) else [client_ids]
+                ids = common.encodeJson(client_ids)
                 command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, ids)
-            else:
+
+            if room_name is not None:
                 room = self._server.get_room(room_name)
                 if room is not None:
                     ids = common.encodeJson(room.client_ids())
@@ -84,13 +90,14 @@ class Connection:
                 else:
                     command = common.Command(common.MessageType.SEND_ERROR,
                                              common.encodeString(f'No room named {room_name}.'))
-            self.commands.append(command)
+            if command:
+                self.commands.append(command)
 
     def sendListClients(self):
         with common.mutex:
             clients = []
             for room in self._server.rooms():
-                clients += room.client_ids()
+                clients.extend(room.client_ids())
             command = common.Command(common.MessageType.LIST_CLIENTS, common.encodeJson(clients))
             self.commands.append(command)
 
@@ -103,7 +110,7 @@ class Connection:
                 break
 
             if command is not None:
-                logging.info("client % s: % s: % s received", self.address[0], self.address[1], command.type)
+                logging.debug("client % s: % s: % s received", self.address[0], self.address[1], command.type)
 
                 if command.type == common.MessageType.JOIN_ROOM:
                     self.joinRoom(command.data.decode())
@@ -121,7 +128,7 @@ class Connection:
                     self.clearRoom(command.data.decode())
 
                 elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
-                    self.sendListRoomClients(command.data.decode())
+                    self.sendListRoomClients(room_name=command.data.decode())
 
                 elif command.type == common.MessageType.LIST_CLIENTS:
                     self.sendListClients()
@@ -174,6 +181,7 @@ class Room:
     def addClient(self, connection: Connection):
         logging.info(f"Add Client {connection.address} to Room {self.name}")
         self._connections.append(connection)
+        connection.room = self
         if len(self._connections) == 1:
             command = common.Command(common.MessageType.CONTENT)
             connection.addCommand(command)
@@ -190,9 +198,11 @@ class Room:
 
     def broadcast_user_list(self):
         for connection in self._connections:
-            connection.sendListRoomClients(self.name)
+            connection.sendListRoomClients(client_ids=self.client_ids())
 
     def client_ids(self):
+        if not self._connections:
+            return None
         return [c.client_id() for c in self._connections]
 
     def close(self):
@@ -246,6 +256,9 @@ class Server:
         self._shutdown = True
 
     def client_count(self):
+        """
+        Returns (numver of joined connections, number of unjoined connections)
+        """
         joined = 0
         for room in self._rooms.values():
             joined += room.client_count()
@@ -253,53 +266,56 @@ class Server:
         return (joined, unjoined)
 
     def remove_unjoined_client(self, connection: Connection):
-        logging.debug("Server : removing unjoined client %s", connection.address)
-        del self._unjoined_connections[connection.address]
+        with common.mutex:
+            logging.debug("Server : removing unjoined client %s", connection.address)
+            del self._unjoined_connections[connection.address]
 
     def get_room(self, room_name: str) -> Room:
         return self._rooms.get(room_name)
 
     def add_room(self, room_name: str) -> Room:
-        if room_name in self._rooms:
-            raise ValueError(f"add_room: room with name {room_name} already exists")
-        room = Room(self, room_name)
-        self._rooms[room_name] = room
-        logging.info(f'Room {room_name} added')
-        self.broadcast_user_list()
-        return room
+        with common.mutex:
+            if room_name in self._rooms:
+                raise ValueError(f"add_room: room with name {room_name} already exists")
+            room = Room(self, room_name)
+            self._rooms[room_name] = room
+            logging.info(f'Room {room_name} added')
+            self.broadcast_user_list()
+            return room
 
     def delete_room(self, room_name: str):
         with common.mutex:
             if room_name in self._rooms:
                 del self._rooms[room_name]
                 logging.info(f'Room {room_name} deleted')
-        self.broadcast_user_list()
+            self.broadcast_user_list()
 
-    def join_room(self, connection: Connection, room_name: str) -> Room:
-        assert connection.room is None
-        room = self.get_room(room_name)
-        if room is None:
-            logging.info(f"Room {room_name} does not exist. Creating it.")
-            room = self.add_room(room_name)
+    def join_room(self, connection: Connection, room_name: str):
+        with common.mutex:
+            assert connection.room is None
+            room = self.get_room(room_name)
+            if room is None:
+                logging.info(f"Room {room_name} does not exist. Creating it.")
+                room = self.add_room(room_name)
 
-        peer = connection.address
-        if peer in self._unjoined_connections:
-            logging.debug("Reusing connection %s", peer)
-            del self._unjoined_connections[peer]
+            peer = connection.address
+            if peer in self._unjoined_connections:
+                logging.debug("Reusing connection %s", peer)
+                del self._unjoined_connections[peer]
 
-        room.addClient(connection)
-        self.broadcast_user_list()
-        return room
+            room.addClient(connection)
+            self.broadcast_user_list()
 
     def leave_room(self, connection: Connection, room_name: str):
-        room = self.get_room(room_name)
-        if room is None:
-            raise ValueError(f"Room not found {room_name})")
-        room.removeClient(connection)
-        peer = connection.address
-        assert peer not in self._unjoined_connections
-        self._unjoined_connections[peer] = connection
-        self.broadcast_user_list()
+        with common.mutex:
+            room = self.get_room(room_name)
+            if room is None:
+                raise ValueError(f"Room not found {room_name})")
+            room.removeClient(connection)
+            peer = connection.address
+            assert peer not in self._unjoined_connections
+            self._unjoined_connections[peer] = connection
+            self.broadcast_user_list()
 
     def rooms_names(self) -> List[str]:
         return self._rooms.keys()
@@ -310,12 +326,19 @@ class Server:
     def broadcast_user_list(self):
         with common.mutex:
             for connection in self._unjoined_connections.values():
+                # broadcast everything to unjoined connections
                 if len(self._rooms) == 0:
-                    connection.sendListRoomClients(None)
+                    # send something to that the client get an update with no rooms
+                    client_ids = connection.client_id()
                 else:
-                    for room_name in self._rooms.keys():
-                        connection.sendListRoomClients(room_name)
+                    client_ids = []
+                    for room in self._rooms.values():
+                        ids = room.client_ids()
+                        if ids is not None:
+                            client_ids.extend(ids)
+                connection.sendListRoomClients(client_ids=client_ids)
             for room in self._rooms.values():
+                # each room broadcasts to its own users only
                 room.broadcast_user_list()
 
     def run(self):

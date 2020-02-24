@@ -127,8 +127,11 @@ def is_joined():
 
 def disconnect():
     # the socket has already been disconnected
-    assert shareData.client is not None and not shareData.client.isConnected()
-    shareData.client = None
+    if shareData.client is not None:
+        if shareData.client.isConnected():
+            shareData.client.disconnect()
+        shareData.client = None
+    shareData.currentRoom = None
 
 
 @persistent
@@ -571,6 +574,8 @@ def updateListUsersProperty(clients: Mapping[str, str]):
     if clients is None:
         return
     for client in clients:
+        if client['room'] is None:
+            continue
         item = props.users.add()
         display_name = client['name']
         display_name = display_name if display_name is not None else "<unnamed>"

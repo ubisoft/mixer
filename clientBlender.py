@@ -1034,10 +1034,11 @@ class ClientBlender(Client):
     def sendListRooms(self):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
 
-    def buildListRoomClients(self, data):
-        clients = []
-        if data is not None:
-            clients, _ = common.decodeJson(data, 0)
+    def on_connection_lost(self):
+        operators.updateListUsersProperty(None)
+        operators.disconnect()
+
+    def buildListRoomClients(self, clients):
         logger.info("ListRoom")
         for client in clients:
             logger.info("client %s", client)
@@ -1056,12 +1057,12 @@ class ClientBlender(Client):
 
     def networkConsumer(self):
         while True:
-            self.blockSignals = True
-            self.receivedCommandsProcessed = True
             command, processed = self.consume_one()
             if command is None:
                 return 0.01
 
+            self.blockSignals = True
+            self.receivedCommandsProcessed = True
             if processed:
                 # this was a room protocol command that was processed
                 self.receivedCommandsProcessed = False

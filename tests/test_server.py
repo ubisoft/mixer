@@ -20,10 +20,13 @@ class Delegate:
     def buildListRoomClients(self, clients):
         logging.info('xxx %s', clients)
         self.clients = clients
-        self.name_room = [(c['name'], c['room']) for c in clients]
+        if clients is None:
+            self.name_room = None
+        else:
+            self.name_room = [(c['name'], c['room']) for c in clients]
         return None
 
-    def clearListRoomClients(self):
+    def on_connection_lost(self):
         return None
 
 
@@ -96,8 +99,8 @@ class Test_Server(unittest.TestCase):
         delay()
         self.assertEqual(server.client_count(), (0, 1))
 
-        c0.joinRoom(c0_room)
         c0.setClientName(c0_name)
+        c0.joinRoom(c0_room)
         delay()
         c0.networkConsumer()
         expected = (c0_name, c0_room)
