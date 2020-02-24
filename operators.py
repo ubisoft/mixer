@@ -441,6 +441,7 @@ def updateObjectsData():
 
 @persistent
 def sendSceneDataToServer(scene):
+    logger.info("sendSceneDataToServer")
     shareData.clearLists()
 
     # prevent processing self events

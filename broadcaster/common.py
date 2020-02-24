@@ -55,6 +55,7 @@ class MessageType(Enum):
     TRANSFORM = 201
     MESH = 202
     MATERIAL = 203
+    SOURCE_MESH = 204  # Original unbaked mesh
 
 
 class LightType(Enum):

@@ -165,6 +165,48 @@ class ClientBlender(Client):
             me = bpy.data.meshes.new(meshName)
         return me
 
+    def buildSourceMesh(self, data):
+        index = 0
+        meshName, index = common.decodeString(data, index)
+
+        bm = bmesh.new()
+
+        positions, index = common.decodeVector3Array(data, index)
+        # logger.info("Reading %d vertices", len(positions))
+
+        for p in positions:
+            bm.verts.new(p)
+
+        bm.verts.ensure_lookup_table()
+
+        edgeCount, index = common.decodeInt(data, index)
+        # logger.info("Reading %d edges", edgeCount)
+
+        edgesData = struct.unpack(f'{edgeCount * 3}I', data[index:index + edgeCount * 3 * 4])
+        index += edgeCount * 3 * 4
+
+        for edgeIdx in range(edgeCount):
+            v1 = edgesData[edgeIdx * 3]
+            v2 = edgesData[edgeIdx * 3 + 1]
+            edgeSmooth = edgesData[edgeIdx * 3 + 2]
+            edge = bm.edges.new((bm.verts[v1], bm.verts[v2]))
+            edge.smooth = bool(edgeSmooth)
+
+        faceCount, index = common.decodeInt(data, index)
+        # logger.info("Reading %d faces", faceCount)
+
+        for fIdx in range(faceCount):
+            vertCount, index = common.decodeInt(data, index)
+            # logger.info("Reading %d face vertices", vertCount)
+            faceVertices = struct.unpack(f'{vertCount}I', data[index:index + vertCount * 4])
+            index += vertCount * 4
+            verts = [bm.verts[i] for i in faceVertices]
+            face = bm.faces.new(verts)
+
+        me = self.getOrCreateMesh(meshName)
+        bm.to_mesh(me)
+        bm.free()
+
     def buildMesh(self, data):
         index = 0
         meshName, index = common.decodeString(data, index)
@@ -607,21 +649,13 @@ class ClientBlender(Client):
     def getMeshName(self, mesh):
         return mesh.name
 
-    class CurrentBuffers:
+    def getMeshBuffers(self, obj, meshName):
         vertices = []
         normals = []
         uvs = []
         indices = []
         materials = []
-        materialIndices = []    # array of triangle index, material index
-
-    def getMeshBuffers(self, obj, meshName):
-        self.CurrentBuffers.vertices = []
-        self.CurrentBuffers.normals = []
-        self.CurrentBuffers.uvs = []
-        self.CurrentBuffers.indices = []
-        self.CurrentBuffers.materials = []
-        self.CurrentBuffers.materialIndices = []
+        materialIndices = []  # array of triangle index, material index
 
         mesh = obj.data
 
@@ -630,7 +664,7 @@ class ClientBlender(Client):
         obj = obj.evaluated_get(depsgraph)
 
         for slot in obj.material_slots[:]:
-            self.CurrentBuffers.materials.append(slot.name.encode())
+            materials.append(slot.name.encode())
 
         # triangulate mesh (before calculating normals)
         mesh = obj.data
@@ -653,52 +687,90 @@ class ClientBlender(Client):
         for f in mesh.polygons:
             for loop_id in f.loop_indices:
                 index = mesh.loops[loop_id].vertex_index
-                self.CurrentBuffers.vertices.extend(mesh.vertices[index].co)
-                self.CurrentBuffers.normals.extend(mesh.loops[loop_id].normal)
+                vertices.extend(mesh.vertices[index].co)
+                normals.extend(mesh.loops[loop_id].normal)
                 if uvlayer:
-                    self.CurrentBuffers.uvs.extend([x for x in uvlayer.data[loop_id].uv])
-                self.CurrentBuffers.indices.append(loop_id)
+                    uvs.extend([x for x in uvlayer.data[loop_id].uv])
+                indices.append(loop_id)
 
             if f.material_index != currentMaterialIndex:
                 currentMaterialIndex = f.material_index
-                self.CurrentBuffers.materialIndices.append(currentfaceIndex)
-                self.CurrentBuffers.materialIndices.append(currentMaterialIndex)
+                materialIndices.append(currentfaceIndex)
+                materialIndices.append(currentMaterialIndex)
             currentfaceIndex = currentfaceIndex + 1
 
         # Vericex count + binary vertices buffer
-        size = len(self.CurrentBuffers.vertices) // 3
+        size = len(vertices) // 3
         binaryVerticesBuffer = common.intToBytes(
-            size, 4) + struct.pack(f'{len(self.CurrentBuffers.vertices)}f', *self.CurrentBuffers.vertices)
+            size, 4) + struct.pack(f'{len(vertices)}f', *vertices)
         # Normals count + binary normals buffer
-        size = len(self.CurrentBuffers.normals) // 3
+        size = len(normals) // 3
         binaryNormalsBuffer = common.intToBytes(
-            size, 4) + struct.pack(f'{len(self.CurrentBuffers.normals)}f', *self.CurrentBuffers.normals)
+            size, 4) + struct.pack(f'{len(normals)}f', *normals)
         # UVs count + binary uvs buffer
-        size = len(self.CurrentBuffers.uvs) // 2
+        size = len(uvs) // 2
         binaryUVsBuffer = common.intToBytes(
-            size, 4) + struct.pack(f'{len(self.CurrentBuffers.uvs)}f', *self.CurrentBuffers.uvs)
+            size, 4) + struct.pack(f'{len(uvs)}f', *uvs)
         # material indices + binary material indices buffer
-        size = len(self.CurrentBuffers.materialIndices) // 2
+        size = len(materialIndices) // 2
         binaryMaterialIndicesBuffer = common.intToBytes(
-            size, 4) + struct.pack(f'{len(self.CurrentBuffers.materialIndices)}I', *self.CurrentBuffers.materialIndices)
+            size, 4) + struct.pack(f'{len(materialIndices)}I', *materialIndices)
         # triangle indices count + binary triangle indices buffer
-        size = len(self.CurrentBuffers.indices) // 3
+        size = len(indices) // 3
         binaryIndicesBuffer = common.intToBytes(
-            size, 4) + struct.pack(f'{len(self.CurrentBuffers.indices)}I', *self.CurrentBuffers.indices)
+            size, 4) + struct.pack(f'{len(indices)}I', *indices)
         # material names count + binary material bnames buffer
-        size = len(self.CurrentBuffers.materials)
+        size = len(materials)
         binaryMaterialNames = common.intToBytes(size, 4)
-        for material in self.CurrentBuffers.materials:
+        for material in materials:
             binaryMaterialNames += common.intToBytes(len(material), 4) + material
 
         return common.encodeString(meshName) + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
 
+    def dump_mesh(self, mesh):
+        mesh_buffer = bmesh.new()
+
+        mesh_buffer.from_mesh(mesh)
+
+        mesh_buffer.verts.ensure_lookup_table()
+
+        # logger.info("Writing %d vertices", len(mesh_buffer.verts))
+        binary_buffer = common.encodeInt(len(mesh_buffer.verts))
+
+        for vert in mesh_buffer.verts:
+            binary_buffer += struct.pack('3f', *list(vert.co))
+
+        # logger.info("Writing %d edges", len(mesh_buffer.edges))
+        binary_buffer += common.encodeInt(len(mesh_buffer.edges))
+
+        for edge in mesh_buffer.edges:
+            binary_buffer += struct.pack('2I', edge.verts[0].index, edge.verts[1].index)
+            binary_buffer += struct.pack('1I', edge.smooth)
+
+        # logger.info("Writing %d faces", len(mesh_buffer.faces))
+        binary_buffer += common.encodeInt(len(mesh_buffer.faces))
+
+        for face in mesh_buffer.faces:
+            binary_buffer += common.encodeInt(len(face.verts))
+            # logger.info("Writing %d face vertices", len(face.verts))
+            for vert in face.verts:
+                binary_buffer += common.encodeInt(vert.index)
+
+        return binary_buffer
+
+    def getSourceMeshBuffers(self, obj, meshName):
+        mesh = obj.data
+        binary_buffer = self.dump_mesh(mesh)
+        return common.encodeString(meshName) + binary_buffer
+
     def sendMesh(self, obj):
         mesh = obj.data
         meshName = self.getMeshName(mesh)
+        sourceMeshBuffer = self.getSourceMeshBuffers(obj, meshName)
         meshBuffer = self.getMeshBuffers(obj, meshName)
         if meshBuffer:
             self.addCommand(common.Command(common.MessageType.MESH, meshBuffer, 0))
+            self.addCommand(common.Command(common.MessageType.SOURCE_MESH, sourceMeshBuffer, 0))
 
     def getMeshConnectionBuffers(self, obj, meshName):
         # geometry path
@@ -1079,8 +1151,8 @@ class ClientBlender(Client):
 
                 elif command.type == common.MessageType.CLEAR_CONTENT:
                     self.clearContent()
-                elif command.type == common.MessageType.MESH:
-                    self.buildMesh(command.data)
+                elif command.type == common.MessageType.SOURCE_MESH:
+                    self.buildSourceMesh(command.data)
                 elif command.type == common.MessageType.MESHCONNECTION:
                     self.buildMeshConnection(command.data)
                 elif command.type == common.MessageType.TRANSFORM:
