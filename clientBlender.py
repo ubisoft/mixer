@@ -940,8 +940,8 @@ class ClientBlender(Client):
         if not frame:
             frame = layer.frames.new(greasePencilFrame)
 
-    def sendGreasePencilLayer(self, GP, layerName):
-        layerBuffer = common.encodeString(GP.name) + common.encodeString(layerName)
+    def sendGreasePencilLayer(self, GP, index, layerName):
+        layerBuffer = common.encodeString(GP.name) + common.encodeInt(index)+ common.encodeString(layerName)
         self.addCommand(common.Command(common.MessageType.GREASEPENCIL_LAYER, layerBuffer, 0))
         layer = GP.layers[layerName]
         for frame in layer.frames:
@@ -949,6 +949,7 @@ class ClientBlender(Client):
 
     def buildGreasePencilLayer(self, data):
         greasePencilName, start = common.decodeString(data, 0)
+        _, start = common.decodeInt(data, start)
         greasePencilLayerName, start = common.decodeString(data, start)
         greasePencil = bpy.data.grease_pencils.get(greasePencilName)
         if not greasePencil:
@@ -1011,8 +1012,8 @@ class ClientBlender(Client):
         self.addCommand(common.Command(common.MessageType.GREASEPENCIL, greasePencilBuffer, 0))
         for material in GP.materials:
             self.sendGreasePencilMaterial(GP.name, material)
-        for layerKey in GP.layers.keys():
-            self.sendGreasePencilLayer(GP, layerKey)
+        for index, layerKey in enumerate(GP.layers.keys()):            
+            self.sendGreasePencilLayer(GP, index, layerKey)
 
     def buildGreasePencil(self, data):
         objectPath, start = common.decodeString(data, 0)
