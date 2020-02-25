@@ -1,5 +1,6 @@
 import bpy
 import os
+from datetime import datetime
 from .broadcaster import common
 
 
@@ -11,6 +12,10 @@ class RoomItem(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name")
 
 
+def stats_file_path_suffix():
+    return datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+
 class DCCSyncProperties(bpy.types.PropertyGroup):
     #host: bpy.props.StringProperty(name="Host", default="lgy-wks-052279")
     host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
@@ -19,10 +24,18 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
     rooms: bpy.props.CollectionProperty(name="Rooms", type=RoomItem)
     room_index: bpy.props.IntProperty()  # index in the list of rooms
     advanced: bpy.props.BoolProperty(default=False)
+    developer_options: bpy.props.BoolProperty(default=False)
     remoteServerIsUp: bpy.props.BoolProperty(default=False)
     showServerConsole: bpy.props.BoolProperty(default=False)
     VRtist: bpy.props.StringProperty(name="VRtist", default=os.environ.get(
         "VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe"))
+    statistics_file_path: bpy.props.StringProperty(name="Stats File Path", default=os.environ.get(
+        "DCCSYNC_STATS_PATH", f"D:/dccsync_stats_{stats_file_path_suffix()}.json"))
+
+    # Developer option to avoid sending scene content to server at the first connexion
+    # Allow to quickly iterate debugging/test on large scenes with only one client in room
+    # Main usage: optimization of client timers to check if updates are required
+    no_send_scene_content: bpy.props.BoolProperty(default=False)
 
 
 classes = (
