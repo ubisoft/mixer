@@ -7,6 +7,7 @@ from pathlib import Path
 import bpy
 import socket
 from . import clientBlender
+from .shareData import shareData
 from bpy.app.handlers import persistent
 
 from .data import get_dcc_sync_props
@@ -21,49 +22,6 @@ class TransformStruct:
         self.quaternion = quaternion
         self.scale = scale
         self.visible = visible
-
-
-class ShareData:
-    def __init__(self):
-        self.sessionId = 0  # For logging and debug
-        self.client: clientBlender.ClientBlender = None
-
-        # equivalent to handlers set
-        self.currentRoom: str = None
-
-        self.isLocal = False
-        self.localServerProcess = None
-        self.selectedObjectsNames = []
-        self.depsgraph = None
-
-        self.objectsAdded = set()
-        self.objectsRemoved = set()
-        self.collectionsAdded = set()
-        self.collectionsRemoved = set()
-        self.objectsAddedToCollection = {}
-        self.objectsRemovedFromCollection = {}
-        self.collectionsAddedToCollection = set()
-        self.collectionsRemovedFromCollection = set()
-        self.collectionsInfo = {}
-        self.objectsReparented = set()
-        self.objectsParents = {}
-        self.objectsRenamed = {}
-        self.objectsTransformed = set()
-        self.objectsTransforms = {}
-        self.objectsVisibilityChanged = set()
-        self.objectsVisibility = {}
-        self.objects = set()
-
-    def clearLists(self):
-        self.objectsAddedToCollection.clear()
-        self.objectsRemovedFromCollection.clear()
-        self.objectsReparented.clear()
-        self.objectsRenamed.clear()
-        self.objectsTransformed.clear()
-        self.objectsVisibilityChanged.clear()
-
-
-shareData = ShareData()
 
 
 def updateParams(obj):
@@ -559,22 +517,27 @@ def onUndoRedoPost(scene):
     shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
 
 
-def updateListRoomsProperty(rooms):
-    props = get_dcc_sync_props()
-    props.rooms.clear()
-    for room in rooms:
-        item = get_dcc_sync_props().rooms.add()
-        item.name = room
+def updateListUsers(client_ids: Mapping[str, str] = None):
+    shareData.client_ids = client_ids
 
 
-def updateListUsersProperty(clients: Mapping[str, str]):
-    logger.debug("updateListUsersProperty() cache")
+def updateListUsersProperty(room_name=None):
+    logger.debug("updateListUsersProperty()")
     props = get_dcc_sync_props()
     props.users.clear()
-    if clients is None:
+
+    if room_name is not None or shareData.currentRoom == room_name:
+        # filter on specified room name
+        # of currently joined room
+        client_ids = [c for c in shareData.client_ids if c['room'] == room_name]
+    else:
+        client_ids = shareData.client_ids
+
+    if client_ids is None:
         return
-    for client in clients:
-        if client['room'] is None:
+
+    for client in client_ids:
+        if client['room'] is None or client['room'] != shareData.currentRoom:
             continue
         item = props.users.add()
         display_name = client['name']

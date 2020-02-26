@@ -257,7 +257,7 @@ class Room:
 
     def broadcast_user_list(self):
         for connection in self._connections:
-            connection.sendListRoomClients(client_ids=self.client_ids())
+            connection.send_client_ids(client_ids=self.client_ids())
 
     def client_ids(self):
         if not self._connections:

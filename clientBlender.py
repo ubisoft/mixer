@@ -3,6 +3,8 @@ import queue
 import struct
 import bmesh
 import bpy
+from . import data
+from .shareData import shareData
 from .broadcaster import common
 from .broadcaster.client import Client
 from mathutils import *
@@ -1035,17 +1037,20 @@ class ClientBlender(Client):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
 
     def on_connection_lost(self):
-        operators.updateListUsersProperty(None)
+        shareData.client_ids = None
+        props = data.get_dcc_sync_props()
+        props.updateListUsersProperty()
+        props.updateListRoomsProperty()
         operators.disconnect()
 
-    def buildListRoomClients(self, clients):
-        logger.info("ListRoom")
-        for client in clients:
-            logger.info("client %s", client)
+    def buildListAllClients(self, client_ids):
+        shareData.client_ids = client_ids
+        props = data.get_dcc_sync_props()
+        props.updateListUsersProperty()
+        props.updateListRoomsProperty()
 
-        operators.updateListUsersProperty(clients)
-        rooms = {client['room'] for client in clients if client['room']}
-        operators.updateListRoomsProperty(rooms)
+    def buildListRoomClients(self, client_ids):
+        pass
 
     def sendSceneContent(self):
         if 'SendContent' in self.callbacks:

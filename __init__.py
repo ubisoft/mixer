@@ -1,6 +1,7 @@
 from . import ui
 from . import operators
 from . import data
+from .shareData import shareData
 import bpy
 import atexit
 import logging
@@ -18,8 +19,8 @@ bl_info = {
 
 def cleanup():
     try:
-        if operators.shareData.localServerProcess:
-            operators.shareData.localServerProcess.kill()
+        if shareData.localServerProcess:
+            shareData.localServerProcess.kill()
     except Exception:
         pass
 
@@ -42,7 +43,6 @@ def register():
 def unregister():
     operators.leave_current_room()
 
-    shareData = operators.shareData
     if shareData:
         if shareData.client and bpy.app.timers.is_registered(shareData.client.networkConsumer):
             bpy.app.timers.unregister(shareData.client.networkConsumer)

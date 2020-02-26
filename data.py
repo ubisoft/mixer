@@ -2,6 +2,7 @@ import bpy
 import os
 import logging
 from .broadcaster import common
+from .shareData import shareData
 
 
 class RoomItem(bpy.types.PropertyGroup):
@@ -15,15 +16,48 @@ class UserItem(bpy.types.PropertyGroup):
 class DCCSyncProperties(bpy.types.PropertyGroup):
 
     def on_user_selection_changed(self, context):
-        # print("on_user_selection_changed", self.user_index)
-        pass
+        print("on_user_selection_changed", self.user_index)
 
-    # host: bpy.props.StringProperty(name="Host", default="lgy-wks-052279")
+    def on_room_selection_changed(self, context):
+        self.updateListUsersProperty()
+
+    def updateListUsersProperty(self):
+        self.users.clear()
+        if shareData.client_ids is None:
+            return
+
+        if shareData.currentRoom:
+            room_name = shareData.currentRoom
+        else:
+            idx = self.room_index
+            if idx >= len(self.rooms):
+                return
+            room_name = self.rooms[idx].name
+
+        client_ids = [c for c in shareData.client_ids if c['room'] == room_name]
+
+        for client in client_ids:
+            item = self.users.add()
+            display_name = client['name']
+            display_name = display_name if display_name is not None else "<unnamed>"
+            display_name = f"{display_name} ({client['ip']}:{client['port']})"
+            item.name = display_name
+
+    def updateListRoomsProperty(self):
+        self.rooms.clear()
+        if shareData.client_ids is None:
+            return
+
+        rooms = {id['room'] for id in shareData.client_ids if id['room']}
+        for room in rooms:
+            item = self.rooms.add()
+            item.name = room
+
     host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
     port: bpy.props.IntProperty(name="Port", default=common.DEFAULT_PORT)
     room: bpy.props.StringProperty(name="Room", default=os.getlogin())
     rooms: bpy.props.CollectionProperty(name="Rooms", type=RoomItem)
-    room_index: bpy.props.IntProperty()  # index in the list of rooms
+    room_index: bpy.props.IntProperty(update=on_room_selection_changed)  # index in the list of rooms
 
     # User name as displayed in peers user list
     user: bpy.props.StringProperty(name="User", default=os.getlogin())

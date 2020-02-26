@@ -127,7 +127,8 @@ class Client:
                 return command, True
             elif command.type == common.MessageType.LIST_ALL_CLIENTS:
                 if self._delegate:
-                    self._delegate.buildListAllClients()
+                    clients, _ = common.decodeJson(command.data, 0)
+                    self._delegate.buildListAllClients(clients)
                 return command, True
             elif command.type == common.MessageType.CONNECTION_LOST:
                 if self._delegate:

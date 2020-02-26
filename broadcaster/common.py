@@ -287,9 +287,8 @@ class CommandFormatter:
             s += 'CONNECTION_LOST:\n'
         elif command.type == MessageType.SEND_ERROR:
             s += f'ERROR: {decodeString(command.data, 0)[0]}\n'
-
         else:
-            s = str(command)
+            pass
 
         return s
 
