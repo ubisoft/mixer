@@ -10,7 +10,7 @@ except ImportError:
 
 
 class Client:
-    def __init__(self, name, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT, delegate=None):
+    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT, name=None, delegate=None):
 
         self.name = name
         self.host = host
@@ -124,6 +124,10 @@ class Client:
                 if self._delegate:
                     clients, _ = common.decodeJson(command.data, 0)
                     self._delegate.buildListRoomClients(clients)
+                return command, True
+            elif command.type == common.MessageType.LIST_ALL_CLIENTS:
+                if self._delegate:
+                    self._delegate.buildListAllClients()
                 return command, True
             elif command.type == common.MessageType.CONNECTION_LOST:
                 if self._delegate:

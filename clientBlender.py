@@ -19,7 +19,7 @@ logger.setLevel(logging.INFO)
 
 class ClientBlender(Client):
     def __init__(self, name, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
-        super(ClientBlender, self).__init__(name, host, port, delegate=self)
+        super(ClientBlender, self).__init__(host, port, name=name, delegate=self)
 
         self.objectNames = {}  # object name / object
         self.textures = set()
