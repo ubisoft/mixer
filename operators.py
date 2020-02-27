@@ -90,7 +90,8 @@ def updateParams(obj):
         shareData.client.sendLight(obj)
 
     if typename == 'Grease Pencil':
-        shareData.client.sendGreasePencil(obj)
+        shareData.client.sendGreasePencilMesh(obj)
+        shareData.client.sendGreasePencilConnection(obj)
 
     if typename == 'Mesh':
         if obj.mode == 'OBJECT':
