@@ -7,6 +7,7 @@ from pathlib import Path
 import bpy
 import socket
 from . import clientBlender
+from . import ui
 from .shareData import shareData
 from bpy.app.handlers import persistent
 
@@ -83,19 +84,9 @@ def is_joined():
     return connected and shareData.currentRoom
 
 
-def disconnect():
-    # the socket has already been disconnected
-    if shareData.client is not None:
-        if shareData.client.isConnected():
-            shareData.client.disconnect()
-        shareData.client = None
-    shareData.currentRoom = None
-
-
 @persistent
 def onLoad(scene):
-    if is_joined():
-        leave_current_room()
+    disconnect()
 
 
 def updateSceneChanged():
@@ -521,31 +512,6 @@ def updateListUsers(client_ids: Mapping[str, str] = None):
     shareData.client_ids = client_ids
 
 
-def updateListUsersProperty(room_name=None):
-    logger.debug("updateListUsersProperty()")
-    props = get_dcc_sync_props()
-    props.users.clear()
-
-    if room_name is not None or shareData.currentRoom == room_name:
-        # filter on specified room name
-        # of currently joined room
-        client_ids = [c for c in shareData.client_ids if c['room'] == room_name]
-    else:
-        client_ids = shareData.client_ids
-
-    if client_ids is None:
-        return
-
-    for client in client_ids:
-        if client['room'] is None or client['room'] != shareData.currentRoom:
-            continue
-        item = props.users.add()
-        display_name = client['name']
-        display_name = display_name if display_name is not None else "<unnamed>"
-        display_name = f"{display_name} ({client['ip']}:{client['port']})"
-        item.name = display_name
-
-
 def clear_scene_content():
     set_handlers(False)
 
@@ -695,6 +661,36 @@ def server_is_up(address, port):
         return False
 
 
+def is_localhost(host):
+    # does not catch local address
+    return host == "localhost" or host == "127.0.0.1"
+
+
+def connect():
+    props = get_dcc_sync_props()
+    if not server_is_up(props.host, props.port):
+        if is_localhost(props.host):
+            start_local_server(wait_for_server=True)
+            wait_for_server(props.host, props.port)
+
+    if not isClientConnected():
+        if not create_main_client(props.host, props.port):
+            return False
+
+    shareData.client.setClientName(props.user)
+    return True
+
+
+def disconnect():
+    # the socket has already been disconnected
+    if shareData.client is not None:
+        if shareData.client.isConnected():
+            shareData.client.disconnect()
+        shareData.client_ids = None
+        shareData.client = None
+    shareData.currentRoom = None
+
+
 def isClientConnected():
     return shareData.client is not None and shareData.client.isConnected()
 
@@ -703,6 +699,7 @@ def create_main_client(host: str, port: int):
     assert shareData.client is None
     shareData.sessionId += 1
     client = clientBlender.ClientBlender(f"syncClient {shareData.sessionId}", host, port)
+    client.connect()
     if not client.isConnected():
         return False
 
@@ -746,25 +743,20 @@ class JoinRoomOperator(bpy.types.Operator):
     @classmethod
     def poll(self, context):
         roomIndex = get_dcc_sync_props().room_index
-        return roomIndex < len(get_dcc_sync_props().rooms)
+        return isClientConnected() and roomIndex < len(get_dcc_sync_props().rooms)
 
     def execute(self, context):
         assert not shareData.currentRoom
         shareData.currentRoom = None
         updateCurrentData()
 
+        if not connect():
+            self.report({'ERROR'}, repr(e))
+
         shareData.isLocal = False
         props = get_dcc_sync_props()
         roomIndex = props.room_index
         room = props.rooms[roomIndex].name
-
-        # TODO same code as CreateRoom
-        if shareData.client and not shareData.client.isConnected:
-            shareData.client = None
-        if not shareData.client:
-            if not create_main_client(props.host, props.port):
-                return {'CANCELLED'}
-
         join_room(room)
         return {'FINISHED'}
 
@@ -776,36 +768,47 @@ class LeaveRoomOperator(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        props = get_dcc_sync_props()
-        props.rooms.clear()
         leave_current_room()
+        ui.update_ui_lists()
         return {'FINISHED'}
 
 
-def connect():
-    props = get_dcc_sync_props()
-    if not server_is_up(props.host, props.port):
-        start_local_server(wait_for_server=True)
-        wait_for_server(props.host, props.port)
-
-    if not isClientConnected():
-        if not create_main_client(props.host, props.port):
-            return False
-
-    shareData.client.setClientName(props.user)
-    return True
-
-
 class ConnectOperator(bpy.types.Operator):
-    """Fetch and update the list of DCC Sync rooms"""
+    """Connect to the DCCSync server"""
     bl_idname = "dcc_sync.connect"
     bl_label = "Connect to server"
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        logger.info("ConnectOperator")
-        if not connect():
+        props = get_dcc_sync_props()
+        try:
+            self.report({'INFO'}, f'Connecting to "{props.host}:{props.port}" ...')
+            ok = connect()
+            if not ok:
+                self.report({'ERROR'}, "unknown error")
+                return {'CANCELLED'}
+            else:
+                self.report({'INFO'}, f'Connected to "{props.host}:{props.port}" ...')
+        except socket.gaierror:
+            msg = f'Cannot connect to "{props.host}": invalid host name or address'
+            self.report({'ERROR'}, msg)
+        except Exception as e:
+            self.report({'ERROR'}, repr(e))
             return {'CANCELLED'}
+
+        return {'FINISHED'}
+
+
+class DisconnectOperator(bpy.types.Operator):
+    """Disconnect from the DccSync server"""
+    bl_idname = "dcc_sync.disconnect"
+    bl_label = "Disconnect from server"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        disconnect()
+        ui.update_ui_lists()
+        ui.redraw()
         return {'FINISHED'}
 
 
@@ -858,6 +861,7 @@ classes = (
     LaunchVRtistOperator,
     CreateRoomOperator,
     ConnectOperator,
+    DisconnectOperator,
     SendSelectionOperator,
     JoinRoomOperator,
     LeaveRoomOperator,

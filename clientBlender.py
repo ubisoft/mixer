@@ -4,6 +4,7 @@ import struct
 import bmesh
 import bpy
 from . import data
+from . import ui
 from .shareData import shareData
 from .broadcaster import common
 from .broadcaster.client import Client
@@ -1038,16 +1039,12 @@ class ClientBlender(Client):
 
     def on_connection_lost(self):
         shareData.client_ids = None
-        props = data.get_dcc_sync_props()
-        props.updateListUsersProperty()
-        props.updateListRoomsProperty()
         operators.disconnect()
+        ui.update_ui_lists()
 
     def buildListAllClients(self, client_ids):
         shareData.client_ids = client_ids
-        props = data.get_dcc_sync_props()
-        props.updateListUsersProperty()
-        props.updateListRoomsProperty()
+        ui.update_ui_lists()
 
     def buildListRoomClients(self, client_ids):
         pass

@@ -75,12 +75,14 @@ def process_room_command(args):
     try:
         if args.command == 'list':
             client = CliClient(args)
+            client.connect()
             client.listRooms()
 
         elif args.command == 'delete':
             count = len(args.name)
             if count:
                 client = CliClient(args)
+                client.connect()
                 for name in args.name:
                     client.deleteRoom(name)
             else:
@@ -90,6 +92,7 @@ def process_room_command(args):
             count = len(args.name)
             if count:
                 client = CliClient(args)
+                client.connect()
                 for name in args.name:
                     client.clearRoom(name)
             else:
@@ -99,6 +102,7 @@ def process_room_command(args):
             count = len(args.name)
             if count:
                 client = CliClient(args)
+                client.connect()
                 for name in args.name:
                     client.listRoomClients(name)
             else:
@@ -116,6 +120,7 @@ def process_client_command(args):
     try:
         if args.command == 'list':
             client = CliClient(args)
+            client.connect()
             client.listClients()
     except ServerError as e:
         logging.error(e)
@@ -152,6 +157,7 @@ def help():
 
 def interactive_loop():
     client = CliClient(args)
+    client.connect()
     done = False
     while not done:
         try:

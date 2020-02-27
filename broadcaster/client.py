@@ -23,16 +23,22 @@ class Client:
         self._local_address = None
         self._delegate = delegate
         self.socket = None
+        self.thread = None
+
+    def connect(self):
+        if self.isConnected():
+            raise RuntimeError("Client.connect : already connected")
 
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((host, port))
+            self.socket.connect((self.host, self.port))
             self._local_address = self.socket.getsockname()
             logging.info("Connecting from local %s:%s to %s:%s",
-                         self._local_address[0], self._local_address[1], host, port)
+                         self._local_address[0], self._local_address[1], self.host, self.port)
         except Exception as e:
             logging.error("Connection error %s", e)
             self.socket = None
+            raise
 
         if self.socket:
             self.threadAlive = True
@@ -49,6 +55,7 @@ class Client:
         if self.thread is not None:
             self.threadAlive = False
             self.thread.join()
+            self.thread = None
 
         if self.socket:
             self.socket.shutdown(socket.SHUT_RDWR)

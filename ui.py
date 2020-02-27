@@ -1,12 +1,77 @@
 import bpy
 from . import operators
-from .data import get_dcc_sync_props
+from .data import get_dcc_sync_props, DCCSyncProperties
+from .shareData import shareData
+
 import logging
 
 logger = logging.Logger(__name__)
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger.setLevel(logging.INFO)
+
+
+def redraw():
+    for window in bpy.context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == 'VIEW_3D':
+                for region in area.regions:
+                    if region.type == 'UI':
+                        region.tag_redraw()
+                        break
+
+
+def redraw_if(condition: bool):
+    if condition:
+        redraw()
+
+
+def update_ui_lists():
+    update_room_list(do_redraw=False)
+    update_user_list()
+
+
+def update_user_list(do_redraw=True):
+    props = get_dcc_sync_props()
+    props.users.clear()
+    if shareData.client_ids is None:
+        redraw_if(do_redraw)
+        return
+
+    if shareData.currentRoom:
+        room_name = shareData.currentRoom
+    else:
+        idx = props.room_index
+        if idx >= len(props.rooms):
+            redraw_if(do_redraw)
+            return
+        room_name = props.rooms[idx].name
+
+    client_ids = [c for c in shareData.client_ids if c['room'] == room_name]
+
+    for client in client_ids:
+        item = props.users.add()
+        display_name = client['name']
+        display_name = display_name if display_name is not None else "<unnamed>"
+        display_name = f"{display_name} ({client['ip']}:{client['port']})"
+        item.name = display_name
+
+    redraw_if(do_redraw)
+
+
+def update_room_list(do_redraw=True):
+    props = get_dcc_sync_props()
+    props.rooms.clear()
+    if shareData.client_ids is None:
+        redraw_if(do_redraw)
+        return
+
+    rooms = {id['room'] for id in shareData.client_ids if id['room']}
+    for room in rooms:
+        item = props.rooms.add()
+        item.name = room
+
+    redraw_if(do_redraw)
 
 
 class ROOM_UL_ItemRenderer(bpy.types.UIList):
@@ -46,8 +111,7 @@ class SettingsPanel(bpy.types.Panel):
 
         row = layout.column()
 
-        connected = operators.shareData.client is not None and operators.shareData.client.isConnected()
-        if not connected or not operators.shareData.currentRoom:
+        if not operators.shareData.currentRoom:
 
             # Room list
             row = layout.row()
@@ -56,7 +120,12 @@ class SettingsPanel(bpy.types.Panel):
 
             # Join room
             col = row.column()
-            col.operator(operators.ConnectOperator.bl_idname, text="Connect")
+
+            connected = operators.shareData.client is not None and operators.shareData.client.isConnected()
+            if not connected:
+                col.operator(operators.ConnectOperator.bl_idname, text="Connect")
+            else:
+                col.operator(operators.DisconnectOperator.bl_idname, text="Disconnect")
             col.operator(operators.JoinRoomOperator.bl_idname, text="Join Room")
 
             row = layout.row()
