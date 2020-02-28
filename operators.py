@@ -474,18 +474,28 @@ def updateObjectsData():
             updateParams(container[d])
 
 @persistent
-def sendFrameChanged(scene):
-    shareData.client.sendFrame(scene.frame_current)
-    shareData.clearLists()
+def sendFrameChanged(scene):    
+    logger.info("sendFrameChanged")
+    with StatsTimer(shareData.current_statistics, "sendFrameChanged") as timer:
+        with timer.child("setFrame"):
+            shareData.client.sendFrame(scene.frame_current)
 
-    updateObjectsState()
-    updateCollectionsState()
+        with timer.child("clearLists"):
+            shareData.clearLists()
 
-    changed = False
-    changed |= updateObjectsTransforms()
+        with timer.child("updateObjectsState") as child_timer:
+            updateObjectsState(child_timer)
 
-    # update for next change
-    updateCurrentData()
+        with timer.child("updateCollectionsState"):
+            updateCollectionsState()
+
+        with timer.child("checkForChangeAndSendUpdates"):
+            changed = False
+            changed |= updateObjectsTransforms()
+
+        # update for next change
+        with timer.child("updateCurrentData"):
+            updateCurrentData()
 
 @persistent
 def sendSceneDataToServer(scene):
@@ -797,7 +807,8 @@ def start_local_server():
     if get_dcc_sync_props().showServerConsole:
         args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
     else:
-        args = {'stdout': subprocess.PIPE, 'stderr': subprocess.STDOUT}
+        #args = {'stdout': subprocess.PIPE, 'stderr': subprocess.STDOUT}
+        args = {}
 
     shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(
         serverPath)], shell=False, **args)
@@ -957,13 +968,13 @@ class LaunchVRtistOperator(bpy.types.Operator):
         dcc_sync_props = get_dcc_sync_props()
         room = shareData.currentRoom
         if not room:
-            bpy.ops.dcc_sync.joinroom()
+            bpy.ops.dcc_sync.join_or_leave_room()
             room = shareData.currentRoom
 
         hostname = "localhost"
         if not shareData.isLocal:
-            hostname = vrtistconnect.host
-        args = [dcc_sync_props.VRtist, "--room", room, "--hostname", hostname, "--port", str(vrtistconnect.port)]
+            hostname = dcc_sync_props.host
+        args = [dcc_sync_props.VRtist, "--room", room, "--hostname", hostname, "--port", str(dcc_sync_props.port)]
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
         return {'FINISHED'}
 

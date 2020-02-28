@@ -282,6 +282,19 @@ def readMessage(socket) -> Command:
 
     return None
 
+def send(socket, buffer):
+    attempts = 5
+    timeout = 0.01
+    while True:  
+        try:          
+            tmp = socket.send(buffer)
+            return tmp
+        except:
+            if attempts == 0:
+                raise
+            attempts -= 1
+            time.sleep(timeout)
+ 
 
 def writeMessage(socket, command: Command):
     if not socket:
@@ -296,6 +309,7 @@ def writeMessage(socket, command: Command):
     while remainingSize > 0:
         _, w, _ = select.select([], [socket], [], 0.0001)
         if len(w) > 0:
-            sent = socket.send(buffer[currentIndex:])
+            sent = send(socket, buffer[currentIndex:])
             remainingSize -= sent
             currentIndex += sent
+
