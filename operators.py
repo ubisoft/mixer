@@ -1,9 +1,14 @@
+from contextlib import contextmanager
 import os
 import sys
 import subprocess
 import shutil
 import logging
+import time
+import json
+import copy
 from pathlib import Path
+from datetime import datetime
 
 import bpy
 import socket
@@ -14,6 +19,7 @@ from bpy.app.handlers import persistent
 from bpy.types import UIList
 
 from .data import get_dcc_sync_props
+from .stats import StatsTimer, save_statistics, get_stats_filename
 
 logger = logging.getLogger(__package__)
 
@@ -28,6 +34,7 @@ class TransformStruct:
 
 class ShareData:
     def __init__(self):
+        self.runId = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         self.sessionId = 0  # For logging and debug
         self.client = None
         self.currentRoom = None
@@ -53,7 +60,11 @@ class ShareData:
         self.objectsTransforms = {}
         self.objectsVisibilityChanged = set()
         self.objectsVisibility = {}
-        self.objects = set()
+        self.objects = {}  # Name of object to bpy.types.Object
+
+        self.current_statistics = None
+        self.auto_save_statistics = False
+        self.statistics_directory = None
 
     def clearLists(self):
         self.objectsAddedToCollection.clear()
@@ -106,6 +117,12 @@ def updateTransform(obj):
 def leave_current_room():
     shareData.currentRoom = None
     set_handlers(False)
+
+    if None != shareData.current_statistics and shareData.auto_save_statistics:
+        save_statistics(shareData.current_statistics, shareData.statistics_directory)
+    shareData.current_statistics = None
+    shareData.auto_save_statistics = False
+    shareData.statistics_directory = None
 
     if shareData.client is not None:
         if bpy.app.timers.is_registered(shareData.client.networkConsumer):
@@ -224,10 +241,11 @@ def updateCollectionsInfo():
         shareData.collectionsInfo[collection.name].objects = [x.name for x in collection.objects]
 
 
-def updateObjectsState():
-    objects = set([x.name for x in bpy.data.objects])
-    shareData.objectsAdded = objects - shareData.objects
-    shareData.objectsRemoved = shareData.objects - objects
+def updateObjectsState(stats_timer: StatsTimer):
+    with stats_timer.child("checkObjectsAddedAndRemoved"):
+        objects = set([x.name for x in bpy.data.objects])
+        shareData.objectsAdded = objects - shareData.objects.keys()
+        shareData.objectsRemoved = shareData.objects.keys() - objects
 
     if len(shareData.objectsAdded) == 1 and len(shareData.objectsRemoved) == 1:
         shareData.objectsRenamed[list(shareData.objectsRemoved)[0]] = list(shareData.objectsAdded)[0]
@@ -235,33 +253,47 @@ def updateObjectsState():
         shareData.objectsRemoved.clear()
         return
 
-    for objName, visible in shareData.objectsVisibility.items():
-        newObj = bpy.data.objects.get(objName)
-        if newObj and visible != newObj.hide_viewport:
-            shareData.objectsVisibilityChanged.add(objName)
+    with stats_timer.child("updateObjectsVisibilityChanged"):
+        for objName, visible in shareData.objectsVisibility.items():
+            newObj = shareData.objects[objName]
+            if newObj and visible != newObj.hide_viewport:
+                shareData.objectsVisibilityChanged.add(objName)
 
-    for objName, parent in shareData.objectsParents.items():
-        newObj = bpy.data.objects.get(objName)
-        if not newObj:
-            continue
-        newObjParent = "" if newObj.parent == None else newObj.parent.name
-        if newObjParent != parent:
-            shareData.objectsReparented.add(objName)
+    with stats_timer.child("updateObjectsParentingChanged"):
+        for objName, parent in shareData.objectsParents.items():
+            newObj = shareData.objects[objName]
+            if not newObj:
+                continue
 
-    for objName, transform in shareData.objectsTransforms.items():
-        newObj = bpy.data.objects.get(objName)
-        if not newObj:
-            continue
-        matrix = newObj.matrix_local
-        t = matrix.to_translation()
-        r = matrix.to_quaternion()
-        s = matrix.to_scale()
-        if t != transform[0] or r != transform[1] or s != transform[2]:
-            shareData.objectsTransformed.add(objName)
+            newObjParent = "" if newObj.parent == None else newObj.parent.name
+            if newObjParent != parent:
+                shareData.objectsReparented.add(objName)
+
+    with stats_timer.child("updateObjectsTransformsChanged") as local_timer:
+        for objName, transform in shareData.objectsTransforms.items():
+            local_timer.reset_checkpoint()
+
+            newObj = shareData.objects[objName]
+            if not newObj:
+                hitCount += 1
+                continue
+            local_timer.checkpoint("getObject")
+
+            matrix = newObj.matrix_local
+            t = matrix.to_translation()
+            r = matrix.to_quaternion()
+            s = matrix.to_scale()
+
+            local_timer.checkpoint("getTransformsFromMatrix")
+
+            if t != transform[0] or r != transform[1] or s != transform[2]:
+                shareData.objectsTransformed.add(objName)
+
+            local_timer.checkpoint("compareTransforms")
 
 
 def updateObjectsInfo():
-    shareData.objects = set([x.name for x in bpy.data.objects])
+    shareData.objects = {x.name: x for x in bpy.data.objects}
     shareData.objectsVisibility = dict((x.name, x.hide_viewport) for x in bpy.data.objects)
     shareData.objectsParents = dict((x.name, x.parent.name if x.parent != None else "") for x in bpy.data.objects)
 
@@ -442,47 +474,56 @@ def updateObjectsData():
 
 @persistent
 def sendSceneDataToServer(scene):
-    shareData.clearLists()
+    logger.info("sendSceneDataToServer")
+    with StatsTimer(shareData.current_statistics, "sendSceneDataToServer") as timer:
+        with timer.child("clearLists"):
+            shareData.clearLists()
 
-    # prevent processing self events
-    if shareData.client.receivedCommandsProcessed:
-        if not shareData.client.blockSignals:
-            shareData.client.receivedCommandsProcessed = False
-        return
+        # prevent processing self events
+        if shareData.client.receivedCommandsProcessed:
+            if not shareData.client.blockSignals:
+                shareData.client.receivedCommandsProcessed = False
+            return
 
-    if shareData.client.currentSceneName != bpy.context.scene.name:
-        updateCurrentData()
-        updateSceneChanged()
-        return
+        if shareData.client.currentSceneName != bpy.context.scene.name:
+            updateCurrentData()
+            updateSceneChanged()
+            return
 
-    if not isInObjectMode():
-        return
+        if not isInObjectMode():
+            return
 
-    updateObjectsState()
-    updateCollectionsState()
+        with timer.child("updateObjectsState") as child_timer:
+            updateObjectsState(child_timer)
 
-    changed = False
-    changed |= removeObjectsFromCollections()
-    changed |= removeCollectionsFromCollections()
-    changed |= removeCollections()
-    changed |= addObjects()
-    changed |= addCollections()
-    changed |= addCollectionsToCollections()
-    changed |= addObjectsToCollections()
-    changed |= updateCollectionsParameters()
-    changed |= createSceneObjects()
-    changed |= deleteSceneObjects()
-    changed |= renameObjects()
-    changed |= updateObjectsVisibility()
-    changed |= updateObjectsTransforms()
-    changed |= reparentObjects()
+        with timer.child("updateCollectionsState"):
+            updateCollectionsState()
 
-    if not changed:
-        shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
-        updateObjectsData()
+        changed = False
+        with timer.child("checkForChangeAndSendUpdates"):
+            changed |= removeObjectsFromCollections()
+            changed |= removeCollectionsFromCollections()
+            changed |= removeCollections()
+            changed |= addObjects()
+            changed |= addCollections()
+            changed |= addCollectionsToCollections()
+            changed |= addObjectsToCollections()
+            changed |= updateCollectionsParameters()
+            changed |= createSceneObjects()
+            changed |= deleteSceneObjects()
+            changed |= renameObjects()
+            changed |= updateObjectsVisibility()
+            changed |= updateObjectsTransforms()
+            changed |= reparentObjects()
 
-    # update for next change
-    updateCurrentData()
+        if not changed:
+            with timer.child("updateObjectsData"):
+                shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
+                updateObjectsData()
+
+        # update for next change
+        with timer.child("updateCurrentData"):
+            updateCurrentData()
 
 
 @persistent
@@ -672,36 +713,40 @@ def send_collections():
 
 
 def send_scene_content():
-    logger.info("Sending scene content to server")
+    if get_dcc_sync_props().no_send_scene_content:
+        return
 
-    shareData.client.currentSceneName = bpy.context.scene.name
+    with StatsTimer(shareData.current_statistics, "send_scene_content", True) as stats_timer:
+        shareData.client.currentSceneName = bpy.context.scene.name
 
-    # First step : Send all Blender data (materials, objects, collection) existing in file
-    # ====================================================================================
+        # First step : Send all Blender data (materials, objects, collection) existing in file
+        # ====================================================================================
 
-    # send materials
-    for material in bpy.data.materials:
-        shareData.client.sendMaterial(material)
+        with stats_timer.child("sendAllMaterials"):
+            for material in bpy.data.materials:
+                shareData.client.sendMaterial(material)
 
-    # send objects
-    for obj in bpy.data.objects:
-        updateParams(obj)
-        updateTransform(obj)
+        with stats_timer.child("sendAllObjects"):
+            for obj in bpy.data.objects:
+                updateParams(obj)
+                updateTransform(obj)
 
-    # send all collections
-    send_collections()
+        # send all collections
+        with stats_timer.child("sendAllCollections"):
+            send_collections()
 
-    # Second step : send current scene content
-    # ========================================
-    shareData.client.sendSetCurrentScene(bpy.context.scene.name)
+        # Second step : send current scene content
+        # ========================================
+        with stats_timer.child("sendSetCurrentScene"):
+            shareData.client.sendSetCurrentScene(bpy.context.scene.name)
 
-    # send scene objects
-    for obj in bpy.context.scene.objects:
-        shareData.client.sendSceneObject(obj)
+        with stats_timer.child("sendSceneObjects"):
+            for obj in bpy.context.scene.objects:
+                shareData.client.sendSceneObject(obj)
 
-    # send scene collections
-    for col in bpy.context.scene.collection.children:
-        shareData.client.sendSceneCollection(col)
+        with stats_timer.child("sendSceneCollections"):
+            for col in bpy.context.scene.collection.children:
+                shareData.client.sendSceneCollection(col)
 
 
 def set_handlers(connect: bool):
@@ -764,6 +809,16 @@ def create_main_client(host: str, port: int, room: str):
 
     shareData.client.joinRoom(room)
     shareData.currentRoom = room
+    shareData.current_statistics = {
+        "session_id": shareData.sessionId,
+        "blendfile": bpy.data.filepath,
+        "statsfile": get_stats_filename(shareData.runId, shareData.sessionId),
+        "user": os.getlogin(),
+        "room": room,
+        "children": {}
+    }
+    shareData.auto_save_statistics = get_dcc_sync_props().auto_save_statistics
+    shareData.statistics_directory = get_dcc_sync_props().statistics_directory
     set_handlers(True)
 
 
@@ -896,12 +951,37 @@ class LaunchVRtistOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+class WriteStatisticsOperator(bpy.types.Operator):
+    """Write dccsync statistics in a file"""
+    bl_idname = "dcc_sync.write_statistics"
+    bl_label = "DCCSync Write Statistics"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        if None != shareData.current_statistics:
+            save_statistics(shareData.current_statistics, get_dcc_sync_props().statistics_directory)
+        return {'FINISHED'}
+
+
+class OpenStatsDirOperator(bpy.types.Operator):
+    """Write dccsync stats directory in explorer"""
+    bl_idname = "dcc_sync.open_stats_dir"
+    bl_label = "DCCSync Open Stats Directory"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        os.startfile(get_dcc_sync_props().statistics_directory)
+        return {'FINISHED'}
+
+
 classes = (
     LaunchVRtistOperator,
     CreateRoomOperator,
     UpdateRoomListOperator,
     SendSelectionOperator,
     JoinOrLeaveRoomOperator,
+    WriteStatisticsOperator,
+    OpenStatsDirOperator
 )
 
 
