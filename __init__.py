@@ -1,6 +1,7 @@
 from . import ui
 from . import operators
 from . import data
+from . import stats
 import bpy
 import atexit
 import logging
@@ -22,9 +23,12 @@ def refreshRoomListHack():
 
 
 def cleanup():
+    shareData = operators.shareData
+    if None != shareData.current_statistics and shareData.auto_save_statistics:
+        stats.save_statistics(shareData.current_statistics, shareData.statistics_directory)
     try:
-        if operators.shareData.localServerProcess:
-            operators.shareData.localServerProcess.kill()
+        if shareData.localServerProcess:
+            shareData.localServerProcess.kill()
     except Exception:
         pass
 
