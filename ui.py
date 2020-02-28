@@ -66,6 +66,19 @@ class SettingsPanel(bpy.types.Panel):
         else:
             row.operator(operators.JoinOrLeaveRoomOperator.bl_idname, text="Leave Room")
 
+        col = layout.column()
+        row = col.row()
+        row.prop(dcc_sync_props, "developer_options",
+                 icon="TRIA_DOWN" if dcc_sync_props.developer_options else "TRIA_RIGHT",
+                 icon_only=True, emboss=False)
+        row.label(text="Developer options")
+        if dcc_sync_props.developer_options:
+            col.prop(dcc_sync_props, "statistics_directory", text="Stats Directory")
+            col.operator(operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
+            col.operator(operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
+            col.prop(dcc_sync_props, "auto_save_statistics", text="Auto Save Statistics")
+            col.prop(dcc_sync_props, "no_send_scene_content", text="No send_scene_content")
+
 
 classes = (
     ROOM_UL_ItemRenderer,
