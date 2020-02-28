@@ -134,6 +134,8 @@ def updateParams(obj):
         shareData.client.sendLight(obj)
 
     if typename == 'Grease Pencil':
+        for material in obj.data.materials:
+            shareData.client.sendMaterial(material)
         shareData.client.sendGreasePencilMesh(obj)
         shareData.client.sendGreasePencilConnection(obj)
 
@@ -286,6 +288,9 @@ def updateObjectsState(stats_timer: StatsTimer):
         shareData.objectsRemoved.clear()
         return
 
+    for objName in shareData.objectsRemoved:
+        shareData.objects[objName] = None
+
     with stats_timer.child("updateObjectsVisibilityChanged"):
         for objName, visible in shareData.objectsVisibility.items():
             newObj = shareData.objects[objName]
@@ -308,7 +313,6 @@ def updateObjectsState(stats_timer: StatsTimer):
 
             newObj = shareData.objects[objName]
             if not newObj:
-                hitCount += 1
                 continue
             local_timer.checkpoint("getObject")
 
@@ -504,6 +508,29 @@ def updateObjectsData():
         if d in container:
             updateParams(container[d])
 
+@persistent
+def sendFrameChanged(scene):    
+    logger.info("sendFrameChanged")
+    with StatsTimer(shareData.current_statistics, "sendFrameChanged") as timer:
+        with timer.child("setFrame"):
+            shareData.client.sendFrame(scene.frame_current)
+
+        with timer.child("clearLists"):
+            shareData.clearLists()
+
+        with timer.child("updateObjectsState") as child_timer:
+            updateObjectsState(child_timer)
+
+        with timer.child("updateCollectionsState"):
+            updateCollectionsState()
+
+        with timer.child("checkForChangeAndSendUpdates"):
+            changed = False
+            changed |= updateObjectsTransforms()
+
+        # update for next change
+        with timer.child("updateCurrentData"):
+            updateCurrentData()
 
 @persistent
 def sendSceneDataToServer(scene):
@@ -781,12 +808,14 @@ def send_scene_content():
             for col in bpy.context.scene.collection.children:
                 shareData.client.sendSceneCollection(col)
 
+    shareData.client.sendFrame(bpy.context.scene.frame_current)
+
 
 def set_handlers(connect: bool):
     try:
         if connect:
             shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
-            bpy.app.handlers.frame_change_post.append(sendSceneDataToServer)
+            bpy.app.handlers.frame_change_post.append(sendFrameChanged)
             bpy.app.handlers.depsgraph_update_post.append(sendSceneDataToServer)
             bpy.app.handlers.undo_pre.append(onUndoRedoPre)
             bpy.app.handlers.redo_pre.append(onUndoRedoPre)
@@ -795,7 +824,7 @@ def set_handlers(connect: bool):
             bpy.app.handlers.load_post.append(onLoad)
         else:
             bpy.app.handlers.load_post.remove(onLoad)
-            bpy.app.handlers.frame_change_post.remove(sendSceneDataToServer)
+            bpy.app.handlers.frame_change_post.remove(sendFrameChanged)
             bpy.app.handlers.depsgraph_update_post.remove(sendSceneDataToServer)
             bpy.app.handlers.undo_pre.remove(onUndoRedoPre)
             bpy.app.handlers.redo_pre.remove(onUndoRedoPre)
@@ -813,7 +842,8 @@ def start_local_server():
     if get_dcc_sync_props().showServerConsole:
         args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
     else:
-        args = {'stdout': subprocess.PIPE, 'stderr': subprocess.STDOUT}
+        #args = {'stdout': subprocess.PIPE, 'stderr': subprocess.STDOUT}
+        args = {}
 
     shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(
         serverPath)], shell=False, **args)
@@ -973,13 +1003,13 @@ class LaunchVRtistOperator(bpy.types.Operator):
         dcc_sync_props = get_dcc_sync_props()
         room = shareData.currentRoom
         if not room:
-            bpy.ops.dcc_sync.joinroom()
+            bpy.ops.dcc_sync.join_or_leave_room()
             room = shareData.currentRoom
 
         hostname = "localhost"
         if not shareData.isLocal:
-            hostname = vrtistconnect.host
-        args = [dcc_sync_props.VRtist, "--room", room, "--hostname", hostname, "--port", str(vrtistconnect.port)]
+            hostname = dcc_sync_props.host
+        args = [dcc_sync_props.VRtist, "--room", room, "--hostname", hostname, "--port", str(dcc_sync_props.port)]
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
         return {'FINISHED'}
 

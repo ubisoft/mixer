@@ -59,10 +59,6 @@ class Client:
     def joinRoom(self, roomName):
         common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
 
-    def send(self, data):
-        with common.mutex:
-            self.socket.send(data)
-
     def run(self):
         while(self.threadAlive):
             try:
