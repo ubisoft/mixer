@@ -2,6 +2,7 @@ import bpy
 import os
 from datetime import datetime
 from .broadcaster import common
+from .stats import get_stats_directory
 
 
 def get_dcc_sync_props():
@@ -29,8 +30,9 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
     showServerConsole: bpy.props.BoolProperty(default=False)
     VRtist: bpy.props.StringProperty(name="VRtist", default=os.environ.get(
         "VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe"))
-    statistics_file_path: bpy.props.StringProperty(name="Stats File Path", default=os.environ.get(
-        "DCCSYNC_STATS_PATH", f"D:/dccsync_stats_{stats_file_path_suffix()}.json"))
+    statistics_directory: bpy.props.StringProperty(name="Stats Directory", default=os.environ.get(
+        "DCCSYNC_STATS_DIR", get_stats_directory()))
+    auto_save_statistics: bpy.props.BoolProperty(default=True)
 
     # Developer option to avoid sending scene content to server at the first connexion
     # Allow to quickly iterate debugging/test on large scenes with only one client in room

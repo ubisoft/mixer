@@ -113,3 +113,5 @@ if __name__ == '__main__':
             client.addCommand(common.Command(common.MessageType.DELETE, encodedMsg[6:]))
         elif msg.startswith("Room"):
             client.joinRoom(msg[4:])
+            
+    client.disconnect()

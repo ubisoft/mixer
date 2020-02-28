@@ -4,6 +4,7 @@ import select
 import socket
 import struct
 import json
+import time
 
 
 mutex = threading.RLock()
@@ -45,12 +46,9 @@ class MessageType(Enum):
     COLLECTION = 117
     COLLECTION_REMOVED = 118
     SET_SCENE = 119
-    GREASEPENCIL = 120
-    GREASEPENCIL_LAYER = 121
-    GREASEPENCIL_FRAME = 122
-    GREASEPENCIL_STROKE = 123
-    GREASEPENCIL_MATERIAL = 124
-    GREASEPENCIL_CONNECT_MATERIAL = 125
+    GREASE_PENCIL_MESH = 120
+    GREASE_PENCIL_MATERIAL = 121
+    GREASE_PENCIL_CONNECTION = 122
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
     MESH = 202
@@ -245,6 +243,18 @@ class Command:
             self.id = Command._id
             Command._id += 1
 
+def recv(socket, size):
+    attempts = 5
+    timeout = 0.01
+    while True:  
+        try:          
+            tmp = socket.recv(size)
+            return tmp
+        except:
+            if attempts == 0:
+                raise
+            attempts -= 1
+            time.sleep(timeout)
 
 def readMessage(socket) -> Command:
     if not socket:
@@ -252,16 +262,14 @@ def readMessage(socket) -> Command:
     r, _, _ = select.select([socket], [], [], 0.0001)
     if len(r) > 0:
         try:
-            msg = socket.recv(14)
-            if len(msg) < 14:
-                raise ClientDisconnectedException()
+            msg = recv(socket, 14)
             frameSize = bytesToInt(msg[:8])
             commandId = bytesToInt(msg[8:12])
             messageType = bytesToInt(msg[12:])
             currentSize = frameSize
             msg = b''
             while currentSize != 0:
-                tmp = socket.recv(currentSize)
+                tmp = recv(socket, currentSize)
                 msg += tmp
                 currentSize -= len(tmp)
             return Command(intToMessageType(messageType), msg, commandId)

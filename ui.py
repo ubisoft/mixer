@@ -73,8 +73,10 @@ class SettingsPanel(bpy.types.Panel):
                  icon_only=True, emboss=False)
         row.label(text="Developer options")
         if dcc_sync_props.developer_options:
-            col.prop(dcc_sync_props, "statistics_file_path", text="Stats Path")
+            col.prop(dcc_sync_props, "statistics_directory", text="Stats Directory")
+            col.operator(operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
             col.operator(operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
+            col.prop(dcc_sync_props, "auto_save_statistics", text="Auto Save Statistics")
             col.prop(dcc_sync_props, "no_send_scene_content", text="No send_scene_content")
 
 

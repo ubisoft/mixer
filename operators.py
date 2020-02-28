@@ -8,6 +8,7 @@ import time
 import json
 import copy
 from pathlib import Path
+from datetime import datetime
 
 import bpy
 import socket
@@ -18,6 +19,7 @@ from bpy.app.handlers import persistent
 from bpy.types import UIList
 
 from .data import get_dcc_sync_props
+from .stats import StatsTimer, save_statistics, get_stats_filename
 
 logger = logging.getLogger(__package__)
 
@@ -65,6 +67,7 @@ class TransformStruct:
 
 class ShareData:
     def __init__(self):
+        self.runId = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         self.sessionId = 0  # For logging and debug
         self.client = None
         self.currentRoom = None
@@ -93,7 +96,8 @@ class ShareData:
         self.objects = {}  # Name of object to bpy.types.Object
 
         self.current_statistics = None
-        self.all_statistics = []
+        self.auto_save_statistics = False
+        self.statistics_directory = None
 
     def clearLists(self):
         self.objectsAddedToCollection.clear()
@@ -130,7 +134,8 @@ def updateParams(obj):
         shareData.client.sendLight(obj)
 
     if typename == 'Grease Pencil':
-        shareData.client.sendGreasePencil(obj)
+        shareData.client.sendGreasePencilMesh(obj)
+        shareData.client.sendGreasePencilConnection(obj)
 
     if typename == 'Mesh':
         if obj.mode == 'OBJECT':
@@ -146,8 +151,11 @@ def leave_current_room():
     shareData.currentRoom = None
     set_handlers(False)
 
-    shareData.all_statistics.append(shareData.current_statistics)
+    if None != shareData.current_statistics and shareData.auto_save_statistics:
+        save_statistics(shareData.current_statistics, shareData.statistics_directory)
     shareData.current_statistics = None
+    shareData.auto_save_statistics = False
+    shareData.statistics_directory = None
 
     if shareData.client is not None:
         if bpy.app.timers.is_registered(shareData.client.networkConsumer):
@@ -294,20 +302,27 @@ def updateObjectsState(stats_timer: StatsTimer):
             if newObjParent != parent:
                 shareData.objectsReparented.add(objName)
 
-    with stats_timer.child("updateObjectsTransformsChanged"):
+    with stats_timer.child("updateObjectsTransformsChanged") as local_timer:
         for objName, transform in shareData.objectsTransforms.items():
+            local_timer.reset_checkpoint()
+
             newObj = shareData.objects[objName]
             if not newObj:
                 hitCount += 1
                 continue
+            local_timer.checkpoint("getObject")
 
             matrix = newObj.matrix_local
             t = matrix.to_translation()
             r = matrix.to_quaternion()
             s = matrix.to_scale()
 
+            local_timer.checkpoint("getTransformsFromMatrix")
+
             if t != transform[0] or r != transform[1] or s != transform[2]:
                 shareData.objectsTransformed.add(objName)
+
+            local_timer.checkpoint("compareTransforms")
 
 
 def updateObjectsInfo():
@@ -829,8 +844,14 @@ def create_main_client(host: str, port: int, room: str):
     shareData.currentRoom = room
     shareData.current_statistics = {
         "session_id": shareData.sessionId,
+        "blendfile": bpy.data.filepath,
+        "statsfile": get_stats_filename(shareData.runId, shareData.sessionId),
+        "user": os.getlogin(),
+        "room": room,
         "children": {}
     }
+    shareData.auto_save_statistics = get_dcc_sync_props().auto_save_statistics
+    shareData.statistics_directory = get_dcc_sync_props().statistics_directory
     set_handlers(True)
 
 
@@ -963,24 +984,6 @@ class LaunchVRtistOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-def compute_final_statistics(stats_dict):
-    new_dict = copy.deepcopy(stats_dict)
-
-    def recursive_compute(d, parent, root):
-        d["mean_time"] = d["time"] / d["hit_count"]
-        if parent:
-            d["parent_percent_time"] = 100 * d["time"] / parent["time"]
-        if root:
-            d["global_percent_time"] = 100 * d["time"] / root["time"]
-        if "children" in d:
-            for child, child_dict in d["children"].items():
-                recursive_compute(child_dict, d, root)
-
-    for _, d in new_dict["children"].items():
-        recursive_compute(d, None, d)
-    return new_dict
-
-
 class WriteStatisticsOperator(bpy.types.Operator):
     """Write dccsync statistics in a file"""
     bl_idname = "dcc_sync.write_statistics"
@@ -988,12 +991,19 @@ class WriteStatisticsOperator(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        with open(get_dcc_sync_props().statistics_file_path, "w") as f:
-            all_statistics = shareData.all_statistics[:]
-            if shareData.current_statistics:
-                all_statistics += [shareData.current_statistics]
-            json.dump([compute_final_statistics(stats_dict) for stats_dict in all_statistics], f, indent=2)
+        if None != shareData.current_statistics:
+            save_statistics(shareData.current_statistics, get_dcc_sync_props().statistics_directory)
+        return {'FINISHED'}
 
+
+class OpenStatsDirOperator(bpy.types.Operator):
+    """Write dccsync stats directory in explorer"""
+    bl_idname = "dcc_sync.open_stats_dir"
+    bl_label = "DCCSync Open Stats Directory"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        os.startfile(get_dcc_sync_props().statistics_directory)
         return {'FINISHED'}
 
 
@@ -1003,7 +1013,8 @@ classes = (
     UpdateRoomListOperator,
     SendSelectionOperator,
     JoinOrLeaveRoomOperator,
-    WriteStatisticsOperator
+    WriteStatisticsOperator,
+    OpenStatsDirOperator
 )
 
 

@@ -86,7 +86,6 @@ class ClientBlender(Client):
             return None  # todo should not happen ? assert this ?
 
         parent = ob.parent
-        name = ob.name
 
         collection = self.getOrCreateCollection()
         if not ob.name in collection.objects:
@@ -644,7 +643,10 @@ class ClientBlender(Client):
             print('not found')
 
     def sendMaterial(self, material):
-        self.addCommand(common.Command(common.MessageType.MATERIAL, self.getMaterialBuffer(material), 0))
+        if material.grease_pencil:
+            self.sendGreasePencilMaterial(material)
+        else:
+            self.addCommand(common.Command(common.MessageType.MATERIAL, self.getMaterialBuffer(material), 0))
 
     def getMeshName(self, mesh):
         return mesh.name
@@ -920,13 +922,9 @@ class ClientBlender(Client):
     #
     # -----------------------------------------------------------------------------------------------------------
 
-    def sendGreasePencilStroke(self, GPName, layerName, frame, strokeIndex):
-        strokeBuffer = common.encodeString(GPName) + common.encodeString(layerName) + \
-            common.encodeInt(frame.frame_number)
-        strokeBuffer += common.encodeInt(strokeIndex)
-        stroke = frame.strokes[strokeIndex]
-        strokeBuffer += common.encodeInt(stroke.material_index)
-        strokeBuffer += common.encodeInt(stroke.line_width)
+    def sendGreasePencilStroke(self, stroke):
+        buffer = common.encodeInt(stroke.material_index)
+        buffer += common.encodeInt(stroke.line_width)
 
         points = list()
 
@@ -936,38 +934,78 @@ class ClientBlender(Client):
             points.append(point.strength)
 
         binaryPointsBuffer = common.intToBytes(len(stroke.points), 4) + struct.pack(f'{len(points)}f', *points)
+        buffer += binaryPointsBuffer
+        return buffer
 
-        strokeBuffer += binaryPointsBuffer
-        self.addCommand(common.Command(common.MessageType.GREASEPENCIL_STROKE, strokeBuffer, 0))
+    def sendGreasePenciFrame(self, frame):
+        buffer = common.encodeInt(frame.frame_number)
+        buffer += common.encodeInt(len(frame.strokes))
+        for stroke in frame.strokes:
+            buffer += self.sendGreasePencilStroke(stroke)
+        return buffer
 
-    def buildGreasePencilStroke(self, data):
-        greasePencilName, start = common.decodeString(data, 0)
-        greasePencilLayerName, start = common.decodeString(data, start)
-        greasePencilFrame, start = common.decodeInt(data, start)
-        greasePencilStrokeIndex, start = common.decodeInt(data, start)
-        materialIndex, start = common.decodeInt(data, start)
-        lineWidth, start = common.decodeInt(data, start)
-        points, start = common.decodeArray(data, start, '5f', 5*4)
+    def sendGreasePencilLayer(self, layer, name):
+        buffer = common.encodeString(name)
+        buffer += common.encodeInt(len(layer.frames))
+        for frame in layer.frames:
+            buffer += self.sendGreasePenciFrame(frame)
+        return buffer
 
-        greasePencil = bpy.data.grease_pencils.get(greasePencilName)
-        if not greasePencil:
-            return
-        if not greasePencilLayerName in greasePencil.layers:
-            return
-        layer = greasePencil.layers[greasePencilLayerName]
+    def sendGreasePencilMesh(self, obj):
+        GP = obj.data
+        buffer = common.encodeString(GP.name)
 
-        frame = None
-        for f in layer.frames:
-            if f.frame_number == greasePencilFrame:
-                frame = f
-                break
-        if not frame:
-            return
+        buffer += common.encodeInt(len(GP.materials))
+        for material in GP.materials:
+            buffer += common.encodeString(material.name)
 
-        if greasePencilStrokeIndex >= len(frame.strokes):
-            stroke = frame.strokes.new()
+        buffer += common.encodeInt(len(GP.layers))
+        for name, layer in GP.layers.items():            
+            buffer += self.sendGreasePencilLayer(layer, name)
+
+        self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_MESH, buffer, 0))
+
+    def sendGreasePencilMaterial(self, material):
+        GPMaterial = material.grease_pencil
+        strokeEnable = GPMaterial.show_stroke
+        strokeMode = GPMaterial.mode
+        strokeStyle = GPMaterial.stroke_style
+        strokeColor = GPMaterial.color
+        strokeOverlap = GPMaterial.use_overlap_strokes
+        fillEnable = GPMaterial.show_fill
+        fillStyle = GPMaterial.fill_style
+        fillColor = GPMaterial.fill_color
+        GPMaterialBuffer = common.encodeString(material.name)
+        GPMaterialBuffer += common.encodeBool(strokeEnable)
+        GPMaterialBuffer += common.encodeString(strokeMode)
+        GPMaterialBuffer += common.encodeString(strokeStyle)
+        GPMaterialBuffer += common.encodeColor(strokeColor)
+        GPMaterialBuffer += common.encodeBool(strokeOverlap)
+        GPMaterialBuffer += common.encodeBool(fillEnable)
+        GPMaterialBuffer += common.encodeString(fillStyle)
+        GPMaterialBuffer += common.encodeColor(fillColor)
+        self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_MATERIAL, GPMaterialBuffer, 0))
+
+    def sendGreasePencilConnection(self, obj):
+        buffer = common.encodeString(self.getObjectPath(obj))
+        buffer += common.encodeString(obj.data.name)
+        self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_CONNECTION, buffer, 0))
+
+    def buildGreasePencilConnection(self, data):
+        path, start = common.decodeString(data, 0)
+        greasePencilName, start = common.decodeString(data, start)
+        gp = bpy.data.grease_pencils[greasePencilName]
+        self.getOrCreateObjectData(path, gp)
+
+    def decodeGreasePencilStroke(self, greasePencilFrame, strokeIndex, data, index):
+        materialIndex, index = common.decodeInt(data, index)
+        lineWidth, index = common.decodeInt(data, index)
+        points, index = common.decodeArray(data, index, '5f', 5*4)
+
+        if strokeIndex >= len(greasePencilFrame.strokes):
+            stroke = greasePencilFrame.strokes.new()
         else:
-            stroke = frame.strokes[greasePencilStrokeIndex]
+            stroke = greasePencilFrame.strokes[strokeIndex]
 
         stroke.material_index = materialIndex
         stroke.line_width = lineWidth
@@ -985,86 +1023,57 @@ class ClientBlender(Client):
             p[i].co = ((point[0], point[1], point[2]))
             p[i].pressure = point[3]
             p[i].strength = point[4]
+        return index
 
-    def sendGreasePenciFrame(self, GPName, layerName, frame):
-        frameBuffer = common.encodeString(GPName) + common.encodeString(layerName) + \
-            common.encodeInt(frame.frame_number)
-        self.addCommand(common.Command(common.MessageType.GREASEPENCIL_FRAME, frameBuffer, 0))
-        for strokeIndex in range(len(frame.strokes)):
-            self.sendGreasePencilStroke(GPName, layerName, frame, strokeIndex)
-
-    def buildGreasePencilFrame(self, data):
-        greasePencilName, start = common.decodeString(data, 0)
-        greasePencilLayerName, start = common.decodeString(data, start)
-        greasePencilFrame, start = common.decodeInt(data, start)
-        greasePencil = bpy.data.grease_pencils.get(greasePencilName)
-        if not greasePencil:
-            return
-        if not greasePencilLayerName in greasePencil.layers:
-            return
-        layer = greasePencil.layers[greasePencilLayerName]
-
+    def decodeGreasePencilFrame(self, greasePencilLayer, data, index):
+        greasePencilFrame, index = common.decodeInt(data, index)
         frame = None
-        for f in layer.frames:
+        for f in greasePencilLayer.frames:
             if f.frame_number == greasePencilFrame:
                 frame = f
                 break
         if not frame:
-            frame = layer.frames.new(greasePencilFrame)
+            frame = greasePencilLayer.frames.new(greasePencilFrame)
+        strokeCount, index = common.decodeInt(data, index)
+        for strokeIndex in range(strokeCount):
+            index = self.decodeGreasePencilStroke(frame, strokeIndex, data, index)
+        return index
 
-    def sendGreasePencilLayer(self, GP, layerName):
-        layerBuffer = common.encodeString(GP.name) + common.encodeString(layerName)
-        self.addCommand(common.Command(common.MessageType.GREASEPENCIL_LAYER, layerBuffer, 0))
-        layer = GP.layers[layerName]
-        for frame in layer.frames:
-            self.sendGreasePenciFrame(GP.name, layerName, frame)
-
-    def buildGreasePencilLayer(self, data):
-        greasePencilName, start = common.decodeString(data, 0)
-        greasePencilLayerName, start = common.decodeString(data, start)
-        greasePencil = bpy.data.grease_pencils.get(greasePencilName)
-        if not greasePencil:
-            return
+    def decodeGreasePencilLayer(self, greasePencil, data, index):
+        greasePencilLayerName, index = common.decodeString(data, index)
         layer = greasePencil.get(greasePencilLayerName)
         if not layer:
-            greasePencil.layers.new(greasePencilLayerName)
+            layer = greasePencil.layers.new(greasePencilLayerName)
+        frameCount, index = common.decodeInt(data, index)
+        for _ in range(frameCount):
+            index = self.decodeGreasePencilFrame(layer, data, index)
+        return index
 
-    def sendGreasePencilMaterial(self, GPName, material):
-        GPMaterial = material.grease_pencil
-        strokeEnable = GPMaterial.show_stroke
-        strokeMode = GPMaterial.mode
-        strokeStyle = GPMaterial.stroke_style
-        strokeColor = GPMaterial.color
-        strokeOverlap = GPMaterial.use_overlap_strokes
-        fillEnable = GPMaterial.show_fill
-        fillStyle = GPMaterial.fill_style
-        fillColor = GPMaterial.fill_color
-        GPMaterialBuffer = common.encodeString(GPName)
-        GPMaterialBuffer += common.encodeString(material.name)
-        GPMaterialBuffer += common.encodeBool(strokeEnable)
-        GPMaterialBuffer += common.encodeString(strokeMode)
-        GPMaterialBuffer += common.encodeString(strokeStyle)
-        GPMaterialBuffer += common.encodeColor(strokeColor)
-        GPMaterialBuffer += common.encodeBool(strokeOverlap)
-        GPMaterialBuffer += common.encodeBool(fillEnable)
-        GPMaterialBuffer += common.encodeString(fillStyle)
-        GPMaterialBuffer += common.encodeColor(fillColor)
-        self.addCommand(common.Command(common.MessageType.GREASEPENCIL_MATERIAL, GPMaterialBuffer, 0))
+    def buildGreasePencilMesh(self, data):
+        greasePencilName, index = common.decodeString(data, 0)
+
+        greasePencil = bpy.data.grease_pencils.get(greasePencilName)
+        if not greasePencil:
+            greasePencil = bpy.data.grease_pencils.new(greasePencilName)
+
+        greasePencil.materials.clear()
+        materialCount, index = common.decodeInt(data, index)
+        for _ in range(materialCount):
+            materialName, index = common.decodeString(data, index)
+            material = bpy.data.materials[materialName]
+            greasePencil.materials.append(material)
+
+        layerCount, index = common.decodeInt(data, index)
+        for _ in range(layerCount):
+            index = self.decodeGreasePencilLayer(greasePencil, data, index)
 
     def buildGreasePencilMaterial(self, data):
-        GPName, start = common.decodeString(data, 0)
-        GP = bpy.data.grease_pencils.get(GPName)
-        if not GP:
-            GP = bpy.data.grease_pencils.new(GPName)
-
-        greasePencilMaterialName, start = common.decodeString(data, start)
+        greasePencilMaterialName, start = common.decodeString(data, 0)
         material = bpy.data.materials.get(greasePencilMaterialName)
         if not material:
             material = bpy.data.materials.new(greasePencilMaterialName)
         if not material.grease_pencil:
             bpy.data.materials.create_gpencil_data(material)
-
-        GP.materials.append(material)
 
         GPMaterial = material.grease_pencil
         GPMaterial.show_stroke, start = common.decodeBool(data, start)
@@ -1076,23 +1085,14 @@ class ClientBlender(Client):
         GPMaterial.fill_style, start = common.decodeString(data, start)
         GPMaterial.fill_color, start = common.decodeColor(data, start)
 
-    def sendGreasePencil(self, obj):
-        GP = obj.data
-        path = self.getObjectPath(obj)
-        greasePencilBuffer = common.encodeString(path) + common.encodeString(GP.name)
-        self.addCommand(common.Command(common.MessageType.GREASEPENCIL, greasePencilBuffer, 0))
-        for material in GP.materials:
-            self.sendGreasePencilMaterial(GP.name, material)
-        for layerKey in GP.layers.keys():
-            self.sendGreasePencilLayer(GP, layerKey)
-
     def buildGreasePencil(self, data):
         objectPath, start = common.decodeString(data, 0)
         greasePencilName, start = common.decodeString(data, start)
         greasePencil = bpy.data.grease_pencils.get(greasePencilName)
         if not greasePencil:
             greasePencil = bpy.data.grease_pencils.new(greasePencilName)
-            self.getOrCreateObjectData(objectPath, greasePencil)
+            self.getOrCreateObjectData(objectPath, greasePencil)        
+
 
     def getDeleteBuffer(self, name):
         encodedName = name.encode()
@@ -1138,16 +1138,12 @@ class ClientBlender(Client):
                     self.sendSceneContent()
                     self.receivedCommandsProcessed = False
 
-                elif command.type == common.MessageType.GREASEPENCIL:
-                    self.buildGreasePencil(command.data)
-                elif command.type == common.MessageType.GREASEPENCIL_MATERIAL:
+                elif command.type == common.MessageType.GREASE_PENCIL_MESH:
+                    self.buildGreasePencilMesh(command.data)
+                elif command.type == common.MessageType.GREASE_PENCIL_MATERIAL:
                     self.buildGreasePencilMaterial(command.data)
-                elif command.type == common.MessageType.GREASEPENCIL_LAYER:
-                    self.buildGreasePencilLayer(command.data)
-                elif command.type == common.MessageType.GREASEPENCIL_FRAME:
-                    self.buildGreasePencilFrame(command.data)
-                elif command.type == common.MessageType.GREASEPENCIL_STROKE:
-                    self.buildGreasePencilStroke(command.data)
+                elif command.type == common.MessageType.GREASE_PENCIL_CONNECTION:
+                    self.buildGreasePencilConnection(command.data)
 
                 elif command.type == common.MessageType.CLEAR_CONTENT:
                     self.clearContent()
