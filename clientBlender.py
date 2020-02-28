@@ -874,6 +874,7 @@ class ClientBlender(Client):
 
     def sendGreasePencilLayer(self, layer, name):
         buffer = common.encodeString(name)
+        buffer += common.encodeBool(layer.hide)
         buffer += common.encodeInt(len(layer.frames))
         for frame in layer.frames:
             buffer += self.sendGreasePenciFrame(frame)
@@ -972,6 +973,7 @@ class ClientBlender(Client):
         layer = greasePencil.get(greasePencilLayerName)
         if not layer:
             layer = greasePencil.layers.new(greasePencilLayerName)
+        layer.hide, index = common.decodeBool(data, index)
         frameCount, index = common.decodeInt(data, index)
         for _ in range(frameCount):
             index = self.decodeGreasePencilFrame(layer, data, index)

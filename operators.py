@@ -255,6 +255,9 @@ def updateObjectsState(stats_timer: StatsTimer):
         shareData.objectsRemoved.clear()
         return
 
+    for objName in shareData.objectsRemoved:
+        shareData.objects[objName] = None
+
     with stats_timer.child("updateObjectsVisibilityChanged"):
         for objName, visible in shareData.objectsVisibility.items():
             newObj = shareData.objects[objName]
@@ -277,7 +280,6 @@ def updateObjectsState(stats_timer: StatsTimer):
 
             newObj = shareData.objects[objName]
             if not newObj:
-                hitCount += 1
                 continue
             local_timer.checkpoint("getObject")
 
