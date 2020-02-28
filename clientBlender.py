@@ -1042,6 +1042,9 @@ class ClientBlender(Client):
         if 'SendContent' in self.callbacks:
             self.callbacks['SendContent']()
 
+    def sendFrame(self, frame):
+        self.addCommand(common.Command(common.MessageType.FRAME, common.encodeInt(frame), 0))
+
     def clearContent(self):
         if 'ClearContent' in self.callbacks:
             self.callbacks['ClearContent']()

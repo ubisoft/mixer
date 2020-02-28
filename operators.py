@@ -90,6 +90,8 @@ def updateParams(obj):
         shareData.client.sendLight(obj)
 
     if typename == 'Grease Pencil':
+        for material in obj.data.materials:
+            shareData.client.sendMaterial(material)
         shareData.client.sendGreasePencilMesh(obj)
         shareData.client.sendGreasePencilConnection(obj)
 
@@ -439,6 +441,19 @@ def updateObjectsData():
         if d in container:
             updateParams(container[d])
 
+@persistent
+def sendFrameChanged(scene):
+    shareData.client.sendFrame(scene.frame_current)
+    shareData.clearLists()
+
+    updateObjectsState()
+    updateCollectionsState()
+
+    changed = False
+    changed |= updateObjectsTransforms()
+
+    # update for next change
+    updateCurrentData()
 
 @persistent
 def sendSceneDataToServer(scene):
@@ -703,12 +718,14 @@ def send_scene_content():
     for col in bpy.context.scene.collection.children:
         shareData.client.sendSceneCollection(col)
 
+    shareData.client.sendFrame(bpy.context.scene.frame_current)
+
 
 def set_handlers(connect: bool):
     try:
         if connect:
             shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
-            bpy.app.handlers.frame_change_post.append(sendSceneDataToServer)
+            bpy.app.handlers.frame_change_post.append(sendFrameChanged)
             bpy.app.handlers.depsgraph_update_post.append(sendSceneDataToServer)
             bpy.app.handlers.undo_pre.append(onUndoRedoPre)
             bpy.app.handlers.redo_pre.append(onUndoRedoPre)
@@ -717,7 +734,7 @@ def set_handlers(connect: bool):
             bpy.app.handlers.load_post.append(onLoad)
         else:
             bpy.app.handlers.load_post.remove(onLoad)
-            bpy.app.handlers.frame_change_post.remove(sendSceneDataToServer)
+            bpy.app.handlers.frame_change_post.remove(sendFrameChanged)
             bpy.app.handlers.depsgraph_update_post.remove(sendSceneDataToServer)
             bpy.app.handlers.undo_pre.remove(onUndoRedoPre)
             bpy.app.handlers.redo_pre.remove(onUndoRedoPre)
