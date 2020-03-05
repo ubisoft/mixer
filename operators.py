@@ -875,7 +875,7 @@ class JoinRoomOperator(bpy.types.Operator):
         updateCurrentData()
 
         if not connect():
-            self.report({'ERROR'}, repr(e))
+            self.report({'ERROR'})
 
         shareData.isLocal = False
         props = get_dcc_sync_props()
@@ -966,17 +966,25 @@ class LaunchVRtistOperator(bpy.types.Operator):
     bl_label = "Launch VRtist"
     bl_options = {'REGISTER'}
 
+    @classmethod
+    def poll(cls, context):
+        props = get_dcc_sync_props()
+        return not shareData.currentRoom and bool(props.room)
+
     def execute(self, context):
         dcc_sync_props = get_dcc_sync_props()
-        room = shareData.currentRoom
-        if not room:
-            bpy.ops.dcc_sync.join_or_leave_room()
-            room = shareData.currentRoom
+        if not shareData.currentRoom:
+            if not connect():
+                return {'CANCELLED'}
+
+            props = get_dcc_sync_props()
+            join_room(props.room)
 
         hostname = "localhost"
         if not shareData.isLocal:
             hostname = dcc_sync_props.host
-        args = [dcc_sync_props.VRtist, "--room", room, "--hostname", hostname, "--port", str(dcc_sync_props.port)]
+        args = [dcc_sync_props.VRtist, "--room", shareData.currentRoom,
+                "--hostname", hostname, "--port", str(dcc_sync_props.port)]
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
         return {'FINISHED'}
 
