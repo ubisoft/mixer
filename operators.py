@@ -243,33 +243,37 @@ def updateCollectionsInfo():
         shareData.collectionsInfo[collection.name].objects = [x.name for x in collection.objects]
 
 
-def updateObjectsState(stats_timer: StatsTimer):
+def updateObjectsState(oldObjects : dict, newObjects : dict, stats_timer: StatsTimer):
     with stats_timer.child("checkObjectsAddedAndRemoved"):
-        objects = set([x.name for x in bpy.data.objects])
-        shareData.objectsAdded = objects - shareData.objects.keys()
-        shareData.objectsRemoved = shareData.objects.keys() - objects
+        objects = set(newObjects.keys())
+        shareData.objectsAdded = objects - oldObjects.keys()
+        shareData.objectsRemoved = oldObjects.keys() - objects
+
+    shareData.objects = newObjects
 
     if len(shareData.objectsAdded) == 1 and len(shareData.objectsRemoved) == 1:
         shareData.objectsRenamed[list(shareData.objectsRemoved)[0]] = list(shareData.objectsAdded)[0]
         shareData.objectsAdded.clear()
         shareData.objectsRemoved.clear()
-        return
+        return    
 
     for objName in shareData.objectsRemoved:
-        shareData.objects[objName] = None
+        if objName in shareData.objects:
+            del shareData.objects[objName]
 
     with stats_timer.child("updateObjectsVisibilityChanged"):
         for objName, visible in shareData.objectsVisibility.items():
+            if not objName in shareData.objects:
+                continue
             newObj = shareData.objects[objName]
-            if newObj and visible != newObj.hide_viewport:
+            if visible != newObj.hide_viewport:
                 shareData.objectsVisibilityChanged.add(objName)
 
     with stats_timer.child("updateObjectsParentingChanged"):
         for objName, parent in shareData.objectsParents.items():
-            newObj = shareData.objects[objName]
-            if not newObj:
+            if not objName in shareData.objects:
                 continue
-
+            newObj = shareData.objects[objName]
             newObjParent = "" if newObj.parent == None else newObj.parent.name
             if newObjParent != parent:
                 shareData.objectsReparented.add(objName)
@@ -277,10 +281,9 @@ def updateObjectsState(stats_timer: StatsTimer):
     with stats_timer.child("updateObjectsTransformsChanged") as local_timer:
         for objName, transform in shareData.objectsTransforms.items():
             local_timer.reset_checkpoint()
-
-            newObj = shareData.objects[objName]
-            if not newObj:
+            if not objName in shareData.objects:
                 continue
+            newObj = shareData.objects[objName]
             local_timer.checkpoint("getObject")
 
             matrix = newObj.matrix_local
@@ -486,7 +489,7 @@ def sendFrameChanged(scene):
             shareData.clearLists()
 
         with timer.child("updateObjectsState") as child_timer:
-            updateObjectsState(child_timer)
+            updateObjectsState(shareData.objects, dict(bpy.data.objects), child_timer)
 
         with timer.child("updateCollectionsState"):
             updateCollectionsState()
@@ -521,7 +524,7 @@ def sendSceneDataToServer(scene):
             return
 
         with timer.child("updateObjectsState") as child_timer:
-            updateObjectsState(child_timer)
+            updateObjectsState(shareData.objects, dict(bpy.data.objects), child_timer)
 
         with timer.child("updateCollectionsState"):
             updateCollectionsState()
@@ -566,6 +569,32 @@ def onUndoRedoPre(scene):
     shareData.clearLists()
     updateCurrentData()
 
+def remapObjectsInfo():
+    # update objects references
+    newObjects = {x.name: x for x in bpy.data.objects}
+    addedObjects = set(newObjects.keys()) - set(shareData.objects.keys())
+    removedObjects = set(shareData.objects.keys()) - set(newObjects.keys())
+    # we are only able to manage one object rename
+    if len(addedObjects) == 1 and len(removedObjects) == 1:
+        oldName = list(removedObjects)[0]
+        newName = list(addedObjects)[0]
+
+        visible = shareData.objectsVisibility[oldName]
+        del shareData.objectsVisibility[oldName]
+        shareData.objectsVisibility[newName] = visible
+
+        parent = shareData.objectsParents[oldName]
+        del shareData.objectsParents[oldName]
+        shareData.objectsParents[newName] = parent
+        for name, parent in shareData.objectsParents.items():
+            if parent == oldName:
+                shareData.objectsParents[name] = newName
+
+        trf = shareData.objectsTransforms[oldName]
+        del shareData.objectsTransforms[oldName]
+        shareData.objectsTransforms[newName] = trf
+
+    shareData.objects = newObjects
 
 @persistent
 def onUndoRedoPost(scene):
@@ -577,7 +606,16 @@ def onUndoRedoPost(scene):
         updateSceneChanged()
         return
 
-    updateObjectsState()
+    oldObjectsName = dict([(k, None) for k in shareData.objects.keys()])  # value not needed
+    remapObjectsInfo()
+    for k, v in shareData.objects.items():
+        if k in oldObjectsName:
+            oldObjectsName[k] = v
+
+    with StatsTimer(shareData.current_statistics, "onUndoRedoPost") as timer:
+        with timer.child("updateObjectsState") as child_timer:
+            updateObjectsState(oldObjectsName, shareData.objects, child_timer)
+
     updateCollectionsState()
 
     removeObjectsFromCollections()
