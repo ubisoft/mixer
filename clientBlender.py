@@ -24,7 +24,6 @@ class ClientBlender(Client):
     def __init__(self, name, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(host, port, name=name, delegate=self)
 
-        self.objectNames = {}  # object name / object
         self.textures = set()
         self.currentSceneName = ""
 
@@ -61,7 +60,7 @@ class ClientBlender(Client):
             bpy.context.scene.collection.children.link(collection)
         return bpy.data.collections[name]
 
-    def getOrCreatePath(self, path, data, collectionName="Collection"):
+    def getOrCreatePath(self, path, data = None, collectionName="Collection"):
         collection = self.getOrCreateCollection(collectionName)
         pathElem = path.split('/')
         parent = None
@@ -82,6 +81,7 @@ class ClientBlender(Client):
             collection.objects.link(ob)
         else:
             ob = bpy.data.objects[elem]
+            ob.parent = parent
         return ob
 
     def getOrCreateObjectData(self, path, data):
@@ -232,7 +232,8 @@ class ClientBlender(Client):
 
         for materialName in materialNames:
             material = self.getOrCreateMaterial(materialName)
-            me.materials.append(material)
+            if not materialName in me.materials:
+                me.materials.append(material)
 
         bm.free()
 
@@ -266,7 +267,7 @@ class ClientBlender(Client):
         visible, start = common.decodeBool(data, start)
 
         try:
-            obj = self.getOrCreatePath(objectPath, None)
+            obj = self.getOrCreatePath(objectPath)
         except KeyError:
             # Object doesn't exist anymore
             return
@@ -375,12 +376,9 @@ class ClientBlender(Client):
     def buildRename(self, data):
         oldPath, index = common.decodeString(data, 0)
         newPath, index = common.decodeString(data, index)
-
         oldName = oldPath.split('/')[-1]
         newName = newPath.split('/')[-1]
-        obj = self.objectNames[oldName]
-        obj.name = newName
-        self.objectNames[newName] = obj
+        bpy.data.objects[oldName].name = newName
 
     def buildDuplicate(self, data):
         srcPath, index = common.decodeString(data, 0)
@@ -878,6 +876,7 @@ class ClientBlender(Client):
 
     def sendGreasePencilLayer(self, layer, name):
         buffer = common.encodeString(name)
+        buffer += common.encodeBool(layer.hide)
         buffer += common.encodeInt(len(layer.frames))
         for frame in layer.frames:
             buffer += self.sendGreasePenciFrame(frame)
@@ -976,6 +975,7 @@ class ClientBlender(Client):
         layer = greasePencil.get(greasePencilLayerName)
         if not layer:
             layer = greasePencil.layers.new(greasePencilLayerName)
+        layer.hide, index = common.decodeBool(data, index)
         frameCount, index = common.decodeInt(data, index)
         for _ in range(frameCount):
             index = self.decodeGreasePencilFrame(layer, data, index)
@@ -1052,6 +1052,9 @@ class ClientBlender(Client):
     def sendSceneContent(self):
         if 'SendContent' in self.callbacks:
             self.callbacks['SendContent']()
+
+    def sendFrame(self, frame):
+        self.addCommand(common.Command(common.MessageType.FRAME, common.encodeInt(frame), 0))
 
     def clearContent(self):
         if 'ClearContent' in self.callbacks:

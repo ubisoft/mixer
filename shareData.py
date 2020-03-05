@@ -1,9 +1,11 @@
 from typing import List, Mapping
 from . import clientBlender
+from datetime import datetime
 
 
 class ShareData:
     def __init__(self):
+        self.runId = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         self.sessionId = 0  # For logging and debug
         self.client: clientBlender.ClientBlender = None
 
@@ -35,6 +37,10 @@ class ShareData:
         self.objectsVisibilityChanged = set()
         self.objectsVisibility = {}
         self.objects = set()
+
+        self.current_statistics = None
+        self.auto_save_statistics = False
+        self.statistics_directory = None
 
     def clearLists(self):
         self.objectsAddedToCollection.clear()

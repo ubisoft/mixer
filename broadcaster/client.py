@@ -70,10 +70,6 @@ class Client:
     def addCommand(self, command):
         self.pendingCommands.put(command)
 
-    def send(self, data):
-        with common.mutex:
-            self.socket.send(data)
-
     def joinRoom(self, roomName):
         common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
 
@@ -177,3 +173,5 @@ if __name__ == '__main__':
             client.addCommand(common.Command(common.MessageType.DELETE, encodedMsg[6:]))
         elif msg.startswith("Room"):
             client.joinRoom(msg[4:])
+            
+    client.disconnect()
