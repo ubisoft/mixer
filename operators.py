@@ -70,9 +70,21 @@ def updateTransform(obj):
 
 def join_room(room_name: str):
     assert shareData.currentRoom is None
+    user = get_dcc_sync_props().user
     shareData.currentRoom = room_name
     shareData.client.joinRoom(room_name)
-    shareData.client.setClientName(get_dcc_sync_props().user)
+    shareData.client.setClientName(user)
+
+    shareData.current_statistics = {
+        "session_id": shareData.sessionId,
+        "blendfile": bpy.data.filepath,
+        "statsfile": get_stats_filename(shareData.runId, shareData.sessionId),
+        "user": user,
+        "room": room_name,
+        "children": {}
+    }
+    shareData.auto_save_statistics = get_dcc_sync_props().auto_save_statistics
+    shareData.statistics_directory = get_dcc_sync_props().statistics_directory
     # join a room <==> want to track local changes
     set_handlers(True)
 
@@ -203,7 +215,7 @@ def updateCollectionsInfo():
         shareData.collectionsInfo[collection.name].objects = [x.name for x in collection.objects]
 
 
-def updateObjectsState(oldObjects : dict, newObjects : dict, stats_timer: StatsTimer):
+def updateObjectsState(oldObjects: dict, newObjects: dict, stats_timer: StatsTimer):
     with stats_timer.child("checkObjectsAddedAndRemoved"):
         objects = set(newObjects.keys())
         shareData.objectsAdded = objects - oldObjects.keys()
@@ -215,7 +227,7 @@ def updateObjectsState(oldObjects : dict, newObjects : dict, stats_timer: StatsT
         shareData.objectsRenamed[list(shareData.objectsRemoved)[0]] = list(shareData.objectsAdded)[0]
         shareData.objectsAdded.clear()
         shareData.objectsRemoved.clear()
-        return    
+        return
 
     for objName in shareData.objectsRemoved:
         if objName in shareData.objects:
@@ -438,8 +450,9 @@ def updateObjectsData():
         if d in container:
             updateParams(container[d])
 
+
 @persistent
-def sendFrameChanged(scene):    
+def sendFrameChanged(scene):
     logger.info("sendFrameChanged")
     with StatsTimer(shareData.current_statistics, "sendFrameChanged") as timer:
         with timer.child("setFrame"):
@@ -461,6 +474,7 @@ def sendFrameChanged(scene):
         # update for next change
         with timer.child("updateCurrentData"):
             updateCurrentData()
+
 
 @persistent
 def sendSceneDataToServer(scene):
@@ -529,6 +543,7 @@ def onUndoRedoPre(scene):
     shareData.clearLists()
     updateCurrentData()
 
+
 def remapObjectsInfo():
     # update objects references
     newObjects = {x.name: x for x in bpy.data.objects}
@@ -555,6 +570,7 @@ def remapObjectsInfo():
         shareData.objectsTransforms[newName] = trf
 
     shareData.objects = newObjects
+
 
 @persistent
 def onUndoRedoPost(scene):
@@ -818,16 +834,6 @@ def create_main_client(host: str, port: int):
         bpy.app.timers.register(shareData.client.networkConsumer)
 
     return True
-    shareData.current_statistics = {
-        "session_id": shareData.sessionId,
-        "blendfile": bpy.data.filepath,
-        "statsfile": get_stats_filename(shareData.runId, shareData.sessionId),
-        "user": os.getlogin(),
-        "room": room,
-        "children": {}
-    }
-    shareData.auto_save_statistics = get_dcc_sync_props().auto_save_statistics
-    shareData.statistics_directory = get_dcc_sync_props().statistics_directory
 
 
 class CreateRoomOperator(bpy.types.Operator):

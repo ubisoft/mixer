@@ -36,7 +36,7 @@ class ShareData:
         self.objectsTransforms = {}
         self.objectsVisibilityChanged = set()
         self.objectsVisibility = {}
-        self.objects = set()
+        self.objects = {}  # Name of object to bpy.types.Object
 
         self.current_statistics = None
         self.auto_save_statistics = False
