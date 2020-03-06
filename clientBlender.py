@@ -592,13 +592,16 @@ class ClientBlender(Client):
         try:
             buffers = []
             for slot in obj.material_slots[:]:
-                buffer = getMaterialBuffer(slot.material)
-                buffers.append(buffer)
+                if slot.material:
+                    buffer = getMaterialBuffer(slot.material)
+                    buffers.append(buffer)
             return buffers
         except:
             print('not found')
 
     def sendMaterial(self, material):
+        if not material:
+            return
         if material.grease_pencil:
             self.sendGreasePencilMaterial(material)
         else:
@@ -884,7 +887,11 @@ class ClientBlender(Client):
 
         buffer += common.encodeInt(len(GP.materials))
         for material in GP.materials:
-            buffer += common.encodeString(material.name)
+            if not material:
+                materialName = "Default"
+            else:
+                materialName = material.name
+            buffer += common.encodeString(materialName)
 
         buffer += common.encodeInt(len(GP.layers))
         for name, layer in GP.layers.items():            
