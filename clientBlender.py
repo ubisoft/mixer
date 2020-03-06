@@ -9,6 +9,9 @@ import os
 import platform
 import ctypes
 import logging
+
+from .shareData import shareData
+
 _STILL_ACTIVE = 259
 
 logger = logging.getLogger(__package__)
@@ -26,6 +29,7 @@ class ClientBlender(Client):
         self.callbacks = {}
         self.blenderPID = os.getpid()
 
+
     def blenderExists(self):
         # Hack, check if a window still exists
         try:
@@ -41,20 +45,22 @@ class ClientBlender(Client):
 
     # returns the path of an object
     def getObjectPath(self, obj):
-        path = obj.name
+        path = obj.name_full
         while obj.parent:
             obj = obj.parent
             if obj:
-                path = obj.name + "/" + path
+                path = obj.name_full + "/" + path
         return path
 
     # get first collection
     def getOrCreateCollection(self, name="Collection"):
-        if name not in bpy.data.collections:
+        collection = shareData.blenderCollections.get(name)
+        if not collection:
             bpy.ops.collection.create(name=name)
             collection = bpy.data.collections[name]
+            shareData._blenderCollections[name] = collection
             bpy.context.scene.collection.children.link(collection)
-        return bpy.data.collections[name]
+        return collection
 
     def getOrCreatePath(self, path, data = None, collectionName="Collection"):
         collection = self.getOrCreateCollection(collectionName)
@@ -63,20 +69,21 @@ class ClientBlender(Client):
         ob = None
         # Create or get parents
         for elem in pathElem[:-1]:
-            if elem not in bpy.data.objects:
+            ob = shareData.blenderObjects.get(elem)
+            if not ob:
                 ob = bpy.data.objects.new(elem, None)
+                shareData._blenderObjects[ob.name_full] = ob
                 collection.objects.link(ob)
-            else:
-                ob = bpy.data.objects[elem]
             ob.parent = parent
             parent = ob
         # Create or get object
         elem = pathElem[-1]
-        if elem not in bpy.data.objects:
+        ob = shareData.blenderObjects.get(elem)
+        if not ob:
             ob = bpy.data.objects.new(elem, data)
+            shareData._blenderObjects[ob.name_full] = ob
             collection.objects.link(ob)
         else:
-            ob = bpy.data.objects[elem]
             ob.parent = parent
         return ob
 
@@ -93,9 +100,11 @@ class ClientBlender(Client):
         ob.parent = parent
 
     def getOrCreateCamera(self, cameraName):
-        if cameraName in bpy.data.cameras:
-            return bpy.data.cameras[cameraName]
+        camera = shareData.blenderCameras.get(cameraName)
+        if camera:
+            return camera
         camera = bpy.data.cameras.new(cameraName)
+        shareData._blenderCameras[camera.name_full] = camera
         return camera
 
     def buildCamera(self, data):
@@ -122,9 +131,11 @@ class ClientBlender(Client):
         self.getOrCreateObjectData(cameraPath, camera)
 
     def getOrCreateLight(self, lightName, lightType):
-        if lightName in bpy.data.lights:
-            return bpy.data.lights[lightName]
+        light = shareData.blenderLights.get(lightName)
+        if light:
+            return light
         light = bpy.data.lights.new(lightName, type=lightType)
+        shareData._blenderLights[light.name_full] = light
         return light
 
     def buildLight(self, data):
@@ -157,11 +168,10 @@ class ClientBlender(Client):
         self.getOrCreateObjectData(lightPath, light)
 
     def getOrCreateMesh(self, meshName):
-        me = None
-        if meshName in bpy.data.meshes:
-            me = bpy.data.meshes[meshName]
-        else:
+        me = shareData.blenderMeshes.get(meshName)
+        if not me:
             me = bpy.data.meshes.new(meshName)
+            shareData._blenderMeshes[me.name_full] = me
         return me
 
     def buildMesh(self, data):
@@ -187,14 +197,16 @@ class ClientBlender(Client):
         if len(uvs) > 0:
             uv_layer = bm.loops.layers.uv.new()
 
+        currentMaterialIndex = 0
         indexInMaterialIndices = 0
         nextriangleIndex = len(triangles)
         if len(materialIndices) > 1:
             nextriangleIndex = materialIndices[indexInMaterialIndices + 1][0]
-        currentMaterialIndex = materialIndices[indexInMaterialIndices][1]
+        if len(materialIndices) > 0:
+            currentMaterialIndex = materialIndices[indexInMaterialIndices][1]
 
         for i in range(len(triangles)):
-            if i >= nextriangleIndex:
+            if i >= nextriangleIndex: 
                 indexInMaterialIndices = indexInMaterialIndices + 1
                 nextriangleIndex = len(triangles)
                 if len(materialIndices) > indexInMaterialIndices + 1:
@@ -236,7 +248,7 @@ class ClientBlender(Client):
     def buildMeshConnection(self, data):
         path, start = common.decodeString(data, 0)
         meshName, start = common.decodeString(data, start)
-        mesh = bpy.data.meshes[meshName]
+        mesh = shareData.blenderMeshes[meshName]
         self.getOrCreateObjectData(path, mesh)
 
     def setTransform(self, obj, position, rotation, scale):
@@ -272,12 +284,13 @@ class ClientBlender(Client):
             obj.hide_viewport = not visible
 
     def getOrCreateMaterial(self, materialName):
-        if materialName in bpy.data.materials:
-            material = bpy.data.materials[materialName]
+        material = shareData.blenderMaterials.get(materialName)
+        if material:
             material.use_nodes = True
             return material
 
         material = bpy.data.materials.new(name=materialName)
+        shareData._blenderMaterials[material.name_full] = material
         material.use_nodes = True
         return material
 
@@ -374,7 +387,7 @@ class ClientBlender(Client):
         newPath, index = common.decodeString(data, index)
         oldName = oldPath.split('/')[-1]
         newName = newPath.split('/')[-1]
-        bpy.data.objects[oldName].name = newName
+        shareData.blenderObjects.get(oldName).name = newName
 
     def buildDuplicate(self, data):
         srcPath, index = common.decodeString(data, 0)
@@ -401,10 +414,11 @@ class ClientBlender(Client):
         path, _ = common.decodeString(data, 0)
 
         try:
-            obj = bpy.data.objects[path.split('/')[-1]]
+            obj = shareData.blenderObjects[path.split('/')[-1]]
         except KeyError:
             # Object doesn't exist anymore
             return
+        del shareData._blenderObjects[obj.name_full]
         bpy.data.objects.remove(obj, do_unlink=True)
 
     def buildSendToTrash(self, data):
@@ -424,14 +438,14 @@ class ClientBlender(Client):
         name, index = common.decodeString(data, 0)
         path, index = common.decodeString(data, index)
 
-        obj = bpy.data.objects[name]
+        obj = shareData.blenderObjects[name]
         trashCollection = self.getOrCreateCollection("__Trash__")
         trashCollection.hide_viewport = True
         trashCollection.objects.unlink(obj)
         collection = self.getOrCreateCollection()
         collection.objects.link(obj)
         if len(path) > 0:
-            obj.parent = bpy.data.objects[path.split('/')[-1]]
+            obj.parent = shareData.blenderObjects[path.split('/')[-1]]
 
     def getTransformBuffer(self, obj):
         path = self.getObjectPath(obj)
@@ -483,7 +497,7 @@ class ClientBlender(Client):
         return None
 
     def getMaterialBuffer(self, material):
-        name = material.name
+        name = material.name_full
         buffer = common.encodeString(name)
         principled = None
         # Get the nodes in the node tree
@@ -608,7 +622,7 @@ class ClientBlender(Client):
             self.addCommand(common.Command(common.MessageType.MATERIAL, self.getMaterialBuffer(material), 0))
 
     def getMeshName(self, mesh):
-        return mesh.name
+        return mesh.name_full
 
     class CurrentBuffers:
         vertices = []
@@ -715,17 +729,17 @@ class ClientBlender(Client):
         self.addCommand(common.Command(common.MessageType.MESHCONNECTION, meshConnectionBuffer, 0))
 
     def sendCollectionInstance(self, obj):
-        instanceName = obj.name
-        instantiatedCollection = obj.instance_collection.name
+        instanceName = obj.name_full
+        instantiatedCollection = obj.instance_collection.name_full
         buffer = common.encodeString(instanceName) + common.encodeString(instantiatedCollection)
         self.addCommand(common.Command(common.MessageType.INSTANCE_COLLECTION, buffer, 0))
 
     def sendSceneObject(self, obj):
-        buffer = common.encodeString(obj.name)
+        buffer = common.encodeString(obj.name_full)
         self.addCommand(common.Command(common.MessageType.ADD_OBJECT_TO_SCENE, buffer, 0))
 
     def sendSceneCollection(self, col):
-        buffer = common.encodeString(col.name)
+        buffer = common.encodeString(col.name_full)
         self.addCommand(common.Command(common.MessageType.ADD_COLLECTION_TO_SCENE, buffer, 0))
 
     def sendSetCurrentScene(self, name):
@@ -824,7 +838,7 @@ class ClientBlender(Client):
 
     def sendCollection(self, collection):
         collectionInstanceOffset = collection.instance_offset
-        buffer = common.encodeString(collection.name) + common.encodeBool(not collection.hide_viewport) + \
+        buffer = common.encodeString(collection.name_full) + common.encodeBool(not collection.hide_viewport) + \
             common.encodeVector3(collectionInstanceOffset)
         self.addCommand(common.Command(common.MessageType.COLLECTION, buffer, 0))
 
@@ -883,14 +897,14 @@ class ClientBlender(Client):
 
     def sendGreasePencilMesh(self, obj):
         GP = obj.data
-        buffer = common.encodeString(GP.name)
+        buffer = common.encodeString(GP.name_full)
 
         buffer += common.encodeInt(len(GP.materials))
         for material in GP.materials:
             if not material:
                 materialName = "Default"
             else:
-                materialName = material.name
+                materialName = material.name_full
             buffer += common.encodeString(materialName)
 
         buffer += common.encodeInt(len(GP.layers))
@@ -909,7 +923,7 @@ class ClientBlender(Client):
         fillEnable = GPMaterial.show_fill
         fillStyle = GPMaterial.fill_style
         fillColor = GPMaterial.fill_color
-        GPMaterialBuffer = common.encodeString(material.name)
+        GPMaterialBuffer = common.encodeString(material.name_full)
         GPMaterialBuffer += common.encodeBool(strokeEnable)
         GPMaterialBuffer += common.encodeString(strokeMode)
         GPMaterialBuffer += common.encodeString(strokeStyle)
@@ -922,13 +936,13 @@ class ClientBlender(Client):
 
     def sendGreasePencilConnection(self, obj):
         buffer = common.encodeString(self.getObjectPath(obj))
-        buffer += common.encodeString(obj.data.name)
+        buffer += common.encodeString(obj.data.name_full)
         self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_CONNECTION, buffer, 0))
 
     def buildGreasePencilConnection(self, data):
         path, start = common.decodeString(data, 0)
         greasePencilName, start = common.decodeString(data, start)
-        gp = bpy.data.grease_pencils[greasePencilName]
+        gp = shareData.blenderGreasePencils[greasePencilName]
         self.getOrCreateObjectData(path, gp)
 
     def decodeGreasePencilStroke(self, greasePencilFrame, strokeIndex, data, index):
@@ -987,15 +1001,16 @@ class ClientBlender(Client):
     def buildGreasePencilMesh(self, data):
         greasePencilName, index = common.decodeString(data, 0)
 
-        greasePencil = bpy.data.grease_pencils.get(greasePencilName)
+        greasePencil = shareData.blenderGreasePencils.get(greasePencilName)
         if not greasePencil:
             greasePencil = bpy.data.grease_pencils.new(greasePencilName)
+            shareData._blenderGreasePencils[greasePencil.name_full] = greasePencil
 
         greasePencil.materials.clear()
         materialCount, index = common.decodeInt(data, index)
         for _ in range(materialCount):
             materialName, index = common.decodeString(data, index)
-            material = bpy.data.materials[materialName]
+            material = shareData.blenderMaterials.get(materialName)
             greasePencil.materials.append(material)
 
         layerCount, index = common.decodeInt(data, index)
@@ -1004,9 +1019,10 @@ class ClientBlender(Client):
 
     def buildGreasePencilMaterial(self, data):
         greasePencilMaterialName, start = common.decodeString(data, 0)
-        material = bpy.data.materials.get(greasePencilMaterialName)
+        material = shareData.blenderMaterials.get(greasePencilMaterialName)
         if not material:
             material = bpy.data.materials.new(greasePencilMaterialName)
+            shareData._blenderMaterials[material.name_full] = material
         if not material.grease_pencil:
             bpy.data.materials.create_gpencil_data(material)
 
@@ -1023,7 +1039,7 @@ class ClientBlender(Client):
     def buildGreasePencil(self, data):
         objectPath, start = common.decodeString(data, 0)
         greasePencilName, start = common.decodeString(data, start)
-        greasePencil = bpy.data.grease_pencils.get(greasePencilName)
+        greasePencil = shareData.blenderGreasePencils.get(greasePencilName)
         if not greasePencil:
             greasePencil = bpy.data.grease_pencils.new(greasePencilName)
             self.getOrCreateObjectData(objectPath, greasePencil)        
@@ -1057,6 +1073,8 @@ class ClientBlender(Client):
             self.callbacks['ClearContent']()
 
     def networkConsumer(self):
+        shareData.setDirty()
+
         while True:
             try:
                 command = self.receivedCommands.get_nowait()
