@@ -1080,6 +1080,7 @@ class ClientBlender(Client):
             try:
                 command = self.receivedCommands.get_nowait()
             except queue.Empty:
+                shareData.updateCurrentData()
                 return 0.01
             else:
                 logger.info("Client %s Command %s received (queue size = %d)",

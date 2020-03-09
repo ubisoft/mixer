@@ -1,6 +1,14 @@
 from datetime import datetime
 import bpy
 
+class CollectionInfo:
+    def __init__(self, hide_viewport, instance_offset, children, parent, objects=None):
+        self.hide_viewport = hide_viewport
+        self.instance_offset = instance_offset
+        self.children = children
+        self.parent = parent
+        self.objects = objects or []
+
 class ShareData:
     def __init__(self):
         self.runId = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -138,6 +146,44 @@ class ShareData:
         self.objectsRenamed.clear()
         self.objectsVisibilityChanged.clear()
         self.clearChangedFrameRelatedLists()
+
+    def updateCollectionsInfo(self):
+        self.collectionsInfo = {}
+
+        # Master Collection (scene dependent)
+        collection = bpy.context.scene.collection
+        children = [x.name_full for x in collection.children]
+        self.collectionsInfo[collection.name_full] = CollectionInfo(
+            collection.hide_viewport, collection.instance_offset, children, None, [x.name_full for x in collection.objects])
+        for child in collection.children:
+            self.collectionsInfo[child.name_full] = CollectionInfo(child.hide_viewport, child.instance_offset, [
+                                                                x.name_full for x in child.children], collection.name_full)
+
+        # All other collections (all scenes)
+        for collection in self.blenderCollections.values():
+            if not self.collectionsInfo.get(collection.name_full):
+                self.collectionsInfo[collection.name_full] = CollectionInfo(collection.hide_viewport, collection.instance_offset, [
+                                                                            x.name_full for x in collection.children], None)
+            for child in collection.children:
+                self.collectionsInfo[child.name_full] = CollectionInfo(child.hide_viewport, child.instance_offset, [
+                                                                    x.name_full for x in child.children], collection.name_full)
+
+        # Store collections objects (already done for master collection above)
+        for collection in self.blenderCollections.values():
+            self.collectionsInfo[collection.name_full].objects = [x.name_full for x in collection.objects]
+
+    def updateObjectsInfo(self):
+        self.oldObjects = self.blenderObjects
+
+        self.objectsTransforms = {}
+        for obj in self.blenderObjects.values():
+            self.objectsTransforms[obj.name_full] = obj.matrix_local.copy()
+
+    def updateCurrentData(self):
+        self.updateCollectionsInfo()    
+        self.updateObjectsInfo()    
+        self.objectsVisibility = dict((x.name_full, x.hide_viewport) for x in self.blenderObjects.values())
+        self.objectsParents = dict((x.name_full, x.parent.name_full if x.parent != None else "") for x in self.blenderObjects.values())
 
 
 shareData = ShareData()
