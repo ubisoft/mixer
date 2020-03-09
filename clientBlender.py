@@ -729,6 +729,28 @@ class ClientBlender(Client):
         buffer = common.encodeString(name)
         self.addCommand(common.Command(common.MessageType.SET_SCENE, buffer, 0))
 
+    def getCameraAnimationBuffer(self, obj):
+        focalCurveAnimationData = obj.data.animation_data
+        if not focalCurveAnimationData:
+            return None
+
+        action = focalCurveAnimationData.action
+        for fcurve in action.fcurves:
+            if fcurve.data_path == 'lens':
+                keyCount = len(fcurve.keyframe_points)
+                keys = []
+                for keyframe in fcurve.keyframe_points:
+                    keys.extend(keyframe.co)
+
+                return common.encodeString(obj.name_full) + common.encodeString(fcurve.data_path) + common.intToBytes(keyCount, 4) + struct.pack(f'{len(keys)}f', *keys)
+
+        return None
+
+    def sendCameraAnimation(self, obj):
+        cameraAnimationBuffer = self.getCameraAnimationBuffer(obj)
+        if cameraAnimationBuffer:
+            self.addCommand(common.Command(common.MessageType.CAMERA_ANIMATION, cameraAnimationBuffer, 0))
+
     def getCameraBuffer(self, obj):
         cam = obj.data
         focal = cam.lens
@@ -757,6 +779,7 @@ class ClientBlender(Client):
             common.encodeFloat(sensorHeight)
 
     def sendCamera(self, obj):
+        self.sendCameraAnimation(obj)
         cameraBuffer = self.getCameraBuffer(obj)
         if cameraBuffer:
             self.addCommand(common.Command(common.MessageType.CAMERA, cameraBuffer, 0))
@@ -1044,6 +1067,9 @@ class ClientBlender(Client):
 
     def sendFrame(self, frame):
         self.addCommand(common.Command(common.MessageType.FRAME, common.encodeInt(frame), 0))
+
+    def sendFrameStartEnd(self, start, end):
+        self.addCommand(common.Command(common.MessageType.FRAME_START_END, common.encodeInt(start) + common.encodeInt(end), 0))
 
     def clearContent(self):
         if 'ClearContent' in self.callbacks:

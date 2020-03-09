@@ -813,6 +813,7 @@ def send_scene_content():
             for col in bpy.context.scene.collection.children:
                 shareData.client.sendSceneCollection(col)
 
+    shareData.client.sendFrameStartEnd(bpy.context.scene.frame_start, bpy.context.scene.frame_end)
     shareData.client.sendFrame(bpy.context.scene.frame_current)
 
 
