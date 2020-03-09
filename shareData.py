@@ -74,38 +74,70 @@ class ShareData:
 
     @property
     def blenderObjects(self):
-        return self.getBlenderProperty(self._blenderObjects, self.blenderObjectsDirty, bpy.data.objects)
+        if not self.blenderObjectsDirty:
+            return self._blenderObjects
+        self._blenderObjects = { x.name_full: x for x in bpy.data.objects }
+        self.blenderObjectsDirty = False
+        return self._blenderObjects
 
     @property
     def blenderMaterials(self):
-        return self.getBlenderProperty(self._blenderMaterials, self.blenderMaterialsDirty, bpy.data.materials)
+        if not self.blenderMaterialsDirty:
+            return self._blenderMaterials
+        self._blenderMaterials = { x.name_full: x for x in bpy.data.materials }
+        self.blenderMaterialsDirty = False
+        return self._blenderMaterials
 
     @property
     def blenderMeshes(self):
-        return self.getBlenderProperty(self._blenderMeshes, self.blenderMeshesDirty, bpy.data.meshes)
+        if not self.blenderMeshesDirty:
+            return self._blenderMeshes
+        self._blenderMeshes = { x.name_full: x for x in bpy.data.meshes }
+        self.blenderMeshesDirty = False
+        return self._blenderMeshes
 
     @property
     def blenderGreasePencils(self):
-        return self.getBlenderProperty(self._blenderGreasePencils, self.blenderGreasePencilsDirty, bpy.data.grease_pencils)
+        if not self.blenderGreasePencilsDirty:
+            return self._blenderGreasePencils
+        self._blenderGreasePencils = { x.name_full: x for x in bpy.data.grease_pencils }
+        self.blenderGreasePencilsDirty = False
+        return self._blenderGreasePencils
 
     @property
     def blenderCameras(self):
-        return self.getBlenderProperty(self._blenderCameras, self.blenderCamerasDirty, bpy.data.cameras)
+        if not self.blenderCamerasDirty:
+            return self._blenderCameras
+        self._blenderCameras = { x.name_full: x for x in bpy.data.cameras }
+        self.blenderCamerasDirty = False
+        return self._blenderCameras
 
     @property
     def blenderLights(self):
-        return self.getBlenderProperty(self._blenderLights, self.blenderLightsDirty, bpy.data.lights)
+        if not self.blenderLightsDirty:
+            return self._blenderLights
+        self._blenderLights = { x.name_full: x for x in bpy.data.lights }
+        self.blenderLightsDirty = False
+        return self._blenderLights
 
     @property
     def blenderCollections(self):
-        return self.getBlenderProperty(self._blenderCollections, self.blenderCollectionsDirty, bpy.data.collections)
+        if not self.blenderCollectionsDirty:
+            return self._blenderCollections
+        self._blenderCollections = { x.name_full: x for x in bpy.data.collections }
+        self.blenderCollectionsDirty = False
+        return self._blenderCollections
+
+    def clearChangedFrameRelatedLists(self):
+        self.objectsTransformed.clear()
+
     def clearLists(self):
         self.objectsAddedToCollection.clear()
         self.objectsRemovedFromCollection.clear()
         self.objectsReparented.clear()
         self.objectsRenamed.clear()
-        self.objectsTransformed.clear()
         self.objectsVisibilityChanged.clear()
+        self.clearChangedFrameRelatedLists()
 
 
 shareData = ShareData()

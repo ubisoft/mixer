@@ -1073,7 +1073,8 @@ class ClientBlender(Client):
             self.callbacks['ClearContent']()
 
     def networkConsumer(self):
-        shareData.setDirty()
+
+        setDirty = True
 
         while True:
             try:
@@ -1083,6 +1084,10 @@ class ClientBlender(Client):
             else:
                 logger.info("Client %s Command %s received (queue size = %d)",
                             self.name, command.type, self.receivedCommands.qsize())
+
+                if setDirty:
+                    shareData.setDirty()
+                    setDirty = False
 
                 self.blockSignals = True
                 self.receivedCommandsProcessed = True

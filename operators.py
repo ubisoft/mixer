@@ -199,6 +199,13 @@ def updateCollectionsInfo():
     for collection in shareData.blenderCollections.values():
         shareData.collectionsInfo[collection.name_full].objects = [x.name_full for x in collection.objects]
 
+def updateFrameChangedRelatedObjectsState(oldObjects : dict, newObjects : dict):
+    for objName, matrix in shareData.objectsTransforms.items():
+        newObj = shareData.oldObjects.get(objName)
+        if not newObj:
+            continue
+        if newObj.matrix_local != matrix:
+            shareData.objectsTransformed.add(objName)
 
 def updateObjectsState(oldObjects : dict, newObjects : dict, stats_timer: StatsTimer):
     with stats_timer.child("checkObjectsAddedAndRemoved"):
@@ -218,14 +225,6 @@ def updateObjectsState(oldObjects : dict, newObjects : dict, stats_timer: StatsT
         if objName in shareData.oldObjects:
             del shareData.oldObjects[objName]
 
-    with stats_timer.child("updateObjectsVisibilityChanged"):
-        for objName, visible in shareData.objectsVisibility.items():
-            if not objName in shareData.oldObjects:
-                continue
-            newObj = shareData.oldObjects[objName]
-            if visible != newObj.hide_viewport:
-                shareData.objectsVisibilityChanged.add(objName)
-
     with stats_timer.child("updateObjectsParentingChanged"):
         for objName, parent in shareData.objectsParents.items():
             if not objName in shareData.oldObjects:
@@ -235,45 +234,29 @@ def updateObjectsState(oldObjects : dict, newObjects : dict, stats_timer: StatsT
             if newObjParent != parent:
                 shareData.objectsReparented.add(objName)
 
-    with stats_timer.child("updateObjectsTransformsChanged") as local_timer:
-        for objName, transform in shareData.objectsTransforms.items():
-            local_timer.reset_checkpoint()
-            if not objName in shareData.oldObjects:
+    with stats_timer.child("updateObjectsVisibilityChanged"):
+        for objName, visible in shareData.objectsVisibility.items():
+            newObj = shareData.oldObjects.get(objName)
+            if not newObj:
                 continue
-            newObj = shareData.oldObjects[objName]
-            local_timer.checkpoint("getObject")
+            if visible != newObj.hide_viewport:
+                shareData.objectsVisibilityChanged.add(objName)
 
-            matrix = newObj.matrix_local
-            t = matrix.to_translation()
-            r = matrix.to_quaternion()
-            s = matrix.to_scale()
-
-            local_timer.checkpoint("getTransformsFromMatrix")
-
-            if t != transform[0] or r != transform[1] or s != transform[2]:
-                shareData.objectsTransformed.add(objName)
-
-            local_timer.checkpoint("compareTransforms")
+    updateFrameChangedRelatedObjectsState(oldObjects, newObjects)
 
 
 def updateObjectsInfo():
     shareData.oldObjects = shareData.blenderObjects
-    shareData.objectsVisibility = dict((x.name_full, x.hide_viewport) for x in shareData.blenderObjects.values())
-    shareData.objectsParents = dict((x.name_full, x.parent.name_full if x.parent != None else "") for x in shareData.blenderObjects.values())
 
     shareData.objectsTransforms = {}
     for obj in shareData.blenderObjects.values():
-        matrix = obj.matrix_local
-        t = matrix.to_translation()
-        r = matrix.to_quaternion()
-        s = matrix.to_scale()
-        shareData.objectsTransforms[obj.name_full] = (t, r, s)
-
+        shareData.objectsTransforms[obj.name_full] = obj.matrix_local.copy()
 
 def updateCurrentData():
-    updateCollectionsInfo()
-    updateObjectsInfo()
-
+    updateCollectionsInfo()    
+    updateObjectsInfo()    
+    shareData.objectsVisibility = dict((x.name_full, x.hide_viewport) for x in shareData.blenderObjects.values())
+    shareData.objectsParents = dict((x.name_full, x.parent.name_full if x.parent != None else "") for x in shareData.blenderObjects.values())
 
 def isInObjectMode():
     return hasattr(bpy.context, "active_object") and (not bpy.context.active_object or bpy.context.active_object.mode == 'OBJECT')
@@ -438,27 +421,22 @@ def updateObjectsData():
 
 @persistent
 def sendFrameChanged(scene):    
-    shareData.setDirty()
     with StatsTimer(shareData.current_statistics, "sendFrameChanged") as timer:
         with timer.child("setFrame"):
             shareData.client.sendFrame(scene.frame_current)
 
         with timer.child("clearLists"):
-            shareData.clearLists()
+            shareData.clearChangedFrameRelatedLists()
 
-        with timer.child("updateObjectsState") as child_timer:            
-            updateObjectsState(shareData.oldObjects, shareData.blenderObjects, child_timer)
-
-        with timer.child("updateCollectionsState"):
-            updateCollectionsState()
+        with timer.child("updateFrameChangedRelatedObjectsState"):            
+            updateFrameChangedRelatedObjectsState(shareData.oldObjects, shareData.blenderObjects)
 
         with timer.child("checkForChangeAndSendUpdates"):
-            changed = False
-            changed |= updateObjectsTransforms()
+            updateObjectsTransforms()
 
         # update for next change
-        with timer.child("updateCurrentData"):
-            updateCurrentData()
+        with timer.child("updateObjectsInfo"):
+            updateObjectsInfo()
 
 @persistent
 def sendSceneDataToServer(scene):
@@ -549,9 +527,9 @@ def remapObjectsInfo():
             if parent == oldName:
                 shareData.objectsParents[name] = newName
 
-        trf = shareData.objectsTransforms[oldName]
+        matrix = shareData.objectsTransforms[oldName]
         del shareData.objectsTransforms[oldName]
-        shareData.objectsTransforms[newName] = trf
+        shareData.objectsTransforms[newName] = matrix
 
     shareData.oldObjects = shareData.blenderObjects
 
@@ -895,6 +873,7 @@ class JoinOrLeaveRoomOperator(bpy.types.Operator):
         if connected:
             leave_current_room()
         else:
+            shareData.setDirty()
             updateCurrentData()
 
             shareData.isLocal = False
