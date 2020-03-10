@@ -26,14 +26,18 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
         if client and client.isConnected():
             client.setClientName(self.user)
 
-    host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
+    host: bpy.props.StringProperty(
+        name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
     port: bpy.props.IntProperty(name="Port", default=common.DEFAULT_PORT)
-    room: bpy.props.StringProperty(name="Room", default=os.getlogin())
+    room: bpy.props.StringProperty(
+        name="Room", default=os.environ.get("VRTIST_ROOM", os.getlogin()))
     rooms: bpy.props.CollectionProperty(name="Rooms", type=RoomItem)
-    room_index: bpy.props.IntProperty(update=on_room_selection_changed)  # index in the list of rooms
+    room_index: bpy.props.IntProperty(
+        update=on_room_selection_changed)  # index in the list of rooms
 
     # User name as displayed in peers user list
-    user: bpy.props.StringProperty(name="User", default=os.getlogin(), update=on_user_changed)
+    user: bpy.props.StringProperty(
+        name="User", default=os.getlogin(), update=on_user_changed)
 
     # user list of the selected or connected room, according to status
     users: bpy.props.CollectionProperty(name="Users", type=UserItem)
@@ -45,7 +49,8 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
 
     show_server_console_value = common.is_debugger_attached()
     logging.info("Debugger attached : %s ", show_server_console_value)
-    showServerConsole: bpy.props.BoolProperty(default=show_server_console_value)
+    showServerConsole: bpy.props.BoolProperty(
+        default=show_server_console_value)
 
     VRtist: bpy.props.StringProperty(name="VRtist", default=os.environ.get(
         "VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe"))
@@ -73,7 +78,8 @@ classes = (
 def register():
     for _ in classes:
         bpy.utils.register_class(_)
-    bpy.types.WindowManager.dcc_sync = bpy.props.PointerProperty(type=DCCSyncProperties)
+    bpy.types.WindowManager.dcc_sync = bpy.props.PointerProperty(
+        type=DCCSyncProperties)
 
 
 def unregister():

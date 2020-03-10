@@ -99,7 +99,8 @@ def leave_current_room():
         set_handlers(False)
 
     if None != shareData.current_statistics and shareData.auto_save_statistics:
-        save_statistics(shareData.current_statistics, shareData.statistics_directory)
+        save_statistics(shareData.current_statistics,
+                        shareData.statistics_directory)
     shareData.current_statistics = None
     shareData.auto_save_statistics = False
     shareData.statistics_directory = None
@@ -156,7 +157,8 @@ def getParentCollection(collectionName):
 
 
 def updateCollectionsState():
-    newCollectionsNames = set([bpy.context.scene.collection.name] + [x.name for x in bpy.data.collections])
+    newCollectionsNames = set(
+        [bpy.context.scene.collection.name] + [x.name for x in bpy.data.collections])
     oldCollectionsNames = set(shareData.collectionsInfo.keys())
 
     shareData.collectionsAdded = newCollectionsNames - oldCollectionsNames
@@ -172,13 +174,16 @@ def updateCollectionsState():
         newChildren = set([x.name for x in collection.children])
 
         for x in newChildren - oldChildren:
-            shareData.collectionsAddedToCollection.add((getParentCollection(x).name, x))
+            shareData.collectionsAddedToCollection.add(
+                (getParentCollection(x).name, x))
 
         for x in oldChildren - newChildren:
-            shareData.collectionsRemovedFromCollection.add((shareData.collectionsInfo[x].parent, x))
+            shareData.collectionsRemovedFromCollection.add(
+                (shareData.collectionsInfo[x].parent, x))
 
         newObjects = set([x.name for x in collection.objects])
-        oldObjects = set([shareData.objectsRenamed.get(x, x) for x in collectionInfo.objects])
+        oldObjects = set([shareData.objectsRenamed.get(x, x)
+                          for x in collectionInfo.objects])
 
         addedObjects = [x for x in newObjects - oldObjects]
         if len(addedObjects) > 0:
@@ -212,7 +217,8 @@ def updateCollectionsInfo():
 
     # Store collections objects (already done for master collection above)
     for collection in bpy.data.collections:
-        shareData.collectionsInfo[collection.name].objects = [x.name for x in collection.objects]
+        shareData.collectionsInfo[collection.name].objects = [
+            x.name for x in collection.objects]
 
 
 def updateObjectsState(oldObjects: dict, newObjects: dict, stats_timer: StatsTimer):
@@ -224,7 +230,8 @@ def updateObjectsState(oldObjects: dict, newObjects: dict, stats_timer: StatsTim
     shareData.objects = newObjects
 
     if len(shareData.objectsAdded) == 1 and len(shareData.objectsRemoved) == 1:
-        shareData.objectsRenamed[list(shareData.objectsRemoved)[0]] = list(shareData.objectsAdded)[0]
+        shareData.objectsRenamed[list(shareData.objectsRemoved)[
+            0]] = list(shareData.objectsAdded)[0]
         shareData.objectsAdded.clear()
         shareData.objectsRemoved.clear()
         return
@@ -273,8 +280,10 @@ def updateObjectsState(oldObjects: dict, newObjects: dict, stats_timer: StatsTim
 
 def updateObjectsInfo():
     shareData.objects = {x.name: x for x in bpy.data.objects}
-    shareData.objectsVisibility = dict((x.name, x.hide_viewport) for x in bpy.data.objects)
-    shareData.objectsParents = dict((x.name, x.parent.name if x.parent is not None else "") for x in bpy.data.objects)
+    shareData.objectsVisibility = dict(
+        (x.name, x.hide_viewport) for x in bpy.data.objects)
+    shareData.objectsParents = dict(
+        (x.name, x.parent.name if x.parent is not None else "") for x in bpy.data.objects)
 
     shareData.objectsTransforms = {}
     for obj in bpy.data.objects:
@@ -297,9 +306,11 @@ def isInObjectMode():
 def removeObjectsFromCollections():
     changed = False
     for collectionName in shareData.objectsRemovedFromCollection:
-        objectNames = shareData.objectsRemovedFromCollection.get(collectionName)
+        objectNames = shareData.objectsRemovedFromCollection.get(
+            collectionName)
         for objName in objectNames:
-            shareData.client.sendRemoveObjectFromCollection(collectionName, objName)
+            shareData.client.sendRemoveObjectFromCollection(
+                collectionName, objName)
             changed = True
     return changed
 
@@ -352,7 +363,8 @@ def addObjectsToCollections():
     for collectionName in shareData.objectsAddedToCollection:
         objectNames = shareData.objectsAddedToCollection.get(collectionName)
         for objectName in objectNames:
-            shareData.client.sendAddObjectToCollection(collectionName, objectName)
+            shareData.client.sendAddObjectToCollection(
+                collectionName, objectName)
             changed = True
     return changed
 
@@ -462,7 +474,8 @@ def sendFrameChanged(scene):
             shareData.clearLists()
 
         with timer.child("updateObjectsState") as child_timer:
-            updateObjectsState(shareData.objects, dict(bpy.data.objects), child_timer)
+            updateObjectsState(shareData.objects, dict(
+                bpy.data.objects), child_timer)
 
         with timer.child("updateCollectionsState"):
             updateCollectionsState()
@@ -498,7 +511,8 @@ def sendSceneDataToServer(scene):
             return
 
         with timer.child("updateObjectsState") as child_timer:
-            updateObjectsState(shareData.objects, dict(bpy.data.objects), child_timer)
+            updateObjectsState(shareData.objects, dict(
+                bpy.data.objects), child_timer)
 
         with timer.child("updateCollectionsState"):
             updateCollectionsState()
@@ -582,7 +596,8 @@ def onUndoRedoPost(scene):
         updateSceneChanged()
         return
 
-    oldObjectsName = dict([(k, None) for k in shareData.objects.keys()])  # value not needed
+    oldObjectsName = dict([(k, None)
+                           for k in shareData.objects.keys()])  # value not needed
     remapObjectsInfo()
     for k, v in shareData.objects.items():
         if k in oldObjectsName:
@@ -679,7 +694,8 @@ def send_collection_content(collection):
         shareData.client.sendAddObjectToCollection(collection.name, obj.name)
 
     for childCollection in collection.children:
-        shareData.client.sendAddCollectionToCollection(collection.name, childCollection.name)
+        shareData.client.sendAddCollectionToCollection(
+            collection.name, childCollection.name)
 
 
 def send_collections():
@@ -732,7 +748,8 @@ def set_handlers(connect: bool):
         if connect:
             shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
             bpy.app.handlers.frame_change_post.append(sendFrameChanged)
-            bpy.app.handlers.depsgraph_update_post.append(sendSceneDataToServer)
+            bpy.app.handlers.depsgraph_update_post.append(
+                sendSceneDataToServer)
             bpy.app.handlers.undo_pre.append(onUndoRedoPre)
             bpy.app.handlers.redo_pre.append(onUndoRedoPre)
             bpy.app.handlers.undo_post.append(onUndoRedoPost)
@@ -741,7 +758,8 @@ def set_handlers(connect: bool):
         else:
             bpy.app.handlers.load_post.remove(onLoad)
             bpy.app.handlers.frame_change_post.remove(sendFrameChanged)
-            bpy.app.handlers.depsgraph_update_post.remove(sendSceneDataToServer)
+            bpy.app.handlers.depsgraph_update_post.remove(
+                sendSceneDataToServer)
             bpy.app.handlers.undo_pre.remove(onUndoRedoPre)
             bpy.app.handlers.redo_pre.remove(onUndoRedoPre)
             bpy.app.handlers.undo_post.remove(onUndoRedoPost)
@@ -822,7 +840,8 @@ def isClientConnected():
 def create_main_client(host: str, port: int):
     assert shareData.client is None
     shareData.sessionId += 1
-    client = clientBlender.ClientBlender(f"syncClient {shareData.sessionId}", host, port)
+    client = clientBlender.ClientBlender(
+        f"syncClient {shareData.sessionId}", host, port)
     client.connect()
     if not client.isConnected():
         return False
@@ -906,13 +925,15 @@ class ConnectOperator(bpy.types.Operator):
     def execute(self, context):
         props = get_dcc_sync_props()
         try:
-            self.report({'INFO'}, f'Connecting to "{props.host}:{props.port}" ...')
+            self.report(
+                {'INFO'}, f'Connecting to "{props.host}:{props.port}" ...')
             ok = connect()
             if not ok:
                 self.report({'ERROR'}, "unknown error")
                 return {'CANCELLED'}
             else:
-                self.report({'INFO'}, f'Connected to "{props.host}:{props.port}" ...')
+                self.report(
+                    {'INFO'}, f'Connected to "{props.host}:{props.port}" ...')
         except socket.gaierror:
             msg = f'Cannot connect to "{props.host}": invalid host name or address'
             self.report({'ERROR'}, msg)
@@ -968,8 +989,9 @@ class LaunchVRtistOperator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        props = get_dcc_sync_props()
-        return not shareData.currentRoom and bool(props.room)
+        return True
+        #props = get_dcc_sync_props()
+        # return not shareData.currentRoom and bool(props.room)
 
     def execute(self, context):
         dcc_sync_props = get_dcc_sync_props()
@@ -985,7 +1007,8 @@ class LaunchVRtistOperator(bpy.types.Operator):
             hostname = dcc_sync_props.host
         args = [dcc_sync_props.VRtist, "--room", shareData.currentRoom,
                 "--hostname", hostname, "--port", str(dcc_sync_props.port)]
-        subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+        subprocess.Popen(args, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, shell=False)
         return {'FINISHED'}
 
 
@@ -997,7 +1020,8 @@ class WriteStatisticsOperator(bpy.types.Operator):
 
     def execute(self, context):
         if None != shareData.current_statistics:
-            save_statistics(shareData.current_statistics, get_dcc_sync_props().statistics_directory)
+            save_statistics(shareData.current_statistics,
+                            get_dcc_sync_props().statistics_directory)
         return {'FINISHED'}
 
 
