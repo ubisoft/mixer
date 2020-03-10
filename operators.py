@@ -1,10 +1,8 @@
 from contextlib import contextmanager
-import os
-import sys
 import subprocess
-import shutil
 import logging
 import time
+from typing import Mapping
 import json
 import copy
 from pathlib import Path
@@ -12,16 +10,16 @@ from datetime import datetime
 
 import bpy
 import socket
-from mathutils import *
 from . import clientBlender
-from .broadcaster import common
+from . import ui
+from .shareData import shareData
 from bpy.app.handlers import persistent
-from bpy.types import UIList
 
 from .data import get_dcc_sync_props
 from .stats import StatsTimer, save_statistics, get_stats_filename
 
 logger = logging.getLogger(__package__)
+logger.setLevel(logging.INFO)
 
 
 class TransformStruct:
@@ -30,52 +28,6 @@ class TransformStruct:
         self.quaternion = quaternion
         self.scale = scale
         self.visible = visible
-
-
-class ShareData:
-    def __init__(self):
-        self.runId = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        self.sessionId = 0  # For logging and debug
-        self.client = None
-        self.currentRoom = None
-        self.isLocal = False
-        self.localServerProcess = None
-        self.selectedObjectsNames = []
-        self.depsgraph = None
-        self.roomListUpdateClient = None
-
-        self.objectsAdded = set()
-        self.objectsRemoved = set()
-        self.collectionsAdded = set()
-        self.collectionsRemoved = set()
-        self.objectsAddedToCollection = {}
-        self.objectsRemovedFromCollection = {}
-        self.collectionsAddedToCollection = set()
-        self.collectionsRemovedFromCollection = set()
-        self.collectionsInfo = {}
-        self.objectsReparented = set()
-        self.objectsParents = {}
-        self.objectsRenamed = {}
-        self.objectsTransformed = set()
-        self.objectsTransforms = {}
-        self.objectsVisibilityChanged = set()
-        self.objectsVisibility = {}
-        self.objects = {}  # Name of object to bpy.types.Object
-
-        self.current_statistics = None
-        self.auto_save_statistics = False
-        self.statistics_directory = None
-
-    def clearLists(self):
-        self.objectsAddedToCollection.clear()
-        self.objectsRemovedFromCollection.clear()
-        self.objectsReparented.clear()
-        self.objectsRenamed.clear()
-        self.objectsTransformed.clear()
-        self.objectsVisibilityChanged.clear()
-
-
-shareData = ShareData()
 
 
 def updateParams(obj):
@@ -116,31 +68,52 @@ def updateTransform(obj):
     shareData.client.sendTransform(obj)
 
 
+def join_room(room_name: str):
+    assert shareData.currentRoom is None
+    user = get_dcc_sync_props().user
+    shareData.currentRoom = room_name
+    shareData.client.joinRoom(room_name)
+    shareData.client.setClientName(user)
+
+    shareData.current_statistics = {
+        "session_id": shareData.sessionId,
+        "blendfile": bpy.data.filepath,
+        "statsfile": get_stats_filename(shareData.runId, shareData.sessionId),
+        "user": user,
+        "room": room_name,
+        "children": {}
+    }
+    shareData.auto_save_statistics = get_dcc_sync_props().auto_save_statistics
+    shareData.statistics_directory = get_dcc_sync_props().statistics_directory
+    # join a room <==> want to track local changes
+    set_handlers(True)
+
+
 def leave_current_room():
-    shareData.currentRoom = None
-    set_handlers(False)
+    # room ==> client
+    assert not shareData.currentRoom or shareData.client
+    if shareData.currentRoom:
+        if shareData.client:
+            shareData.client.leaveRoom(shareData.currentRoom)
+        shareData.currentRoom = None
+        set_handlers(False)
 
     if None != shareData.current_statistics and shareData.auto_save_statistics:
-        save_statistics(shareData.current_statistics, shareData.statistics_directory)
+        save_statistics(shareData.current_statistics,
+                        shareData.statistics_directory)
     shareData.current_statistics = None
     shareData.auto_save_statistics = False
     shareData.statistics_directory = None
 
-    if shareData.client is not None:
-        if bpy.app.timers.is_registered(shareData.client.networkConsumer):
-            bpy.app.timers.unregister(shareData.client.networkConsumer)
 
-        shareData.client.disconnect()
-        del(shareData.client)
-        shareData.client = None
-    UpdateRoomListOperator.rooms_cached = False
+def is_joined():
+    connected = shareData.client is not None and shareData.client.isConnected()
+    return connected and shareData.currentRoom
 
 
 @persistent
 def onLoad(scene):
-    connected = shareData.client is not None and shareData.client.isConnected()
-    if connected:
-        leave_current_room()
+    disconnect()
 
 
 def updateSceneChanged():
@@ -184,7 +157,8 @@ def getParentCollection(collectionName):
 
 
 def updateCollectionsState():
-    newCollectionsNames = set([bpy.context.scene.collection.name] + [x.name for x in bpy.data.collections])
+    newCollectionsNames = set(
+        [bpy.context.scene.collection.name] + [x.name for x in bpy.data.collections])
     oldCollectionsNames = set(shareData.collectionsInfo.keys())
 
     shareData.collectionsAdded = newCollectionsNames - oldCollectionsNames
@@ -200,13 +174,16 @@ def updateCollectionsState():
         newChildren = set([x.name for x in collection.children])
 
         for x in newChildren - oldChildren:
-            shareData.collectionsAddedToCollection.add((getParentCollection(x).name, x))
+            shareData.collectionsAddedToCollection.add(
+                (getParentCollection(x).name, x))
 
         for x in oldChildren - newChildren:
-            shareData.collectionsRemovedFromCollection.add((shareData.collectionsInfo[x].parent, x))
+            shareData.collectionsRemovedFromCollection.add(
+                (shareData.collectionsInfo[x].parent, x))
 
         newObjects = set([x.name for x in collection.objects])
-        oldObjects = set([shareData.objectsRenamed.get(x, x) for x in collectionInfo.objects])
+        oldObjects = set([shareData.objectsRenamed.get(x, x)
+                          for x in collectionInfo.objects])
 
         addedObjects = [x for x in newObjects - oldObjects]
         if len(addedObjects) > 0:
@@ -240,10 +217,11 @@ def updateCollectionsInfo():
 
     # Store collections objects (already done for master collection above)
     for collection in bpy.data.collections:
-        shareData.collectionsInfo[collection.name].objects = [x.name for x in collection.objects]
+        shareData.collectionsInfo[collection.name].objects = [
+            x.name for x in collection.objects]
 
 
-def updateObjectsState(oldObjects : dict, newObjects : dict, stats_timer: StatsTimer):
+def updateObjectsState(oldObjects: dict, newObjects: dict, stats_timer: StatsTimer):
     with stats_timer.child("checkObjectsAddedAndRemoved"):
         objects = set(newObjects.keys())
         shareData.objectsAdded = objects - oldObjects.keys()
@@ -252,10 +230,11 @@ def updateObjectsState(oldObjects : dict, newObjects : dict, stats_timer: StatsT
     shareData.objects = newObjects
 
     if len(shareData.objectsAdded) == 1 and len(shareData.objectsRemoved) == 1:
-        shareData.objectsRenamed[list(shareData.objectsRemoved)[0]] = list(shareData.objectsAdded)[0]
+        shareData.objectsRenamed[list(shareData.objectsRemoved)[
+            0]] = list(shareData.objectsAdded)[0]
         shareData.objectsAdded.clear()
         shareData.objectsRemoved.clear()
-        return    
+        return
 
     for objName in shareData.objectsRemoved:
         if objName in shareData.objects:
@@ -301,8 +280,10 @@ def updateObjectsState(oldObjects : dict, newObjects : dict, stats_timer: StatsT
 
 def updateObjectsInfo():
     shareData.objects = {x.name: x for x in bpy.data.objects}
-    shareData.objectsVisibility = dict((x.name, x.hide_viewport) for x in bpy.data.objects)
-    shareData.objectsParents = dict((x.name, x.parent.name if x.parent != None else "") for x in bpy.data.objects)
+    shareData.objectsVisibility = dict(
+        (x.name, x.hide_viewport) for x in bpy.data.objects)
+    shareData.objectsParents = dict(
+        (x.name, x.parent.name if x.parent is not None else "") for x in bpy.data.objects)
 
     shareData.objectsTransforms = {}
     for obj in bpy.data.objects:
@@ -325,9 +306,11 @@ def isInObjectMode():
 def removeObjectsFromCollections():
     changed = False
     for collectionName in shareData.objectsRemovedFromCollection:
-        objectNames = shareData.objectsRemovedFromCollection.get(collectionName)
+        objectNames = shareData.objectsRemovedFromCollection.get(
+            collectionName)
         for objName in objectNames:
-            shareData.client.sendRemoveObjectFromCollection(collectionName, objName)
+            shareData.client.sendRemoveObjectFromCollection(
+                collectionName, objName)
             changed = True
     return changed
 
@@ -380,7 +363,8 @@ def addObjectsToCollections():
     for collectionName in shareData.objectsAddedToCollection:
         objectNames = shareData.objectsAddedToCollection.get(collectionName)
         for objectName in objectNames:
-            shareData.client.sendAddObjectToCollection(collectionName, objectName)
+            shareData.client.sendAddObjectToCollection(
+                collectionName, objectName)
             changed = True
     return changed
 
@@ -478,8 +462,9 @@ def updateObjectsData():
         if d in container:
             updateParams(container[d])
 
+
 @persistent
-def sendFrameChanged(scene):    
+def sendFrameChanged(scene):
     logger.info("sendFrameChanged")
     with StatsTimer(shareData.current_statistics, "sendFrameChanged") as timer:
         with timer.child("setFrame"):
@@ -489,7 +474,8 @@ def sendFrameChanged(scene):
             shareData.clearLists()
 
         with timer.child("updateObjectsState") as child_timer:
-            updateObjectsState(shareData.objects, dict(bpy.data.objects), child_timer)
+            updateObjectsState(shareData.objects, dict(
+                bpy.data.objects), child_timer)
 
         with timer.child("updateCollectionsState"):
             updateCollectionsState()
@@ -501,6 +487,7 @@ def sendFrameChanged(scene):
         # update for next change
         with timer.child("updateCurrentData"):
             updateCurrentData()
+
 
 @persistent
 def sendSceneDataToServer(scene):
@@ -524,7 +511,8 @@ def sendSceneDataToServer(scene):
             return
 
         with timer.child("updateObjectsState") as child_timer:
-            updateObjectsState(shareData.objects, dict(bpy.data.objects), child_timer)
+            updateObjectsState(shareData.objects, dict(
+                bpy.data.objects), child_timer)
 
         with timer.child("updateCollectionsState"):
             updateCollectionsState()
@@ -558,7 +546,7 @@ def sendSceneDataToServer(scene):
 
 @persistent
 def onUndoRedoPre(scene):
-    #shareData.selectedObjectsNames = set()
+    # shareData.selectedObjectsNames = set()
     # for obj in bpy.context.selected_objects:
     #    shareData.selectedObjectsNames.add(obj.name)
     if not isInObjectMode():
@@ -568,6 +556,7 @@ def onUndoRedoPre(scene):
 
     shareData.clearLists()
     updateCurrentData()
+
 
 def remapObjectsInfo():
     # update objects references
@@ -596,6 +585,7 @@ def remapObjectsInfo():
 
     shareData.objects = newObjects
 
+
 @persistent
 def onUndoRedoPost(scene):
     # apply only in object mode
@@ -606,7 +596,8 @@ def onUndoRedoPost(scene):
         updateSceneChanged()
         return
 
-    oldObjectsName = dict([(k, None) for k in shareData.objects.keys()])  # value not needed
+    oldObjectsName = dict([(k, None)
+                           for k in shareData.objects.keys()])  # value not needed
     remapObjectsInfo()
     for k, v in shareData.objects.items():
         if k in oldObjectsName:
@@ -649,73 +640,8 @@ def onUndoRedoPost(scene):
     shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
 
 
-rooms_cache = None
-getting_rooms = False
-
-
-def updateListRoomsProperty():
-    get_dcc_sync_props().rooms.clear()
-    if rooms_cache:
-        for room in rooms_cache:
-            item = get_dcc_sync_props().rooms.add()
-            item.name = room
-
-
-def onRooms(rooms):
-    global getting_rooms, rooms_cache
-    if not "Local" in rooms:
-        rooms_cache = ["Local"] + rooms
-    else:
-        rooms_cache = [] + rooms
-
-    connected = shareData.roomListUpdateClient is not None and shareData.roomListUpdateClient.isConnected()
-    if connected:
-        if bpy.app.timers.is_registered(shareData.roomListUpdateClient.networkConsumer):
-            bpy.app.timers.unregister(shareData.roomListUpdateClient.networkConsumer)
-        shareData.roomListUpdateClient.disconnect()
-        del(shareData.roomListUpdateClient)
-        shareData.roomListUpdateClient = None
-
-    updateListRoomsProperty()
-    getting_rooms = False
-
-
-def addLocalRoom():
-    get_dcc_sync_props().rooms.clear()
-    localItem = get_dcc_sync_props().rooms.add()
-    localItem.name = "Local"
-    UpdateRoomListOperator.rooms_cached = True
-
-
-def getRooms(force=False):
-    global getting_rooms, rooms_cache
-    if getting_rooms:
-        return
-
-    if not force and rooms_cache:
-        return
-
-    host = get_dcc_sync_props().host
-    port = get_dcc_sync_props().port
-    shareData.roomListUpdateClient = None
-
-    up = server_is_up(host, port)
-    get_dcc_sync_props().remoteServerIsUp = up
-
-    if up:
-        shareData.roomListUpdateClient = clientBlender.ClientBlender(
-            f"roomListUpdateClient {shareData.sessionId}", host, port)
-
-    if not up or not shareData.roomListUpdateClient.isConnected():
-        rooms_cache = ["Local"]
-        return
-
-    getting_rooms = True
-    if not bpy.app.timers.is_registered(shareData.roomListUpdateClient.networkConsumer):
-        bpy.app.timers.register(shareData.roomListUpdateClient.networkConsumer)
-
-    shareData.roomListUpdateClient.addCallback('roomsList', onRooms)
-    shareData.roomListUpdateClient.sendListRooms()
+def updateListUsers(client_ids: Mapping[str, str] = None):
+    shareData.client_ids = client_ids
 
 
 def clear_scene_content():
@@ -768,7 +694,8 @@ def send_collection_content(collection):
         shareData.client.sendAddObjectToCollection(collection.name, obj.name)
 
     for childCollection in collection.children:
-        shareData.client.sendAddCollectionToCollection(collection.name, childCollection.name)
+        shareData.client.sendAddCollectionToCollection(
+            collection.name, childCollection.name)
 
 
 def send_collections():
@@ -821,7 +748,8 @@ def set_handlers(connect: bool):
         if connect:
             shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
             bpy.app.handlers.frame_change_post.append(sendFrameChanged)
-            bpy.app.handlers.depsgraph_update_post.append(sendSceneDataToServer)
+            bpy.app.handlers.depsgraph_update_post.append(
+                sendSceneDataToServer)
             bpy.app.handlers.undo_pre.append(onUndoRedoPre)
             bpy.app.handlers.redo_pre.append(onUndoRedoPre)
             bpy.app.handlers.undo_post.append(onUndoRedoPost)
@@ -830,17 +758,27 @@ def set_handlers(connect: bool):
         else:
             bpy.app.handlers.load_post.remove(onLoad)
             bpy.app.handlers.frame_change_post.remove(sendFrameChanged)
-            bpy.app.handlers.depsgraph_update_post.remove(sendSceneDataToServer)
+            bpy.app.handlers.depsgraph_update_post.remove(
+                sendSceneDataToServer)
             bpy.app.handlers.undo_pre.remove(onUndoRedoPre)
             bpy.app.handlers.redo_pre.remove(onUndoRedoPre)
             bpy.app.handlers.undo_post.remove(onUndoRedoPost)
             bpy.app.handlers.redo_post.remove(onUndoRedoPost)
             shareData.depsgraph = None
-    except:
-        print("Error setting handlers")
+    except Exception as e:
+        logger.error("Exception during set_handlers(%s) : %s", connect, e)
 
 
-def start_local_server():
+def wait_for_server(host, port):
+    attempts = 0
+    max_attempts = 10
+    while not server_is_up(host, port) and attempts < max_attempts:
+        attempts += 1
+        time.sleep(0.2)
+    return attempts < max_attempts
+
+
+def start_local_server(wait_for_server=False):
     dir_path = Path(__file__).parent
     serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
 
@@ -861,33 +799,60 @@ def server_is_up(address, port):
         s.shutdown(socket.SHUT_RDWR)
         s.close()
         return True
-    except:
+    except Exception:
         return False
 
 
-def create_main_client(host: str, port: int, room: str):
+def is_localhost(host):
+    # does not catch local address
+    return host == "localhost" or host == "127.0.0.1"
+
+
+def connect():
+    props = get_dcc_sync_props()
+    if not server_is_up(props.host, props.port):
+        if is_localhost(props.host):
+            start_local_server(wait_for_server=True)
+            wait_for_server(props.host, props.port)
+
+    if not isClientConnected():
+        if not create_main_client(props.host, props.port):
+            return False
+
+    shareData.client.setClientName(props.user)
+    return True
+
+
+def disconnect():
+    # the socket has already been disconnected
+    if shareData.client is not None:
+        if shareData.client.isConnected():
+            shareData.client.disconnect()
+        shareData.client_ids = None
+        shareData.client = None
+    shareData.currentRoom = None
+
+
+def isClientConnected():
+    return shareData.client is not None and shareData.client.isConnected()
+
+
+def create_main_client(host: str, port: int):
+    assert shareData.client is None
     shareData.sessionId += 1
-    shareData.client = clientBlender.ClientBlender(f"syncClient {shareData.sessionId}", host, port)
+    client = clientBlender.ClientBlender(
+        f"syncClient {shareData.sessionId}", host, port)
+    client.connect()
+    if not client.isConnected():
+        return False
+
+    shareData.client = client
     shareData.client.addCallback('SendContent', send_scene_content)
     shareData.client.addCallback('ClearContent', clear_scene_content)
-    if not shareData.client.isConnected():
-        return {'CANCELLED'}
     if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
         bpy.app.timers.register(shareData.client.networkConsumer)
 
-    shareData.client.joinRoom(room)
-    shareData.currentRoom = room
-    shareData.current_statistics = {
-        "session_id": shareData.sessionId,
-        "blendfile": bpy.data.filepath,
-        "statsfile": get_stats_filename(shareData.runId, shareData.sessionId),
-        "user": os.getlogin(),
-        "room": room,
-        "children": {}
-    }
-    shareData.auto_save_statistics = get_dcc_sync_props().auto_save_statistics
-    shareData.statistics_directory = get_dcc_sync_props().statistics_directory
-    set_handlers(True)
+    return True
 
 
 class CreateRoomOperator(bpy.types.Operator):
@@ -896,81 +861,99 @@ class CreateRoomOperator(bpy.types.Operator):
     bl_label = "DCCSync Create Room"
     bl_options = {'REGISTER'}
 
-    def execute(self, context):
-        connected = shareData.client is not None and shareData.client.isConnected()
-        if connected:
-            set_handlers(False)
-
-            if bpy.app.timers.is_registered(shareData.client.networkConsumer):
-                bpy.app.timers.unregister(shareData.client.networkConsumer)
-
-            if shareData.client is not None:
-                shareData.client.disconnect()
-                del(shareData.client)
-                shareData.client = None
-        else:
-            shareData.isLocal = False
-            room = get_dcc_sync_props().room
-            host = get_dcc_sync_props().host
-            port = get_dcc_sync_props().port
-
-            create_main_client(host, port, room)
-
-            UpdateRoomListOperator.rooms_cached = False
-        return {'FINISHED'}
-
-
-class JoinOrLeaveRoomOperator(bpy.types.Operator):
-    """Join a room, or leave the one that was already joined"""
-    bl_idname = "dcc_sync.join_or_leave_room"
-    bl_label = "DCCSync Join or Leave Room"
-    bl_options = {'REGISTER'}
+    @classmethod
+    def poll(cls, context):
+        props = get_dcc_sync_props()
+        return not shareData.currentRoom and bool(props.room)
 
     def execute(self, context):
-        global rooms_cache
-
+        assert not shareData.currentRoom
         shareData.currentRoom = None
-        connected = shareData.client is not None and shareData.client.isConnected()
-        if connected:
-            leave_current_room()
-        else:
-            updateCurrentData()
+        if not connect():
+            return {'CANCELLED'}
 
-            shareData.isLocal = False
-            try:
-                roomIndex = get_dcc_sync_props().room_index
-                room = get_dcc_sync_props().rooms[roomIndex].name
-            except IndexError:
-                room = "Local"
+        props = get_dcc_sync_props()
+        join_room(props.room)
+        return {'FINISHED'}
 
-            localServerIsUp = True
-            if room == 'Local':
-                host = common.DEFAULT_HOST
-                port = common.DEFAULT_PORT
-                localServerIsUp = server_is_up(host, port)
-                # Launch local server? if it doesn't exist
-                if not localServerIsUp:
-                    start_local_server()
-                shareData.isLocal = True
+
+class JoinRoomOperator(bpy.types.Operator):
+    """Join a room"""
+    bl_idname = "dcc_sync.join_room"
+    bl_label = "DCCSync Join Room"
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(self, context):
+        roomIndex = get_dcc_sync_props().room_index
+        return isClientConnected() and roomIndex < len(get_dcc_sync_props().rooms)
+
+    def execute(self, context):
+        assert not shareData.currentRoom
+        shareData.currentRoom = None
+        updateCurrentData()
+
+        if not connect():
+            self.report({'ERROR'})
+
+        shareData.isLocal = False
+        props = get_dcc_sync_props()
+        roomIndex = props.room_index
+        room = props.rooms[roomIndex].name
+        join_room(room)
+        return {'FINISHED'}
+
+
+class LeaveRoomOperator(bpy.types.Operator):
+    """Reave the current room"""
+    bl_idname = "dcc_sync.leave_room"
+    bl_label = "DCCSync Leave Room"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        leave_current_room()
+        ui.update_ui_lists()
+        return {'FINISHED'}
+
+
+class ConnectOperator(bpy.types.Operator):
+    """Connect to the DCCSync server"""
+    bl_idname = "dcc_sync.connect"
+    bl_label = "Connect to server"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        props = get_dcc_sync_props()
+        try:
+            self.report(
+                {'INFO'}, f'Connecting to "{props.host}:{props.port}" ...')
+            ok = connect()
+            if not ok:
+                self.report({'ERROR'}, "unknown error")
+                return {'CANCELLED'}
             else:
-                host = get_dcc_sync_props().host
-                port = get_dcc_sync_props().port
-
-            create_main_client(host, port, room)
+                self.report(
+                    {'INFO'}, f'Connected to "{props.host}:{props.port}" ...')
+        except socket.gaierror:
+            msg = f'Cannot connect to "{props.host}": invalid host name or address'
+            self.report({'ERROR'}, msg)
+        except Exception as e:
+            self.report({'ERROR'}, repr(e))
+            return {'CANCELLED'}
 
         return {'FINISHED'}
 
 
-class UpdateRoomListOperator(bpy.types.Operator):
-    """Fetch and update the list of DCC Sync rooms"""
-    bl_idname = "dcc_sync.update_room_list"
-    bl_label = "DCCSync Update Room List"
+class DisconnectOperator(bpy.types.Operator):
+    """Disconnect from the DccSync server"""
+    bl_idname = "dcc_sync.disconnect"
+    bl_label = "Disconnect from server"
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        logger.info("UpdateRoomListOperator")
-        getRooms(force=True)
-        updateListRoomsProperty()
+        disconnect()
+        ui.update_ui_lists()
+        ui.redraw()
         return {'FINISHED'}
 
 
@@ -989,7 +972,7 @@ class SendSelectionOperator(bpy.types.Operator):
             try:
                 for slot in obj.material_slots[:]:
                     shareData.client.sendMaterial(slot.material)
-            except:
+            except Exception:
                 print('materials not found')
 
             updateParams(obj)
@@ -1004,18 +987,28 @@ class LaunchVRtistOperator(bpy.types.Operator):
     bl_label = "Launch VRtist"
     bl_options = {'REGISTER'}
 
+    @classmethod
+    def poll(cls, context):
+        return True
+        #props = get_dcc_sync_props()
+        # return not shareData.currentRoom and bool(props.room)
+
     def execute(self, context):
         dcc_sync_props = get_dcc_sync_props()
-        room = shareData.currentRoom
-        if not room:
-            bpy.ops.dcc_sync.join_or_leave_room()
-            room = shareData.currentRoom
+        if not shareData.currentRoom:
+            if not connect():
+                return {'CANCELLED'}
+
+            props = get_dcc_sync_props()
+            join_room(props.room)
 
         hostname = "localhost"
         if not shareData.isLocal:
             hostname = dcc_sync_props.host
-        args = [dcc_sync_props.VRtist, "--room", room, "--hostname", hostname, "--port", str(dcc_sync_props.port)]
-        subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+        args = [dcc_sync_props.VRtist, "--room", shareData.currentRoom,
+                "--hostname", hostname, "--port", str(dcc_sync_props.port)]
+        subprocess.Popen(args, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, shell=False)
         return {'FINISHED'}
 
 
@@ -1027,7 +1020,8 @@ class WriteStatisticsOperator(bpy.types.Operator):
 
     def execute(self, context):
         if None != shareData.current_statistics:
-            save_statistics(shareData.current_statistics, get_dcc_sync_props().statistics_directory)
+            save_statistics(shareData.current_statistics,
+                            get_dcc_sync_props().statistics_directory)
         return {'FINISHED'}
 
 
@@ -1045,9 +1039,11 @@ class OpenStatsDirOperator(bpy.types.Operator):
 classes = (
     LaunchVRtistOperator,
     CreateRoomOperator,
-    UpdateRoomListOperator,
+    ConnectOperator,
+    DisconnectOperator,
     SendSelectionOperator,
-    JoinOrLeaveRoomOperator,
+    JoinRoomOperator,
+    LeaveRoomOperator,
     WriteStatisticsOperator,
     OpenStatsDirOperator
 )

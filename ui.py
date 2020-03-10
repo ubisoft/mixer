@@ -1,10 +1,86 @@
-import os
 import bpy
 from . import operators
-from .data import get_dcc_sync_props
+from .data import get_dcc_sync_props, DCCSyncProperties
+from .shareData import shareData
+
+import logging
+
+logger = logging.Logger(__name__)
+logging.basicConfig(
+    format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger.setLevel(logging.INFO)
+
+
+def redraw():
+    for window in bpy.context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == 'VIEW_3D':
+                for region in area.regions:
+                    if region.type == 'UI':
+                        region.tag_redraw()
+                        break
+
+
+def redraw_if(condition: bool):
+    if condition:
+        redraw()
+
+
+def update_ui_lists():
+    update_room_list(do_redraw=False)
+    update_user_list()
+
+
+def update_user_list(do_redraw=True):
+    props = get_dcc_sync_props()
+    props.users.clear()
+    if shareData.client_ids is None:
+        redraw_if(do_redraw)
+        return
+
+    if shareData.currentRoom:
+        room_name = shareData.currentRoom
+    else:
+        idx = props.room_index
+        if idx >= len(props.rooms):
+            redraw_if(do_redraw)
+            return
+        room_name = props.rooms[idx].name
+
+    client_ids = [c for c in shareData.client_ids if c['room'] == room_name]
+
+    for client in client_ids:
+        item = props.users.add()
+        display_name = client['name']
+        display_name = display_name if display_name is not None else "<unnamed>"
+        display_name = f"{display_name} ({client['ip']}:{client['port']})"
+        item.name = display_name
+
+    redraw_if(do_redraw)
+
+
+def update_room_list(do_redraw=True):
+    props = get_dcc_sync_props()
+    props.rooms.clear()
+    if shareData.client_ids is None:
+        redraw_if(do_redraw)
+        return
+
+    rooms = {id['room'] for id in shareData.client_ids if id['room']}
+    for room in rooms:
+        item = props.rooms.add()
+        item.name = room
+
+    redraw_if(do_redraw)
 
 
 class ROOM_UL_ItemRenderer(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        split = layout.row()
+        split.label(text=item.name)  # avoids renaming the item by accident
+
+
+class USERS_UL_ItemRenderer(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.row()
         split.label(text=item.name)  # avoids renaming the item by accident
@@ -19,6 +95,7 @@ class SettingsPanel(bpy.types.Panel):
     bl_category = "DCC Sync"
 
     def draw(self, context):
+        logger.debug("SettingsPanel::draw()")
         layout = self.layout
 
         dcc_sync_props = get_dcc_sync_props()
@@ -34,22 +111,34 @@ class SettingsPanel(bpy.types.Panel):
 
         row = layout.column()
 
-        connected = operators.shareData.client is not None and operators.shareData.client.isConnected()
-        if not connected:
+        if not operators.shareData.currentRoom:
 
             # Room list
             row = layout.row()
             row.template_list("ROOM_UL_ItemRenderer", "", dcc_sync_props,
                               "rooms", dcc_sync_props, "room_index", rows=4)
+
             # Join room
             col = row.column()
-            col.operator(operators.UpdateRoomListOperator.bl_idname, text="Refresh")
-            col.operator(operators.JoinOrLeaveRoomOperator.bl_idname, text="Join Room")
 
-            if dcc_sync_props.remoteServerIsUp:
-                row = layout.row()
-                row.prop(dcc_sync_props, "room", text="Room")
-                row.operator(operators.CreateRoomOperator.bl_idname, text='Create Room')
+            connected = operators.shareData.client is not None and operators.shareData.client.isConnected()
+            if not connected:
+                col.operator(operators.ConnectOperator.bl_idname, text="Connect")
+            else:
+                col.operator(operators.DisconnectOperator.bl_idname, text="Disconnect")
+            col.operator(operators.JoinRoomOperator.bl_idname, text="Join Room")
+
+            row = layout.row()
+            col = row.column()
+            col.label(text="Room Users: ")
+            col.template_list("USERS_UL_ItemRenderer", "", dcc_sync_props,
+                              "users", dcc_sync_props, "user_index", rows=4)
+
+            row = layout.row()
+            row.prop(dcc_sync_props, "room", text="Room")
+            row.operator(operators.CreateRoomOperator.bl_idname, text='Create Room')
+            row = layout.row()
+            row.prop(dcc_sync_props, "user", text="User")
 
             col = layout.column()
             row = col.row()
@@ -64,7 +153,12 @@ class SettingsPanel(bpy.types.Panel):
                 col.prop(dcc_sync_props, "showServerConsole", text="Show server console")
 
         else:
-            row.operator(operators.JoinOrLeaveRoomOperator.bl_idname, text="Leave Room")
+            col = row.column()
+            col.operator(operators.LeaveRoomOperator.bl_idname,
+                         text=f"Leave Room : {operators.shareData.currentRoom}")
+            col.label(text="Room Users: ")
+            col.template_list("USERS_UL_ItemRenderer", "", dcc_sync_props,
+                              "users", dcc_sync_props, "user_index", rows=4)
 
         col = layout.column()
         row = col.row()
@@ -82,6 +176,7 @@ class SettingsPanel(bpy.types.Panel):
 
 classes = (
     ROOM_UL_ItemRenderer,
+    USERS_UL_ItemRenderer,
     SettingsPanel
 )
 

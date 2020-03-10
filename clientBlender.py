@@ -1,24 +1,28 @@
+import logging
 import queue
 import struct
 import bmesh
 import bpy
+from . import data
+from . import ui
+from .shareData import shareData
 from .broadcaster import common
 from .broadcaster.client import Client
 from mathutils import *
 import os
 import platform
 import ctypes
-import logging
+from . import operators
 _STILL_ACTIVE = 259
 
+
 logger = logging.getLogger(__package__)
+logger.setLevel(logging.INFO)
 
 
 class ClientBlender(Client):
     def __init__(self, name, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
-        super(ClientBlender, self).__init__(host, port)
-
-        self.name = name
+        super(ClientBlender, self).__init__(host, port, name=name, delegate=self)
 
         self.textures = set()
         self.currentSceneName = ""
@@ -1033,10 +1037,17 @@ class ClientBlender(Client):
     def sendListRooms(self):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
 
-    def buildListRooms(self, data):
-        rooms, _ = common.decodeStringArray(data, 0)
-        if 'roomsList' in self.callbacks:
-            self.callbacks['roomsList'](rooms)
+    def on_connection_lost(self):
+        shareData.client_ids = None
+        operators.disconnect()
+        ui.update_ui_lists()
+
+    def buildListAllClients(self, client_ids):
+        shareData.client_ids = client_ids
+        ui.update_ui_lists()
+
+    def buildListRoomClients(self, client_ids):
+        pass
 
     def sendSceneContent(self):
         if 'SendContent' in self.callbacks:
@@ -1051,21 +1062,17 @@ class ClientBlender(Client):
 
     def networkConsumer(self):
         while True:
-            try:
-                command = self.receivedCommands.get_nowait()
-            except queue.Empty:
+            command, processed = self.consume_one()
+            if command is None:
                 return 0.01
+
+            self.blockSignals = True
+            self.receivedCommandsProcessed = True
+            if processed:
+                # this was a room protocol command that was processed
+                self.receivedCommandsProcessed = False
             else:
-                logger.info("Client %s Command %s received (queue size = %d)",
-                            self.name, command.type, self.receivedCommands.qsize())
-
-                self.blockSignals = True
-                self.receivedCommandsProcessed = True
-
-                if command.type == common.MessageType.LIST_ROOMS:
-                    self.buildListRooms(command.data)
-                    self.receivedCommandsProcessed = False
-                elif command.type == common.MessageType.CONTENT:
+                if command.type == common.MessageType.CONTENT:
                     self.sendSceneContent()
                     self.receivedCommandsProcessed = False
 

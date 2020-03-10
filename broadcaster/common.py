@@ -22,10 +22,16 @@ class MessageType(Enum):
     CLEAR_CONTENT = 6
     DELETE_ROOM = 7
     CLEAR_ROOM = 8
+    # All clients that have joined a room
     LIST_ROOM_CLIENTS = 9
+    # All joined clients for all rooes
     LIST_CLIENTS = 10
     SET_CLIENT_NAME = 11
     SEND_ERROR = 12
+    CONNECTION_LOST = 13
+    # All all joined and un joined clients
+    LIST_ALL_CLIENTS = 14
+
     COMMAND = 100
     DELETE = 101
     CAMERA = 102
@@ -256,7 +262,49 @@ def recv(socket, size):
             attempts -= 1
             time.sleep(timeout)
 
-def readMessage(socket) -> Command:
+class CommandFormatter:
+    def format_clients(self, clients):
+        s = ''
+        for c in clients:
+            s += f'   - {c["ip"]}:{c["port"]} name = \"{c["name"]}\" room = \"{c["room"]}\"\n'
+        return s
+
+    def format(self, command: Command):
+
+        s = f'={command.type.name}: '
+
+        if command.type == MessageType.LIST_ROOMS:
+            rooms, _ = decodeStringArray(command.data, 0)
+            s += 'LIST_ROOMS: '
+            if len(rooms) == 0:
+                s += '  No rooms'
+            else:
+                s += f' {len(rooms)} room(s) : {rooms}'
+        elif command.type == MessageType.LIST_ROOM_CLIENTS:
+            clients, _ = decodeJson(command.data, 0)
+            if len(clients) == 0:
+                s += f'  No clients in room'
+            else:
+                s += f'  {len(clients)} client(s) in room :\n'
+                s += self.format_clients(clients)
+        elif command.type == MessageType.LIST_CLIENTS or command.type == MessageType.LIST_ALL_CLIENTS:
+            clients, _ = decodeJson(command.data, 0)
+            if len(clients) == 0:
+                s += '  No clients\n'
+            else:
+                s += f'  {len(clients)} client(s):\n'
+                s += self.format_clients(clients)
+        elif command.type == MessageType.CONNECTION_LOST:
+            s += 'CONNECTION_LOST:\n'
+        elif command.type == MessageType.SEND_ERROR:
+            s += f'ERROR: {decodeString(command.data, 0)[0]}\n'
+        else:
+            pass
+
+        return s
+
+
+def readMessage(socket: socket.socket) -> Command:
     if not socket:
         return None
     r, _, _ = select.select([socket], [], [], 0.0001)
@@ -296,7 +344,7 @@ def send(socket, buffer):
             time.sleep(timeout)
  
 
-def writeMessage(socket, command: Command):
+def writeMessage(sock: socket.socket, command: Command):
     if not socket:
         return
     size = intToBytes(len(command.data), 8)
@@ -307,9 +355,17 @@ def writeMessage(socket, command: Command):
     remainingSize = len(buffer)
     currentIndex = 0
     while remainingSize > 0:
-        _, w, _ = select.select([], [socket], [], 0.0001)
+        _, w, _ = select.select([], [sock], [], 0.0001)
         if len(w) > 0:
-            sent = send(socket, buffer[currentIndex:])
+            sent = send(sock, buffer[currentIndex:])
             remainingSize -= sent
             currentIndex += sent
 
+
+def is_debugger_attached():
+    try:
+        import ptvsd
+        return ptvsd.is_attached()
+    except Exception:
+        pass
+    return False
