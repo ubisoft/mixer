@@ -449,7 +449,7 @@ class Server:
 
 
 logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+    format='%(asctime)s - %(levelname)s - %(message)s', level=logging.ERROR)
 
 if __name__ == '__main__':
     server = Server()
