@@ -56,7 +56,7 @@ class ClientBlender(Client):
             bpy.context.scene.collection.children.link(collection)
         return bpy.data.collections[name]
 
-    def getOrCreatePath(self, path, data = None, collectionName="Collection"):
+    def getOrCreatePath(self, path, data=None, collectionName="Collection"):
         collection = self.getOrCreateCollection(collectionName)
         pathElem = path.split('/')
         parent = None
@@ -251,7 +251,8 @@ class ClientBlender(Client):
         elif obj.rotation_mode == 'QUATERNION':
             obj.rotation_quaternion = quaternion
         else:
-            obj.rotation_euler = Quaternion(quaternion).to_euler(obj.rotation_mode)
+            obj.rotation_euler = Quaternion(
+                quaternion).to_euler(obj.rotation_mode)
         obj.scale = scale
 
     def buildTransform(self, data):
@@ -291,7 +292,8 @@ class ClientBlender(Client):
                     texImage.image.colorspace_settings.name = 'Non-Color'
             except:
                 pass
-            material.node_tree.links.new(principled.inputs[channel], texImage.outputs['Color'])
+            material.node_tree.links.new(
+                principled.inputs[channel], texImage.outputs['Color'])
         return index
 
     def buildMaterial(self, data):
@@ -324,7 +326,8 @@ class ClientBlender(Client):
         fileName, index = common.decodeString(data, index)
         if len(fileName) > 0:
             invert = material.node_tree.nodes.new('ShaderNodeInvert')
-            material.node_tree.links.new(principled.inputs['Transmission'], invert.outputs['Color'])
+            material.node_tree.links.new(
+                principled.inputs['Transmission'], invert.outputs['Color'])
             texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
             try:
                 texImage.image = bpy.data.images.load(fileName)
@@ -332,29 +335,34 @@ class ClientBlender(Client):
             except:
                 print("could not load : " + fileName)
                 pass
-            material.node_tree.links.new(invert.inputs['Color'], texImage.outputs['Color'])
+            material.node_tree.links.new(
+                invert.inputs['Color'], texImage.outputs['Color'])
 
         # Base Color
         baseColor, index = common.decodeColor(data, index)
         material.diffuse_color = (baseColor[0], baseColor[1], baseColor[2], 1)
         principled.inputs['Base Color'].default_value = material.diffuse_color
-        index = self.buildTexture(principled, material, 'Base Color', True, data, index)
+        index = self.buildTexture(
+            principled, material, 'Base Color', True, data, index)
 
         # Metallic
         material.metallic, index = common.decodeFloat(data, index)
         principled.inputs['Metallic'].default_value = material.metallic
-        index = self.buildTexture(principled, material, 'Metallic', False, data, index)
+        index = self.buildTexture(
+            principled, material, 'Metallic', False, data, index)
 
         # Roughness
         material.roughness, index = common.decodeFloat(data, index)
         principled.inputs['Roughness'].default_value = material.roughness
-        index = self.buildTexture(principled, material, 'Roughness', False, data, index)
+        index = self.buildTexture(
+            principled, material, 'Roughness', False, data, index)
 
         # Normal
         fileName, index = common.decodeString(data, index)
         if len(fileName) > 0:
             normalMap = material.node_tree.nodes.new('ShaderNodeNormalMap')
-            material.node_tree.links.new(principled.inputs['Normal'], normalMap.outputs['Normal'])
+            material.node_tree.links.new(
+                principled.inputs['Normal'], normalMap.outputs['Normal'])
             texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
             try:
                 texImage.image = bpy.data.images.load(fileName)
@@ -362,12 +370,14 @@ class ClientBlender(Client):
             except:
                 print("could not load : " + fileName)
                 pass
-            material.node_tree.links.new(normalMap.inputs['Color'], texImage.outputs['Color'])
+            material.node_tree.links.new(
+                normalMap.inputs['Color'], texImage.outputs['Color'])
 
         # Emission
         emission, index = common.decodeColor(data, index)
         principled.inputs['Emission'].default_value = emission
-        index = self.buildTexture(principled, material, 'Emission', False, data, index)
+        index = self.buildTexture(
+            principled, material, 'Emission', False, data, index)
 
     def buildRename(self, data):
         oldPath, index = common.decodeString(data, 0)
@@ -443,7 +453,8 @@ class ClientBlender(Client):
 
     def sendTransform(self, obj):
         transformBuffer = self.getTransformBuffer(obj)
-        self.addCommand(common.Command(common.MessageType.TRANSFORM, transformBuffer, 0))
+        self.addCommand(common.Command(
+            common.MessageType.TRANSFORM, transformBuffer, 0))
 
     def buildTextureFile(self, data):
         path, index = common.decodeString(data, 0)
@@ -507,7 +518,8 @@ class ClientBlender(Client):
             buffer += common.encodeFloat(metallic) + common.encodeString("")
             buffer += common.encodeFloat(roughness) + common.encodeString("")
             buffer += common.encodeString("")
-            buffer += common.encodeColor(emissionColor) + common.encodeString("")
+            buffer += common.encodeColor(emissionColor) + \
+                common.encodeString("")
         else:
 
             opacityInput = principled.inputs['Transmission']
@@ -522,7 +534,8 @@ class ClientBlender(Client):
                 opacity = 1.0 - opacityInput.default_value
 
             # Get the slot for 'base color'
-            baseColorInput = principled.inputs['Base Color']  # Or principled.inputs[0]
+            # Or principled.inputs[0]
+            baseColorInput = principled.inputs['Base Color']
             # Get its default value (not the value from a possible link)
             baseColor = baseColorInput.default_value
             baseColorTexture = self.getTexture(baseColorInput)
@@ -602,7 +615,8 @@ class ClientBlender(Client):
         if material.grease_pencil:
             self.sendGreasePencilMaterial(material)
         else:
-            self.addCommand(common.Command(common.MessageType.MATERIAL, self.getMaterialBuffer(material), 0))
+            self.addCommand(common.Command(
+                common.MessageType.MATERIAL, self.getMaterialBuffer(material), 0))
 
     def getMeshName(self, mesh):
         return mesh.name
@@ -656,13 +670,15 @@ class ClientBlender(Client):
                 self.CurrentBuffers.vertices.extend(mesh.vertices[index].co)
                 self.CurrentBuffers.normals.extend(mesh.loops[loop_id].normal)
                 if uvlayer:
-                    self.CurrentBuffers.uvs.extend([x for x in uvlayer.data[loop_id].uv])
+                    self.CurrentBuffers.uvs.extend(
+                        [x for x in uvlayer.data[loop_id].uv])
                 self.CurrentBuffers.indices.append(loop_id)
 
             if f.material_index != currentMaterialIndex:
                 currentMaterialIndex = f.material_index
                 self.CurrentBuffers.materialIndices.append(currentfaceIndex)
-                self.CurrentBuffers.materialIndices.append(currentMaterialIndex)
+                self.CurrentBuffers.materialIndices.append(
+                    currentMaterialIndex)
             currentfaceIndex = currentfaceIndex + 1
 
         # Vericex count + binary vertices buffer
@@ -689,7 +705,8 @@ class ClientBlender(Client):
         size = len(self.CurrentBuffers.materials)
         binaryMaterialNames = common.intToBytes(size, 4)
         for material in self.CurrentBuffers.materials:
-            binaryMaterialNames += common.intToBytes(len(material), 4) + material
+            binaryMaterialNames += common.intToBytes(
+                len(material), 4) + material
 
         return common.encodeString(meshName) + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
 
@@ -698,7 +715,8 @@ class ClientBlender(Client):
         meshName = self.getMeshName(mesh)
         meshBuffer = self.getMeshBuffers(obj, meshName)
         if meshBuffer:
-            self.addCommand(common.Command(common.MessageType.MESH, meshBuffer, 0))
+            self.addCommand(common.Command(
+                common.MessageType.MESH, meshBuffer, 0))
 
     def getMeshConnectionBuffers(self, obj, meshName):
         # geometry path
@@ -709,47 +727,64 @@ class ClientBlender(Client):
         mesh = obj.data
         meshName = self.getMeshName(mesh)
         meshConnectionBuffer = self.getMeshConnectionBuffers(obj, meshName)
-        self.addCommand(common.Command(common.MessageType.MESHCONNECTION, meshConnectionBuffer, 0))
+        self.addCommand(common.Command(
+            common.MessageType.MESHCONNECTION, meshConnectionBuffer, 0))
 
     def sendCollectionInstance(self, obj):
         instanceName = obj.name
         instantiatedCollection = obj.instance_collection.name
-        buffer = common.encodeString(instanceName) + common.encodeString(instantiatedCollection)
-        self.addCommand(common.Command(common.MessageType.INSTANCE_COLLECTION, buffer, 0))
+        buffer = common.encodeString(
+            instanceName) + common.encodeString(instantiatedCollection)
+        self.addCommand(common.Command(
+            common.MessageType.INSTANCE_COLLECTION, buffer, 0))
 
     def sendSceneObject(self, obj):
         buffer = common.encodeString(obj.name)
-        self.addCommand(common.Command(common.MessageType.ADD_OBJECT_TO_SCENE, buffer, 0))
+        self.addCommand(common.Command(
+            common.MessageType.ADD_OBJECT_TO_SCENE, buffer, 0))
 
     def sendSceneCollection(self, col):
         buffer = common.encodeString(col.name)
-        self.addCommand(common.Command(common.MessageType.ADD_COLLECTION_TO_SCENE, buffer, 0))
+        self.addCommand(common.Command(
+            common.MessageType.ADD_COLLECTION_TO_SCENE, buffer, 0))
 
     def sendSetCurrentScene(self, name):
         buffer = common.encodeString(name)
-        self.addCommand(common.Command(common.MessageType.SET_SCENE, buffer, 0))
+        self.addCommand(common.Command(
+            common.MessageType.SET_SCENE, buffer, 0))
 
-    def getCameraAnimationBuffer(self, obj):
-        focalCurveAnimationData = obj.data.animation_data
-        if not focalCurveAnimationData:
-            return None
-
-        action = focalCurveAnimationData.action
+    def sendAnimationBuffer(self, objName, animationData, channelName, channelIndex=-1):
+        if not animationData:
+            return
+        action = animationData.action
         for fcurve in action.fcurves:
-            if fcurve.data_path == 'lens':
-                keyCount = len(fcurve.keyframe_points)
-                keys = []
-                for keyframe in fcurve.keyframe_points:
-                    keys.extend(keyframe.co)
+            if fcurve.data_path == channelName:
+                if channelIndex == -1 or fcurve.array_index == channelIndex:
+                    keyCount = len(fcurve.keyframe_points)
+                    keys = []
+                    for keyframe in fcurve.keyframe_points:
+                        keys.extend(keyframe.co)
+                    buffer = common.encodeString(objName) + common.encodeString(channelName) + common.encodeInt(
+                        channelIndex) + common.intToBytes(keyCount, 4) + struct.pack(f'{len(keys)}f', *keys)
+                    self.addCommand(common.Command(
+                        common.MessageType.CAMERA_ANIMATION, buffer, 0))
+                    return
 
-                return common.encodeString(obj.name_full) + common.encodeString(fcurve.data_path) + common.intToBytes(keyCount, 4) + struct.pack(f'{len(keys)}f', *keys)
-
-        return None
-
-    def sendCameraAnimation(self, obj):
-        cameraAnimationBuffer = self.getCameraAnimationBuffer(obj)
-        if cameraAnimationBuffer:
-            self.addCommand(common.Command(common.MessageType.CAMERA_ANIMATION, cameraAnimationBuffer, 0))
+    def sendCameraAnimations(self, obj):
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'location', 0)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'location', 1)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'location', 2)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'rotation', 0)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'rotation', 1)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'rotation', 2)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.data.animation_data, 'lens')
 
     def getCameraBuffer(self, obj):
         cam = obj.data
@@ -779,10 +814,11 @@ class ClientBlender(Client):
             common.encodeFloat(sensorHeight)
 
     def sendCamera(self, obj):
-        self.sendCameraAnimation(obj)
         cameraBuffer = self.getCameraBuffer(obj)
         if cameraBuffer:
-            self.addCommand(common.Command(common.MessageType.CAMERA, cameraBuffer, 0))
+            self.addCommand(common.Command(
+                common.MessageType.CAMERA, cameraBuffer, 0))
+        self.sendCameraAnimations(obj)
 
     def getLightBuffer(self, obj):
         light = obj.data
@@ -820,33 +856,44 @@ class ClientBlender(Client):
     def sendLight(self, obj):
         lightBuffer = self.getLightBuffer(obj)
         if lightBuffer:
-            self.addCommand(common.Command(common.MessageType.LIGHT, lightBuffer, 0))
+            self.addCommand(common.Command(
+                common.MessageType.LIGHT, lightBuffer, 0))
 
     def sendAddCollectionToCollection(self, parentCollectionName, collectionName):
-        buffer = common.encodeString(parentCollectionName) + common.encodeString(collectionName)
-        self.addCommand(common.Command(common.MessageType.ADD_COLLECTION_TO_COLLECTION, buffer, 0))
+        buffer = common.encodeString(
+            parentCollectionName) + common.encodeString(collectionName)
+        self.addCommand(common.Command(
+            common.MessageType.ADD_COLLECTION_TO_COLLECTION, buffer, 0))
 
     def sendRemoveCollectionFromCollection(self, parentCollectionName, collectionName):
-        buffer = common.encodeString(parentCollectionName) + common.encodeString(collectionName)
-        self.addCommand(common.Command(common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION, buffer, 0))
+        buffer = common.encodeString(
+            parentCollectionName) + common.encodeString(collectionName)
+        self.addCommand(common.Command(
+            common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION, buffer, 0))
 
     def sendAddObjectToCollection(self, collectionName, objName):
-        buffer = common.encodeString(collectionName) + common.encodeString(objName)
-        self.addCommand(common.Command(common.MessageType.ADD_OBJECT_TO_COLLECTION, buffer, 0))
+        buffer = common.encodeString(
+            collectionName) + common.encodeString(objName)
+        self.addCommand(common.Command(
+            common.MessageType.ADD_OBJECT_TO_COLLECTION, buffer, 0))
 
     def sendRemoveObjectFromCollection(self, collectionName, objName):
-        buffer = common.encodeString(collectionName) + common.encodeString(objName)
-        self.addCommand(common.Command(common.MessageType.REMOVE_OBJECT_FROM_COLLECTION, buffer, 0))
+        buffer = common.encodeString(
+            collectionName) + common.encodeString(objName)
+        self.addCommand(common.Command(
+            common.MessageType.REMOVE_OBJECT_FROM_COLLECTION, buffer, 0))
 
     def sendCollectionRemoved(self, collectionName):
         buffer = common.encodeString(collectionName)
-        self.addCommand(common.Command(common.MessageType.COLLECTION_REMOVED, buffer, 0))
+        self.addCommand(common.Command(
+            common.MessageType.COLLECTION_REMOVED, buffer, 0))
 
     def sendCollection(self, collection):
         collectionInstanceOffset = collection.instance_offset
         buffer = common.encodeString(collection.name) + common.encodeBool(not collection.hide_viewport) + \
             common.encodeVector3(collectionInstanceOffset)
-        self.addCommand(common.Command(common.MessageType.COLLECTION, buffer, 0))
+        self.addCommand(common.Command(
+            common.MessageType.COLLECTION, buffer, 0))
 
     def sendDeletedObject(self, objName):
         self.sendDelete(objName)
@@ -863,7 +910,8 @@ class ClientBlender(Client):
         return buffer
 
     def sendRename(self, oldName, newName):
-        self.addCommand(common.Command(common.MessageType.RENAME, self.getRenameBuffer(oldName, newName), 0))
+        self.addCommand(common.Command(common.MessageType.RENAME,
+                                       self.getRenameBuffer(oldName, newName), 0))
 
     # -----------------------------------------------------------------------------------------------------------
     #
@@ -882,7 +930,8 @@ class ClientBlender(Client):
             points.append(point.pressure)
             points.append(point.strength)
 
-        binaryPointsBuffer = common.intToBytes(len(stroke.points), 4) + struct.pack(f'{len(points)}f', *points)
+        binaryPointsBuffer = common.intToBytes(
+            len(stroke.points), 4) + struct.pack(f'{len(points)}f', *points)
         buffer += binaryPointsBuffer
         return buffer
 
@@ -910,10 +959,11 @@ class ClientBlender(Client):
             buffer += common.encodeString(material.name)
 
         buffer += common.encodeInt(len(GP.layers))
-        for name, layer in GP.layers.items():            
+        for name, layer in GP.layers.items():
             buffer += self.sendGreasePencilLayer(layer, name)
 
-        self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_MESH, buffer, 0))
+        self.addCommand(common.Command(
+            common.MessageType.GREASE_PENCIL_MESH, buffer, 0))
 
     def sendGreasePencilMaterial(self, material):
         GPMaterial = material.grease_pencil
@@ -934,12 +984,14 @@ class ClientBlender(Client):
         GPMaterialBuffer += common.encodeBool(fillEnable)
         GPMaterialBuffer += common.encodeString(fillStyle)
         GPMaterialBuffer += common.encodeColor(fillColor)
-        self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_MATERIAL, GPMaterialBuffer, 0))
+        self.addCommand(common.Command(
+            common.MessageType.GREASE_PENCIL_MATERIAL, GPMaterialBuffer, 0))
 
     def sendGreasePencilConnection(self, obj):
         buffer = common.encodeString(self.getObjectPath(obj))
         buffer += common.encodeString(obj.data.name)
-        self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_CONNECTION, buffer, 0))
+        self.addCommand(common.Command(
+            common.MessageType.GREASE_PENCIL_CONNECTION, buffer, 0))
 
     def buildGreasePencilConnection(self, data):
         path, start = common.decodeString(data, 0)
@@ -986,7 +1038,8 @@ class ClientBlender(Client):
             frame = greasePencilLayer.frames.new(greasePencilFrame)
         strokeCount, index = common.decodeInt(data, index)
         for strokeIndex in range(strokeCount):
-            index = self.decodeGreasePencilStroke(frame, strokeIndex, data, index)
+            index = self.decodeGreasePencilStroke(
+                frame, strokeIndex, data, index)
         return index
 
     def decodeGreasePencilLayer(self, greasePencil, data, index):
@@ -1042,8 +1095,7 @@ class ClientBlender(Client):
         greasePencil = bpy.data.grease_pencils.get(greasePencilName)
         if not greasePencil:
             greasePencil = bpy.data.grease_pencils.new(greasePencilName)
-            self.getOrCreateObjectData(objectPath, greasePencil)        
-
+            self.getOrCreateObjectData(objectPath, greasePencil)
 
     def getDeleteBuffer(self, name):
         encodedName = name.encode()
@@ -1051,7 +1103,8 @@ class ClientBlender(Client):
         return buffer
 
     def sendDelete(self, objName):
-        self.addCommand(common.Command(common.MessageType.DELETE, self.getDeleteBuffer(objName), 0))
+        self.addCommand(common.Command(
+            common.MessageType.DELETE, self.getDeleteBuffer(objName), 0))
 
     def sendListRooms(self):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
@@ -1066,10 +1119,12 @@ class ClientBlender(Client):
             self.callbacks['SendContent']()
 
     def sendFrame(self, frame):
-        self.addCommand(common.Command(common.MessageType.FRAME, common.encodeInt(frame), 0))
+        self.addCommand(common.Command(
+            common.MessageType.FRAME, common.encodeInt(frame), 0))
 
     def sendFrameStartEnd(self, start, end):
-        self.addCommand(common.Command(common.MessageType.FRAME_START_END, common.encodeInt(start) + common.encodeInt(end), 0))
+        self.addCommand(common.Command(common.MessageType.FRAME_START_END,
+                                       common.encodeInt(start) + common.encodeInt(end), 0))
 
     def clearContent(self):
         if 'ClearContent' in self.callbacks:

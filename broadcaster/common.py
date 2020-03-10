@@ -132,7 +132,7 @@ def decodeFloat(data, index):
 
 
 def encodeInt(value):
-    return struct.pack('I', value)
+    return struct.pack('i', value)
 
 
 def decodeInt(data, index):
@@ -245,11 +245,12 @@ class Command:
             self.id = Command._id
             Command._id += 1
 
+
 def recv(socket, size):
     attempts = 5
     timeout = 0.01
-    while True:  
-        try:          
+    while True:
+        try:
             tmp = socket.recv(size)
             return tmp
         except:
@@ -257,6 +258,7 @@ def recv(socket, size):
                 raise
             attempts -= 1
             time.sleep(timeout)
+
 
 def readMessage(socket) -> Command:
     if not socket:
@@ -284,11 +286,12 @@ def readMessage(socket) -> Command:
 
     return None
 
+
 def send(socket, buffer):
     attempts = 5
     timeout = 0.01
-    while True:  
-        try:          
+    while True:
+        try:
             tmp = socket.send(buffer)
             return tmp
         except:
@@ -296,7 +299,7 @@ def send(socket, buffer):
                 raise
             attempts -= 1
             time.sleep(timeout)
- 
+
 
 def writeMessage(socket, command: Command):
     if not socket:
@@ -314,4 +317,3 @@ def writeMessage(socket, command: Command):
             sent = send(socket, buffer[currentIndex:])
             remainingSize -= sent
             currentIndex += sent
-
