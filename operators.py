@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import contextmanager
 import subprocess
 import logging
@@ -979,6 +980,96 @@ class OpenStatsDirOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 
+timer = None
+
+PORT = 8081
+HOST = "127.0.0.1"
+STRING_MAX = 1024*1024
+
+
+async def exec_buffer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    while True:
+        buffer = await reader.read(STRING_MAX)
+        if not buffer:
+            break
+        addr = writer.get_extra_info('peername')
+        print(f"-- Received {len(buffer)} bytes from {addr!r}")
+
+        try:
+            code = compile(buffer, '<string>', 'exec')
+            exec(code, {})
+            print("-- Done")
+        except Exception:
+            import traceback
+            traceback.print_exc()
+
+
+async def serve():
+    server = await asyncio.start_server(exec_buffer, HOST, PORT)
+    addr = server.sockets[0].getsockname()
+    print(f'Serving on {addr}')
+    async with server:
+        await server.serve_forever()
+
+
+async def sleep():
+    while True:
+        print("before sleep")
+        await asyncio.sleep(2)
+        print("after sleep")
+
+
+class TestRemoteOperator(bpy.types.Operator):
+    """
+    From https://blenderartists.org/t/running-background-jobs-with-asyncio/673805
+    """
+    bl_idname = "dcc_sync.test_remote"
+    bl_label = "Test Remote"
+    command = bpy.props.EnumProperty(name="Command",
+                                     description="Command being issued to the asyncio loop",
+                                     default='TOGGLE', items=[
+                                         ('START', "Start", "Start the loop"),
+                                         ('STOP', "Stop", "Stop the loop"),
+                                         ('TOGGLE', "Toggle", "Toggle the loop state")
+                                     ])
+    period = bpy.props.FloatProperty(name="Period",
+                                     description="Time between two asyncio beats",
+                                     default=0.01, subtype="UNSIGNED", unit="TIME")
+    sock: socket.socket = None
+    PORT = 8081
+    HOST = "localhost"
+    STRING_MAX = 1024*1024
+
+    def execute(self, context):
+        return self.invoke(context, None)
+
+    def invoke(self, context, event):
+        global timer
+        wm = context.window_manager
+        if timer and self.command in ('STOP', 'TOGGLE'):
+            wm.event_timer_remove(timer)
+            timer = None
+            return {'FINISHED'}
+        elif not timer and self.command in ('START', 'TOGGLE'):
+            wm.modal_handler_add(self)
+            timer = wm.event_timer_add(self.period, window=context.window)
+            return {'RUNNING_MODAL'}
+        else:
+            return {'CANCELLED'}
+
+    def modal(self, context, event):
+        global timer
+        if not timer:
+            return {'FINISHED'}
+        elif event.type != 'TIMER':
+            return {'PASS_THROUGH'}
+        else:
+            loop = asyncio.get_event_loop()
+            loop.stop()
+            loop.run_forever()
+            return {'RUNNING_MODAL'}
+
+
 classes = (
     LaunchVRtistOperator,
     CreateRoomOperator,
@@ -988,7 +1079,8 @@ classes = (
     JoinRoomOperator,
     LeaveRoomOperator,
     WriteStatisticsOperator,
-    OpenStatsDirOperator
+    OpenStatsDirOperator,
+    TestRemoteOperator
 )
 
 

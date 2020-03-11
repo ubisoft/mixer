@@ -884,7 +884,8 @@ class ClientBlender(Client):
 
     def buildCollection(self, data):
         name_full, index = common.decodeString(data, 0)
-        hide_viewport, index = common.decodeBool(data, index)
+        visible, index = common.decodeBool(data, index)
+        hide_viewport = not visible
         offset, _ = common.decodeVector3(data, index)
 
         collection = shareData.blenderCollections.get(name_full)
@@ -898,11 +899,15 @@ class ClientBlender(Client):
         name_full, _ = common.decodeString(data, 0)
 
         collection = shareData.blenderCollections[name_full]
-        bpy.context.scene.collection.children.link(collection)
+
+        # We may have received an object creation message before this collection link message
+        # and object creation will have created and linked the collecetion if needed
+        if bpy.context.scene.collection.children.get(collection.name) is None:
+            bpy.context.scene.collection.children.link(collection)
 
     def buildCollectionToCollection(self, data):
         parent_name, index = common.decodeString(data, 0)
-        child_name, _ = common.decodeString(data, 0)
+        child_name, _ = common.decodeString(data, index)
 
         parent = shareData.blenderCollections[parent_name]
         child = shareData.blenderCollections[child_name]
