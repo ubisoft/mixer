@@ -882,6 +882,32 @@ class ClientBlender(Client):
         self.addCommand(common.Command(
             common.MessageType.COLLECTION, buffer, 0))
 
+    def buildCollection(self, data):
+        name_full, index = common.decodeString(data, 0)
+        hide_viewport, index = common.decodeBool(data, index)
+        offset, _ = common.decodeVector3(data, index)
+
+        collection = shareData.blenderCollections.get(name_full)
+        if collection is None:
+            collection = bpy.data.collections.new(name_full)
+            shareData.blenderCollections[name_full] = collection
+        collection.hide_viewport = hide_viewport
+        collection.instance_offset = offset
+
+    def buildCollectionToScene(self, data):
+        name_full, _ = common.decodeString(data, 0)
+
+        collection = shareData.blenderCollections[name_full]
+        bpy.context.scene.collection.children.link(collection)
+
+    def buildCollectionToCollection(self, data):
+        parent_name, index = common.decodeString(data, 0)
+        child_name, _ = common.decodeString(data, 0)
+
+        parent = shareData.blenderCollections[parent_name]
+        child = shareData.blenderCollections[child_name]
+        parent.children.link(child)
+
     def sendDeletedObject(self, objName):
         self.sendDelete(objName)
 
@@ -1184,6 +1210,13 @@ class ClientBlender(Client):
                     self.buildRestoreFromTrash(command.data)
                 elif command.type == common.MessageType.TEXTURE:
                     self.buildTextureFile(command.data)
+
+                elif command.type == common.MessageType.COLLECTION:
+                    self.buildCollection(command.data)
+                elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
+                    self.buildCollectionToScene(command.data)
+                elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
+                    self.buildCollectionToCollection(command.data)
 
                 self.receivedCommands.task_done()
                 self.blockSignals = False
