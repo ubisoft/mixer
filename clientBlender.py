@@ -726,7 +726,8 @@ class ClientBlender(Client):
         obj = obj.evaluated_get(depsgraph)
 
         for slot in obj.material_slots[:]:
-            self.CurrentBuffers.materials.append(slot.material.name_full.encode())
+            self.CurrentBuffers.materials.append(
+                slot.material.name_full.encode())
 
         # triangulate mesh (before calculating normals)
         mesh = obj.data
@@ -837,6 +838,39 @@ class ClientBlender(Client):
         self.addCommand(common.Command(
             common.MessageType.SET_SCENE, buffer, 0))
 
+    def sendAnimationBuffer(self, objName, animationData, channelName, channelIndex=-1):
+        if not animationData:
+            return
+        action = animationData.action
+        for fcurve in action.fcurves:
+            if fcurve.data_path == channelName:
+                if channelIndex == -1 or fcurve.array_index == channelIndex:
+                    keyCount = len(fcurve.keyframe_points)
+                    keys = []
+                    for keyframe in fcurve.keyframe_points:
+                        keys.extend(keyframe.co)
+                    buffer = common.encodeString(objName) + common.encodeString(channelName) + common.encodeInt(
+                        channelIndex) + common.intToBytes(keyCount, 4) + struct.pack(f'{len(keys)}f', *keys)
+                    self.addCommand(common.Command(
+                        common.MessageType.CAMERA_ANIMATION, buffer, 0))
+                    return
+
+    def sendCameraAnimations(self, obj):
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'location', 0)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'location', 1)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'location', 2)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'rotation', 0)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'rotation', 1)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.animation_data, 'rotation', 2)
+        self.sendAnimationBuffer(
+            obj.name_full, obj.data.animation_data, 'lens')
+
     def getCameraBuffer(self, obj):
         cam = obj.data
         focal = cam.lens
@@ -869,6 +903,7 @@ class ClientBlender(Client):
         if cameraBuffer:
             self.addCommand(common.Command(
                 common.MessageType.CAMERA, cameraBuffer, 0))
+        self.sendCameraAnimations(obj)
 
     def getLightBuffer(self, obj):
         light = obj.data
@@ -1184,6 +1219,10 @@ class ClientBlender(Client):
     def sendFrame(self, frame):
         self.addCommand(common.Command(
             common.MessageType.FRAME, common.encodeInt(frame), 0))
+
+    def sendFrameStartEnd(self, start, end):
+        self.addCommand(common.Command(common.MessageType.FRAME_START_END,
+                                       common.encodeInt(start) + common.encodeInt(end), 0))
 
     def clearContent(self):
         if 'ClearContent' in self.callbacks:

@@ -56,6 +56,8 @@ class MessageType(Enum):
     GREASE_PENCIL_MATERIAL = 121
     GREASE_PENCIL_CONNECTION = 122
     FRAME = 123
+    FRAME_START_END = 124
+    CAMERA_ANIMATION = 125
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
     MESH = 202
@@ -136,7 +138,7 @@ def decodeFloat(data, index):
 
 
 def encodeInt(value):
-    return struct.pack('I', value)
+    return struct.pack('i', value)
 
 
 def decodeInt(data, index):
@@ -249,11 +251,12 @@ class Command:
             self.id = Command._id
             Command._id += 1
 
+
 def recv(socket, size):
     attempts = 5
     timeout = 0.01
-    while True:  
-        try:          
+    while True:
+        try:
             tmp = socket.recv(size)
             return tmp
         except:
@@ -261,6 +264,7 @@ def recv(socket, size):
                 raise
             attempts -= 1
             time.sleep(timeout)
+
 
 class CommandFormatter:
     def format_clients(self, clients):
@@ -330,11 +334,12 @@ def readMessage(socket: socket.socket) -> Command:
 
     return None
 
+
 def send(socket, buffer):
     attempts = 5
     timeout = 0.01
-    while True:  
-        try:          
+    while True:
+        try:
             tmp = socket.send(buffer)
             return tmp
         except:
@@ -342,7 +347,7 @@ def send(socket, buffer):
                 raise
             attempts -= 1
             time.sleep(timeout)
- 
+
 
 def writeMessage(sock: socket.socket, command: Command):
     if not socket:
