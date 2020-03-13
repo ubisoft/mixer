@@ -406,6 +406,9 @@ def updateObjectsData():
 
 @persistent
 def sendFrameChanged(scene):
+    if not shareData.client:
+        return
+
     with StatsTimer(shareData.current_statistics, "sendFrameChanged") as timer:
         with timer.child("setFrame"):
             shareData.client.sendFrame(scene.frame_current)
@@ -428,6 +431,9 @@ def sendFrameChanged(scene):
 @persistent
 def sendSceneDataToServer(scene):
     logger.info("sendSceneDataToServer")
+    if not shareData.client:
+        return
+
     shareData.setDirty()
     with StatsTimer(shareData.current_statistics, "sendSceneDataToServer") as timer:
         with timer.child("clearLists"):
@@ -683,6 +689,8 @@ def send_scene_content():
             for col in bpy.context.scene.collection.children:
                 shareData.client.sendSceneCollection(col)
 
+    shareData.client.sendFrameStartEnd(
+        bpy.context.scene.frame_start, bpy.context.scene.frame_end)
     shareData.client.sendFrame(bpy.context.scene.frame_current)
 
 
@@ -767,6 +775,8 @@ def connect():
 
 
 def disconnect():
+    leave_current_room()
+
     # the socket has already been disconnected
     if shareData.client is not None:
         if shareData.client.isConnected():
