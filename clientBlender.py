@@ -463,9 +463,10 @@ class ClientBlender(Client):
 
     def getTransformBuffer(self, obj):
         path = self.getObjectPath(obj)
-        translate = obj.matrix_local.to_translation()
-        quaternion = obj.matrix_local.to_quaternion()
-        scale = obj.matrix_local.to_scale()
+        matrix = obj.matrix_local
+        translate = matrix.to_translation()
+        quaternion = matrix.to_quaternion()
+        scale = matrix.to_scale()
         visible = not obj.hide_viewport
         return common.encodeString(path) + common.encodeVector3(translate) + common.encodeVector4(quaternion) + common.encodeVector3(scale) + common.encodeBool(visible)
 
@@ -752,6 +753,8 @@ class ClientBlender(Client):
             common.MessageType.MESHCONNECTION, meshConnectionBuffer, 0))
 
     def sendCollectionInstance(self, obj):
+        if not obj.instance_collection:
+            return
         instanceName = obj.name_full
         instantiatedCollection = obj.instance_collection.name_full
         buffer = common.encodeString(
