@@ -491,24 +491,34 @@ class ClientBlender(Client):
         if path in self.textures:
             return
         if os.path.exists(path):
-            nameBuffer = common.encodeString(path)
             try:
                 f = open(path, "rb")
                 data = f.read()
                 f.close()
-                self.textures.add(path)
-                self.addCommand(common.Command(common.MessageType.TEXTURE,
-                                               nameBuffer + common.encodeInt(len(data)) + data, 0))
+                self.sendTextureData(path, data)
             except:
                 print("Could not read : " + path)
 
+    def sendTextureData(self, path, data):
+        nameBuffer = common.encodeString(path)
+        self.textures.add(path)
+        self.addCommand(common.Command(common.MessageType.TEXTURE,
+                                       nameBuffer + common.encodeInt(len(data)) + data, 0))
+
     def getTexture(self, inputs):
+        if not inputs:
+            return None
         if len(inputs.links) == 1:
             connectedNode = inputs.links[0].from_node
             if type(connectedNode).__name__ == 'ShaderNodeTexImage':
                 image = connectedNode.image
+                pack = image.packed_file
                 path = bpy.path.abspath(image.filepath)
-                self.sendTextureFile(path)
+                path = path.replace("\\", "/")
+                if pack:
+                    self.sendTextureData(path, pack.data)
+                else:
+                    self.sendTextureFile(path)
                 return path
         return None
 
@@ -516,6 +526,7 @@ class ClientBlender(Client):
         name = material.name_full
         buffer = common.encodeString(name)
         principled = None
+        diffuse = None
         # Get the nodes in the node tree
         if material.node_tree:
             nodes = material.node_tree.nodes
@@ -525,8 +536,10 @@ class ClientBlender(Client):
                     if n.type == 'BSDF_PRINCIPLED':
                         principled = n
                         break
+                    if n.type == 'BSDF_DIFFUSE':
+                        diffuse = n
             # principled = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
-        if principled is None:
+        if principled is None and diffuse is None:
             baseColor = (0.8, 0.8, 0.8)
             metallic = 0.0
             roughness = 0.5
@@ -539,84 +552,131 @@ class ClientBlender(Client):
             buffer += common.encodeString("")
             buffer += common.encodeColor(emissionColor) + \
                 common.encodeString("")
-        else:
-
-            opacityInput = principled.inputs['Transmission']
+            return buffer
+        elif diffuse:
             opacity = 1.0
             opacityTexture = None
-            if len(opacityInput.links) == 1:
-                invert = opacityInput.links[0].from_node
-                if "Color" in invert.inputs:
-                    colorInput = invert.inputs["Color"]
-                    opacityTexture = self.getTexture(colorInput)
-            else:
-                opacity = 1.0 - opacityInput.default_value
+            metallic = 0.0
+            metallicTexture = None
+            emission = (0.0, 0.0, 0.0)
+            emissionTexture = None
 
             # Get the slot for 'base color'
             # Or principled.inputs[0]
-            baseColorInput = principled.inputs['Base Color']
+            baseColor = (1.0, 1.0, 1.0)
+            baseColorTexture = None
+            baseColorInput = diffuse.inputs.get('Color')
             # Get its default value (not the value from a possible link)
-            baseColor = baseColorInput.default_value
-            baseColorTexture = self.getTexture(baseColorInput)
+            if baseColorInput:
+                baseColor = baseColorInput.default_value
+                baseColorTexture = self.getTexture(baseColorInput)
 
-            metallicInput = principled.inputs['Metallic']
-            metallic = 0
-            metallicTexture = self.getTexture(metallicInput)
-            if len(metallicInput.links) == 0:
-                metallic = metallicInput.default_value
+            roughness = 1.0
+            roughnessTexture = None
+            roughnessInput = diffuse.inputs.get('Roughness')
+            if roughnessInput:
+                roughnessTexture = self.getTexture(roughnessInput)
+                if len(roughnessInput.links) == 0:
+                    roughness = roughnessInput.default_value
 
-            roughnessInput = principled.inputs['Roughness']
-            roughness = 1
-            roughnessTexture = self.getTexture(roughnessInput)
-            if len(roughnessInput.links) == 0:
-                roughness = roughnessInput.default_value
-
-            normalInput = principled.inputs['Normal']
             normalTexture = None
-            if len(normalInput.links) == 1:
-                normalMap = normalInput.links[0].from_node
-                if "Color" in normalMap.inputs:
-                    colorInput = normalMap.inputs["Color"]
-                    normalTexture = self.getTexture(colorInput)
+            normalInput = diffuse.inputs.get('Normal')
+            if normalInput:
+                if len(normalInput.links) == 1:
+                    normalMap = normalInput.links[0].from_node
+                    if "Color" in normalMap.inputs:
+                        colorInput = normalMap.inputs["Color"]
+                        normalTexture = self.getTexture(colorInput)
 
-            emissionInput = principled.inputs['Emission']
+        else:
+            opacity = 1.0
+            opacityTexture = None
+            opacityInput = principled.inputs.get('Transmission')
+            if opacityInput:
+                if len(opacityInput.links) == 1:
+                    invert = opacityInput.links[0].from_node
+                    if "Color" in invert.inputs:
+                        colorInput = invert.inputs["Color"]
+                        opacityTexture = self.getTexture(colorInput)
+                else:
+                    opacity = 1.0 - opacityInput.default_value
+
+            # Get the slot for 'base color'
+            # Or principled.inputs[0]
+            baseColor = (1.0, 1.0, 1.0)
+            baseColorTexture = None
+            baseColorInput = principled.inputs.get('Base Color')
             # Get its default value (not the value from a possible link)
-            emission = emissionInput.default_value
-            emissionTexture = self.getTexture(emissionInput)
+            if baseColorInput:
+                baseColor = baseColorInput.default_value
+                baseColorTexture = self.getTexture(baseColorInput)
 
-            buffer += common.encodeFloat(opacity)
-            if opacityTexture:
-                buffer += common.encodeString(opacityTexture)
-            else:
-                buffer += common.encodeString("")
-            buffer += common.encodeColor(baseColor)
-            if baseColorTexture:
-                buffer += common.encodeString(baseColorTexture)
-            else:
-                buffer += common.encodeString("")
+            metallic = 0.0
+            metallicTexture = None
+            metallicInput = principled.inputs.get('Metallic')
+            if metallicInput:
+                metallicTexture = self.getTexture(metallicInput)
+                if len(metallicInput.links) == 0:
+                    metallic = metallicInput.default_value
 
-            buffer += common.encodeFloat(metallic)
-            if metallicTexture:
-                buffer += common.encodeString(metallicTexture)
-            else:
-                buffer += common.encodeString("")
+            roughness = 1.0
+            roughnessTexture = None
+            roughnessInput = principled.inputs.get('Roughness')
+            if roughnessInput:
+                roughnessTexture = self.getTexture(roughnessInput)
+                if len(roughnessInput.links) == 0:
+                    roughness = roughnessInput.default_value
 
-            buffer += common.encodeFloat(roughness)
-            if roughnessTexture:
-                buffer += common.encodeString(roughnessTexture)
-            else:
-                buffer += common.encodeString("")
+            normalTexture = None
+            normalInput = principled.inputs.get('Normal')
+            if normalInput:
+                if len(normalInput.links) == 1:
+                    normalMap = normalInput.links[0].from_node
+                    if "Color" in normalMap.inputs:
+                        colorInput = normalMap.inputs["Color"]
+                        normalTexture = self.getTexture(colorInput)
 
-            if normalTexture:
-                buffer += common.encodeString(normalTexture)
-            else:
-                buffer += common.encodeString("")
+            emission = (0.0, 0.0, 0.0)
+            emissionTexture = None
+            emissionInput = principled.inputs.get('Emission')
+            if emissionInput:
+                # Get its default value (not the value from a possible link)
+                emission = emissionInput.default_value
+                emissionTexture = self.getTexture(emissionInput)
 
-            buffer += common.encodeColor(emission)
-            if emissionTexture:
-                buffer += common.encodeString(emissionTexture)
-            else:
-                buffer += common.encodeString("")
+        buffer += common.encodeFloat(opacity)
+        if opacityTexture:
+            buffer += common.encodeString(opacityTexture)
+        else:
+            buffer += common.encodeString("")
+        buffer += common.encodeColor(baseColor)
+        if baseColorTexture:
+            buffer += common.encodeString(baseColorTexture)
+        else:
+            buffer += common.encodeString("")
+
+        buffer += common.encodeFloat(metallic)
+        if metallicTexture:
+            buffer += common.encodeString(metallicTexture)
+        else:
+            buffer += common.encodeString("")
+
+        buffer += common.encodeFloat(roughness)
+        if roughnessTexture:
+            buffer += common.encodeString(roughnessTexture)
+        else:
+            buffer += common.encodeString("")
+
+        if normalTexture:
+            buffer += common.encodeString(normalTexture)
+        else:
+            buffer += common.encodeString("")
+
+        buffer += common.encodeColor(emission)
+        if emissionTexture:
+            buffer += common.encodeString(emissionTexture)
+        else:
+            buffer += common.encodeString("")
 
         return buffer
 
@@ -666,7 +726,7 @@ class ClientBlender(Client):
         obj = obj.evaluated_get(depsgraph)
 
         for slot in obj.material_slots[:]:
-            self.CurrentBuffers.materials.append(slot.name.encode())
+            self.CurrentBuffers.materials.append(slot.material.name_full.encode())
 
         # triangulate mesh (before calculating normals)
         mesh = obj.data
