@@ -982,63 +982,26 @@ class OpenStatsDirOperator(bpy.types.Operator):
 
 timer = None
 
-PORT = 8081
-HOST = "127.0.0.1"
-STRING_MAX = 1024*1024
 
-
-async def exec_buffer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-    while True:
-        buffer = await reader.read(STRING_MAX)
-        if not buffer:
-            break
-        addr = writer.get_extra_info('peername')
-        print(f"-- Received {len(buffer)} bytes from {addr!r}")
-
-        try:
-            code = compile(buffer, '<string>', 'exec')
-            exec(code, {})
-            print("-- Done")
-        except Exception:
-            import traceback
-            traceback.print_exc()
-
-
-async def serve():
-    server = await asyncio.start_server(exec_buffer, HOST, PORT)
-    addr = server.sockets[0].getsockname()
-    print(f'Serving on {addr}')
-    async with server:
-        await server.serve_forever()
-
-
-async def sleep():
-    while True:
-        print("before sleep")
-        await asyncio.sleep(2)
-        print("after sleep")
-
-
-class TestRemoteOperator(bpy.types.Operator):
+class AsyncioLoopOperator(bpy.types.Operator):
     """
+    Executes an asyncio loop, bluntly copied from
     From https://blenderartists.org/t/running-background-jobs-with-asyncio/673805
+
+    Used by the unit tests (python_server.py)
     """
-    bl_idname = "dcc_sync.test_remote"
+    bl_idname = "dcc_sync.asyncio_loop"
     bl_label = "Test Remote"
-    command = bpy.props.EnumProperty(name="Command",
-                                     description="Command being issued to the asyncio loop",
-                                     default='TOGGLE', items=[
+    command: bpy.props.EnumProperty(name="Command",
+                                    description="Command being issued to the asyncio loop",
+                                    default='TOGGLE', items=[
                                          ('START', "Start", "Start the loop"),
                                          ('STOP', "Stop", "Stop the loop"),
                                          ('TOGGLE', "Toggle", "Toggle the loop state")
-                                     ])
-    period = bpy.props.FloatProperty(name="Period",
-                                     description="Time between two asyncio beats",
-                                     default=0.01, subtype="UNSIGNED", unit="TIME")
-    sock: socket.socket = None
-    PORT = 8081
-    HOST = "localhost"
-    STRING_MAX = 1024*1024
+                                    ])
+    period: bpy.props.FloatProperty(name="Period",
+                                    description="Time between two asyncio beats",
+                                    default=0.01, subtype="UNSIGNED", unit="TIME")
 
     def execute(self, context):
         return self.invoke(context, None)
@@ -1080,7 +1043,7 @@ classes = (
     LeaveRoomOperator,
     WriteStatisticsOperator,
     OpenStatsDirOperator,
-    TestRemoteOperator
+    AsyncioLoopOperator
 )
 
 

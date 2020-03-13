@@ -1216,12 +1216,13 @@ class ClientBlender(Client):
                 elif command.type == common.MessageType.TEXTURE:
                     self.buildTextureFile(command.data)
 
+                """
                 elif command.type == common.MessageType.COLLECTION:
                     self.buildCollection(command.data)
                 elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
                     self.buildCollectionToScene(command.data)
                 elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
                     self.buildCollectionToCollection(command.data)
-
+                """
                 self.receivedCommands.task_done()
                 self.blockSignals = False
