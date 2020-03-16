@@ -834,6 +834,9 @@ class ClientBlender(Client):
             common.MessageType.ADD_OBJECT_TO_SCENE, buffer, 0))
 
     def sendSceneCollection(self, col):
+        # TODO a bit shaky. Collections that are children of scene collection at
+        # startup are sent with ADD_COLLECTION_TO_SCENE, but adter startup they are sent with
+        # ADD_COLLECTION_TO_COLLECTION
         buffer = common.encodeString(col.name_full)
         self.addCommand(common.Command(
             common.MessageType.ADD_COLLECTION_TO_SCENE, buffer, 0))
@@ -1302,10 +1305,14 @@ class ClientBlender(Client):
 
                 elif command.type == common.MessageType.COLLECTION:
                     collection.buildCollection(command.data)
+                elif command.type == common.MessageType.COLLECTION_REMOVED:
+                    collection.buildCollectionRemoved(command.data)
                 elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
                     collection.buildCollectionToScene(command.data)
                 elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
                     collection.buildCollectionToCollection(command.data)
+                elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
+                    collection.buildRemoveCollectionFromCollection(command.data)
 
                 self.receivedCommands.task_done()
                 self.blockSignals = False

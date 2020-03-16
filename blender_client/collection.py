@@ -22,6 +22,14 @@ def buildCollection(data):
     collection.instance_offset = offset
 
 
+def buildCollectionRemoved(data):
+    name_full, index = common.decodeString(data, 0)
+    collection_logger.debug("buildCollectionRemove %s", name_full)
+    collection = shareData.blenderCollections[name_full]
+    bpy.data.collections.remove(collection)
+    del shareData.blenderCollections[name_full]
+
+
 def buildCollectionToScene(data):
     name_full, _ = common.decodeString(data, 0)
     collection_logger.debug("buildCollectionToScene %s", name_full)
@@ -41,3 +49,13 @@ def buildCollectionToCollection(data):
     parent = shareData.blenderCollections[parent_name]
     child = shareData.blenderCollections[child_name]
     parent.children.link(child)
+
+
+def buildRemoveCollectionFromCollection(data):
+    parent_name, index = common.decodeString(data, 0)
+    child_name, _ = common.decodeString(data, index)
+    collection_logger.debug("buildRemoveCollectionFromCollection %s <- %s", parent_name, child_name)
+
+    parent = shareData.blenderCollections[parent_name]
+    child = shareData.blenderCollections[child_name]
+    parent.children.unlink(child)

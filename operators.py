@@ -154,9 +154,6 @@ def getParentCollection(collectionName):
 
 
 def updateCollectionsState():
-    from . import debug
-    debug.wait_for_debugger()
-
     newCollectionsNames = set(
         [bpy.context.scene.collection.name] + list(shareData.blenderCollections.keys()))
     oldCollectionsNames = set(shareData.collectionsInfo.keys())

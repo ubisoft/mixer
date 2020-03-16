@@ -23,8 +23,8 @@ Receiver Blender
 Diff the scenes
 """
 
-BLENDER_DIR = Path(r'D:\blenders\blender-2.82-windows64')
-# BLENDER_DIR = Path(r'D:\blenders\2.82')
+#BLENDER_DIR = Path(r'D:\blenders\blender-2.82-windows64')
+BLENDER_DIR = Path(r'D:\blenders\2.82')
 current_dir = Path(__file__).parent
 
 
@@ -75,7 +75,6 @@ class Blender(Process):
             popen_args.extend(['--python', str(python_script_path)])
         if script_args is not None:
             popen_args.append('--')
-            script_args = script_args if isinstance(script_args, list) else [script_args]
             popen_args.extend([str(arg) for arg in script_args])
 
             display_args = ''
@@ -97,15 +96,18 @@ class BlenderServer(Blender):
     by sending python source code.
     """
 
-    def __init__(self, port: int):
+    def __init__(self, port: int, ptvsd_port: int = None):
         super().__init__()
         self._port = port
+        self._ptvsd_port = ptvsd_port
         self._path = str(current_dir / 'python_server.py')
         self._sock: socket.socket = None
 
     def start(self, blender_args: List = None):
-        arg = f'--port={self._port}'
-        super().start(self._path, arg, blender_args)
+        args = [f'--port={self._port}']
+        if self._ptvsd_port is not None:
+            args.append(f'--ptvsd={self._ptvsd_port}')
+        super().start(self._path, args, blender_args)
 
     def connect(self):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
