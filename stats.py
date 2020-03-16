@@ -2,6 +2,8 @@ import time
 import os
 import json
 import logging
+import copy
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -54,13 +56,14 @@ class StatsTimer():
 
 
 def get_stats_directory():
-    # todo Improve this -> should be set by a launcher in an env var, should handle linux paths
-    username = os.getlogin()
-    base_shared_path = Path("//ubisoft.org/mtrstudio/World/UAS/Tech/uas_data/dcc_sync/users_statistics/")
-    if os.path.exists(base_shared_path):
-        return os.path.join(os.fspath(base_shared_path), username)
-    user_dir_path = Path("C:/tmp/dccsync_stats/")
-    return os.fspath(user_dir_path)
+    if "DCCSYNC_USER_STATS_DIR" in os.environ:
+        username = os.getlogin()
+        base_shared_path = Path(os.environ["DCCSYNC_USER_STATS_DIR"])
+        if os.path.exists(base_shared_path):
+            return os.path.join(os.fspath(base_shared_path), username)
+        logger.error(
+            f"DCCSYNC_USER_STATS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location.")
+    return os.path.join(os.fspath(tempfile.gettempdir()), "dcc_sync")
 
 
 def get_stats_filename(run_id, session_id):
@@ -89,4 +92,4 @@ def save_statistics(stats_dict, stats_directory):
     Path(stats_directory).mkdir(parents=True, exist_ok=True)
     file = os.path.join(stats_directory, stats_dict["statsfile"])
     with open(file, "w") as f:
-        json.dump(stats_dict, f, indent=2)
+        json.dump(compute_final_statistics(stats_dict), f, indent=2)
