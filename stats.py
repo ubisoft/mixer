@@ -2,6 +2,7 @@ import time
 import os
 import json
 import logging
+import copy
 from datetime import datetime
 from pathlib import Path
 
@@ -89,4 +90,4 @@ def save_statistics(stats_dict, stats_directory):
     Path(stats_directory).mkdir(parents=True, exist_ok=True)
     file = os.path.join(stats_directory, stats_dict["statsfile"])
     with open(file, "w") as f:
-        json.dump(stats_dict, f, indent=2)
+        json.dump(compute_final_statistics(stats_dict), f, indent=2)
