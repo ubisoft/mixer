@@ -25,39 +25,6 @@ logger = logging.getLogger(__package__)
 logger.setLevel(logging.INFO)
 
 
-class StatsTimer():
-    def __init__(self, parent_stats_dict, key, log=False):
-        if log:
-            logger.info(key)
-        if not "children" in parent_stats_dict:
-            parent_stats_dict["children"] = {}
-        if not key in parent_stats_dict["children"]:
-            parent_stats_dict["children"][key] = {
-                "time": 0,
-                "max_time": 0,
-                "hit_count": 0
-            }
-        self.key = key
-        self.stats_dict = parent_stats_dict["children"][key]
-        self.log = log
-
-    def __enter__(self):
-        self.start = time.time()
-        return self
-
-    def __exit__(self, *args):
-        t = time.time() - self.start
-        self.stats_dict["time"] += t
-        self.stats_dict["max_time"] = max(t, self.stats_dict["max_time"])
-        self.stats_dict["hit_count"] += 1
-        return
-
-    def child(self, key, log=None):
-        if log == None:
-            log = self.log
-        return StatsTimer(self.stats_dict, key, log)
-
-
 class TransformStruct:
     def __init__(self, translate, quaternion, scale, visible):
         self.translate = translate
