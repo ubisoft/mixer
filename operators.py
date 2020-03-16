@@ -10,6 +10,7 @@ from datetime import datetime
 
 import bpy
 import socket
+import os
 from . import clientBlender
 from . import ui
 from .shareData import shareData
