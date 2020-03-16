@@ -2,6 +2,7 @@ from . import ui
 from . import operators
 from . import data
 from . import stats
+from .shareData import shareData
 import bpy
 import atexit
 import logging
@@ -15,11 +16,6 @@ bl_info = {
     "warning": "",
     "category": "Generic"
 }
-
-
-def refreshRoomListHack():
-    bpy.ops.dcc_sync.update_room_list()
-    return None
 
 
 def cleanup():
@@ -45,23 +41,16 @@ def register():
     ui.register()
     data.register()
 
-    bpy.app.timers.register(refreshRoomListHack, first_interval=0)
     atexit.register(cleanup)
 
 
 def unregister():
     operators.leave_current_room()
 
-    if bpy.app.timers.is_registered(refreshRoomListHack):
-        bpy.app.timers.unregister(refreshRoomListHack)
-
-    shareData = operators.shareData
     if shareData:
         if shareData.client and bpy.app.timers.is_registered(shareData.client.networkConsumer):
             bpy.app.timers.unregister(shareData.client.networkConsumer)
-
-        if shareData.roomListUpdateClient and bpy.app.timers.is_registered(shareData.roomListUpdateClient.networkConsumer):
-            bpy.app.timers.unregister(shareData.roomListUpdateClient.networkConsumer)
+    operators.disconnect()
 
     operators.unregister()
     ui.unregister()

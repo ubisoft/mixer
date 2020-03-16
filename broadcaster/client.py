@@ -1,7 +1,7 @@
-import socket
-import select
-import threading
 import queue
+import socket
+import threading
+import logging
 
 try:
     from . import common
@@ -10,7 +10,9 @@ except ImportError:
 
 
 class Client:
-    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
+    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT, name=None, delegate=None):
+
+        self.name = name
         self.host = host
         self.port = port
         self.receivedCommands = queue.Queue()
@@ -18,14 +20,25 @@ class Client:
         self.applyTransformCallback = None
         self.receivedCommandsProcessed = False
         self.blockSignals = False
+        self._local_address = None
+        self._delegate = delegate
+        self.socket = None
+        self.thread = None
+
+    def connect(self):
+        if self.isConnected():
+            raise RuntimeError("Client.connect : already connected")
 
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((host, port))
-            print(f"Connection on port {port}")
+            self.socket.connect((self.host, self.port))
+            self._local_address = self.socket.getsockname()
+            logging.info("Connecting from local %s:%s to %s:%s",
+                         self._local_address[0], self._local_address[1], self.host, self.port)
         except Exception as e:
-            print("Connection error ", e)
+            logging.error("Connection error %s", e)
             self.socket = None
+            raise
 
         if self.socket:
             self.threadAlive = True
@@ -42,6 +55,7 @@ class Client:
         if self.thread is not None:
             self.threadAlive = False
             self.thread.join()
+            self.thread = None
 
         if self.socket:
             self.socket.shutdown(socket.SHUT_RDWR)
@@ -59,6 +73,13 @@ class Client:
     def joinRoom(self, roomName):
         common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
 
+    def leaveRoom(self, roomName):
+        common.writeMessage(self.socket, common.Command(common.MessageType.LEAVE_ROOM, roomName.encode('utf8'), 0))
+
+    def setClientName(self, userName):
+        common.writeMessage(self.socket, common.Command(
+            common.MessageType.SET_CLIENT_NAME, userName.encode('utf8'), 0))
+
     def run(self):
         while(self.threadAlive):
             try:
@@ -66,7 +87,9 @@ class Client:
                     break
                 command = common.readMessage(self.socket)
             except common.ClientDisconnectedException:
-                print("Connection lost")
+                logging.info("Connection lost for %s:%s", self.host, self.port)
+                command = common.Command(common.MessageType.CONNECTION_LOST)
+                self.receivedCommands.put(command)
                 self.socket = None
                 break
 
@@ -87,13 +110,54 @@ class Client:
         self.threadAlive = False
         self.thread = None
 
+    def consume_one(self):
+        try:
+            command = self.receivedCommands.get_nowait()
+        except queue.Empty:
+            return None, None
+        else:
+            logging.info("Client %s Command %s received (queue size = %d)",
+                         self.name, command.type, self.receivedCommands.qsize())
+
+            if command.type == common.MessageType.LIST_ROOMS:
+                if self._delegate:
+                    self._delegate.buildListRooms(command.data)
+                return command, True
+            elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
+                if self._delegate:
+                    clients, _ = common.decodeJson(command.data, 0)
+                    self._delegate.buildListRoomClients(clients)
+                return command, True
+            elif command.type == common.MessageType.LIST_ALL_CLIENTS:
+                if self._delegate:
+                    clients, _ = common.decodeJson(command.data, 0)
+                    self._delegate.buildListAllClients(clients)
+                return command, True
+            elif command.type == common.MessageType.CONNECTION_LOST:
+                if self._delegate:
+                    self._delegate.on_connection_lost()
+                return command, True
+
+            return command, False
+
     def blenderExists(self):
         return True
 
 
+class TestClient(Client):
+    def __init__(self, *args, **kwargs):
+        super(TestClient, self).__init__("noname", *args, **kwargs)
+
+    def networkConsumer(self):
+        while True:
+            command, processed = super().consume_one()
+            if command is None:
+                return
+
+
 # For tests
 if __name__ == '__main__':
-    client = Client()
+    client = TestClient()
 
     while True:
         msg = input("> ")

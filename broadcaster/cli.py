@@ -2,9 +2,10 @@ import time
 import queue
 import argparse
 import logging
-
+import time
 import common
 import client
+import threading
 
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -21,74 +22,51 @@ class ServerError(RuntimeError):
 class CliClient(client.Client):
     def __init__(self, args):
         super().__init__(args.host, args.port)
-        self.timeout = args.timeout
+        self.formatter = common.CommandFormatter()
+        self.terminate = False
+        consumer_thread = threading.Thread(None, self.consume)
+        consumer_thread.start()
 
     def listRooms(self):
-        def _printResult(command: common.Command):
-            rooms, _ = common.decodeStringArray(command.data, 0)
-            if len(rooms) == 0:
-                print('No rooms')
-            else:
-                print(f'{len(rooms)} room(s):\n  - ', end='')
-                print('\n  - '.join(rooms))
-
         command = common.Command(common.MessageType.LIST_ROOMS)
-        self.processCommand(command, _printResult)
+        self.post_command(command)
 
     def deleteRoom(self, name):
         command = common.Command(common.MessageType.DELETE_ROOM, name.encode())
-        self.processCommand(command)
+        self.post_command(command)
 
     def clearRoom(self, name):
         command = common.Command(common.MessageType.CLEAR_ROOM, name.encode())
-        self.processCommand(command)
+        self.post_command(command)
 
     def listRoomClients(self, name):
-        def _printResult(command: common.Command):
-            clients, _ = common.decodeJson(command.data, 0)
-            if len(clients) == 0:
-                print(f'No clients in "{name}" room')
-            else:
-                print(f'{len(clients)} client(s) in "{name}" room :')
-                for c in clients:
-                    print(f' - {c["ip"]}:{c["port"]} name = {c["name"]}')
         command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, name.encode())
-        self.processCommand(command, _printResult)
+        self.post_command(command)
 
     def listClients(self):
-        def _printResult(command: common.Command):
-            clients, _ = common.decodeJson(command.data, 0)
-            if len(clients) == 0:
-                print('No clients')
-            else:
-                print(f'{len(clients)} client(s):')
-                for c in clients:
-                    print(f' - {c["ip"]}:{c["port"]} name = {c["name"]} room = {c["room"]}')
-
         command = common.Command(common.MessageType.LIST_CLIENTS)
-        self.processCommand(command, _printResult)
+        self.post_command(command)
 
-    def processCommand(self, command: common.Command, callback=None):
-        if not self.isConnected():
-            print(f'CLI not connected to server {self.host}:{self.port}')
-            return
+    def listAllClients(self):
+        command = common.Command(common.MessageType.LIST_ALL_CLIENTS)
+        self.post_command(command)
 
+    def post_command(self, command: common.Command):
         self.addCommand(command)
-        if callback is not None:
-            command = self.consume()
-            if command:
-                if command.type == common.MessageType.SEND_ERROR:
-                    raise ServerError(common.decodeString(command.data, 0)[0])
-                callback(command)
 
     def consume(self):
-        try:
-            command = self.receivedCommands.get(timeout=self.timeout)
-            self.receivedCommands.task_done()
-        except queue.Empty:
-            print(f'Timeout error: no server response (waited {self.timeout}s)')
-            return
-        return command
+        # consume pending replies
+        while not self.terminate:
+            received, _ = super().consume_one()
+            if received is None:
+                time.sleep(0.1)
+            else:
+                if received.type == common.MessageType.CONNECTION_LOST:
+                    self.disconnect()
+
+                print(self.formatter.format(received))
+                # a fake prompt
+                print('> ')
 
 
 def process_room_command(args):
@@ -97,12 +75,14 @@ def process_room_command(args):
     try:
         if args.command == 'list':
             client = CliClient(args)
+            client.connect()
             client.listRooms()
 
         elif args.command == 'delete':
             count = len(args.name)
             if count:
                 client = CliClient(args)
+                client.connect()
                 for name in args.name:
                     client.deleteRoom(name)
             else:
@@ -112,6 +92,7 @@ def process_room_command(args):
             count = len(args.name)
             if count:
                 client = CliClient(args)
+                client.connect()
                 for name in args.name:
                     client.clearRoom(name)
             else:
@@ -121,6 +102,7 @@ def process_room_command(args):
             count = len(args.name)
             if count:
                 client = CliClient(args)
+                client.connect()
                 for name in args.name:
                     client.listRoomClients(name)
             else:
@@ -138,12 +120,101 @@ def process_client_command(args):
     try:
         if args.command == 'list':
             client = CliClient(args)
+            client.connect()
             client.listClients()
     except ServerError as e:
         logging.error(e)
     finally:
         if client is not None:
             client.disconnect()
+
+
+commands = [
+    "connect",
+    "disconnect",
+
+    "listrooms",
+    "join <roomname>",
+    "leave <roomname>",
+
+    "listjoinedclients",
+    "listallclients",
+    "setclientname <clientname>",
+
+    "listroomclients <roomname>",
+
+    "help"
+    "exit"  # this loop
+]
+
+
+def help():
+    print("Allowed commands : ")
+    for c in commands:
+        print(" ", c)
+    print()
+
+
+def interactive_loop():
+    client = CliClient(args)
+    client.connect()
+    done = False
+    while not done:
+        try:
+            prompt = "> "
+            print(prompt, end="", flush=False)
+            user_input = input()
+            items = user_input.split()
+            if not items:
+                continue
+            input_command = items[0]
+            candidates = [c for c in commands if c.startswith(input_command)]
+            if len(candidates) == 0:
+                print(f"Command not recognised : {input_command}.")
+                help()
+                continue
+            if len(candidates) >= 2:
+                print(f"ambigous command {input_command} : found {candidates}.")
+                continue
+
+            command = candidates[0].split()[0]
+            command_args = items[1:]
+            if input_command != command:
+                print(command, command_args)
+            if command == "connect":
+                if client is None or not client.isConnected():
+                    client = CliClient(args)
+                else:
+                    print(f"Error : already connected. Use disconnect first")
+            elif command == "exit":
+                client.terminate = True
+                done = True
+            elif command == "help":
+                help()
+            else:
+                if client is None or not client.isConnected():
+                    raise RuntimeError('Not connected, use "connect" first')
+                if command == "listrooms":
+                    client.listRooms()
+                elif command == "listroomclients":
+                    client.listRoomClients(command_args[0])
+                elif command == "listjoinedclients":
+                    client.listClients()
+                elif command == "listallclients":
+                    client.listAllClients()
+                elif command == "join":
+                    client.joinRoom(command_args[0])
+                elif command == "leave":
+                    client.leaveRoom(command_args[0])
+                elif command == "setclientname":
+                    client.setClientName(command_args[0])
+                elif command == "disconnect":
+                    client.disconnect()
+                    client = None
+                else:
+                    pass
+        except Exception as e:
+            print(f'Exception: {e}')
 
 
 parser = argparse.ArgumentParser(prog='cli', description='Command Line Interface for VRtist server')
@@ -168,3 +239,5 @@ client_parser.set_defaults(func=process_client_command)
 args = parser.parse_args()
 if hasattr(args, 'func'):
     args.func(args)
+else:
+    interactive_loop()
