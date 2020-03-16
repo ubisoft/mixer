@@ -14,6 +14,8 @@ import platform
 import ctypes
 from . import operators
 
+from .blender_client import collection
+
 from .shareData import shareData
 
 _STILL_ACTIVE = 259
@@ -21,6 +23,9 @@ _STILL_ACTIVE = 259
 
 logger = logging.getLogger(__package__)
 logger.setLevel(logging.INFO)
+
+collection_logger = logging.getLogger('collection')
+collection_logger.setLevel(logging.DEBUG)
 
 
 class ClientBlender(Client):
@@ -945,71 +950,48 @@ class ClientBlender(Client):
                 common.MessageType.LIGHT, lightBuffer, 0))
 
     def sendAddCollectionToCollection(self, parentCollectionName, collectionName):
+        collection_logger.debug("sendAddCollectionToCollection %s <- %s", parentCollectionName, collectionName)
+
         buffer = common.encodeString(
             parentCollectionName) + common.encodeString(collectionName)
         self.addCommand(common.Command(
             common.MessageType.ADD_COLLECTION_TO_COLLECTION, buffer, 0))
 
     def sendRemoveCollectionFromCollection(self, parentCollectionName, collectionName):
+        collection_logger.debug("sendRemoveCollectionFromCollection %s <- %s", parentCollectionName, collectionName)
+
         buffer = common.encodeString(
             parentCollectionName) + common.encodeString(collectionName)
         self.addCommand(common.Command(
             common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION, buffer, 0))
 
     def sendAddObjectToCollection(self, collectionName, objName):
+        collection_logger.debug("sendAddObjectToCollection %s <- %s", collectionName, objName)
         buffer = common.encodeString(
             collectionName) + common.encodeString(objName)
         self.addCommand(common.Command(
             common.MessageType.ADD_OBJECT_TO_COLLECTION, buffer, 0))
 
     def sendRemoveObjectFromCollection(self, collectionName, objName):
+        collection_logger.debug("sendRemoveObjectFromCollection %s <- %s", collectionName, objName)
         buffer = common.encodeString(
             collectionName) + common.encodeString(objName)
         self.addCommand(common.Command(
             common.MessageType.REMOVE_OBJECT_FROM_COLLECTION, buffer, 0))
 
     def sendCollectionRemoved(self, collectionName):
+        collection_logger.debug("sendCollectionRemoved %s", collectionName)
         buffer = common.encodeString(collectionName)
         self.addCommand(common.Command(
             common.MessageType.COLLECTION_REMOVED, buffer, 0))
 
     def sendCollection(self, collection):
+        collection_logger.debug("sendCollection %s", collection.name_full)
         collectionInstanceOffset = collection.instance_offset
         buffer = common.encodeString(collection.name_full) + common.encodeBool(not collection.hide_viewport) + \
             common.encodeVector3(collectionInstanceOffset)
         self.addCommand(common.Command(
             common.MessageType.COLLECTION, buffer, 0))
-
-    def buildCollection(self, data):
-        name_full, index = common.decodeString(data, 0)
-        visible, index = common.decodeBool(data, index)
-        hide_viewport = not visible
-        offset, _ = common.decodeVector3(data, index)
-
-        collection = shareData.blenderCollections.get(name_full)
-        if collection is None:
-            collection = bpy.data.collections.new(name_full)
-            shareData.blenderCollections[name_full] = collection
-        collection.hide_viewport = hide_viewport
-        collection.instance_offset = offset
-
-    def buildCollectionToScene(self, data):
-        name_full, _ = common.decodeString(data, 0)
-
-        collection = shareData.blenderCollections[name_full]
-
-        # We may have received an object creation message before this collection link message
-        # and object creation will have created and linked the collecetion if needed
-        if bpy.context.scene.collection.children.get(collection.name) is None:
-            bpy.context.scene.collection.children.link(collection)
-
-    def buildCollectionToCollection(self, data):
-        parent_name, index = common.decodeString(data, 0)
-        child_name, _ = common.decodeString(data, index)
-
-        parent = shareData.blenderCollections[parent_name]
-        child = shareData.blenderCollections[child_name]
-        parent.children.link(child)
 
     def sendDeletedObject(self, objName):
         self.sendDelete(objName)
@@ -1318,13 +1300,12 @@ class ClientBlender(Client):
                 elif command.type == common.MessageType.TEXTURE:
                     self.buildTextureFile(command.data)
 
-                """
                 elif command.type == common.MessageType.COLLECTION:
-                    self.buildCollection(command.data)
+                    collection.buildCollection(command.data)
                 elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
-                    self.buildCollectionToScene(command.data)
+                    collection.buildCollectionToScene(command.data)
                 elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
-                    self.buildCollectionToCollection(command.data)
-                """
+                    collection.buildCollectionToCollection(command.data)
+
                 self.receivedCommands.task_done()
                 self.blockSignals = False

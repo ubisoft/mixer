@@ -19,8 +19,9 @@ class Blender:
         self._blender.send_function(dccsync.join_room)
 
     def teardown(self):
-        time.sleep(60)
-        self._blender.send_function(bl.quit)
+        self._blender.wait()
+        # time.sleep(60)
+        # self._blender.send_function(bl.quit)
 
     def send_function(self, f, *args, **kwargs):
         self._blender.send_function(f, *args, **kwargs)
@@ -30,6 +31,9 @@ class BlenderTestCase(unittest.TestCase):
     def setUp(self):
         self._sender = Blender(8081)
         self._sender.setup(["--window-geometry", "0", "0", "960", "1080"])
+
+        time.sleep(2)
+
         self._receiver = Blender(8082)
         self._receiver.setup(["--window-geometry", "960", "0", "960", "1080"])
 

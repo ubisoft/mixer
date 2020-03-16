@@ -87,6 +87,9 @@ class Blender(Process):
         other_args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
         self._process = subprocess.Popen(popen_args, shell=False, **other_args)
 
+    def wait(self):
+        self._process.wait()
+
 
 class BlenderServer(Blender):
     """
