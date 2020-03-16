@@ -76,6 +76,7 @@ def updateTransform(obj):
 def join_room(room_name: str):
     assert shareData.currentRoom is None
     user = get_dcc_sync_props().user
+    shareData.sessionId += 1
     shareData.currentRoom = room_name
     shareData.client.joinRoom(room_name)
     shareData.client.setClientName(user)
@@ -792,7 +793,6 @@ def isClientConnected():
 
 def create_main_client(host: str, port: int):
     assert shareData.client is None
-    shareData.sessionId += 1
     client = clientBlender.ClientBlender(
         f"syncClient {shareData.sessionId}", host, port)
     client.connect()
