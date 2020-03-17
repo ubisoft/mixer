@@ -719,8 +719,6 @@ class ClientBlender(Client):
         self.CurrentBuffers.materials = []
         self.CurrentBuffers.materialIndices = []
 
-        mesh = obj.data
-
         # compute modifiers
         depsgraph = bpy.context.evaluated_depsgraph_get()
         obj = obj.evaluated_get(depsgraph)
@@ -733,7 +731,9 @@ class ClientBlender(Client):
                 self.CurrentBuffers.materials.append("Default".encode())
 
         # triangulate mesh (before calculating normals)
-        mesh = obj.data
+        mesh = obj.to_mesh()
+        if not mesh:
+            return None
         bm = bmesh.new()
         bm.from_mesh(mesh)
         bmesh.ops.triangulate(bm, faces=bm.faces)
@@ -803,6 +803,7 @@ class ClientBlender(Client):
         if meshBuffer:
             self.addCommand(common.Command(
                 common.MessageType.MESH, meshBuffer, 0))
+            self.sendMeshConnection(obj)
 
     def getMeshConnectionBuffers(self, obj, meshName):
         # geometry path
