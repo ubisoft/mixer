@@ -19,4 +19,4 @@ def create_room():
 
 def join_room():
     import dccsync
-    dccsync.operators.join_room('plop')
+    dccsync.operators.join_room('dccsync_unittest')

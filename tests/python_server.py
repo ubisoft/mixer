@@ -72,6 +72,102 @@ def forcebreak():
     breakpoint()
 
 
+class FailOperator(bpy.types.Operator):
+    """Report test failure"""
+    bl_idname = "dcc_sync.test_fail"
+    bl_label = "Report test failure"
+    bl_options = {'REGISTER'}
+
+    def execute(self, context):
+        import sys
+        sys.exit(1)
+        return {'FINISHED'}
+
+
+timer = None
+
+# Also see https://www.blender.org/forum/viewtopic.php?t=28331
+
+
+class AsyncioLoopOperator(bpy.types.Operator):
+    """
+    Executes an asyncio loop, bluntly copied from
+    From https://blenderartists.org/t/running-background-jobs-with-asyncio/673805
+
+    Used by the unit tests (python_server.py)
+    """
+    bl_idname = "dcc_sync.test_asyncio_loop"
+    bl_label = "Test Remote"
+    command: bpy.props.EnumProperty(name="Command",
+                                    description="Command being issued to the asyncio loop",
+                                    default='TOGGLE', items=[
+                                         ('START', "Start", "Start the loop"),
+                                         ('STOP', "Stop", "Stop the loop"),
+                                         ('TOGGLE', "Toggle", "Toggle the loop state")
+                                    ])
+    period: bpy.props.FloatProperty(name="Period",
+                                    description="Time between two asyncio beats",
+                                    default=0.01, subtype="UNSIGNED", unit="TIME")
+
+    def execute(self, context):
+        return self.invoke(context, None)
+
+    def invoke(self, context, event):
+        global timer
+        wm = context.window_manager
+        if timer and self.command in ('STOP', 'TOGGLE'):
+            wm.event_timer_remove(timer)
+            timer = None
+            return {'FINISHED'}
+        elif not timer and self.command in ('START', 'TOGGLE'):
+            wm.modal_handler_add(self)
+            timer = wm.event_timer_add(self.period, window=context.window)
+            return {'RUNNING_MODAL'}
+        else:
+            return {'CANCELLED'}
+
+    def modal(self, context, event):
+        global timer
+        if not timer:
+            return {'FINISHED'}
+        elif event.type != 'TIMER':
+            return {'PASS_THROUGH'}
+        else:
+            loop = asyncio.get_event_loop()
+            loop.stop()
+            loop.run_forever()
+            return {'RUNNING_MODAL'}
+
+
+class TestPanel(bpy.types.Panel):
+    """Report test status"""
+    bl_label = "TEST"
+    bl_idname = "TEST_PT_settings"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "TEST"
+
+    def draw(self, context):
+        layout = self.layout
+        row = layout.row()
+        # exit with 0 return code
+        row.operator("wm.quit_blender", text="Succeed")
+        # exit with non-zero return code
+        row.operator(FailOperator.bl_idname, text="Fail")
+
+
+classes = (
+    FailOperator,
+    TestPanel,
+    AsyncioLoopOperator
+)
+
+
+def register():
+    for c in classes:
+        bpy.utils.register_class(c)
+
+
 if __name__ == '__main__':
 
     # forcebreak()
@@ -87,6 +183,6 @@ if __name__ == '__main__':
     logger.info('Starting:')
     logger.info('  python port %s', args.port)
     logger.info('  ptvsd  port %s', args.ptvsd)
-
+    register()
     asyncio.ensure_future(serve(args.port))
-    bpy.ops.dcc_sync.asyncio_loop()
+    bpy.ops.dcc_sync.test_asyncio_loop()

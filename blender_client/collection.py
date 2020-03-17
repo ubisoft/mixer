@@ -59,3 +59,39 @@ def buildRemoveCollectionFromCollection(data):
     parent = shareData.blenderCollections[parent_name]
     child = shareData.blenderCollections[child_name]
     parent.children.unlink(child)
+
+
+def buildAddObjectToCollection(data):
+    collection_name, index = common.decodeString(data, 0)
+    object_name, _ = common.decodeString(data, index)
+    collection_logger.debug("buildAddObjectToCollection %s <- %s", collection_name, object_name)
+
+    collection = shareData.blenderCollections[collection_name]
+
+    # We may have received an object creation message before this collection link message
+    # and object creation will have created and linked the collecetion if needed
+    if collection.objects.get(object_name) is None:
+        object_ = shareData.blenderObjects[object_name]
+        collection.objects.link(object_)
+
+
+def buildRemoveObjectFromCollection(data):
+    collection_name, index = common.decodeString(data, 0)
+    object_name, _ = common.decodeString(data, index)
+    collection_logger.debug("buildRemoveObjectFromCollection %s <- %s", collection_name, object_name)
+
+    collection = shareData.blenderCollections[collection_name]
+    object_ = shareData.blenderObjects[object_name]
+    collection.objects.unlink(object_)
+
+
+def buildCollectionInstance(data):
+    instance_name, index = common.decodeString(data, 0)
+    instantiated_name, _ = common.decodeString(data, index)
+    instantiated = shareData.blenderCollections[instantiated_name]
+
+    instance = bpy.data.objects.new(name=instance_name, object_data=None)
+    instance.instance_collection = instantiated
+    instance.instance_type = 'COLLECTION'
+
+    shareData.blenderObjects[instance_name] = instance

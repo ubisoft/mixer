@@ -274,8 +274,8 @@ def removeCollections():
 def addObjects():
     changed = False
     for objName in shareData.objectsAdded:
-        if objName in bpy.context.scene.objects:
-            obj = bpy.context.scene.objects[objName]
+        if objName in bpy.data.objects:
+            obj = bpy.data.objects[objName]
             updateParams(obj)
             updateTransform(obj)
             changed = True
@@ -990,57 +990,6 @@ class OpenStatsDirOperator(bpy.types.Operator):
         return {'FINISHED'}
 
 
-timer = None
-
-
-class AsyncioLoopOperator(bpy.types.Operator):
-    """
-    Executes an asyncio loop, bluntly copied from
-    From https://blenderartists.org/t/running-background-jobs-with-asyncio/673805
-
-    Used by the unit tests (python_server.py)
-    """
-    bl_idname = "dcc_sync.asyncio_loop"
-    bl_label = "Test Remote"
-    command: bpy.props.EnumProperty(name="Command",
-                                    description="Command being issued to the asyncio loop",
-                                    default='TOGGLE', items=[
-                                         ('START', "Start", "Start the loop"),
-                                         ('STOP', "Stop", "Stop the loop"),
-                                         ('TOGGLE', "Toggle", "Toggle the loop state")
-                                    ])
-    period: bpy.props.FloatProperty(name="Period",
-                                    description="Time between two asyncio beats",
-                                    default=0.01, subtype="UNSIGNED", unit="TIME")
-
-    def execute(self, context):
-        return self.invoke(context, None)
-
-    def invoke(self, context, event):
-        global timer
-        wm = context.window_manager
-        if timer and self.command in ('STOP', 'TOGGLE'):
-            wm.event_timer_remove(timer)
-            timer = None
-            return {'FINISHED'}
-        elif not timer and self.command in ('START', 'TOGGLE'):
-            wm.modal_handler_add(self)
-            timer = wm.event_timer_add(self.period, window=context.window)
-            return {'RUNNING_MODAL'}
-        else:
-            return {'CANCELLED'}
-
-    def modal(self, context, event):
-        global timer
-        if not timer:
-            return {'FINISHED'}
-        elif event.type != 'TIMER':
-            return {'PASS_THROUGH'}
-        else:
-            loop = asyncio.get_event_loop()
-            loop.stop()
-            loop.run_forever()
-            return {'RUNNING_MODAL'}
 
 
 classes = (
@@ -1053,7 +1002,6 @@ classes = (
     LeaveRoomOperator,
     WriteStatisticsOperator,
     OpenStatsDirOperator,
-    AsyncioLoopOperator
 )
 
 

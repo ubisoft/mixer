@@ -62,7 +62,7 @@ class ClientBlender(Client):
         return path
 
     # get first collection
-    def getOrCreateCollection(self, name="Collection"):
+    def getOrCreateCollection(self, name):
         collection = shareData.blenderCollections.get(name)
         if not collection:
             bpy.ops.collection.create(name=name)
@@ -71,8 +71,7 @@ class ClientBlender(Client):
             bpy.context.scene.collection.children.link(collection)
         return collection
 
-    def getOrCreatePath(self, path, data=None, collectionName="Collection"):
-        collection = self.getOrCreateCollection(collectionName)
+    def getOrCreatePath(self, path, data=None):
         pathElem = path.split('/')
         parent = None
         ob = None
@@ -82,7 +81,6 @@ class ClientBlender(Client):
             if not ob:
                 ob = bpy.data.objects.new(elem, None)
                 shareData._blenderObjects[ob.name_full] = ob
-                collection.objects.link(ob)
             ob.parent = parent
             parent = ob
         # Create or get object
@@ -91,22 +89,12 @@ class ClientBlender(Client):
         if not ob:
             ob = bpy.data.objects.new(elem, data)
             shareData._blenderObjects[ob.name_full] = ob
-            collection.objects.link(ob)
         else:
             ob.parent = parent
         return ob
 
     def getOrCreateObjectData(self, path, data):
-        ob = self.getOrCreatePath(path, data)
-        if not ob:
-            return None  # todo should not happen ? assert this ?
-
-        parent = ob.parent
-
-        collection = self.getOrCreateCollection()
-        if not ob.name in collection.objects:
-            collection.objects.link(ob)
-        ob.parent = parent
+        self.getOrCreatePath(path, data)
 
     def getOrCreateCamera(self, cameraName):
         camera = shareData.blenderCameras.get(cameraName)
@@ -1313,6 +1301,13 @@ class ClientBlender(Client):
                     collection.buildCollectionToCollection(command.data)
                 elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
                     collection.buildRemoveCollectionFromCollection(command.data)
+                elif command.type == common.MessageType.ADD_OBJECT_TO_COLLECTION:
+                    collection.buildAddObjectToCollection(command.data)
+                elif command.type == common.MessageType.REMOVE_OBJECT_FROM_COLLECTION:
+                    collection.buildRemoveObjectFromCollection(command.data)
+                elif command.type == common.MessageType.INSTANCE_COLLECTION:
+                    collection. buildCollectionInstance(command.data)
+
 
                 self.receivedCommands.task_done()
                 self.blockSignals = False
