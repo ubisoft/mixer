@@ -46,7 +46,7 @@ def updateParams(obj):
     if obj.data:
         typename = obj.data.bl_rna.name
 
-    if typename != 'Camera' and typename != 'Mesh' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
+    if typename != 'Camera' and typename != 'Mesh' and typename != 'Curve' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
         return
 
     if typename == 'Camera':
@@ -61,12 +61,11 @@ def updateParams(obj):
         shareData.client.sendGreasePencilMesh(obj)
         shareData.client.sendGreasePencilConnection(obj)
 
-    if typename == 'Mesh':
+    if typename == 'Mesh' or typename == 'Curve':
         if obj.mode == 'OBJECT':
             for material in obj.data.materials:
                 shareData.client.sendMaterial(material)
             shareData.client.sendMesh(obj)
-            shareData.client.sendMeshConnection(obj)
 
 
 def updateTransform(obj):
