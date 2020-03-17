@@ -726,8 +726,11 @@ class ClientBlender(Client):
         obj = obj.evaluated_get(depsgraph)
 
         for slot in obj.material_slots[:]:
-            self.CurrentBuffers.materials.append(
-                slot.material.name_full.encode())
+            if slot.material:
+                self.CurrentBuffers.materials.append(
+                    slot.material.name_full.encode())
+            else:
+                self.CurrentBuffers.materials.append("Default".encode())
 
         # triangulate mesh (before calculating normals)
         mesh = obj.data
@@ -842,6 +845,8 @@ class ClientBlender(Client):
         if not animationData:
             return
         action = animationData.action
+        if not action:
+            return
         for fcurve in action.fcurves:
             if fcurve.data_path == channelName:
                 if channelIndex == -1 or fcurve.array_index == channelIndex:
@@ -1035,6 +1040,24 @@ class ClientBlender(Client):
             buffer += self.sendGreasePenciFrame(frame)
         return buffer
 
+    def sendGreasePencilTimeOffset(self, obj):
+        GP = obj.data
+        buffer = common.encodeString(GP.name_full)
+
+        for modifier in obj.grease_pencil_modifiers:
+            if modifier.type != 'GP_TIME':
+                continue
+            offset = modifier.offset
+            scale = modifier.frame_scale
+            customRange = modifier.use_custom_frame_range
+            frameStart = modifier.frame_start
+            frameEnd = modifier.frame_end
+            buffer += common.encodeInt(offset) + common.encodeFloat(scale) + common.encodeBool(
+                customRange) + common.encodeInt(frameStart) + common.encodeInt(frameEnd)
+            self.addCommand(common.Command(
+                common.MessageType.GREASE_PENCIL_TIME_OFFSET, buffer, 0))
+            break
+
     def sendGreasePencilMesh(self, obj):
         GP = obj.data
         buffer = common.encodeString(GP.name_full)
@@ -1053,6 +1076,8 @@ class ClientBlender(Client):
 
         self.addCommand(common.Command(
             common.MessageType.GREASE_PENCIL_MESH, buffer, 0))
+
+        self.sendGreasePencilTimeOffset(obj)
 
     def sendGreasePencilMaterial(self, material):
         GPMaterial = material.grease_pencil
