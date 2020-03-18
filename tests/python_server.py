@@ -79,8 +79,10 @@ class FailOperator(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        import sys
-        sys.exit(1)
+        import os
+        # raise SystemExit() and sys.exit() hang , so :
+        os._exit(1)
+
         return {'FINISHED'}
 
 

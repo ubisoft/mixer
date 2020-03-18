@@ -61,7 +61,7 @@ def instanciate_collection(collection_name: str, instance_name: str):
     bpy.data.collections.remove(c)
 
 
-class test_collection_default_doc(testcase.BlenderTestCase):
+class CollectionTestCase(testcase.BlenderTestCase):
     def create_collection_in_collection(self, parent_name: str, child_name: str):
         self._sender.send_function(create_collection_in_collection, parent_name, child_name)
 
@@ -83,11 +83,22 @@ class test_collection_default_doc(testcase.BlenderTestCase):
     def instanciate_collection(self, collection_name: str, instance_name: str):
         self._sender.send_function(instanciate_collection, collection_name, instance_name)
 
+
+class test_scene_collection_default_doc(CollectionTestCase):
+
+    def test_scene_collection_create_FAILS(self):
+        self._sender.send_function(new_to_scene, 'plop')
+        self.assertUserSuccess()
+
+
+class test_collection_default_doc(CollectionTestCase):
+
     def test_create_collection_in_collection(self):
         self.create_collection_in_collection('Collection', 'plop')
         self.create_collection_in_collection('Collection', 'plaf')
         self.create_collection_in_collection('plop', 'sous_plop')
         self.create_collection_in_collection('plaf', 'sous_plaf')
+        self.assertUserSuccess()
 
     def test_create_collection_in_collection_FAILS(self):
         self.create_collection_in_collection('Collection', 'plop')
@@ -96,17 +107,20 @@ class test_collection_default_doc(testcase.BlenderTestCase):
         # it seems that sendSceneDataToServer handler does not notice the change
         self.create_collection_in_collection('plaf', 'sous_plaf')
         self.create_collection_in_collection('plop', 'sous_plop')
+        self.assertUserSuccess()
 
     def test_create_collection_in_collection_name_clash(self):
         self.create_collection_in_collection('Collection', 'plop')
         self.create_collection_in_collection('Collection', 'Collection')
         self.create_collection_in_collection('plop', 'plop')
+        self.assertUserSuccess()
 
     def test_create_object_in_collection(self):
         self.create_object_in_collection('Collection', 'new_object_0_0')
         self.create_object_in_collection('Collection', 'new_object_0_1')
         self.create_collection_in_collection('Collection', 'sub_collection_0')
         self.create_object_in_collection('sub_collection_0', 'new_object_0_2')
+        self.assertUserSuccess()
 
     def test_remove_object_from_collection(self):
         self.create_collection_in_collection('Collection', 'sub_collection_1')
@@ -119,6 +133,7 @@ class test_collection_default_doc(testcase.BlenderTestCase):
         self.remove_object_from_collection('Collection', 'new_object_0_1')
         self.remove_object_from_collection('sub_collection_1', 'new_object_1_0')
         self.remove_object_from_collection('sub_collection_1', 'new_object_1_1')
+        self.assertUserSuccess()
 
     def test_remove_collection_from_collection(self):
         # TODO
@@ -132,6 +147,7 @@ class test_collection_default_doc(testcase.BlenderTestCase):
 
         self.create_collection_in_collection('Collection', 'plaf1')
         self.remove_collection_from_collection('Collection', 'plaf1')
+        self.assertUserSuccess()
 
     def test_create_collection_instance(self):
         self.create_collection_in_collection('Collection', 'src')
@@ -142,9 +158,7 @@ class test_collection_default_doc(testcase.BlenderTestCase):
         self.instanciate_collection('src', 'instance_1')
         self.add_object_to_collection('dst', 'instance_0')
         self.add_object_to_collection('dst', 'instance_1')
-
-    def test_scene_collection_create_FAILS(self):
-        self._sender.send_function(new_to_scene, 'plop')
+        self.assertUserSuccess()
 
 
 if __name__ == '__main__':

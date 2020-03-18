@@ -4,6 +4,7 @@ from typing import List, Callable
 import inspect
 import socket
 import time
+import blender_lib
 
 """
 The idea is to automate Blender / Blender tests
@@ -23,7 +24,7 @@ Receiver Blender
 Diff the scenes
 """
 
-#BLENDER_DIR = Path(r'D:\blenders\blender-2.82-windows64')
+# BLENDER_DIR = Path(r'D:\blenders\blender-2.82-windows64')
 BLENDER_DIR = Path(r'D:\blenders\2.82')
 current_dir = Path(__file__).parent
 
@@ -65,6 +66,7 @@ class Blender(Process):
             '--log-level', '-1',
             '--start-console'
         ]
+        self._process: subprocess.Popen = None
 
     def start(self, python_script_path: str = None, script_args: List = None, blender_args: List = None):
         popen_args = [self._exe]
@@ -81,13 +83,19 @@ class Blender(Process):
 
         for arg in popen_args:
             display_args += arg + ' '
-        print(display_args)
+        # print(display_args)
 
         other_args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
         self._process = subprocess.Popen(popen_args, shell=False, **other_args)
 
-    def wait(self):
-        self._process.wait()
+    def wait(self, timeout: float = None):
+        try:
+            return self._process.wait(timeout)
+        except subprocess.TimeoutExpired:
+            return None
+
+    def kill(self):
+        self._process.kill()
 
 
 class BlenderServer(Blender):
@@ -112,14 +120,14 @@ class BlenderServer(Blender):
     def connect(self):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         connected = False
-        max_attempts = 20
+        max_attempts = 200
         attempts = 0
         while not connected and attempts < max_attempts:
             try:
                 self._sock.connect(('127.0.0.1', self._port))
                 connected = True
             except ConnectionRefusedError:
-                time.sleep(1)
+                time.sleep(0.1)
                 attempts += 1
 
     def send_string(self, script: str):
@@ -129,7 +137,7 @@ class BlenderServer(Blender):
         """
         Remotely execute a function.
 
-        Extracts the source code from the function f. 
+        Extracts the source code from the function f.
         The def statement must not be indented (no local function)
         """
         src = inspect.getsource(f)
@@ -138,5 +146,7 @@ class BlenderServer(Blender):
         args_.extend(kwargs_)
         arg_string = '' if args_ is None else ','.join(args_)
         source = f'{src}\n{f.__name__}({arg_string})\n'
-        print(source)
         self.send_string(source)
+
+    def quit(self):
+        self.send_function(blender_lib.quit)

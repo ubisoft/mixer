@@ -6,6 +6,11 @@ execution sever, so each function must contain its imports
 """
 
 
+def save(path: str):
+    import bpy
+    bpy.ops.wm.save_as_mainfile(filepath=path)
+
+
 def quit():
     import bpy
     bpy.ops.wm.quit_blender()
