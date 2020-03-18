@@ -49,6 +49,12 @@ def remove_collection(name: str):
     bpy.data.collections.remove(c)
 
 
+def rename_collection(old_name: str, new_name: str):
+    import bpy
+    c = bpy.data.collections[old_name]
+    c.name = new_name
+
+
 def instanciate_collection(collection_name: str, instance_name: str):
     import bpy
     collection = bpy.data.collections[collection_name]
@@ -70,6 +76,9 @@ class CollectionTestCase(testcase.BlenderTestCase):
 
     def remove_collection(self, collection_name: str):
         self._sender.send_function(remove_collection, collection_name)
+
+    def rename_collection(self, old_name: str, new_name: str):
+        self._sender.send_function(rename_collection, old_name, new_name)
 
     def create_object_in_collection(self, collection_name: str, object_name: str):
         self._sender.send_function(create_object_in_collection, collection_name, object_name)
@@ -100,11 +109,11 @@ class test_collection_default_doc(CollectionTestCase):
         self.create_collection_in_collection('plaf', 'sous_plaf')
         self.assertUserSuccess()
 
-    def test_create_collection_in_collection_FAILS(self):
+    def test_create_collection_in_collection_1(self):
         self.create_collection_in_collection('Collection', 'plop')
         self.create_collection_in_collection('Collection', 'plaf')
-        # YES it fails in this order
-        # it seems that sendSceneDataToServer handler does not notice the change
+        # it used to fail in this order and work after collection rename
+        # so keep the test
         self.create_collection_in_collection('plaf', 'sous_plaf')
         self.create_collection_in_collection('plop', 'sous_plop')
         self.assertUserSuccess()
@@ -158,6 +167,19 @@ class test_collection_default_doc(CollectionTestCase):
         self.instanciate_collection('src', 'instance_1')
         self.add_object_to_collection('dst', 'instance_0')
         self.add_object_to_collection('dst', 'instance_1')
+        self.assertUserSuccess()
+
+    def test_rename_collection(self):
+        self.create_collection_in_collection('Collection', 'old_name')
+        self.create_object_in_collection('old_name', 'object_0')
+        self.create_object_in_collection('old_name', 'object_1')
+        self.create_collection_in_collection('old_name', 'collection_0_old')
+        self.create_collection_in_collection('old_name', 'collection_1_old')
+        self.create_object_in_collection('collection_0_old', 'object_0_0')
+
+        self.rename_collection('collection_1_old', 'collection_1_new')
+        self.rename_collection('old_name', 'new_name')
+        self.rename_collection('collection_0_old', 'collection_0_new')
         self.assertUserSuccess()
 
 

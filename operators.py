@@ -164,11 +164,13 @@ def updateCollectionsState():
 
     shareData.collectionsAddedToCollection.clear()
     shareData.collectionsRemovedFromCollection.clear()
-    for collectionName, shareData.collectionInfo in shareData.collectionsInfo.items():
+
+    # walk the old collections
+    for collectionName, collectionInfo in shareData.collectionsInfo.items():
         collection = getCollection(collectionName)
         if not collection:
             continue
-        oldChildren = set(shareData.collectionInfo.children)
+        oldChildren = set(collectionInfo.children)
         newChildren = set([x.name_full for x in collection.children])
 
         for x in newChildren - oldChildren:
@@ -181,7 +183,7 @@ def updateCollectionsState():
 
         newObjects = set([x.name_full for x in collection.objects])
         oldObjects = set([shareData.objectsRenamed.get(x, x)
-                          for x in shareData.collectionInfo.objects])
+                          for x in collectionInfo.objects])
 
         addedObjects = [x for x in newObjects - oldObjects]
         if len(addedObjects) > 0:
@@ -190,6 +192,20 @@ def updateCollectionsState():
         removedObjects = [x for x in oldObjects - newObjects]
         if len(removedObjects) > 0:
             shareData.objectsRemovedFromCollection[collectionName] = removedObjects
+
+    # now the new collections (in case of rename)
+    for collectionName in shareData.collectionsAdded:
+        collection = getCollection(collectionName)
+        if not collection:
+            continue
+        newChildren = set([x.name_full for x in collection.children])
+        for x in newChildren:
+            shareData.collectionsAddedToCollection.add(
+                (getParentCollection(x).name_full, x))
+
+        addedObjects = set([x.name_full for x in collection.objects])
+        if len(addedObjects) > 0:
+            shareData.objectsAddedToCollection[collectionName] = addedObjects
 
 
 def updateFrameChangedRelatedObjectsState(oldObjects: dict, newObjects: dict):
@@ -988,8 +1004,6 @@ class OpenStatsDirOperator(bpy.types.Operator):
     def execute(self, context):
         os.startfile(get_dcc_sync_props().statistics_directory)
         return {'FINISHED'}
-
-
 
 
 classes = (
