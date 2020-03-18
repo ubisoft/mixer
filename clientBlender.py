@@ -180,6 +180,7 @@ class ClientBlender(Client):
 
     def buildMesh(self, data):
         index = 0
+        path, index = common.decodeString(data, index)        
         meshName, index = common.decodeString(data, index)
         positions, index = common.decodeVector3Array(data, index)
         normals, index = common.decodeVector3Array(data, index)
@@ -248,12 +249,7 @@ class ClientBlender(Client):
                 me.materials.append(material)
 
         bm.free()
-
-    def buildMeshConnection(self, data):
-        path, start = common.decodeString(data, 0)
-        meshName, start = common.decodeString(data, start)
-        mesh = shareData.blenderMeshes[meshName]
-        self.getOrCreateObjectData(path, mesh)
+        self.getOrCreateObjectData(path, me)
 
     def setTransform(self, obj, position, rotation, scale):
         obj.location = position
@@ -799,23 +795,11 @@ class ClientBlender(Client):
     def sendMesh(self, obj):
         mesh = obj.data
         meshName = self.getMeshName(mesh)
+        path = self.getObjectPath(obj)        
         meshBuffer = self.getMeshBuffers(obj, meshName)
         if meshBuffer:
             self.addCommand(common.Command(
-                common.MessageType.MESH, meshBuffer, 0))
-            self.sendMeshConnection(obj)
-
-    def getMeshConnectionBuffers(self, obj, meshName):
-        # geometry path
-        path = self.getObjectPath(obj)
-        return common.encodeString(path) + common.encodeString(meshName)
-
-    def sendMeshConnection(self, obj):
-        mesh = obj.data
-        meshName = self.getMeshName(mesh)
-        meshConnectionBuffer = self.getMeshConnectionBuffers(obj, meshName)
-        self.addCommand(common.Command(
-            common.MessageType.MESHCONNECTION, meshConnectionBuffer, 0))
+                common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
 
     def sendCollectionInstance(self, obj):
         if not obj.instance_collection:
@@ -1290,8 +1274,6 @@ class ClientBlender(Client):
                     self.clearContent()
                 elif command.type == common.MessageType.MESH:
                     self.buildMesh(command.data)
-                elif command.type == common.MessageType.MESHCONNECTION:
-                    self.buildMeshConnection(command.data)
                 elif command.type == common.MessageType.TRANSFORM:
                     self.buildTransform(command.data)
                 elif command.type == common.MessageType.MATERIAL:
