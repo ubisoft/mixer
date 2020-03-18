@@ -11,6 +11,7 @@ from datetime import datetime
 
 import bpy
 import socket
+import os
 from . import clientBlender
 from . import ui
 from .shareData import shareData
@@ -46,7 +47,7 @@ def updateParams(obj):
     if obj.data:
         typename = obj.data.bl_rna.name
 
-    if typename != 'Camera' and typename != 'Mesh' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
+    if typename != 'Camera' and typename != 'Mesh' and typename != 'Curve' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
         return
 
     if typename == 'Camera':
@@ -61,12 +62,11 @@ def updateParams(obj):
         shareData.client.sendGreasePencilMesh(obj)
         shareData.client.sendGreasePencilConnection(obj)
 
-    if typename == 'Mesh':
+    if typename == 'Mesh' or typename == 'Curve':
         if obj.mode == 'OBJECT':
             for material in obj.data.materials:
                 shareData.client.sendMaterial(material)
             shareData.client.sendMesh(obj)
-            shareData.client.sendMeshConnection(obj)
 
 
 def updateTransform(obj):
@@ -76,6 +76,7 @@ def updateTransform(obj):
 def join_room(room_name: str):
     assert shareData.currentRoom is None
     user = get_dcc_sync_props().user
+    shareData.sessionId += 1
     shareData.currentRoom = room_name
     shareData.client.joinRoom(room_name)
     shareData.client.setClientName(user)
@@ -792,7 +793,6 @@ def isClientConnected():
 
 def create_main_client(host: str, port: int):
     assert shareData.client is None
-    shareData.sessionId += 1
     client = clientBlender.ClientBlender(
         f"syncClient {shareData.sessionId}", host, port)
     client.connect()
