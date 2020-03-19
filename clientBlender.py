@@ -219,9 +219,11 @@ class ClientBlender(Client):
         me = self.getOrCreateMesh(meshName)
         bm.to_mesh(me)
         bm.free()
+        self.getOrCreateObjectData(path, me)
 
     def buildMesh(self, data):
         index = 0
+        path, index = common.decodeString(data, index)
         meshName, index = common.decodeString(data, index)
         positions, index = common.decodeVector3Array(data, index)
         normals, index = common.decodeVector3Array(data, index)
@@ -290,12 +292,7 @@ class ClientBlender(Client):
                 me.materials.append(material)
 
         bm.free()
-
-    def buildMeshConnection(self, data):
-        path, start = common.decodeString(data, 0)
-        meshName, start = common.decodeString(data, start)
-        mesh = shareData.blenderMeshes[meshName]
-        self.getOrCreateObjectData(path, mesh)
+        self.getOrCreateObjectData(path, me)
 
     def setTransform(self, obj, position, rotation, scale):
         obj.location = position
@@ -753,17 +750,20 @@ class ClientBlender(Client):
         materials = []
         materialIndices = []  # array of triangle index, material index
 
-        mesh = obj.data
-
         # compute modifiers
         depsgraph = bpy.context.evaluated_depsgraph_get()
         obj = obj.evaluated_get(depsgraph)
 
         for slot in obj.material_slots[:]:
-            materials.append(slot.material.name_full.encode())
+            if slot.material:
+                materials.append(slot.material.name_full.encode())
+            else:
+                materials.append("Default".encode())
 
         # triangulate mesh (before calculating normals)
-        mesh = obj.data
+        mesh = obj.to_mesh()
+        if not mesh:
+            return None
         bm = bmesh.new()
         bm.from_mesh(mesh)
         bmesh.ops.triangulate(bm, faces=bm.faces)
@@ -862,23 +862,13 @@ class ClientBlender(Client):
     def sendMesh(self, obj):
         mesh = obj.data
         meshName = self.getMeshName(mesh)
+        path = self.getObjectPath(obj)
         sourceMeshBuffer = self.getSourceMeshBuffers(obj, meshName)
         meshBuffer = self.getMeshBuffers(obj, meshName)
         if meshBuffer:
-            self.addCommand(common.Command(common.MessageType.MESH, meshBuffer, 0))
-            self.addCommand(common.Command(common.MessageType.SOURCE_MESH, sourceMeshBuffer, 0))
-
-    def getMeshConnectionBuffers(self, obj, meshName):
-        # geometry path
-        path = self.getObjectPath(obj)
-        return common.encodeString(path) + common.encodeString(meshName)
-
-    def sendMeshConnection(self, obj):
-        mesh = obj.data
-        meshName = self.getMeshName(mesh)
-        meshConnectionBuffer = self.getMeshConnectionBuffers(obj, meshName)
-        self.addCommand(common.Command(
-            common.MessageType.MESHCONNECTION, meshConnectionBuffer, 0))
+            self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
+            self.addCommand(common.Command(common.MessageType.SOURCE_MESH,
+                                           common.encodeString(path) + sourceMeshBuffer, 0))
 
     def sendCollectionInstance(self, obj):
         if not obj.instance_collection:
@@ -909,6 +899,8 @@ class ClientBlender(Client):
         if not animationData:
             return
         action = animationData.action
+        if not action:
+            return
         for fcurve in action.fcurves:
             if fcurve.data_path == channelName:
                 if channelIndex == -1 or fcurve.array_index == channelIndex:
@@ -1102,6 +1094,24 @@ class ClientBlender(Client):
             buffer += self.sendGreasePenciFrame(frame)
         return buffer
 
+    def sendGreasePencilTimeOffset(self, obj):
+        GP = obj.data
+        buffer = common.encodeString(GP.name_full)
+
+        for modifier in obj.grease_pencil_modifiers:
+            if modifier.type != 'GP_TIME':
+                continue
+            offset = modifier.offset
+            scale = modifier.frame_scale
+            customRange = modifier.use_custom_frame_range
+            frameStart = modifier.frame_start
+            frameEnd = modifier.frame_end
+            buffer += common.encodeInt(offset) + common.encodeFloat(scale) + common.encodeBool(
+                customRange) + common.encodeInt(frameStart) + common.encodeInt(frameEnd)
+            self.addCommand(common.Command(
+                common.MessageType.GREASE_PENCIL_TIME_OFFSET, buffer, 0))
+            break
+
     def sendGreasePencilMesh(self, obj):
         GP = obj.data
         buffer = common.encodeString(GP.name_full)
@@ -1120,6 +1130,8 @@ class ClientBlender(Client):
 
         self.addCommand(common.Command(
             common.MessageType.GREASE_PENCIL_MESH, buffer, 0))
+
+        self.sendGreasePencilTimeOffset(obj)
 
     def sendGreasePencilMaterial(self, material):
         GPMaterial = material.grease_pencil
@@ -1331,8 +1343,6 @@ class ClientBlender(Client):
                     self.clearContent()
                 elif command.type == common.MessageType.SOURCE_MESH:
                     self.buildSourceMesh(command.data)
-                elif command.type == common.MessageType.MESHCONNECTION:
-                    self.buildMeshConnection(command.data)
                 elif command.type == common.MessageType.TRANSFORM:
                     self.buildTransform(command.data)
                 elif command.type == common.MessageType.MATERIAL:

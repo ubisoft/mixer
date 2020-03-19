@@ -46,7 +46,7 @@ def updateParams(obj):
     if obj.data:
         typename = obj.data.bl_rna.name
 
-    if typename != 'Camera' and typename != 'Mesh' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
+    if typename != 'Camera' and typename != 'Mesh' and typename != 'Curve' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
         return
 
     if typename == 'Camera':
@@ -61,12 +61,11 @@ def updateParams(obj):
         shareData.client.sendGreasePencilMesh(obj)
         shareData.client.sendGreasePencilConnection(obj)
 
-    if typename == 'Mesh':
+    if typename == 'Mesh' or typename == 'Curve':
         if obj.mode == 'OBJECT':
             for material in obj.data.materials:
                 shareData.client.sendMaterial(material)
             shareData.client.sendMesh(obj)
-            shareData.client.sendMeshConnection(obj)
 
 
 def updateTransform(obj):
@@ -376,20 +375,23 @@ def reparentObjects():
 
 
 def updateObjectsData():
-    container = {}
+    dataContainer = {}
     data = set()
     transforms = set()
 
     for update in shareData.depsgraph.updates:
-        obj = update.id.original
+        obj =   update.id.original
         typename = obj.bl_rna.name
 
         if typename == 'Object':
             if hasattr(obj, 'data'):
-                container[obj.data] = obj
+                if obj.data in dataContainer:
+                    dataContainer[obj.data].append(obj)
+                else:
+                    dataContainer[obj.data] = [obj]
             transforms.add(obj)
 
-        if typename == 'Camera' or typename == 'Mesh' or typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light' or typename == 'Grease Pencil':
+        if typename == 'Camera' or typename == 'Mesh' or typename == 'Curve' or typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light' or typename == 'Grease Pencil':
             data.add(obj)
 
         if typename == 'Material':
@@ -401,8 +403,11 @@ def updateObjectsData():
 
     # Send data (mesh) of objects
     for d in data:
-        if d in container:
-            updateParams(container[d])
+        container = dataContainer.get(d)
+        if not container:
+            continue
+        for c in container:
+            updateParams(c)
 
 
 @persistent
