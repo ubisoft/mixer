@@ -63,8 +63,6 @@ def updateParams(obj):
 
     if typename == 'Mesh' or typename == 'Curve' or typename == 'Text Curve':
         if obj.mode == 'OBJECT':
-            for material in obj.data.materials:
-                shareData.client.sendMaterial(material)
             shareData.client.sendMesh(obj)
 
 
