@@ -103,6 +103,8 @@ class ClientBlender(Client):
             collection.objects.link(ob)
         ob.parent = parent
 
+        return ob
+
     def getOrCreateCamera(self, cameraName):
         camera = shareData.blenderCameras.get(cameraName)
         if camera:
@@ -184,6 +186,16 @@ class ClientBlender(Client):
         meshName, index = common.decodeString(data, index)
 
         bm = bmesh.new()
+        me = self.getOrCreateMesh(meshName)
+        bm.to_mesh(me)
+        obj = self.getOrCreateObjectData(path, me)
+        bm.free()
+
+        while me.shape_keys != None:
+            obj.shape_key_remove(me.shape_keys.key_blocks[0])
+        print(me.shape_keys)
+
+        bm = bmesh.new()
 
         positions, index = common.decodeVector3Array(data, index)
         # logger.info("Reading %d vertices", len(positions))
@@ -192,6 +204,22 @@ class ClientBlender(Client):
             bm.verts.new(p)
 
         bm.verts.ensure_lookup_table()
+
+        shape_keys_data = []
+
+        # draft: handle vertex layers, but other things are required
+        verts_layer_count, index = common.decodeInt(data, index)
+        for verts_layer_idx in range(verts_layer_count):
+            layer_name, index = common.decodeString(data, index)
+            layer_count, index = common.decodeInt(data, index)
+            layer_collection = getattr(bm.verts.layers, layer_name)
+            for layer_idx in range(layer_count):
+                layer = layer_collection.new()
+                shape_key_data = []
+                for vert in bm.verts:
+                    shape_key_data.append(Vector(struct.unpack('3f', data[index:index + 3 * 4])))
+                    index += 3 * 4
+                shape_keys_data.append(shape_key_data)
 
         edgeCount, index = common.decodeInt(data, index)
         # logger.info("Reading %d edges", edgeCount)
@@ -210,17 +238,28 @@ class ClientBlender(Client):
         # logger.info("Reading %d faces", faceCount)
 
         for fIdx in range(faceCount):
+            materialIdx, index = common.decodeInt(data, index)
             vertCount, index = common.decodeInt(data, index)
             # logger.info("Reading %d face vertices", vertCount)
             faceVertices = struct.unpack(f'{vertCount}I', data[index:index + vertCount * 4])
             index += vertCount * 4
             verts = [bm.verts[i] for i in faceVertices]
             face = bm.faces.new(verts)
+            face.material_index = materialIdx
 
-        me = self.getOrCreateMesh(meshName)
-        bm.to_mesh(me)
+        bm.to_mesh(obj.data)
         bm.free()
-        self.getOrCreateObjectData(path, me)
+
+        materialNames, index = common.decodeStringArray(data, index)
+        for materialName in materialNames:
+            material = self.getOrCreateMaterial(materialName)
+            if not materialName in me.materials:
+                me.materials.append(material)
+
+        for shape_key_data in shape_keys_data:
+            shape_key = obj.shape_key_add()
+            for i in range(len(shape_key_data)):
+                shape_key.data[i].co = shape_key_data[i]
 
     def buildMesh(self, data):
         index = 0
@@ -824,41 +863,77 @@ class ClientBlender(Client):
 
         return common.encodeString(meshName) + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
 
-    def dump_mesh(self, mesh):
-        mesh_buffer = bmesh.new()
+    def dump_mesh(self, mesh_data):
+        bm = bmesh.new()
 
-        mesh_buffer.from_mesh(mesh)
+        bm.from_mesh(mesh_data)
 
-        mesh_buffer.verts.ensure_lookup_table()
+        bm.verts.ensure_lookup_table()
 
-        # logger.info("Writing %d vertices", len(mesh_buffer.verts))
-        binary_buffer = common.encodeInt(len(mesh_buffer.verts))
+        # logger.info("Writing %d vertices", len(bm.verts))
+        binary_buffer = common.encodeInt(len(bm.verts))
 
-        for vert in mesh_buffer.verts:
+        for vert in bm.verts:
             binary_buffer += struct.pack('3f', *list(vert.co))
 
-        # logger.info("Writing %d edges", len(mesh_buffer.edges))
-        binary_buffer += common.encodeInt(len(mesh_buffer.edges))
+        vert_layers = []
+        for key in type(bm.verts.layers).__dict__:
+            attr = getattr(bm.verts.layers, key)
+            if type(attr) == bmesh.types.BMLayerCollection:
+                if len(attr) > 0:
+                    vert_layers.append((key, attr))
+        binary_buffer += common.encodeInt(len(vert_layers))
+        for layer_name, layers in vert_layers:
+            if layer_name == 'shape':
+                logger.info("Writing layer %s", layer_name)
+                binary_buffer += common.encodeString(layer_name)
+                binary_buffer += common.encodeInt(len(layers))
+                for layer_idx in range(len(layers)):  # Note: cannot iterate on BMLayerCollection
+                    layer = layers[layer_idx]
+                    print(type(bm.verts[0][layer]))
+                    for vert in bm.verts:
+                        binary_buffer += struct.pack('3f', *list(vert[layer]))
 
-        for edge in mesh_buffer.edges:
+        # logger.info("Writing %d edges", len(bm.edges))
+        binary_buffer += common.encodeInt(len(bm.edges))
+
+        for edge in bm.edges:
             binary_buffer += struct.pack('2I', edge.verts[0].index, edge.verts[1].index)
             binary_buffer += struct.pack('1I', edge.smooth)
 
-        # logger.info("Writing %d faces", len(mesh_buffer.faces))
-        binary_buffer += common.encodeInt(len(mesh_buffer.faces))
+        # logger.info("Writing %d faces", len(bm.faces))
+        binary_buffer += common.encodeInt(len(bm.faces))
 
-        for face in mesh_buffer.faces:
+        for face in bm.faces:
+            binary_buffer += common.encodeInt(face.material_index)
             binary_buffer += common.encodeInt(len(face.verts))
             # logger.info("Writing %d face vertices", len(face.verts))
             for vert in face.verts:
                 binary_buffer += common.encodeInt(vert.index)
 
+        bm.free()
+
         return binary_buffer
 
     def getSourceMeshBuffers(self, obj, meshName):
-        mesh = obj.data
-        binary_buffer = self.dump_mesh(mesh)
-        return common.encodeString(meshName) + binary_buffer
+        mesh_data = obj.data
+        mesh_binary_buffer = self.dump_mesh(mesh_data)
+
+        if mesh_data.has_custom_normals:
+            # Custom normals are all (0, 0, 0) until calling calc_normals_split() or calc_tangents().
+            mesh_data.calc_normals_split()
+
+        materials = []
+        for slot in obj.material_slots[:]:
+            if slot.material:
+                materials.append(slot.material.name_full.encode())
+            else:
+                materials.append("Default".encode())
+        binaryMaterialNames = common.intToBytes(len(materials), 4)
+        for material in materials:
+            binaryMaterialNames += common.intToBytes(len(material), 4) + material
+
+        return common.encodeString(meshName) + mesh_binary_buffer + binaryMaterialNames
 
     def sendMesh(self, obj):
         mesh = obj.data
