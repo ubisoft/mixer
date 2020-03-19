@@ -60,16 +60,9 @@ def parse():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8888, help="port number to listen to")
     parser.add_argument("--ptvsd", type=int, default=5688, help="Vscode debugger port")
+    parser.add_argument("--wait_for_debugger", default=False, action='store_true', help="wait for debugger")
     args, _ = parser.parse_known_args(args_)
     return args
-
-
-def forcebreak():
-    print("Waiting for debugger attach")
-    import ptvsd
-    ptvsd.enable_attach(address=('localhost', 5678), redirect_output=True)
-    ptvsd.wait_for_attach()
-    breakpoint()
 
 
 class FailOperator(bpy.types.Operator):
@@ -175,12 +168,16 @@ if __name__ == '__main__':
     # forcebreak()
 
     args = parse()
-    if args.ptvsd:
-        try:
-            import ptvsd
+    try:
+        import ptvsd
+    except ImportError:
+        ptvsd = None
+
+    if ptvsd:
+        if args.ptvsd:
             ptvsd.enable_attach(address=('localhost', args.ptvsd), redirect_output=True)
-        except ImportError:
-            pass
+        if args.wait_for_debugger:
+            ptvsd.wait_for_attach()
 
     logger.info('Starting:')
     logger.info('  python port %s', args.port)

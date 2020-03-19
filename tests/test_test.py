@@ -4,6 +4,12 @@ import blender_lib as bl
 
 
 class Test_test(testcase.BlenderTestCase):
+    def setUp(self):
+        # will apply to the whole testcase
+        # self.sender_wait_for_debugger()
+        # self.receiver_wait_for_debugger()
+
+        super().setUp()
 
     def test_just_start(self):
         self.assertUserSuccess()

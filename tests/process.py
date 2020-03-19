@@ -79,11 +79,7 @@ class Blender(Process):
             popen_args.append('--')
             popen_args.extend([str(arg) for arg in script_args])
 
-            display_args = ''
-
-        for arg in popen_args:
-            display_args += arg + ' '
-        # print(display_args)
+        # print('\\n' + ' '.join(popen_args))
 
         other_args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
         self._process = subprocess.Popen(popen_args, shell=False, **other_args)
@@ -104,10 +100,11 @@ class BlenderServer(Blender):
     by sending python source code.
     """
 
-    def __init__(self, port: int, ptvsd_port: int = None):
+    def __init__(self, port: int, ptvsd_port: int = None, wait_for_debugger=False):
         super().__init__()
         self._port = port
         self._ptvsd_port = ptvsd_port
+        self._wait_for_debugger = wait_for_debugger
         self._path = str(current_dir / 'python_server.py')
         self._sock: socket.socket = None
 
@@ -115,6 +112,8 @@ class BlenderServer(Blender):
         args = [f'--port={self._port}']
         if self._ptvsd_port is not None:
             args.append(f'--ptvsd={self._ptvsd_port}')
+        if self._wait_for_debugger:
+            args.append('--wait_for_debugger')
         super().start(self._path, args, blender_args)
 
     def connect(self):

@@ -10,13 +10,14 @@ from pathlib import Path
 
 
 class Blender:
-    def __init__(self, port: int, ptvsd_port: int = None):
+    def __init__(self, port: int, ptvsd_port: int = None, wait_for_debugger=False):
         self._port = port
         self._ptvsd_port = ptvsd_port
+        self._wait_for_debugger = wait_for_debugger
         self.__blender: BlenderServer = None
 
     def setup(self, blender_args: List = None):
-        self._blender = BlenderServer(self._port, self._ptvsd_port)
+        self._blender = BlenderServer(self._port, self._ptvsd_port, self._wait_for_debugger)
         self._blender.start(blender_args)
         self._blender.connect()
         self._blender.send_function(dccsync.connect)
@@ -39,17 +40,30 @@ class Blender:
 
 
 class BlenderTestCase(unittest.TestCase):
+
+    def __init__(self, *args, **kwargs):
+        self._sender_wait_for_debugger = False
+        self._receiver_wait_for_debugger = False
+        super().__init__(*args, **kwargs)
+
+    def sender_wait_for_debugger(self):
+        self._sender_wait_for_debugger = True
+
+    def receiver_wait_for_debugger(self):
+        self._receiver_wait_for_debugger = True
+
     def setUp(self):
         python_port = 8081
         # do not the the default ptvsd port as it will be in use when debugging the TestCase
         ptvsd_port = 5688
-        self._sender = Blender(python_port + 0, ptvsd_port + 0)
+        self._sender = Blender(python_port + 0, ptvsd_port + 0, self._sender_wait_for_debugger)
         self._sender.setup(["--window-geometry", "0", "0", "960", "1080"])
 
-        self._receiver = Blender(python_port + 1, ptvsd_port + 1)
+        self._receiver = Blender(python_port + 1, ptvsd_port + 1, self._receiver_wait_for_debugger)
         self._receiver.setup(["--window-geometry", "960", "0", "960", "1080"])
 
     def tearDown(self):
+        self._wait_for_debugger = False
         self._sender.wait()
         self._receiver.wait()
 
