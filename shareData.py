@@ -3,6 +3,7 @@ from . import clientBlender
 from datetime import datetime
 import bpy
 
+
 class CollectionInfo:
     def __init__(self, hide_viewport, instance_offset, children, parent, objects=None):
         self.hide_viewport = hide_viewport
@@ -10,6 +11,7 @@ class CollectionInfo:
         self.children = children
         self.parent = parent
         self.objects = objects or []
+
 
 class ShareData:
     def __init__(self):
@@ -36,7 +38,7 @@ class ShareData:
         self.objectsRemovedFromCollection = {}
         self.collectionsAddedToCollection = set()
         self.collectionsRemovedFromCollection = set()
-        self.collectionsInfo = {}
+        self.collectionsInfo: Mapping[str, CollectionInfo] = {}
         self.objectsReparented = set()
         self.objectsParents = {}
         self.objectsRenamed = {}
@@ -70,7 +72,7 @@ class ShareData:
 
         self._blenderCollections = {}
         self.blenderCollectionsDirty = True
-    
+
     def setDirty(self):
         self.blenderObjectsDirty = True
         self.blenderMaterialsDirty = True
@@ -78,12 +80,12 @@ class ShareData:
         self.blenderGreasePencilsDirty = True
         self.blenderCamerasDirty = True
         self.blenderLightsDirty = True
-        self.blenderCollectionsDirty = True        
+        self.blenderCollectionsDirty = True
 
     def getBlenderProperty(self, property, propertyDirty, elems):
         if not propertyDirty:
             return property
-        property = { x.name_full: x for x in elems }
+        property = {x.name_full: x for x in elems}
         propertyDirty = False
         return property
 
@@ -91,7 +93,7 @@ class ShareData:
     def blenderObjects(self):
         if not self.blenderObjectsDirty:
             return self._blenderObjects
-        self._blenderObjects = { x.name_full: x for x in bpy.data.objects }
+        self._blenderObjects = {x.name_full: x for x in bpy.data.objects}
         self.blenderObjectsDirty = False
         return self._blenderObjects
 
@@ -99,7 +101,7 @@ class ShareData:
     def blenderMaterials(self):
         if not self.blenderMaterialsDirty:
             return self._blenderMaterials
-        self._blenderMaterials = { x.name_full: x for x in bpy.data.materials }
+        self._blenderMaterials = {x.name_full: x for x in bpy.data.materials}
         self.blenderMaterialsDirty = False
         return self._blenderMaterials
 
@@ -107,7 +109,7 @@ class ShareData:
     def blenderMeshes(self):
         if not self.blenderMeshesDirty:
             return self._blenderMeshes
-        self._blenderMeshes = { x.name_full: x for x in bpy.data.meshes }
+        self._blenderMeshes = {x.name_full: x for x in bpy.data.meshes}
         self.blenderMeshesDirty = False
         return self._blenderMeshes
 
@@ -115,7 +117,7 @@ class ShareData:
     def blenderGreasePencils(self):
         if not self.blenderGreasePencilsDirty:
             return self._blenderGreasePencils
-        self._blenderGreasePencils = { x.name_full: x for x in bpy.data.grease_pencils }
+        self._blenderGreasePencils = {x.name_full: x for x in bpy.data.grease_pencils}
         self.blenderGreasePencilsDirty = False
         return self._blenderGreasePencils
 
@@ -123,7 +125,7 @@ class ShareData:
     def blenderCameras(self):
         if not self.blenderCamerasDirty:
             return self._blenderCameras
-        self._blenderCameras = { x.name_full: x for x in bpy.data.cameras }
+        self._blenderCameras = {x.name_full: x for x in bpy.data.cameras}
         self.blenderCamerasDirty = False
         return self._blenderCameras
 
@@ -131,7 +133,7 @@ class ShareData:
     def blenderLights(self):
         if not self.blenderLightsDirty:
             return self._blenderLights
-        self._blenderLights = { x.name_full: x for x in bpy.data.lights }
+        self._blenderLights = {x.name_full: x for x in bpy.data.lights}
         self.blenderLightsDirty = False
         return self._blenderLights
 
@@ -139,7 +141,7 @@ class ShareData:
     def blenderCollections(self):
         if not self.blenderCollectionsDirty:
             return self._blenderCollections
-        self._blenderCollections = { x.name_full: x for x in bpy.data.collections }
+        self._blenderCollections = {x.name_full: x for x in bpy.data.collections}
         self.blenderCollectionsDirty = False
         return self._blenderCollections
 
@@ -164,7 +166,7 @@ class ShareData:
             collection.hide_viewport, collection.instance_offset, children, None, [x.name_full for x in collection.objects])
         for child in collection.children:
             self.collectionsInfo[child.name_full] = CollectionInfo(child.hide_viewport, child.instance_offset, [
-                                                                x.name_full for x in child.children], collection.name_full)
+                x.name_full for x in child.children], collection.name_full)
 
         # All other collections (all scenes)
         for collection in self.blenderCollections.values():
@@ -173,7 +175,7 @@ class ShareData:
                                                                             x.name_full for x in collection.children], None)
             for child in collection.children:
                 self.collectionsInfo[child.name_full] = CollectionInfo(child.hide_viewport, child.instance_offset, [
-                                                                    x.name_full for x in child.children], collection.name_full)
+                    x.name_full for x in child.children], collection.name_full)
 
         # Store collections objects (already done for master collection above)
         for collection in self.blenderCollections.values():
@@ -187,10 +189,11 @@ class ShareData:
             self.objectsTransforms[obj.name_full] = obj.matrix_local.copy()
 
     def updateCurrentData(self):
-        self.updateCollectionsInfo()    
-        self.updateObjectsInfo()    
+        self.updateCollectionsInfo()
+        self.updateObjectsInfo()
         self.objectsVisibility = dict((x.name_full, x.hide_viewport) for x in self.blenderObjects.values())
-        self.objectsParents = dict((x.name_full, x.parent.name_full if x.parent != None else "") for x in self.blenderObjects.values())
+        self.objectsParents = dict((x.name_full, x.parent.name_full if x.parent != None else "")
+                                   for x in self.blenderObjects.values())
 
 
 shareData = ShareData()

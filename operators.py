@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import contextmanager
 import subprocess
 import logging
@@ -145,7 +146,7 @@ def getCollection(collectionName):
 def getParentCollection(collectionName):
     if collectionName in bpy.context.scene.collection.children:
         return bpy.context.scene.collection
-    for col in shareData.blenderCollections:
+    for col in shareData.blenderCollections.values():
         if collectionName in col.children:
             return col
     return None
@@ -161,11 +162,13 @@ def updateCollectionsState():
 
     shareData.collectionsAddedToCollection.clear()
     shareData.collectionsRemovedFromCollection.clear()
-    for collectionName, shareData.collectionInfo in shareData.collectionsInfo.items():
+
+    # walk the old collections
+    for collectionName, collectionInfo in shareData.collectionsInfo.items():
         collection = getCollection(collectionName)
         if not collection:
             continue
-        oldChildren = set(shareData.collectionInfo.children)
+        oldChildren = set(collectionInfo.children)
         newChildren = set([x.name_full for x in collection.children])
 
         for x in newChildren - oldChildren:
@@ -178,7 +181,7 @@ def updateCollectionsState():
 
         newObjects = set([x.name_full for x in collection.objects])
         oldObjects = set([shareData.objectsRenamed.get(x, x)
-                          for x in shareData.collectionInfo.objects])
+                          for x in collectionInfo.objects])
 
         addedObjects = [x for x in newObjects - oldObjects]
         if len(addedObjects) > 0:
@@ -187,6 +190,20 @@ def updateCollectionsState():
         removedObjects = [x for x in oldObjects - newObjects]
         if len(removedObjects) > 0:
             shareData.objectsRemovedFromCollection[collectionName] = removedObjects
+
+    # now the new collections (in case of rename)
+    for collectionName in shareData.collectionsAdded:
+        collection = getCollection(collectionName)
+        if not collection:
+            continue
+        newChildren = set([x.name_full for x in collection.children])
+        for x in newChildren:
+            shareData.collectionsAddedToCollection.add(
+                (getParentCollection(x).name_full, x))
+
+        addedObjects = set([x.name_full for x in collection.objects])
+        if len(addedObjects) > 0:
+            shareData.objectsAddedToCollection[collectionName] = addedObjects
 
 
 def updateFrameChangedRelatedObjectsState(oldObjects: dict, newObjects: dict):
@@ -272,8 +289,8 @@ def removeCollections():
 def addObjects():
     changed = False
     for objName in shareData.objectsAdded:
-        if objName in bpy.context.scene.objects:
-            obj = bpy.context.scene.objects[objName]
+        if objName in bpy.data.objects:
+            obj = bpy.data.objects[objName]
             updateParams(obj)
             updateTransform(obj)
             changed = True
@@ -1002,7 +1019,7 @@ classes = (
     JoinRoomOperator,
     LeaveRoomOperator,
     WriteStatisticsOperator,
-    OpenStatsDirOperator
+    OpenStatsDirOperator,
 )
 
 
