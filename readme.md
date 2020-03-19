@@ -18,7 +18,12 @@ Evolution possible : on devrait pouvoir utiliser plusieurs sender et receiver po
 
 Command palette : **Python: Configure Tests**, choisir **unittest**, pattern : **test_***
 
+Definir la variables d'environnement DCCSYNC_BLENDER_EXE_PATH
+
 Détails dans https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework
+
+## Ecrire un test
+Voir `tests\test_test.py`
 
 ## Debugger les tests
 Coté Blender, `python_server.py` autorise la connexion du debugger sur les ports spécifiés dans `BlenderTestCase`. Pour attacher le debugger, il faut ajouter deux  configuration de debug, une avec 5688 (sender) et une avec 5689 (receiver):
@@ -53,14 +58,6 @@ Coté Blender, `python_server.py` autorise la connexion du debugger sur les port
 >
 
 Ensuite:
-- Ajouter une méthode `setUp()` au test case (s'applique à tous les tests du test case):
->
-    def setUp(self):
-        # only one or both
-        self.sender_wait_for_debugger()
-        self.receiver_wait_for_debugger()
-        super().setUp()
->
 
 - mettre un breakpoint dans le code de dccsync avec une des deux méthodes suivantes : 
   - ajouter un appel au builtin `breakpoint()` dans le code. Attention le breakpoint ouvrira le fichier qui est dans %ADDPATA% (vois ci dessous) et ne sera pas editable dans VSCode

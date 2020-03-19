@@ -1,15 +1,19 @@
 import unittest
 import testcase
 import blender_lib as bl
+from pathlib import Path
 
 
 class Test_test(testcase.BlenderTestCase):
     def setUp(self):
-        # will apply to the whole testcase
-        # self.sender_wait_for_debugger()
-        # self.receiver_wait_for_debugger()
+        # Everything will apply to the whole testcase
 
-        super().setUp()
+        folder = Path(__file__).parent
+        sender_blendfile = folder / "basic.blend"
+        receiver_blendfile = folder / "empty.blend"
+
+        super().setUp(sender_blendfile, receiver_blendfile,
+                      sender_wait_for_debugger=False, receiver_wait_for_debugger=False)
 
     def test_just_start(self):
         self.assertUserSuccess()

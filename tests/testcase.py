@@ -1,7 +1,7 @@
 import unittest
 import time
 import blender_lib
-import dccsync_lib as dccsync
+import dccsync_lib
 from process import BlenderServer
 from typing import List
 import hashlib
@@ -20,8 +20,8 @@ class Blender:
         self._blender = BlenderServer(self._port, self._ptvsd_port, self._wait_for_debugger)
         self._blender.start(blender_args)
         self._blender.connect()
-        self._blender.send_function(dccsync.connect)
-        self._blender.send_function(dccsync.join_room)
+        self._blender.send_function(dccsync_lib.connect)
+        self._blender.send_function(dccsync_lib.join_room)
 
     def wait(self, timeout: float = None):
         return self._blender.wait(timeout)
@@ -46,26 +46,33 @@ class BlenderTestCase(unittest.TestCase):
         self._receiver_wait_for_debugger = False
         super().__init__(*args, **kwargs)
 
-    def sender_wait_for_debugger(self):
-        self._sender_wait_for_debugger = True
-
-    def receiver_wait_for_debugger(self):
-        self._receiver_wait_for_debugger = True
-
-    def setUp(self):
+    def setUp(self, sender_blendfile=None, receiver_blendfile=None,
+              sender_wait_for_debugger=False, receiver_wait_for_debugger=False):
+        """
+        if a blendfile if not specified, blender will start with its default file.
+        Not recommended) as it is machine dependent
+        """
+        super().setUp()
         python_port = 8081
         # do not the the default ptvsd port as it will be in use when debugging the TestCase
         ptvsd_port = 5688
-        self._sender = Blender(python_port + 0, ptvsd_port + 0, self._sender_wait_for_debugger)
-        self._sender.setup(["--window-geometry", "0", "0", "960", "1080"])
+        sender_args = ["--window-geometry", "0", "0", "960", "1080"]
+        if sender_blendfile is not None:
+            sender_args.append(str(sender_blendfile))
+        self._sender = Blender(python_port + 0, ptvsd_port + 0, sender_wait_for_debugger)
+        self._sender.setup(sender_args)
 
-        self._receiver = Blender(python_port + 1, ptvsd_port + 1, self._receiver_wait_for_debugger)
-        self._receiver.setup(["--window-geometry", "960", "0", "960", "1080"])
+        receiver_args = ["--window-geometry", "960", "0", "960", "1080"]
+        if receiver_blendfile is not None:
+            receiver_args.append(str(receiver_blendfile))
+        self._receiver = Blender(python_port + 1, ptvsd_port + 1, receiver_wait_for_debugger)
+        self._receiver.setup(receiver_args)
 
     def tearDown(self):
         self._wait_for_debugger = False
         self._sender.wait()
         self._receiver.wait()
+        super().tearDown()
 
     def assertUserSuccess(self):
         """

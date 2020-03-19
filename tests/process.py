@@ -5,6 +5,8 @@ import inspect
 import socket
 import time
 import blender_lib
+import os
+import logging
 
 """
 The idea is to automate Blender / Blender tests
@@ -24,8 +26,7 @@ Receiver Blender
 Diff the scenes
 """
 
-# BLENDER_DIR = Path(r'D:\blenders\blender-2.82-windows64')
-BLENDER_DIR = Path(r'D:\blenders\2.82')
+BLENDER_EXE = os.environ.get('DCCSYNC_BLENDER_EXE_PATH', 'blender.exe')
 current_dir = Path(__file__).parent
 
 
@@ -39,20 +40,6 @@ class Process:
             self._process = None
 
 
-class DccsyncServer(Process):
-    def __init__(self):
-        super().__init__()
-        self._exe = str(BLENDER_DIR / r'2.82\python\bin\python.exe')
-
-    def start(self):
-        dir_path = Path(__file__).parent.parent.parent
-        serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
-        popen_args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
-        # https://blender.stackexchange.com/questions/1365/how-can-i-run-blender-from-command-line-or-a-python-script-without-opening-a-gui
-        self._process = subprocess.Popen([self._exe, str(serverPath)], shell=False, **popen_args)
-        return self
-
-
 class Blender(Process):
     """
     Start a Blender process
@@ -60,7 +47,6 @@ class Blender(Process):
 
     def __init__(self):
         super().__init__()
-        self._exe = str(BLENDER_DIR / 'blender.exe')
         self._cmd_args = [
             '--python-exit-code', '255',
             '--log-level', '-1',
@@ -69,7 +55,7 @@ class Blender(Process):
         self._process: subprocess.Popen = None
 
     def start(self, python_script_path: str = None, script_args: List = None, blender_args: List = None):
-        popen_args = [self._exe]
+        popen_args = [BLENDER_EXE]
         popen_args.extend(self._cmd_args)
         if blender_args is not None:
             popen_args.extend(blender_args)
@@ -79,10 +65,14 @@ class Blender(Process):
             popen_args.append('--')
             popen_args.extend([str(arg) for arg in script_args])
 
-        # print('\\n' + ' '.join(popen_args))
+        print(' ' + ' '.join(popen_args))
 
         other_args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
-        self._process = subprocess.Popen(popen_args, shell=False, **other_args)
+        try:
+            self._process = subprocess.Popen(popen_args, shell=False, **other_args)
+        except FileNotFoundError:
+            logging.error(
+                f'Cannot start "{BLENDER_EXE}". Define DCCSYNC_BLENDER_EXE_PATH environment variable or add to PATH')
 
     def wait(self, timeout: float = None):
         try:

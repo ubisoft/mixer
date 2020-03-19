@@ -1,5 +1,6 @@
 import unittest
 import testcase
+from pathlib import Path
 
 
 def new_to_scene(name: str):
@@ -101,6 +102,11 @@ class test_scene_collection_default_doc(CollectionTestCase):
 
 
 class test_collection_default_doc(CollectionTestCase):
+    def setUp(self):
+        folder = Path(__file__).parent
+        sender_blendfile = folder / "basic.blend"
+        receiver_blendfile = folder / "empty.blend"
+        super().setUp(sender_blendfile, receiver_blendfile)
 
     def test_create_collection_in_collection(self):
         self.create_collection_in_collection('Collection', 'plop')
