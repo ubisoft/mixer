@@ -180,6 +180,7 @@ class ClientBlender(Client):
 
     def buildSourceMesh(self, data):
         index = 0
+        path, index = common.decodeString(data, index)
         meshName, index = common.decodeString(data, index)
 
         bm = bmesh.new()
