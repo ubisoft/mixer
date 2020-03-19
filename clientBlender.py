@@ -62,7 +62,7 @@ class ClientBlender(Client):
         return path
 
     # get first collection
-    def getOrCreateCollection(self, name):
+    def getOrCreateCollection(self, name="Collection"):
         collection = shareData.blenderCollections.get(name)
         if not collection:
             bpy.ops.collection.create(name=name)
@@ -173,7 +173,7 @@ class ClientBlender(Client):
 
     def buildMesh(self, data):
         index = 0
-        path, index = common.decodeString(data, index)        
+        path, index = common.decodeString(data, index)
         meshName, index = common.decodeString(data, index)
         positions, index = common.decodeVector3Array(data, index)
         normals, index = common.decodeVector3Array(data, index)
@@ -788,7 +788,7 @@ class ClientBlender(Client):
     def sendMesh(self, obj):
         mesh = obj.data
         meshName = self.getMeshName(mesh)
-        path = self.getObjectPath(obj)        
+        path = self.getObjectPath(obj)
         meshBuffer = self.getMeshBuffers(obj, meshName)
         if meshBuffer:
             self.addCommand(common.Command(
@@ -1315,7 +1315,6 @@ class ClientBlender(Client):
                     collection.buildRemoveObjectFromCollection(command.data)
                 elif command.type == common.MessageType.INSTANCE_COLLECTION:
                     collection. buildCollectionInstance(command.data)
-
 
                 self.receivedCommands.task_done()
                 self.blockSignals = False
