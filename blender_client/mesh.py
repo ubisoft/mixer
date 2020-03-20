@@ -112,6 +112,15 @@ def encode_layer_vector(elmt, layer):
     return common.encodeVector3(elmt[layer])
 
 
+def decode_layer_color(elmt, layer, data, index):
+    elmt[layer], index = common.decodeColor(data, index)
+    return index
+
+
+def encode_layer_color(elmt, layer):
+    return common.encodeColor(elmt[layer])
+
+
 def decode_layer_uv(elmt, layer, data, index):
     pin_uv, index = common.decodeBool(data, index)
     uv, index = common.decodeVector2(data, index)
@@ -213,7 +222,7 @@ def buildSourceMesh(client, data):
     index = decode_bmesh_layer(data, index, bm.faces.layers.face_map, bm.faces, decode_layer_int)
 
     index = decode_bmesh_layer(data, index, bm.loops.layers.uv, loops_iterator(bm), decode_layer_uv)
-    index = decode_bmesh_layer(data, index, bm.loops.layers.color, loops_iterator(bm), decode_layer_vector)
+    index = decode_bmesh_layer(data, index, bm.loops.layers.color, loops_iterator(bm), decode_layer_color)
 
     bm.to_mesh(obj.data)
     bm.free()
@@ -235,7 +244,7 @@ def buildSourceMesh(client, data):
                 shape_key.data[i].co = Vector(struct.unpack('3f', data[index:index + 3 * 4]))
                 index += 3 * 4
         obj.data.shape_keys.use_relative, index = common.decodeBool(data, index)
-        # Set relative keys after all
+
         for i in range(shape_keys_count):
             relative_key_name, index = common.decodeString(data, index)
             shape_key = obj.data.shape_keys.key_blocks[i]
@@ -247,6 +256,7 @@ def buildSourceMesh(client, data):
     for i in range(vg_count):
         vg_name, index = common.decodeString(data, index)
         vertex_group = obj.vertex_groups.new(name=vg_name)
+        vertex_group.lock_weight, index = common.decodeBool(data, index)
         vg_size, index = common.decodeInt(data, index)
         for elmt_idx in range(vg_size):
             vert_idx, index = common.decodeInt(data, index)
@@ -257,10 +267,18 @@ def buildSourceMesh(client, data):
     obj.data.use_auto_smooth, index = common.decodeBool(data, index)
     obj.data.auto_smooth_angle, index = common.decodeFloat(data, index)
 
+    # UV Maps and Vertex Colors are added automatically based on layers in the bmesh
+    # We just need to update their name and active_render state:
+
     # UV Maps
     for uv_layer in obj.data.uv_layers:
         uv_layer.name, index = common.decodeString(data, index)
         uv_layer.active_render, index = common.decodeBool(data, index)
+
+    # Vertex Colors
+    for vertex_colors in obj.data.vertex_colors:
+        vertex_colors.name, index = common.decodeString(data, index)
+        vertex_colors.active_render, index = common.decodeBool(data, index)
 
     # Materials
     materialNames, index = common.decodeStringArray(data, index)
@@ -414,7 +432,7 @@ def dump_mesh(mesh_data):
     # Other ignored layers:
     # - float, int, string: don't really know their role
     binary_buffer += encode_bmesh_layer(bm.loops.layers.uv, loops_iterator(bm), encode_layer_uv)
-    binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), encode_layer_vector)
+    binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), encode_layer_color)
 
     bm.free()
 
@@ -459,6 +477,7 @@ def getSourceMeshBuffers(obj, meshName):
     binary_buffer += common.encodeInt(len(obj.vertex_groups))
     for vertex_group in obj.vertex_groups:
         binary_buffer += common.encodeString(vertex_group.name)
+        binary_buffer += common.encodeBool(vertex_group.lock_weight)
         binary_buffer += common.encodeInt(len(verts_per_group[vertex_group.index]))
         for vg_elmt in verts_per_group[vertex_group.index]:
             binary_buffer += common.encodeInt(vg_elmt[0])
@@ -473,9 +492,15 @@ def getSourceMeshBuffers(obj, meshName):
         binary_buffer += common.encodeString(uv_layer.name)
         binary_buffer += common.encodeBool(uv_layer.active_render)
 
-    if mesh_data.has_custom_normals:
-        # Custom normals are all (0, 0, 0) until calling calc_normals_split() or calc_tangents().
-        mesh_data.calc_normals_split()
+    # Vertex Colors
+    for vertex_colors in mesh_data.vertex_colors:
+        binary_buffer += common.encodeString(vertex_colors.name)
+        binary_buffer += common.encodeBool(vertex_colors.active_render)
+
+    # todo: custom split normals
+    # if mesh_data.has_custom_normals:
+    #         # Custom normals are all (0, 0, 0) until calling calc_normals_split() or calc_tangents().
+    #     mesh_data.calc_normals_split()
 
     # Materials
     materials = []
