@@ -186,16 +186,6 @@ class ClientBlender(Client):
         meshName, index = common.decodeString(data, index)
 
         bm = bmesh.new()
-        me = self.getOrCreateMesh(meshName)
-        bm.to_mesh(me)
-        obj = self.getOrCreateObjectData(path, me)
-        bm.free()
-
-        while me.shape_keys != None:
-            obj.shape_key_remove(me.shape_keys.key_blocks[0])
-        print(me.shape_keys)
-
-        bm = bmesh.new()
 
         positions, index = common.decodeVector3Array(data, index)
         # logger.info("Reading %d vertices", len(positions))
@@ -204,22 +194,6 @@ class ClientBlender(Client):
             bm.verts.new(p)
 
         bm.verts.ensure_lookup_table()
-
-        shape_keys_data = []
-
-        # draft: handle vertex layers, but other things are required
-        verts_layer_count, index = common.decodeInt(data, index)
-        for verts_layer_idx in range(verts_layer_count):
-            layer_name, index = common.decodeString(data, index)
-            layer_count, index = common.decodeInt(data, index)
-            layer_collection = getattr(bm.verts.layers, layer_name)
-            for layer_idx in range(layer_count):
-                layer = layer_collection.new()
-                shape_key_data = []
-                for vert in bm.verts:
-                    shape_key_data.append(Vector(struct.unpack('3f', data[index:index + 3 * 4])))
-                    index += 3 * 4
-                shape_keys_data.append(shape_key_data)
 
         edgeCount, index = common.decodeInt(data, index)
         # logger.info("Reading %d edges", edgeCount)
@@ -247,19 +221,40 @@ class ClientBlender(Client):
             face = bm.faces.new(verts)
             face.material_index = materialIdx
 
+        obj = self.getOrCreateObjectData(path, self.getOrCreateMesh(meshName))
+
         bm.to_mesh(obj.data)
         bm.free()
+
+        # Load shape keys
+        shape_keys_count, index = common.decodeInt(data, index)
+        if shape_keys_count > 0:
+            obj.shape_key_clear()  # Delete existing ones
+
+            for i in range(shape_keys_count):
+                shape_key_name, index = common.decodeString(data, index)
+                shape_key = obj.shape_key_add(name=shape_key_name)
+                shape_key.mute, index = common.decodeBool(data, index)
+                shape_key.value, index = common.decodeFloat(data, index)
+                shape_key.slider_min, index = common.decodeFloat(data, index)
+                shape_key.slider_max, index = common.decodeFloat(data, index)
+                shape_key.vertex_group, index = common.decodeString(data, index)
+                shape_key_data_size, index = common.decodeInt(data, index)
+                for i in range(shape_key_data_size):
+                    shape_key.data[i].co = Vector(struct.unpack('3f', data[index:index + 3 * 4]))
+                    index += 3 * 4
+            obj.data.shape_keys.use_relative, index = common.decodeBool(data, index)
+            # Set relative keys after all
+            for i in range(shape_keys_count):
+                relative_key_name, index = common.decodeString(data, index)
+                shape_key = obj.data.shape_keys.key_blocks[i]
+                shape_key.relative_key = obj.data.shape_keys.key_blocks[relative_key_name]
 
         materialNames, index = common.decodeStringArray(data, index)
         for materialName in materialNames:
             material = self.getOrCreateMaterial(materialName)
-            if not materialName in me.materials:
-                me.materials.append(material)
-
-        for shape_key_data in shape_keys_data:
-            shape_key = obj.shape_key_add()
-            for i in range(len(shape_key_data)):
-                shape_key.data[i].co = shape_key_data[i]
+            if not materialName in obj.data.materials:
+                obj.data.materials.append(material)
 
     def buildMesh(self, data):
         index = 0
@@ -865,14 +860,11 @@ class ClientBlender(Client):
 
     def dump_mesh(self, mesh_data):
         bm = bmesh.new()
-
         bm.from_mesh(mesh_data)
 
-        bm.verts.ensure_lookup_table()
-
         # logger.info("Writing %d vertices", len(bm.verts))
+        bm.verts.ensure_lookup_table()
         binary_buffer = common.encodeInt(len(bm.verts))
-
         for vert in bm.verts:
             binary_buffer += struct.pack('3f', *list(vert.co))
 
@@ -894,25 +886,16 @@ class ClientBlender(Client):
         #             for vert in bm.verts:
         #                 binary_buffer += struct.pack('3f', *list(vert[layer]))
 
-        binary_buffer += common.encodeInt(1)
-        # source https://blender.stackexchange.com/questions/111661/creating-shape-keys-using-python
-        if mesh_data.shape_keys != None:
-            binary_buffer += common.encodeString("shape")
-            binary_buffer += common.encodeInt(len(mesh_data.shape_keys.key_blocks))
-            for key_block in mesh_data.shape_keys.key_blocks:
-                for i in range(len(key_block.data)):
-                    binary_buffer += struct.pack('3f', *list(key_block.data[i].co))
-
         # logger.info("Writing %d edges", len(bm.edges))
+        bm.edges.ensure_lookup_table()
         binary_buffer += common.encodeInt(len(bm.edges))
-
         for edge in bm.edges:
             binary_buffer += struct.pack('2I', edge.verts[0].index, edge.verts[1].index)
             binary_buffer += struct.pack('1I', edge.smooth)
 
         # logger.info("Writing %d faces", len(bm.faces))
+        bm.faces.ensure_lookup_table()
         binary_buffer += common.encodeInt(len(bm.faces))
-
         for face in bm.faces:
             binary_buffer += common.encodeInt(face.material_index)
             binary_buffer += common.encodeInt(len(face.verts))
@@ -921,6 +904,27 @@ class ClientBlender(Client):
                 binary_buffer += common.encodeInt(vert.index)
 
         bm.free()
+
+        # Shape keys
+        # source https://blender.stackexchange.com/questions/111661/creating-shape-keys-using-python
+        if mesh_data.shape_keys == None:
+            binary_buffer += common.encodeInt(0)  # Indicate 0 key blocks
+        else:
+            binary_buffer += common.encodeInt(len(mesh_data.shape_keys.key_blocks))
+            for key_block in mesh_data.shape_keys.key_blocks:
+                binary_buffer += common.encodeString(key_block.name)
+                binary_buffer += common.encodeBool(key_block.mute)
+                binary_buffer += common.encodeFloat(key_block.value)
+                binary_buffer += common.encodeFloat(key_block.slider_min)
+                binary_buffer += common.encodeFloat(key_block.slider_max)
+                binary_buffer += common.encodeString(key_block.vertex_group)
+                binary_buffer += common.encodeInt(len(key_block.data))
+                for i in range(len(key_block.data)):
+                    binary_buffer += struct.pack('3f', *list(key_block.data[i].co))
+            binary_buffer += common.encodeBool(mesh_data.shape_keys.use_relative)
+            # Encore relative key names after to facilite loading
+            for key_block in mesh_data.shape_keys.key_blocks:
+                binary_buffer += common.encodeString(key_block.relative_key.name)
 
         return binary_buffer
 
