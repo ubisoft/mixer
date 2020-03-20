@@ -868,24 +868,6 @@ class ClientBlender(Client):
         for vert in bm.verts:
             binary_buffer += struct.pack('3f', *list(vert.co))
 
-        # vert_layers = []
-        # for key in type(bm.verts.layers).__dict__:
-        #     attr = getattr(bm.verts.layers, key)
-        #     if type(attr) == bmesh.types.BMLayerCollection:
-        #         if len(attr) > 0:
-        #             vert_layers.append((key, attr))
-        # binary_buffer += common.encodeInt(len(vert_layers))
-        # for layer_name, layers in vert_layers:
-        #     if layer_name == 'shape':
-        #         logger.info("Writing layer %s", layer_name)
-        #         binary_buffer += common.encodeString(layer_name)
-        #         binary_buffer += common.encodeInt(len(layers))
-        #         for layer_idx in range(len(layers)):  # Note: cannot iterate on BMLayerCollection
-        #             layer = layers[layer_idx]
-        #             print(type(bm.verts[0][layer]))
-        #             for vert in bm.verts:
-        #                 binary_buffer += struct.pack('3f', *list(vert[layer]))
-
         # logger.info("Writing %d edges", len(bm.edges))
         bm.edges.ensure_lookup_table()
         binary_buffer += common.encodeInt(len(bm.edges))
