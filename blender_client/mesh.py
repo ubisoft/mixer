@@ -220,9 +220,8 @@ def buildSourceMesh(client, data):
 
     # Load shape keys
     shape_keys_count, index = common.decodeInt(data, index)
+    obj.shape_key_clear()
     if shape_keys_count > 0:
-        obj.shape_key_clear()  # Delete existing ones
-
         for i in range(shape_keys_count):
             shape_key_name, index = common.decodeString(data, index)
             shape_key = obj.shape_key_add(name=shape_key_name)
@@ -242,13 +241,28 @@ def buildSourceMesh(client, data):
             shape_key = obj.data.shape_keys.key_blocks[i]
             shape_key.relative_key = obj.data.shape_keys.key_blocks[relative_key_name]
 
+    # Vertex Groups
+    vg_count, index = common.decodeInt(data, index)
+    obj.vertex_groups.clear()
+    for i in range(vg_count):
+        vg_name, index = common.decodeString(data, index)
+        vertex_group = obj.vertex_groups.new(name=vg_name)
+        vg_size, index = common.decodeInt(data, index)
+        for elmt_idx in range(vg_size):
+            vert_idx, index = common.decodeInt(data, index)
+            weight, index = common.decodeFloat(data, index)
+            vertex_group.add([vert_idx], weight, 'REPLACE')
+
+    # Normals
     obj.data.use_auto_smooth, index = common.decodeBool(data, index)
     obj.data.auto_smooth_angle, index = common.decodeFloat(data, index)
 
+    # UV Maps
     for uv_layer in obj.data.uv_layers:
         uv_layer.name, index = common.decodeString(data, index)
         uv_layer.active_render, index = common.decodeBool(data, index)
 
+    # Materials
     materialNames, index = common.decodeStringArray(data, index)
     for materialName in materialNames:
         material = client.getOrCreateMaterial(materialName)
@@ -431,27 +445,47 @@ def dump_mesh(mesh_data):
 
 def getSourceMeshBuffers(obj, meshName):
     mesh_data = obj.data
-    mesh_binary_buffer = dump_mesh(mesh_data)
+    binary_buffer = dump_mesh(mesh_data)
 
-    mesh_binary_buffer += common.encodeBool(mesh_data.use_auto_smooth)
-    mesh_binary_buffer += common.encodeFloat(mesh_data.auto_smooth_angle)
+    # Vertex Groups
+    verts_per_group = {}
+    for vertex_group in obj.vertex_groups:
+        verts_per_group[vertex_group.index] = []
 
+    for vert in mesh_data.vertices:
+        for vg in vert.groups:
+            verts_per_group[vg.group].append((vert.index, vg.weight))
+
+    binary_buffer += common.encodeInt(len(obj.vertex_groups))
+    for vertex_group in obj.vertex_groups:
+        binary_buffer += common.encodeString(vertex_group.name)
+        binary_buffer += common.encodeInt(len(verts_per_group[vertex_group.index]))
+        for vg_elmt in verts_per_group[vertex_group.index]:
+            binary_buffer += common.encodeInt(vg_elmt[0])
+            binary_buffer += common.encodeFloat(vg_elmt[1])
+
+    # Normals
+    binary_buffer += common.encodeBool(mesh_data.use_auto_smooth)
+    binary_buffer += common.encodeFloat(mesh_data.auto_smooth_angle)
+
+    # UV Maps
     for uv_layer in mesh_data.uv_layers:
-        mesh_binary_buffer += common.encodeString(uv_layer.name)
-        mesh_binary_buffer += common.encodeBool(uv_layer.active_render)
+        binary_buffer += common.encodeString(uv_layer.name)
+        binary_buffer += common.encodeBool(uv_layer.active_render)
 
     if mesh_data.has_custom_normals:
         # Custom normals are all (0, 0, 0) until calling calc_normals_split() or calc_tangents().
         mesh_data.calc_normals_split()
 
+    # Materials
     materials = []
     for slot in obj.material_slots[:]:
         if slot.material:
             materials.append(slot.material.name_full.encode())
         else:
             materials.append("Default".encode())
-    binaryMaterialNames = common.intToBytes(len(materials), 4)
+    binary_buffer += common.intToBytes(len(materials), 4)
     for material in materials:
-        binaryMaterialNames += common.intToBytes(len(material), 4) + material
+        binary_buffer += common.intToBytes(len(material), 4) + material
 
-    return common.encodeString(meshName) + mesh_binary_buffer + binaryMaterialNames
+    return common.encodeString(meshName) + binary_buffer
