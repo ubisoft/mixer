@@ -144,7 +144,7 @@ def encodeInt(value):
 
 
 def decodeInt(data, index):
-    return struct.unpack('I', data[index:index+4])[0], index+4
+    return struct.unpack('i', data[index:index+4])[0], index+4
 
 
 def encodeVector2(value):

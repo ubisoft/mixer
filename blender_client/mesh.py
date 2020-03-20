@@ -85,6 +85,48 @@ def deprecated_buildMesh(client, data):
     client.getOrCreateObjectData(path, me)
 
 
+def decode_layer_float(elmt, layer, data, index):
+    elmt[layer], index = common.decodeFloat(data, index)
+    return index
+
+
+def encode_layer_float(elmt, layer):
+    return common.encodeFloat(elmt[layer])
+
+
+def decode_layer_int(elmt, layer, data, index):
+    elmt[layer], index = common.decodeInt(data, index)
+    return index
+
+
+def encode_layer_int(elmt, layer):
+    return common.encodeInt(elmt[layer])
+
+
+def decode_bmesh_layer(data, index, layer_collection, element_seq, decode_layer_value_func):
+    layer_count, index = common.decodeInt(data, index)
+    while layer_count > len(layer_collection):
+        if not layer_collection.is_singleton:
+            layer_collection.new()
+        else:
+            layer_collection.verify()  # Will create a layer and returns it
+            break  # layer_count should be one but break just in case
+    for i in range(layer_count):
+        layer = layer_collection[i]
+        for elt in element_seq:
+            index = decode_layer_value_func(elt, layer, data, index)
+    return index
+
+
+def encode_bmesh_layer(layer_collection, element_seq, encode_layer_value_func):
+    binary_buffer = struct.pack('1I', len(layer_collection))
+    for i in range(len(layer_collection)):
+        layer = layer_collection[i]
+        for elt in element_seq:
+            binary_buffer += encode_layer_value_func(elt, layer)
+    return binary_buffer
+
+
 def buildSourceMesh(client, data):
     index = 0
     path, index = common.decodeString(data, index)
@@ -105,10 +147,7 @@ def buildSourceMesh(client, data):
 
     bm.verts.ensure_lookup_table()
 
-    bevel_layer = bm.verts.layers.bevel_weight.verify()
-    for vert in bm.verts:
-        vert[bevel_layer] = struct.unpack('1f', data[index:index + 4])[0]
-        index += 4
+    index = decode_bmesh_layer(data, index, bm.verts.layers.bevel_weight, bm.verts, decode_layer_float)
 
     edgeCount, index = common.decodeInt(data, index)
     logger.info("Reading %d edges", edgeCount)
@@ -123,15 +162,8 @@ def buildSourceMesh(client, data):
         edge.smooth = bool(edgesData[edgeIdx * 4 + 2])
         edge.seam = bool(edgesData[edgeIdx * 4 + 3])
 
-    bevel_layer = bm.edges.layers.bevel_weight.verify()  # collection of floats
-    for edge in bm.edges:
-        edge[bevel_layer] = struct.unpack('1f', data[index:index + 4])[0]
-        index += 4
-
-    crease_layer = bm.edges.layers.crease.verify()  # collection of floats
-    for edge in bm.edges:
-        edge[crease_layer] = struct.unpack('1f', data[index:index + 4])[0]
-        index += 4
+    index = decode_bmesh_layer(data, index, bm.edges.layers.bevel_weight, bm.edges, decode_layer_float)
+    index = decode_bmesh_layer(data, index, bm.edges.layers.crease, bm.edges, decode_layer_float)
 
     faceCount, index = common.decodeInt(data, index)
     logger.info("Reading %d faces", faceCount)
@@ -147,10 +179,7 @@ def buildSourceMesh(client, data):
         face.material_index = materialIdx
         face.smooth = smooth
 
-    face_map_layer = bm.faces.layers.face_map.verify()  # collection of floats
-    for face in bm.faces:
-        face[face_map_layer] = struct.unpack('1i', data[index:index + 4])[0]
-        index += 4
+    index = decode_bmesh_layer(data, index, bm.faces.layers.face_map, bm.faces, decode_layer_int)
 
     bm.to_mesh(obj.data)
     bm.free()
@@ -289,9 +318,7 @@ def dump_mesh(mesh_data):
     # Other ignored layers:
     # - shape: shape keys are handled with Shape Keys at the mesh and object level
     # - float, int, string: don't really know their role
-    bevel_layer = bm.verts.layers.bevel_weight.verify()  # collection of floats
-    for vert in bm.verts:
-        binary_buffer += struct.pack('1f', vert[bevel_layer])
+    binary_buffer += encode_bmesh_layer(bm.verts.layers.bevel_weight, bm.verts, encode_layer_float)
 
     logger.debug("Writing %d edges", len(bm.edges))
     bm.edges.ensure_lookup_table()
@@ -306,13 +333,8 @@ def dump_mesh(mesh_data):
     # Other ignored layers:
     # - freestyle: of type NotImplementedType, maybe reserved for future dev
     # - float, int, string: don't really know their role
-    bevel_layer = bm.edges.layers.bevel_weight.verify()  # collection of floats
-    for edge in bm.edges:
-        binary_buffer += struct.pack('1f', edge[bevel_layer])
-
-    crease_layer = bm.edges.layers.crease.verify()  # collection of floats
-    for edge in bm.edges:
-        binary_buffer += struct.pack('1f', edge[crease_layer])
+    binary_buffer += encode_bmesh_layer(bm.edges.layers.bevel_weight, bm.edges, encode_layer_float)
+    binary_buffer += encode_bmesh_layer(bm.edges.layers.crease, bm.edges, encode_layer_float)
 
     logger.debug("Writing %d faces", len(bm.faces))
     bm.faces.ensure_lookup_table()
@@ -329,10 +351,13 @@ def dump_mesh(mesh_data):
     # Other ignored layers:
     # - freestyle: of type NotImplementedType, maybe reserved for future dev
     # - float, int, string: don't really know their role
-    face_map_layer = bm.faces.layers.face_map.verify()  # collection of floats
-    logger.info(face_map_layer)
-    for face in bm.faces:
-        binary_buffer += struct.pack('1i', face[face_map_layer])
+    binary_buffer += encode_bmesh_layer(bm.faces.layers.face_map, bm.faces, encode_layer_int)
+
+    # Loops layers
+    # A loop is an edge attached to a face (so each edge of a manifold can have 2 loops at most).
+    # Ignored layers for now: None
+    # Other ignored layers:
+    # - float, int, string: don't really know their role
 
     bm.free()
 
