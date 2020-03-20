@@ -94,9 +94,7 @@ class ClientBlender(Client):
         return ob
 
     def getOrCreateObjectData(self, path, data):
-        self.getOrCreatePath(path, data)
-
-        return ob
+        return self.getOrCreatePath(path, data)
 
     def getOrCreateCamera(self, cameraName):
         camera = shareData.blenderCameras.get(cameraName)
