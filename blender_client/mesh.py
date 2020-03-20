@@ -103,6 +103,29 @@ def encode_layer_int(elmt, layer):
     return common.encodeInt(elmt[layer])
 
 
+def decode_layer_vector(elmt, layer, data, index):
+    elmt[layer], index = common.decodeVector3(data, index)
+    return index
+
+
+def encode_layer_vector(elmt, layer):
+    return common.encodeVector3(elmt[layer])
+
+
+def decode_layer_uv(elmt, layer, data, index):
+    pin_uv, index = common.decodeBool(data, index)
+    uv, index = common.decodeVector2(data, index)
+    elmt[layer].pin_uv = pin_uv
+    elmt[layer].uv = uv
+    return index
+
+
+def encode_layer_uv(elmt, layer):
+    binary_buffer = common.encodeBool(elmt[layer].pin_uv)
+    binary_buffer += common.encodeVector2(elmt[layer].uv)
+    return binary_buffer
+
+
 def decode_bmesh_layer(data, index, layer_collection, element_seq, decode_layer_value_func):
     layer_count, index = common.decodeInt(data, index)
     while layer_count > len(layer_collection):
@@ -125,6 +148,14 @@ def encode_bmesh_layer(layer_collection, element_seq, encode_layer_value_func):
         for elt in element_seq:
             binary_buffer += encode_layer_value_func(elt, layer)
     return binary_buffer
+
+# We cannot iterate directory over bm.loops, so we use a generator
+
+
+def loops_iterator(bm):
+    for face in bm.faces:
+        for loop in face.loops:
+            yield loop
 
 
 def buildSourceMesh(client, data):
@@ -180,6 +211,9 @@ def buildSourceMesh(client, data):
         face.smooth = smooth
 
     index = decode_bmesh_layer(data, index, bm.faces.layers.face_map, bm.faces, decode_layer_int)
+
+    index = decode_bmesh_layer(data, index, bm.loops.layers.uv, loops_iterator(bm), decode_layer_uv)
+    index = decode_bmesh_layer(data, index, bm.loops.layers.color, loops_iterator(bm), decode_layer_vector)
 
     bm.to_mesh(obj.data)
     bm.free()
@@ -358,6 +392,8 @@ def dump_mesh(mesh_data):
     # Ignored layers for now: None
     # Other ignored layers:
     # - float, int, string: don't really know their role
+    binary_buffer += encode_bmesh_layer(bm.loops.layers.uv, loops_iterator(bm), encode_layer_uv)
+    binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), encode_layer_vector)
 
     bm.free()
 
