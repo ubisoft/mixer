@@ -242,6 +242,13 @@ def buildSourceMesh(client, data):
             shape_key = obj.data.shape_keys.key_blocks[i]
             shape_key.relative_key = obj.data.shape_keys.key_blocks[relative_key_name]
 
+    obj.data.use_auto_smooth, index = common.decodeBool(data, index)
+    obj.data.auto_smooth_angle, index = common.decodeFloat(data, index)
+
+    for uv_layer in obj.data.uv_layers:
+        uv_layer.name, index = common.decodeString(data, index)
+        uv_layer.active_render, index = common.decodeBool(data, index)
+
     materialNames, index = common.decodeStringArray(data, index)
     for materialName in materialNames:
         material = client.getOrCreateMaterial(materialName)
@@ -425,6 +432,13 @@ def dump_mesh(mesh_data):
 def getSourceMeshBuffers(obj, meshName):
     mesh_data = obj.data
     mesh_binary_buffer = dump_mesh(mesh_data)
+
+    mesh_binary_buffer += common.encodeBool(mesh_data.use_auto_smooth)
+    mesh_binary_buffer += common.encodeFloat(mesh_data.auto_smooth_angle)
+
+    for uv_layer in mesh_data.uv_layers:
+        mesh_binary_buffer += common.encodeString(uv_layer.name)
+        mesh_binary_buffer += common.encodeBool(uv_layer.active_render)
 
     if mesh_data.has_custom_normals:
         # Custom normals are all (0, 0, 0) until calling calc_normals_split() or calc_tangents().
