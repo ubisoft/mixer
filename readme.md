@@ -1,3 +1,72 @@
+
+# Unit tests
+
+## Fonctionnement en bref
+- La classe `BlenderTestCase` lance deux Blender (un sender et un receiver) qui exécutent `python_server.py`.
+- `python_server.py` enregistre un opérateur qui gère une boucle asyncio. 
+- La boucle exécute un serveur qui reçoit du source python, le compile et l'exécute. Blender n'est pa bloqué entre deux exécutions et on voit le déroulement du test
+- le test (voir `test_test.py`) envoie du code source au Blender 'sender'. D'abord une commande de connection et join room, puis les fonctions du test à proprement parler.
+- pour l'instant la conclusion est décidée manuellement
+  - pour un succès, quitter un Blender
+  - pour un échec, utilisezr le panneau 3D nommé TEST et cliquer sur Fail
+
+Limites : je n'ai pas géré la comparaison automatique de fichiers. Ca ne marche pas tout seul parce que les fichiers qui ne sont pas identiques en binaire.
+
+Evolution possible : on devrait pouvoir utiliser plusieurs sender et receiver pour faire des tests de charge
+
+## Activer les tests
+
+Command palette : **Python: Configure Tests**, choisir **unittest**, pattern : **test_***
+
+Definir la variables d'environnement DCCSYNC_BLENDER_EXE_PATH
+
+Détails dans https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework
+
+## Ecrire un test
+Voir `tests\test_test.py`
+
+## Debugger les tests
+Coté Blender, `python_server.py` autorise la connexion du debugger sur les ports spécifiés dans `BlenderTestCase`. Pour attacher le debugger, il faut ajouter deux  configuration de debug, une avec 5688 (sender) et une avec 5689 (receiver):
+>
+    {
+        "name": "Attach to sender (5688)",
+        "type": "python",
+        "request": "attach",
+        "port": 5688,
+        "host": "localhost",
+        "pathMappings": [
+            {
+                "localRoot": "${workspaceFolder}",
+                "remoteRoot": "."
+            }
+        ]
+    },
+        {
+        "name": "Attach to senreceiver (5689)",
+        "type": "python",
+        "request": "attach",
+        "port": 5689,
+        "host": "localhost",
+        "pathMappings": [
+            {
+                "localRoot": "${workspaceFolder}",
+                "remoteRoot": "."
+            }
+        ]
+    },
+
+>
+
+Ensuite:
+
+- mettre un breakpoint dans le code de dccsync avec une des deux méthodes suivantes : 
+  - ajouter un appel au builtin `breakpoint()` dans le code. Attention le breakpoint ouvrira le fichier qui est dans %ADDPATA% (vois ci dessous) et ne sera pas editable dans VSCode
+  - Ouvrir le fichier de code situé dans `%APPDATA%Blender Foundation\Blender\2.82\scripts\addons\dccsync` et y mettre un breakpoint avec VSCode
+- démarrer l'exécution du test unitaire : Blender se bloque en attendant l'attachement
+- attacher le debugger : l'exécution continue jusqu'au breakpoint
+
+
+# Misc
 ## Guidelines
 - Use name_full instead of name for Blender objects (because of external links)
 

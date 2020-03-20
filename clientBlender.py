@@ -14,6 +14,8 @@ import platform
 import ctypes
 from . import operators
 
+from .blender_client import collection
+
 from .shareData import shareData
 
 _STILL_ACTIVE = 259
@@ -21,6 +23,9 @@ _STILL_ACTIVE = 259
 
 logger = logging.getLogger(__package__)
 logger.setLevel(logging.INFO)
+
+collection_logger = logging.getLogger('collection')
+collection_logger.setLevel(logging.DEBUG)
 
 
 class ClientBlender(Client):
@@ -66,8 +71,7 @@ class ClientBlender(Client):
             bpy.context.scene.collection.children.link(collection)
         return collection
 
-    def getOrCreatePath(self, path, data=None, collectionName="Collection"):
-        collection = self.getOrCreateCollection(collectionName)
+    def getOrCreatePath(self, path, data=None):
         pathElem = path.split('/')
         parent = None
         ob = None
@@ -77,7 +81,6 @@ class ClientBlender(Client):
             if not ob:
                 ob = bpy.data.objects.new(elem, None)
                 shareData._blenderObjects[ob.name_full] = ob
-                collection.objects.link(ob)
             ob.parent = parent
             parent = ob
         # Create or get object
@@ -86,22 +89,12 @@ class ClientBlender(Client):
         if not ob:
             ob = bpy.data.objects.new(elem, data)
             shareData._blenderObjects[ob.name_full] = ob
-            collection.objects.link(ob)
         else:
             ob.parent = parent
         return ob
 
     def getOrCreateObjectData(self, path, data):
-        ob = self.getOrCreatePath(path, data)
-        if not ob:
-            return None  # todo should not happen ? assert this ?
-
-        parent = ob.parent
-
-        collection = self.getOrCreateCollection()
-        if not ob.name in collection.objects:
-            collection.objects.link(ob)
-        ob.parent = parent
+        self.getOrCreatePath(path, data)
 
         return ob
 
@@ -957,6 +950,9 @@ class ClientBlender(Client):
             common.MessageType.ADD_OBJECT_TO_SCENE, buffer, 0))
 
     def sendSceneCollection(self, col):
+        # TODO a bit shaky. Collections that are children of scene collection at
+        # startup are sent with ADD_COLLECTION_TO_SCENE, but adter startup they are sent with
+        # ADD_COLLECTION_TO_COLLECTION
         buffer = common.encodeString(col.name_full)
         self.addCommand(common.Command(
             common.MessageType.ADD_COLLECTION_TO_SCENE, buffer, 0))
@@ -1075,35 +1071,43 @@ class ClientBlender(Client):
                 common.MessageType.LIGHT, lightBuffer, 0))
 
     def sendAddCollectionToCollection(self, parentCollectionName, collectionName):
+        collection_logger.debug("sendAddCollectionToCollection %s <- %s", parentCollectionName, collectionName)
+
         buffer = common.encodeString(
             parentCollectionName) + common.encodeString(collectionName)
         self.addCommand(common.Command(
             common.MessageType.ADD_COLLECTION_TO_COLLECTION, buffer, 0))
 
     def sendRemoveCollectionFromCollection(self, parentCollectionName, collectionName):
+        collection_logger.debug("sendRemoveCollectionFromCollection %s <- %s", parentCollectionName, collectionName)
+
         buffer = common.encodeString(
             parentCollectionName) + common.encodeString(collectionName)
         self.addCommand(common.Command(
             common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION, buffer, 0))
 
     def sendAddObjectToCollection(self, collectionName, objName):
+        collection_logger.debug("sendAddObjectToCollection %s <- %s", collectionName, objName)
         buffer = common.encodeString(
             collectionName) + common.encodeString(objName)
         self.addCommand(common.Command(
             common.MessageType.ADD_OBJECT_TO_COLLECTION, buffer, 0))
 
     def sendRemoveObjectFromCollection(self, collectionName, objName):
+        collection_logger.debug("sendRemoveObjectFromCollection %s <- %s", collectionName, objName)
         buffer = common.encodeString(
             collectionName) + common.encodeString(objName)
         self.addCommand(common.Command(
             common.MessageType.REMOVE_OBJECT_FROM_COLLECTION, buffer, 0))
 
     def sendCollectionRemoved(self, collectionName):
+        collection_logger.debug("sendCollectionRemoved %s", collectionName)
         buffer = common.encodeString(collectionName)
         self.addCommand(common.Command(
             common.MessageType.COLLECTION_REMOVED, buffer, 0))
 
     def sendCollection(self, collection):
+        collection_logger.debug("sendCollection %s", collection.name_full)
         collectionInstanceOffset = collection.instance_offset
         buffer = common.encodeString(collection.name_full) + common.encodeBool(not collection.hide_viewport) + \
             common.encodeVector3(collectionInstanceOffset)
@@ -1434,6 +1438,23 @@ class ClientBlender(Client):
                     self.buildRestoreFromTrash(command.data)
                 elif command.type == common.MessageType.TEXTURE:
                     self.buildTextureFile(command.data)
+
+                elif command.type == common.MessageType.COLLECTION:
+                    collection.buildCollection(command.data)
+                elif command.type == common.MessageType.COLLECTION_REMOVED:
+                    collection.buildCollectionRemoved(command.data)
+                elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
+                    collection.buildCollectionToScene(command.data)
+                elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
+                    collection.buildCollectionToCollection(command.data)
+                elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
+                    collection.buildRemoveCollectionFromCollection(command.data)
+                elif command.type == common.MessageType.ADD_OBJECT_TO_COLLECTION:
+                    collection.buildAddObjectToCollection(command.data)
+                elif command.type == common.MessageType.REMOVE_OBJECT_FROM_COLLECTION:
+                    collection.buildRemoveObjectFromCollection(command.data)
+                elif command.type == common.MessageType.INSTANCE_COLLECTION:
+                    collection. buildCollectionInstance(command.data)
 
                 self.receivedCommands.task_done()
                 self.blockSignals = False

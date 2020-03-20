@@ -2,7 +2,7 @@ import unittest
 import threading
 import time
 from broadcaster.dccBroadcaster import Server
-from broadcaster.client import Client, TestClient
+from broadcaster.client import TestClient
 import logging
 
 
