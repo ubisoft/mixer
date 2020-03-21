@@ -179,11 +179,14 @@ def buildSourceMesh(client, data):
 
     bm = bmesh.new()
 
-    positions, index = common.decodeVector3Array(data, index)
-    logger.debug("Reading %d vertices", len(positions))
+    position_count, index = common.decodeInt(data, index)
+    logger.debug("Reading %d vertices", position_count)
 
-    for p in positions:
-        bm.verts.new(p)
+    for pos_idx in range(position_count):
+        co, index = common.decodeVector3(data, index)
+        normal, index = common.decodeVector3(data, index)
+        vert = bm.verts.new(co)
+        vert.normal = normal
 
     bm.verts.ensure_lookup_table()
 
@@ -381,7 +384,8 @@ def dump_mesh(mesh_data):
     bm.verts.ensure_lookup_table()
     binary_buffer = common.encodeInt(len(bm.verts))
     for vert in bm.verts:
-        binary_buffer += struct.pack('3f', *list(vert.co))
+        binary_buffer += common.encodeVector3(vert.co)
+        binary_buffer += common.encodeVector3(vert.normal)
 
     # Vertex layers
     # Ignored layers for now:
