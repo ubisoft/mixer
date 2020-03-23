@@ -63,7 +63,7 @@ class ClientBlender(Client):
         return path
 
     # get first collection
-    def getOrCreateCollection(self, name="Collection"):
+    def getOrCreateCollection(self, name: str):
         collection = shareData.blenderCollections.get(name)
         if not collection:
             bpy.ops.collection.create(name=name)
@@ -72,7 +72,7 @@ class ClientBlender(Client):
             bpy.context.scene.collection.children.link(collection)
         return collection
 
-    def getOrCreatePath(self, path, data=None):
+    def getOrCreatePath(self, path, data=None) -> bpy.types.Object:
         pathElem = path.split('/')
         parent = None
         ob = None
@@ -334,8 +334,8 @@ class ClientBlender(Client):
             if hasattr(obj, "data"):
                 newObj.data = obj.data.copy()
                 newObj.animation_data_clear()
-            collection = self.getOrCreateCollection()
-            collection.objects.link(newObj)
+            for collection in obj.users_collection:
+                collection.objects.link(newObj)
 
             self.setTransform(newObj, dstPosition, dstRotation, dstScale)
         except Exception:
@@ -356,8 +356,10 @@ class ClientBlender(Client):
         path, _ = common.decodeString(data, 0)
         obj = self.getOrCreatePath(path)
 
-        collections = obj.users_collection
-        for collection in collections:
+        shareData.restoreToCollections[obj.name_full] = []
+        restoreTo = shareData.restoreToCollections[obj.name_full]
+        for collection in obj.users_collection:
+            restoreTo.append(collection.name_full)
             collection.objects.unlink(obj)
         # collection = self.getOrCreateCollection()
         # collection.objects.unlink(obj)
@@ -373,10 +375,14 @@ class ClientBlender(Client):
         trashCollection = self.getOrCreateCollection("__Trash__")
         trashCollection.hide_viewport = True
         trashCollection.objects.unlink(obj)
-        collection = self.getOrCreateCollection()
-        collection.objects.link(obj)
+        restoreTo = shareData.restoreToCollections[obj.name_full]
+        for collectionName in restoreTo:
+            collection = self.getOrCreateCollection(collectionName)
+            collection.objects.link(obj)
+        del shareData.restoreToCollections[obj.name_full]
         if len(path) > 0:
-            obj.parent = shareData.blenderObjects[path.split('/')[-1]]
+            parentName = path.split('/')[-1]
+            obj.parent = shareData.blenderObjects.get(parentName, None)
 
     def getTransformBuffer(self, obj):
         path = self.getObjectPath(obj)

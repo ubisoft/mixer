@@ -48,6 +48,9 @@ class ShareData:
         self.objectsVisibility = {}
         self.oldObjects = {}  # Name of object to bpy.types.Object
 
+        # {objectPath: [collectionName]}
+        self.restoreToCollections: Mapping[str, List[str]] = {}
+
         self.current_statistics = None
         self.auto_save_statistics = False
         self.statistics_directory = None
