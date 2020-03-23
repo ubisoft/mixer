@@ -466,7 +466,9 @@ def dump_mesh(mesh_data):
 
 
 def getSourceMeshBuffers(obj, meshName):
-    mesh_data = obj.data
+    mesh_data = obj.to_mesh()
+    if not mesh_data:
+        return None
     binary_buffer = dump_mesh(mesh_data)
 
     # Vertex Groups

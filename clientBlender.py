@@ -626,7 +626,7 @@ class ClientBlender(Client):
         path = self.getObjectPath(obj)
         sourceMeshBuffer = mesh_functions.getSourceMeshBuffers(obj, meshName)
         meshBuffer = mesh_functions.getMeshBuffers(obj, meshName)
-        if meshBuffer:
+        if meshBuffer and sourceMeshBuffer:
             self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
             self.addCommand(common.Command(common.MessageType.SOURCE_MESH,
                                            common.encodeString(path) + sourceMeshBuffer, 0))
