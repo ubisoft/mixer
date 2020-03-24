@@ -259,24 +259,29 @@ def buildSourceMesh(client, data):
     shape_keys_count, index = common.decodeInt(data, index)
     obj.shape_key_clear()
     if shape_keys_count > 0:
+        logger.info("Loading %d shape keys", shape_keys_count)
+        shapes_keys_list = []
         for i in range(shape_keys_count):
             shape_key_name, index = common.decodeString(data, index)
-            shape_key = obj.shape_key_add(name=shape_key_name)
+            shapes_keys_list.append(obj.shape_key_add(name=shape_key_name))
+        for i in range(shape_keys_count):
+            shapes_keys_list[i].vertex_group, index = common.decodeString(data, index)
+        for i in range(shape_keys_count):
+            relative_key_name, index = common.decodeString(data, index)
+            print(relative_key_name)
+            shapes_keys_list[i].relative_key = obj.data.shape_keys.key_blocks[relative_key_name]
+
+        for i in range(shape_keys_count):
+            shape_key = shapes_keys_list[i]
             shape_key.mute, index = common.decodeBool(data, index)
             shape_key.value, index = common.decodeFloat(data, index)
             shape_key.slider_min, index = common.decodeFloat(data, index)
             shape_key.slider_max, index = common.decodeFloat(data, index)
-            shape_key.vertex_group, index = common.decodeString(data, index)
             shape_key_data_size, index = common.decodeInt(data, index)
             for i in range(shape_key_data_size):
                 shape_key.data[i].co = Vector(struct.unpack('3f', data[index:index + 3 * 4]))
                 index += 3 * 4
         obj.data.shape_keys.use_relative, index = common.decodeBool(data, index)
-
-        for i in range(shape_keys_count):
-            relative_key_name, index = common.decodeString(data, index)
-            shape_key = obj.data.shape_keys.key_blocks[i]
-            shape_key.relative_key = obj.data.shape_keys.key_blocks[relative_key_name]
 
     # Vertex Groups
     vg_count, index = common.decodeInt(data, index)
@@ -532,21 +537,29 @@ def dump_mesh(mesh_data):
         binary_buffer += common.encodeInt(0)  # Indicate 0 key blocks
     else:
         logger.debug("Writing %d shape keys", len(mesh_data.shape_keys.key_blocks))
+
         binary_buffer += common.encodeInt(len(mesh_data.shape_keys.key_blocks))
+        # Encode names
         for key_block in mesh_data.shape_keys.key_blocks:
             binary_buffer += common.encodeString(key_block.name)
-            binary_buffer += common.encodeBool(key_block.mute)
-            binary_buffer += common.encodeFloat(key_block.value)
-            binary_buffer += common.encodeFloat(key_block.slider_min)
-            binary_buffer += common.encodeFloat(key_block.slider_max)
+        # Encode vertex group names
+        for key_block in mesh_data.shape_keys.key_blocks:
             binary_buffer += common.encodeString(key_block.vertex_group)
-            binary_buffer += common.encodeInt(len(key_block.data))
-            for i in range(len(key_block.data)):
-                binary_buffer += struct.pack('3f', *list(key_block.data[i].co))
-        binary_buffer += common.encodeBool(mesh_data.shape_keys.use_relative)
-        # Encore relative key names after to facilite loading
+        # Encode relative key names
         for key_block in mesh_data.shape_keys.key_blocks:
             binary_buffer += common.encodeString(key_block.relative_key.name)
+        # Encode data
+        shape_keys_buffer = []
+        fmt_str = ""
+        for key_block in mesh_data.shape_keys.key_blocks:
+            shape_keys_buffer.extend((key_block.mute, key_block.value, key_block.slider_min,
+                                      key_block.slider_max, len(key_block.data)))
+            fmt_str += f"1I1f1f1f1I{(3 * len(key_block.data))}f"
+            for i in range(len(key_block.data)):
+                shape_keys_buffer.extend(key_block.data[i].co)
+        binary_buffer += struct.pack(f"{fmt_str}", *shape_keys_buffer)
+
+        binary_buffer += common.encodeBool(mesh_data.shape_keys.use_relative)
 
     stats_timer.checkpoint("shape_keys")
 
