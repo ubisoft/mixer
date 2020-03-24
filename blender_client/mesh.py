@@ -218,7 +218,7 @@ def buildSourceMesh(client, data):
     index = decode_bmesh_layer(data, index, bm.verts.layers.bevel_weight, bm.verts, decode_layer_float)
 
     edgeCount, index = common.decodeInt(data, index)
-    logger.info("Reading %d edges", edgeCount)
+    logger.debug("Reading %d edges", edgeCount)
 
     edgesData = struct.unpack(f'{edgeCount * 4}I', data[index:index + edgeCount * 4 * 4])
     index += edgeCount * 4 * 4
@@ -234,7 +234,7 @@ def buildSourceMesh(client, data):
     index = decode_bmesh_layer(data, index, bm.edges.layers.crease, bm.edges, decode_layer_float)
 
     faceCount, index = common.decodeInt(data, index)
-    logger.info("Reading %d faces", faceCount)
+    logger.debug("Reading %d faces", faceCount)
 
     for fIdx in range(faceCount):
         materialIdx, index = common.decodeInt(data, index)
@@ -316,7 +316,7 @@ def buildSourceMesh(client, data):
             obj.data.materials.append(material)
 
 
-@stats_timer(shareData, True)
+@stats_timer(shareData)
 def getMeshBuffers(obj, meshName):
     stats_timer = shareData.current_stats_timer
 
@@ -365,7 +365,7 @@ def getMeshBuffers(obj, meshName):
 
     currentMaterialIndex = -1
     currentfaceIndex = 0
-    logger.info("Writing %d polygons", len(mesh.polygons))
+    logger.debug("Writing %d polygons", len(mesh.polygons))
     for f in mesh.polygons:
         for loop_id in f.loop_indices:
             index = mesh.loops[loop_id].vertex_index
@@ -429,7 +429,7 @@ def getMeshBuffers(obj, meshName):
     return common.encodeString(meshName) + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
 
 
-@stats_timer(shareData, True)
+@stats_timer(shareData)
 def dump_mesh(mesh_data):
     stats_timer = shareData.current_stats_timer
 
@@ -491,7 +491,7 @@ def dump_mesh(mesh_data):
 
     stats_timer.checkpoint("edges_layers")
 
-    logger.info("Writing %d faces", len(bm.faces))
+    logger.debug("Writing %d faces", len(bm.faces))
     bm.faces.ensure_lookup_table()
 
     faces_array = []
