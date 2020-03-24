@@ -454,7 +454,7 @@ def dump_mesh(mesh_data):
 
     stats_timer.checkpoint("make_edges_buffer")
 
-    binary_buffer += struct.pack(f"1I{len(edges_array)}f", len(bm.edges), *edges_array)
+    binary_buffer += struct.pack(f"1I{len(edges_array)}I", len(bm.edges), *edges_array)
 
     stats_timer.checkpoint("encode_edges_buffer")
 
