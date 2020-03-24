@@ -92,8 +92,11 @@ def decode_layer_float(elmt, layer, data, index):
     return index
 
 
-def encode_layer_float(elmt, layer):
-    return common.encodeFloat(elmt[layer])
+def extract_layer_float(elmt, layer):
+    return (elmt[layer],)
+
+
+extract_layer_float.struct = "1f"
 
 
 def decode_layer_int(elmt, layer, data, index):
@@ -101,8 +104,11 @@ def decode_layer_int(elmt, layer, data, index):
     return index
 
 
-def encode_layer_int(elmt, layer):
-    return common.encodeInt(elmt[layer])
+def extract_layer_int(elmt, layer):
+    return (elmt[layer],)
+
+
+extract_layer_int.struct = "1i"
 
 
 def decode_layer_vector(elmt, layer, data, index):
@@ -110,8 +116,12 @@ def decode_layer_vector(elmt, layer, data, index):
     return index
 
 
-def encode_layer_vector(elmt, layer):
-    return common.encodeVector3(elmt[layer])
+def extract_layer_vector3(elmt, layer):
+    v = elmt[layer]
+    return (v[0], v[1], v[2])
+
+
+extract_layer_vector3.struct = "3f"
 
 
 def decode_layer_color(elmt, layer, data, index):
@@ -119,8 +129,14 @@ def decode_layer_color(elmt, layer, data, index):
     return index
 
 
-def encode_layer_color(elmt, layer):
-    return common.encodeColor(elmt[layer])
+def extract_layer_color(elmt, layer):
+    color = elmt[layer]
+    if len(color) == 3:
+        return (color[0], color[1], color[2], 1.0)
+    return (color[0], color[1], color[2], color[3])
+
+
+extract_layer_color.struct = "4f"
 
 
 def decode_layer_uv(elmt, layer, data, index):
@@ -131,10 +147,11 @@ def decode_layer_uv(elmt, layer, data, index):
     return index
 
 
-def encode_layer_uv(elmt, layer):
-    binary_buffer = common.encodeBool(elmt[layer].pin_uv)
-    binary_buffer += common.encodeVector2(elmt[layer].uv)
-    return binary_buffer
+def extract_layer_uv(elmt, layer):
+    return (elmt[layer].pin_uv, *elmt[layer].uv)
+
+
+extract_layer_uv.struct = "1I2f"
 
 
 def decode_bmesh_layer(data, index, layer_collection, element_seq, decode_layer_value_func):
@@ -152,12 +169,18 @@ def decode_bmesh_layer(data, index, layer_collection, element_seq, decode_layer_
     return index
 
 
-def encode_bmesh_layer(layer_collection, element_seq, encode_layer_value_func):
-    binary_buffer = struct.pack('1I', len(layer_collection))
+def encode_bmesh_layer(layer_collection, element_seq, extract_layer_tuple_func):
+    buffer = []
+    count = 0
     for i in range(len(layer_collection)):
         layer = layer_collection[i]
         for elt in element_seq:
-            binary_buffer += encode_layer_value_func(elt, layer)
+            buffer.extend(extract_layer_tuple_func(elt, layer))
+            count += 1
+
+    binary_buffer = struct.pack('1I', len(layer_collection))
+    if len(layer_collection) > 0:
+        binary_buffer += struct.pack(extract_layer_tuple_func.struct * count, *buffer)
     return binary_buffer
 
 # We cannot iterate directory over bm.loops, so we use a generator
@@ -441,7 +464,7 @@ def dump_mesh(mesh_data):
     # Other ignored layers:
     # - shape: shape keys are handled with Shape Keys at the mesh and object level
     # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.verts.layers.bevel_weight, bm.verts, encode_layer_float)
+    binary_buffer += encode_bmesh_layer(bm.verts.layers.bevel_weight, bm.verts, extract_layer_float)
 
     stats_timer.checkpoint("verts_layers")
 
@@ -463,8 +486,8 @@ def dump_mesh(mesh_data):
     # Other ignored layers:
     # - freestyle: of type NotImplementedType, maybe reserved for future dev
     # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.edges.layers.bevel_weight, bm.edges, encode_layer_float)
-    binary_buffer += encode_bmesh_layer(bm.edges.layers.crease, bm.edges, encode_layer_float)
+    binary_buffer += encode_bmesh_layer(bm.edges.layers.bevel_weight, bm.edges, extract_layer_float)
+    binary_buffer += encode_bmesh_layer(bm.edges.layers.crease, bm.edges, extract_layer_float)
 
     stats_timer.checkpoint("edges_layers")
 
@@ -487,7 +510,7 @@ def dump_mesh(mesh_data):
     # Other ignored layers:
     # - freestyle: of type NotImplementedType, maybe reserved for future dev
     # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.faces.layers.face_map, bm.faces, encode_layer_int)
+    binary_buffer += encode_bmesh_layer(bm.faces.layers.face_map, bm.faces, extract_layer_int)
 
     stats_timer.checkpoint("faces_layers")
 
@@ -496,8 +519,8 @@ def dump_mesh(mesh_data):
     # Ignored layers for now: None
     # Other ignored layers:
     # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.loops.layers.uv, loops_iterator(bm), encode_layer_uv)
-    binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), encode_layer_color)
+    binary_buffer += encode_bmesh_layer(bm.loops.layers.uv, loops_iterator(bm), extract_layer_uv)
+    binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), extract_layer_color)
 
     stats_timer.checkpoint("loops_layers")
 
