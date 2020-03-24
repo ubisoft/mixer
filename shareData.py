@@ -49,6 +49,7 @@ class ShareData:
         self.oldObjects = {}  # Name of object to bpy.types.Object
 
         self.current_statistics = None
+        self.current_stats_timer = None
         self.auto_save_statistics = False
         self.statistics_directory = None
 

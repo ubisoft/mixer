@@ -8,6 +8,7 @@ from . import ui
 from .shareData import shareData
 from .broadcaster import common
 from .broadcaster.client import Client
+from .stats import stats_timer
 from mathutils import *
 import os
 import platform
@@ -620,6 +621,7 @@ class ClientBlender(Client):
     def getMeshName(self, mesh):
         return mesh.name_full
 
+    @stats_timer(shareData)
     def sendMesh(self, obj):
         mesh = obj.data
         meshName = self.getMeshName(mesh)
