@@ -1,4 +1,6 @@
 from ..broadcaster import common
+from ..stats import stats_timer
+from ..shareData import shareData
 
 import logging
 import struct
@@ -291,7 +293,10 @@ def buildSourceMesh(client, data):
             obj.data.materials.append(material)
 
 
+@stats_timer(shareData, True)
 def getMeshBuffers(obj, meshName):
+    stats_timer = shareData.current_stats_timer
+
     vertices = []
     normals = []
     uvs = []
@@ -303,11 +308,15 @@ def getMeshBuffers(obj, meshName):
     depsgraph = bpy.context.evaluated_depsgraph_get()
     obj = obj.evaluated_get(depsgraph)
 
+    stats_timer.checkpoint("eval_depsgraph")
+
     for slot in obj.material_slots[:]:
         if slot.material:
             materials.append(slot.material.name_full.encode())
         else:
             materials.append("Default".encode())
+
+    stats_timer.checkpoint("make_material_list")
 
     # triangulate mesh (before calculating normals)
     mesh = obj.to_mesh()
@@ -319,16 +328,21 @@ def getMeshBuffers(obj, meshName):
     bm.to_mesh(mesh)
     bm.free()
 
+    stats_timer.checkpoint("triangulate_mesh")
+
     # Calculate normals, necessary if auto-smooth option enabled
     mesh.calc_normals()
     mesh.calc_normals_split()
     # calc_loop_triangles resets normals so... don't use it
+
+    stats_timer.checkpoint("calc_normals")
 
     # get uv layer
     uvlayer = mesh.uv_layers.active
 
     currentMaterialIndex = -1
     currentfaceIndex = 0
+    logger.info("Writing %d polygons", len(mesh.polygons))
     for f in mesh.polygons:
         for loop_id in f.loop_indices:
             index = mesh.loops[loop_id].vertex_index
@@ -344,48 +358,80 @@ def getMeshBuffers(obj, meshName):
             materialIndices.append(currentMaterialIndex)
         currentfaceIndex = currentfaceIndex + 1
 
+    stats_timer.checkpoint("make_buffers")
+
     # Vericex count + binary vertices buffer
     size = len(vertices) // 3
     binaryVerticesBuffer = common.intToBytes(
         size, 4) + struct.pack(f'{len(vertices)}f', *vertices)
+
+    stats_timer.checkpoint("write_verts")
+
     # Normals count + binary normals buffer
     size = len(normals) // 3
     binaryNormalsBuffer = common.intToBytes(
         size, 4) + struct.pack(f'{len(normals)}f', *normals)
+
+    stats_timer.checkpoint("write_normals")
+
     # UVs count + binary uvs buffer
     size = len(uvs) // 2
     binaryUVsBuffer = common.intToBytes(
         size, 4) + struct.pack(f'{len(uvs)}f', *uvs)
+
+    stats_timer.checkpoint("write_uvs")
+
     # material indices + binary material indices buffer
     size = len(materialIndices) // 2
     binaryMaterialIndicesBuffer = common.intToBytes(
         size, 4) + struct.pack(f'{len(materialIndices)}I', *materialIndices)
+
+    stats_timer.checkpoint("write_material_indices")
+
     # triangle indices count + binary triangle indices buffer
     size = len(indices) // 3
     binaryIndicesBuffer = common.intToBytes(
         size, 4) + struct.pack(f'{len(indices)}I', *indices)
+
+    stats_timer.checkpoint("write_tri_idx_buff")
+
     # material names count + binary material bnames buffer
     size = len(materials)
     binaryMaterialNames = common.intToBytes(size, 4)
     for material in materials:
         binaryMaterialNames += common.intToBytes(len(material), 4) + material
 
+    stats_timer.checkpoint("write_material_names")
+
     return common.encodeString(meshName) + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
 
 
+@stats_timer(shareData, True)
 def dump_mesh(mesh_data):
+    stats_timer = shareData.current_stats_timer
+
     # We do not synchronize "select" and "hide" state of mesh elements
     # because we consider them user specific.
 
     bm = bmesh.new()
     bm.from_mesh(mesh_data)
 
+    stats_timer.checkpoint("bmesh_from_mesh")
+
+    binary_buffer = bytes()
+
     logger.debug("Writing %d vertices", len(bm.verts))
     bm.verts.ensure_lookup_table()
-    binary_buffer = common.encodeInt(len(bm.verts))
+
+    verts_array = []
     for vert in bm.verts:
-        binary_buffer += common.encodeVector3(vert.co)
-        binary_buffer += common.encodeVector3(vert.normal)
+        verts_array.extend((*vert.co, *vert.normal))
+
+    stats_timer.checkpoint("make_verts_buffer")
+
+    binary_buffer += struct.pack(f"1I{len(verts_array)}f", len(bm.verts), *verts_array)
+
+    stats_timer.checkpoint("encode_verts_buffer")
 
     # Vertex layers
     # Ignored layers for now:
@@ -397,13 +443,20 @@ def dump_mesh(mesh_data):
     # - float, int, string: don't really know their role
     binary_buffer += encode_bmesh_layer(bm.verts.layers.bevel_weight, bm.verts, encode_layer_float)
 
+    stats_timer.checkpoint("verts_layers")
+
     logger.debug("Writing %d edges", len(bm.edges))
     bm.edges.ensure_lookup_table()
-    binary_buffer += common.encodeInt(len(bm.edges))
+
+    edges_array = []
     for edge in bm.edges:
-        binary_buffer += struct.pack('2I', edge.verts[0].index, edge.verts[1].index)
-        binary_buffer += struct.pack('1I', edge.smooth)
-        binary_buffer += struct.pack('1I', edge.seam)
+        edges_array.extend((edge.verts[0].index, edge.verts[1].index, edge.smooth, edge.seam))
+
+    stats_timer.checkpoint("make_edges_buffer")
+
+    binary_buffer += struct.pack(f"1I{len(edges_array)}f", len(bm.edges), *edges_array)
+
+    stats_timer.checkpoint("encode_edges_buffer")
 
     # Edge layers
     # Ignored layers for now: None
@@ -413,15 +466,21 @@ def dump_mesh(mesh_data):
     binary_buffer += encode_bmesh_layer(bm.edges.layers.bevel_weight, bm.edges, encode_layer_float)
     binary_buffer += encode_bmesh_layer(bm.edges.layers.crease, bm.edges, encode_layer_float)
 
-    logger.debug("Writing %d faces", len(bm.faces))
+    stats_timer.checkpoint("edges_layers")
+
+    logger.info("Writing %d faces", len(bm.faces))
     bm.faces.ensure_lookup_table()
-    binary_buffer += common.encodeInt(len(bm.faces))
+
+    faces_array = []
     for face in bm.faces:
-        binary_buffer += common.encodeInt(face.material_index)
-        binary_buffer += common.encodeBool(face.smooth)
-        binary_buffer += common.encodeInt(len(face.verts))
-        for vert in face.verts:
-            binary_buffer += common.encodeInt(vert.index)
+        faces_array.extend((face.material_index, face.smooth, len(face.verts)))
+        faces_array.extend((vert.index for vert in face.verts))
+
+    stats_timer.checkpoint("make_faces_buffer")
+
+    binary_buffer += struct.pack(f"1I{len(faces_array)}I", len(bm.faces), *faces_array)
+
+    stats_timer.checkpoint("encode_faces_buffer")
 
     # Face layers
     # Ignored layers for now: None
@@ -430,6 +489,8 @@ def dump_mesh(mesh_data):
     # - float, int, string: don't really know their role
     binary_buffer += encode_bmesh_layer(bm.faces.layers.face_map, bm.faces, encode_layer_int)
 
+    stats_timer.checkpoint("faces_layers")
+
     # Loops layers
     # A loop is an edge attached to a face (so each edge of a manifold can have 2 loops at most).
     # Ignored layers for now: None
@@ -437,6 +498,8 @@ def dump_mesh(mesh_data):
     # - float, int, string: don't really know their role
     binary_buffer += encode_bmesh_layer(bm.loops.layers.uv, loops_iterator(bm), encode_layer_uv)
     binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), encode_layer_color)
+
+    stats_timer.checkpoint("loops_layers")
 
     bm.free()
 
@@ -462,9 +525,12 @@ def dump_mesh(mesh_data):
         for key_block in mesh_data.shape_keys.key_blocks:
             binary_buffer += common.encodeString(key_block.relative_key.name)
 
+    stats_timer.checkpoint("shape_keys")
+
     return binary_buffer
 
 
+@stats_timer(shareData)
 def getSourceMeshBuffers(obj, meshName):
     mesh_data = obj.to_mesh()
     if not mesh_data:
