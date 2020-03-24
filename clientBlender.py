@@ -8,6 +8,7 @@ from . import ui
 from .shareData import shareData
 from .broadcaster import common
 from .broadcaster.client import Client
+from .stats import stats_timer
 from mathutils import *
 import os
 import platform
@@ -626,16 +627,20 @@ class ClientBlender(Client):
     def getMeshName(self, mesh):
         return mesh.name_full
 
+    @stats_timer(shareData)
     def sendMesh(self, obj):
         mesh = obj.data
         meshName = self.getMeshName(mesh)
         path = self.getObjectPath(obj)
-        sourceMeshBuffer = mesh_functions.getSourceMeshBuffers(obj, meshName)
-        meshBuffer = mesh_functions.getMeshBuffers(obj, meshName)
-        if meshBuffer:
-            self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
+
+        if data.get_dcc_sync_props().sync_blender:
+            sourceMeshBuffer = mesh_functions.getSourceMeshBuffers(obj, meshName)
             self.addCommand(common.Command(common.MessageType.SOURCE_MESH,
                                            common.encodeString(path) + sourceMeshBuffer, 0))
+
+        if data.get_dcc_sync_props().sync_vrtist:
+            meshBuffer = mesh_functions.getMeshBuffers(obj, meshName)
+            self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
 
     def sendCollectionInstance(self, obj):
         if not obj.instance_collection:

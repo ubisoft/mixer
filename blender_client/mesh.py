@@ -1,4 +1,6 @@
 from ..broadcaster import common
+from ..stats import stats_timer
+from ..shareData import shareData
 
 import logging
 import struct
@@ -90,8 +92,11 @@ def decode_layer_float(elmt, layer, data, index):
     return index
 
 
-def encode_layer_float(elmt, layer):
-    return common.encodeFloat(elmt[layer])
+def extract_layer_float(elmt, layer):
+    return (elmt[layer],)
+
+
+extract_layer_float.struct = "1f"
 
 
 def decode_layer_int(elmt, layer, data, index):
@@ -99,8 +104,11 @@ def decode_layer_int(elmt, layer, data, index):
     return index
 
 
-def encode_layer_int(elmt, layer):
-    return common.encodeInt(elmt[layer])
+def extract_layer_int(elmt, layer):
+    return (elmt[layer],)
+
+
+extract_layer_int.struct = "1i"
 
 
 def decode_layer_vector(elmt, layer, data, index):
@@ -108,8 +116,12 @@ def decode_layer_vector(elmt, layer, data, index):
     return index
 
 
-def encode_layer_vector(elmt, layer):
-    return common.encodeVector3(elmt[layer])
+def extract_layer_vector3(elmt, layer):
+    v = elmt[layer]
+    return (v[0], v[1], v[2])
+
+
+extract_layer_vector3.struct = "3f"
 
 
 def decode_layer_color(elmt, layer, data, index):
@@ -117,8 +129,14 @@ def decode_layer_color(elmt, layer, data, index):
     return index
 
 
-def encode_layer_color(elmt, layer):
-    return common.encodeColor(elmt[layer])
+def extract_layer_color(elmt, layer):
+    color = elmt[layer]
+    if len(color) == 3:
+        return (color[0], color[1], color[2], 1.0)
+    return (color[0], color[1], color[2], color[3])
+
+
+extract_layer_color.struct = "4f"
 
 
 def decode_layer_uv(elmt, layer, data, index):
@@ -129,10 +147,11 @@ def decode_layer_uv(elmt, layer, data, index):
     return index
 
 
-def encode_layer_uv(elmt, layer):
-    binary_buffer = common.encodeBool(elmt[layer].pin_uv)
-    binary_buffer += common.encodeVector2(elmt[layer].uv)
-    return binary_buffer
+def extract_layer_uv(elmt, layer):
+    return (elmt[layer].pin_uv, *elmt[layer].uv)
+
+
+extract_layer_uv.struct = "1I2f"
 
 
 def decode_bmesh_layer(data, index, layer_collection, element_seq, decode_layer_value_func):
@@ -150,12 +169,18 @@ def decode_bmesh_layer(data, index, layer_collection, element_seq, decode_layer_
     return index
 
 
-def encode_bmesh_layer(layer_collection, element_seq, encode_layer_value_func):
-    binary_buffer = struct.pack('1I', len(layer_collection))
+def encode_bmesh_layer(layer_collection, element_seq, extract_layer_tuple_func):
+    buffer = []
+    count = 0
     for i in range(len(layer_collection)):
         layer = layer_collection[i]
         for elt in element_seq:
-            binary_buffer += encode_layer_value_func(elt, layer)
+            buffer.extend(extract_layer_tuple_func(elt, layer))
+            count += 1
+
+    binary_buffer = struct.pack('1I', len(layer_collection))
+    if len(layer_collection) > 0:
+        binary_buffer += struct.pack(extract_layer_tuple_func.struct * count, *buffer)
     return binary_buffer
 
 # We cannot iterate directory over bm.loops, so we use a generator
@@ -193,7 +218,7 @@ def buildSourceMesh(client, data):
     index = decode_bmesh_layer(data, index, bm.verts.layers.bevel_weight, bm.verts, decode_layer_float)
 
     edgeCount, index = common.decodeInt(data, index)
-    logger.info("Reading %d edges", edgeCount)
+    logger.debug("Reading %d edges", edgeCount)
 
     edgesData = struct.unpack(f'{edgeCount * 4}I', data[index:index + edgeCount * 4 * 4])
     index += edgeCount * 4 * 4
@@ -209,7 +234,7 @@ def buildSourceMesh(client, data):
     index = decode_bmesh_layer(data, index, bm.edges.layers.crease, bm.edges, decode_layer_float)
 
     faceCount, index = common.decodeInt(data, index)
-    logger.info("Reading %d faces", faceCount)
+    logger.debug("Reading %d faces", faceCount)
 
     for fIdx in range(faceCount):
         materialIdx, index = common.decodeInt(data, index)
@@ -234,24 +259,29 @@ def buildSourceMesh(client, data):
     shape_keys_count, index = common.decodeInt(data, index)
     obj.shape_key_clear()
     if shape_keys_count > 0:
+        logger.info("Loading %d shape keys", shape_keys_count)
+        shapes_keys_list = []
         for i in range(shape_keys_count):
             shape_key_name, index = common.decodeString(data, index)
-            shape_key = obj.shape_key_add(name=shape_key_name)
+            shapes_keys_list.append(obj.shape_key_add(name=shape_key_name))
+        for i in range(shape_keys_count):
+            shapes_keys_list[i].vertex_group, index = common.decodeString(data, index)
+        for i in range(shape_keys_count):
+            relative_key_name, index = common.decodeString(data, index)
+            print(relative_key_name)
+            shapes_keys_list[i].relative_key = obj.data.shape_keys.key_blocks[relative_key_name]
+
+        for i in range(shape_keys_count):
+            shape_key = shapes_keys_list[i]
             shape_key.mute, index = common.decodeBool(data, index)
             shape_key.value, index = common.decodeFloat(data, index)
             shape_key.slider_min, index = common.decodeFloat(data, index)
             shape_key.slider_max, index = common.decodeFloat(data, index)
-            shape_key.vertex_group, index = common.decodeString(data, index)
             shape_key_data_size, index = common.decodeInt(data, index)
             for i in range(shape_key_data_size):
                 shape_key.data[i].co = Vector(struct.unpack('3f', data[index:index + 3 * 4]))
                 index += 3 * 4
         obj.data.shape_keys.use_relative, index = common.decodeBool(data, index)
-
-        for i in range(shape_keys_count):
-            relative_key_name, index = common.decodeString(data, index)
-            shape_key = obj.data.shape_keys.key_blocks[i]
-            shape_key.relative_key = obj.data.shape_keys.key_blocks[relative_key_name]
 
     # Vertex Groups
     vg_count, index = common.decodeInt(data, index)
@@ -291,7 +321,10 @@ def buildSourceMesh(client, data):
             obj.data.materials.append(material)
 
 
+@stats_timer(shareData)
 def getMeshBuffers(obj, meshName):
+    stats_timer = shareData.current_stats_timer
+
     vertices = []
     normals = []
     uvs = []
@@ -303,11 +336,15 @@ def getMeshBuffers(obj, meshName):
     depsgraph = bpy.context.evaluated_depsgraph_get()
     obj = obj.evaluated_get(depsgraph)
 
+    stats_timer.checkpoint("eval_depsgraph")
+
     for slot in obj.material_slots[:]:
         if slot.material:
             materials.append(slot.material.name_full.encode())
         else:
             materials.append("Default".encode())
+
+    stats_timer.checkpoint("make_material_list")
 
     # triangulate mesh (before calculating normals)
     mesh = obj.to_mesh()
@@ -319,16 +356,21 @@ def getMeshBuffers(obj, meshName):
     bm.to_mesh(mesh)
     bm.free()
 
+    stats_timer.checkpoint("triangulate_mesh")
+
     # Calculate normals, necessary if auto-smooth option enabled
     mesh.calc_normals()
     mesh.calc_normals_split()
     # calc_loop_triangles resets normals so... don't use it
+
+    stats_timer.checkpoint("calc_normals")
 
     # get uv layer
     uvlayer = mesh.uv_layers.active
 
     currentMaterialIndex = -1
     currentfaceIndex = 0
+    logger.debug("Writing %d polygons", len(mesh.polygons))
     for f in mesh.polygons:
         for loop_id in f.loop_indices:
             index = mesh.loops[loop_id].vertex_index
@@ -344,48 +386,80 @@ def getMeshBuffers(obj, meshName):
             materialIndices.append(currentMaterialIndex)
         currentfaceIndex = currentfaceIndex + 1
 
+    stats_timer.checkpoint("make_buffers")
+
     # Vericex count + binary vertices buffer
     size = len(vertices) // 3
     binaryVerticesBuffer = common.intToBytes(
         size, 4) + struct.pack(f'{len(vertices)}f', *vertices)
+
+    stats_timer.checkpoint("write_verts")
+
     # Normals count + binary normals buffer
     size = len(normals) // 3
     binaryNormalsBuffer = common.intToBytes(
         size, 4) + struct.pack(f'{len(normals)}f', *normals)
+
+    stats_timer.checkpoint("write_normals")
+
     # UVs count + binary uvs buffer
     size = len(uvs) // 2
     binaryUVsBuffer = common.intToBytes(
         size, 4) + struct.pack(f'{len(uvs)}f', *uvs)
+
+    stats_timer.checkpoint("write_uvs")
+
     # material indices + binary material indices buffer
     size = len(materialIndices) // 2
     binaryMaterialIndicesBuffer = common.intToBytes(
         size, 4) + struct.pack(f'{len(materialIndices)}I', *materialIndices)
+
+    stats_timer.checkpoint("write_material_indices")
+
     # triangle indices count + binary triangle indices buffer
     size = len(indices) // 3
     binaryIndicesBuffer = common.intToBytes(
         size, 4) + struct.pack(f'{len(indices)}I', *indices)
+
+    stats_timer.checkpoint("write_tri_idx_buff")
+
     # material names count + binary material bnames buffer
     size = len(materials)
     binaryMaterialNames = common.intToBytes(size, 4)
     for material in materials:
         binaryMaterialNames += common.intToBytes(len(material), 4) + material
 
+    stats_timer.checkpoint("write_material_names")
+
     return common.encodeString(meshName) + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
 
 
+@stats_timer(shareData)
 def dump_mesh(mesh_data):
+    stats_timer = shareData.current_stats_timer
+
     # We do not synchronize "select" and "hide" state of mesh elements
     # because we consider them user specific.
 
     bm = bmesh.new()
     bm.from_mesh(mesh_data)
 
+    stats_timer.checkpoint("bmesh_from_mesh")
+
+    binary_buffer = bytes()
+
     logger.debug("Writing %d vertices", len(bm.verts))
     bm.verts.ensure_lookup_table()
-    binary_buffer = common.encodeInt(len(bm.verts))
+
+    verts_array = []
     for vert in bm.verts:
-        binary_buffer += common.encodeVector3(vert.co)
-        binary_buffer += common.encodeVector3(vert.normal)
+        verts_array.extend((*vert.co, *vert.normal))
+
+    stats_timer.checkpoint("make_verts_buffer")
+
+    binary_buffer += struct.pack(f"1I{len(verts_array)}f", len(bm.verts), *verts_array)
+
+    stats_timer.checkpoint("encode_verts_buffer")
 
     # Vertex layers
     # Ignored layers for now:
@@ -395,48 +469,65 @@ def dump_mesh(mesh_data):
     # Other ignored layers:
     # - shape: shape keys are handled with Shape Keys at the mesh and object level
     # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.verts.layers.bevel_weight, bm.verts, encode_layer_float)
+    binary_buffer += encode_bmesh_layer(bm.verts.layers.bevel_weight, bm.verts, extract_layer_float)
+
+    stats_timer.checkpoint("verts_layers")
 
     logger.debug("Writing %d edges", len(bm.edges))
     bm.edges.ensure_lookup_table()
-    binary_buffer += common.encodeInt(len(bm.edges))
+
+    edges_array = []
     for edge in bm.edges:
-        binary_buffer += struct.pack('2I', edge.verts[0].index, edge.verts[1].index)
-        binary_buffer += struct.pack('1I', edge.smooth)
-        binary_buffer += struct.pack('1I', edge.seam)
+        edges_array.extend((edge.verts[0].index, edge.verts[1].index, edge.smooth, edge.seam))
+
+    stats_timer.checkpoint("make_edges_buffer")
+
+    binary_buffer += struct.pack(f"1I{len(edges_array)}I", len(bm.edges), *edges_array)
+
+    stats_timer.checkpoint("encode_edges_buffer")
 
     # Edge layers
     # Ignored layers for now: None
     # Other ignored layers:
     # - freestyle: of type NotImplementedType, maybe reserved for future dev
     # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.edges.layers.bevel_weight, bm.edges, encode_layer_float)
-    binary_buffer += encode_bmesh_layer(bm.edges.layers.crease, bm.edges, encode_layer_float)
+    binary_buffer += encode_bmesh_layer(bm.edges.layers.bevel_weight, bm.edges, extract_layer_float)
+    binary_buffer += encode_bmesh_layer(bm.edges.layers.crease, bm.edges, extract_layer_float)
+
+    stats_timer.checkpoint("edges_layers")
 
     logger.debug("Writing %d faces", len(bm.faces))
     bm.faces.ensure_lookup_table()
-    binary_buffer += common.encodeInt(len(bm.faces))
+
+    faces_array = []
     for face in bm.faces:
-        binary_buffer += common.encodeInt(face.material_index)
-        binary_buffer += common.encodeBool(face.smooth)
-        binary_buffer += common.encodeInt(len(face.verts))
-        for vert in face.verts:
-            binary_buffer += common.encodeInt(vert.index)
+        faces_array.extend((face.material_index, face.smooth, len(face.verts)))
+        faces_array.extend((vert.index for vert in face.verts))
+
+    stats_timer.checkpoint("make_faces_buffer")
+
+    binary_buffer += struct.pack(f"1I{len(faces_array)}I", len(bm.faces), *faces_array)
+
+    stats_timer.checkpoint("encode_faces_buffer")
 
     # Face layers
     # Ignored layers for now: None
     # Other ignored layers:
     # - freestyle: of type NotImplementedType, maybe reserved for future dev
     # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.faces.layers.face_map, bm.faces, encode_layer_int)
+    binary_buffer += encode_bmesh_layer(bm.faces.layers.face_map, bm.faces, extract_layer_int)
+
+    stats_timer.checkpoint("faces_layers")
 
     # Loops layers
     # A loop is an edge attached to a face (so each edge of a manifold can have 2 loops at most).
     # Ignored layers for now: None
     # Other ignored layers:
     # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.loops.layers.uv, loops_iterator(bm), encode_layer_uv)
-    binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), encode_layer_color)
+    binary_buffer += encode_bmesh_layer(bm.loops.layers.uv, loops_iterator(bm), extract_layer_uv)
+    binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), extract_layer_color)
+
+    stats_timer.checkpoint("loops_layers")
 
     bm.free()
 
@@ -446,27 +537,40 @@ def dump_mesh(mesh_data):
         binary_buffer += common.encodeInt(0)  # Indicate 0 key blocks
     else:
         logger.debug("Writing %d shape keys", len(mesh_data.shape_keys.key_blocks))
+
         binary_buffer += common.encodeInt(len(mesh_data.shape_keys.key_blocks))
+        # Encode names
         for key_block in mesh_data.shape_keys.key_blocks:
             binary_buffer += common.encodeString(key_block.name)
-            binary_buffer += common.encodeBool(key_block.mute)
-            binary_buffer += common.encodeFloat(key_block.value)
-            binary_buffer += common.encodeFloat(key_block.slider_min)
-            binary_buffer += common.encodeFloat(key_block.slider_max)
+        # Encode vertex group names
+        for key_block in mesh_data.shape_keys.key_blocks:
             binary_buffer += common.encodeString(key_block.vertex_group)
-            binary_buffer += common.encodeInt(len(key_block.data))
-            for i in range(len(key_block.data)):
-                binary_buffer += struct.pack('3f', *list(key_block.data[i].co))
-        binary_buffer += common.encodeBool(mesh_data.shape_keys.use_relative)
-        # Encore relative key names after to facilite loading
+        # Encode relative key names
         for key_block in mesh_data.shape_keys.key_blocks:
             binary_buffer += common.encodeString(key_block.relative_key.name)
+        # Encode data
+        shape_keys_buffer = []
+        fmt_str = ""
+        for key_block in mesh_data.shape_keys.key_blocks:
+            shape_keys_buffer.extend((key_block.mute, key_block.value, key_block.slider_min,
+                                      key_block.slider_max, len(key_block.data)))
+            fmt_str += f"1I1f1f1f1I{(3 * len(key_block.data))}f"
+            for i in range(len(key_block.data)):
+                shape_keys_buffer.extend(key_block.data[i].co)
+        binary_buffer += struct.pack(f"{fmt_str}", *shape_keys_buffer)
+
+        binary_buffer += common.encodeBool(mesh_data.shape_keys.use_relative)
+
+    stats_timer.checkpoint("shape_keys")
 
     return binary_buffer
 
 
+@stats_timer(shareData)
 def getSourceMeshBuffers(obj, meshName):
-    mesh_data = obj.data
+    mesh_data = obj.to_mesh()
+    if not mesh_data:
+        return None
     binary_buffer = dump_mesh(mesh_data)
 
     # Vertex Groups
