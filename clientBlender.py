@@ -626,12 +626,15 @@ class ClientBlender(Client):
         mesh = obj.data
         meshName = self.getMeshName(mesh)
         path = self.getObjectPath(obj)
-        sourceMeshBuffer = mesh_functions.getSourceMeshBuffers(obj, meshName)
-        meshBuffer = mesh_functions.getMeshBuffers(obj, meshName)
-        if meshBuffer and sourceMeshBuffer:
-            self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
+
+        if data.get_dcc_sync_props().sync_blender:
+            sourceMeshBuffer = mesh_functions.getSourceMeshBuffers(obj, meshName)
             self.addCommand(common.Command(common.MessageType.SOURCE_MESH,
                                            common.encodeString(path) + sourceMeshBuffer, 0))
+
+        if data.get_dcc_sync_props().sync_vrtist:
+            meshBuffer = mesh_functions.getMeshBuffers(obj, meshName)
+            self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
 
     def sendCollectionInstance(self, obj):
         if not obj.instance_collection:
