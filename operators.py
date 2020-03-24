@@ -393,6 +393,9 @@ def reparentObjects():
 
 
 def updateObjectsData():
+    if len(shareData.depsgraph.updates) == 0:
+        return  # Exit here to avoid noise if you want to put breakpoints in this function
+
     dataContainer = {}
     data = set()
     transforms = set()
