@@ -173,28 +173,35 @@ class ClientBlender(Client):
             shareData._blenderMeshes[me.name_full] = me
         return me
 
-    def setTransform(self, obj, position, rotation, scale):
-        obj.location = position
-        quaternion = (rotation[3], rotation[0], rotation[1], rotation[2])
-        if obj.rotation_mode == 'AXIS_ANGLE':
-            axisAngle = Quaternion(quaternion).to_axis_angle()
-            obj.rotation_axis_angle[0] = axisAngle[1]
-            obj.rotation_axis_angle[1] = axisAngle[0][0]
-            obj.rotation_axis_angle[2] = axisAngle[0][1]
-            obj.rotation_axis_angle[3] = axisAngle[0][2]
-        elif obj.rotation_mode == 'QUATERNION':
-            obj.rotation_quaternion = quaternion
-        else:
-            obj.rotation_euler = Quaternion(
-                quaternion).to_euler(obj.rotation_mode)
-        obj.scale = scale
+    def setTransform(self, obj, parentInverseMatrix, basisMatrix, localMatrix):
+        obj.matrix_parent_inverse = parentInverseMatrix
+        obj.matrix_basis = basisMatrix
+        obj.matrix_local = localMatrix
+
+    def buildMatrixFromComponents(self, translate, rotate, scale):
+        t = Matrix.Translation(translate)
+        r = Quaternion(rotate).to_matrix().to_4x4()
+        s = Matrix()
+        s[0][0] = scale[0]
+        s[1][1] = scale[1]
+        s[2][2] = scale[2]
+        return s @ r @ t
+
+    def decodeMatrix(self, data, index):
+        matrix_data, index = common.decodeMatrix(data, index)
+        m = Matrix()
+        m.col[0] = matrix_data[0]
+        m.col[1] = matrix_data[1]
+        m.col[2] = matrix_data[2]
+        m.col[3] = matrix_data[3]
+        return m, index
 
     def buildTransform(self, data):
         start = 0
         objectPath, start = common.decodeString(data, start)
-        position, start = common.decodeVector3(data, start)
-        rotation, start = common.decodeVector4(data, start)
-        scale, start = common.decodeVector3(data, start)
+        parentInvertMatrix, start = self.decodeMatrix(data, start)
+        basisMatrix, start = self.decodeMatrix(data, start)
+        localMatrix, start = self.decodeMatrix(data, start)
         visible, start = common.decodeBool(data, start)
 
         try:
@@ -203,7 +210,7 @@ class ClientBlender(Client):
             # Object doesn't exist anymore
             return
         if obj:
-            self.setTransform(obj, position, rotation, scale)
+            self.setTransform(obj, parentInvertMatrix, basisMatrix, localMatrix)
             obj.hide_viewport = not visible
 
     def getOrCreateMaterial(self, materialName):
@@ -324,9 +331,7 @@ class ClientBlender(Client):
     def buildDuplicate(self, data):
         srcPath, index = common.decodeString(data, 0)
         dstName, index = common.decodeString(data, index)
-        dstPosition, index = common.decodeVector3(data, index)
-        dstRotation, index = common.decodeVector4(data, index)
-        dstScale, index = common.decodeVector3(data, index)
+        basisMatrix, index = self.decodeMatrix(data, index)
 
         try:
             obj = self.getOrCreatePath(srcPath)
@@ -338,7 +343,7 @@ class ClientBlender(Client):
             for collection in obj.users_collection:
                 collection.objects.link(newObj)
 
-            self.setTransform(newObj, dstPosition, dstRotation, dstScale)
+            self.setTransform(newObj, obj.matrix_parent_invert, basisMatrix, obj.matrix_parent_invert @ basisMatrix)
         except Exception:
             pass
 
@@ -387,12 +392,8 @@ class ClientBlender(Client):
 
     def getTransformBuffer(self, obj):
         path = self.getObjectPath(obj)
-        matrix = obj.matrix_local
-        translate = matrix.to_translation()
-        quaternion = matrix.to_quaternion()
-        scale = matrix.to_scale()
         visible = not obj.hide_viewport
-        return common.encodeString(path) + common.encodeVector3(translate) + common.encodeVector4(quaternion) + common.encodeVector3(scale) + common.encodeBool(visible)
+        return common.encodeString(path) + common.encodeMatrix(obj.matrix_parent_inverse) + common.encodeMatrix(obj.matrix_basis) + common.encodeMatrix(obj.matrix_local) + common.encodeBool(visible)
 
     def sendTransform(self, obj):
         transformBuffer = self.getTransformBuffer(obj)
@@ -635,12 +636,14 @@ class ClientBlender(Client):
 
         if data.get_dcc_sync_props().sync_blender:
             sourceMeshBuffer = mesh_functions.getSourceMeshBuffers(obj, meshName)
-            self.addCommand(common.Command(common.MessageType.SOURCE_MESH,
+            if sourceMeshBuffer:
+                self.addCommand(common.Command(common.MessageType.SOURCE_MESH,
                                            common.encodeString(path) + sourceMeshBuffer, 0))
 
         if data.get_dcc_sync_props().sync_vrtist:
             meshBuffer = mesh_functions.getMeshBuffers(obj, meshName)
-            self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
+            if meshBuffer:
+                self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
 
     def sendCollectionInstance(self, obj):
         if not obj.instance_collection:
