@@ -651,14 +651,23 @@ class ClientBlender(Client):
 
         # Materials
         materials = []
-        for slot in obj.material_slots[:]:
-            if slot.material:
-                materials.append(slot.material.name_full.encode())
+        for material in obj.data.materials:
+            materials.append(material.name_full if material != None else "")
+        binary_buffer += common.encodeStringArray(materials)
+
+        material_link_dict = {
+            'OBJECT': 0,
+            'DATA': 1
+        }
+        material_links = [material_link_dict[slot.link] for slot in obj.material_slots]
+        assert(len(material_links) == len(obj.data.materials))
+        binary_buffer += struct.pack(f'{len(material_links)}I', *material_links)
+
+        for slot in obj.material_slots:
+            if slot.link == 'DATA':
+                binary_buffer += common.encodeString("")
             else:
-                materials.append("Default".encode())
-        binary_buffer += common.intToBytes(len(materials), 4)
-        for material in materials:
-            binary_buffer += common.intToBytes(len(material), 4) + material
+                binary_buffer += common.encodeString(slot.material.name if slot.material != None else "")
 
         self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(
             path) + common.encodeString(meshName) + binary_buffer, 0))
@@ -680,9 +689,22 @@ class ClientBlender(Client):
         # Materials
         materialNames, index = common.decodeStringArray(commandData, index)
         for materialName in materialNames:
-            material = self.getOrCreateMaterial(materialName)
-            if not materialName in obj.data.materials:
-                obj.data.materials.append(material)
+            material = self.getOrCreateMaterial(materialName) if materialName != "" else None
+            obj.data.materials.append(material)
+
+        material_link_dict = [
+            'OBJECT',
+            'DATA'
+        ]
+        material_links = struct.unpack(f'{len(materialNames)}I', commandData[index: index + 4 * len(materialNames)])
+        for link, slot in zip(material_links, obj.material_slots):
+            slot.link = material_link_dict[link]
+        index += 4 * len(materialNames)
+
+        for slot in obj.material_slots:
+            material_name, index = common.decodeString(commandData, index)
+            if slot.link == 'OBJECT' and material_name != "":
+                slot.material = self.getOrCreateMaterial(material_name)
 
     def sendCollectionInstance(self, obj):
         if not obj.instance_collection:
