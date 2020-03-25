@@ -1,7 +1,8 @@
-import bpy
 import os
 import logging
-from datetime import datetime
+
+import bpy
+
 from .broadcaster import common
 from .shareData import shareData
 from .stats import get_stats_directory
@@ -47,10 +48,7 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
     developer_options: bpy.props.BoolProperty(default=False)
     remoteServerIsUp: bpy.props.BoolProperty(default=False)
 
-    show_server_console_value = common.is_debugger_attached()
-    logging.info("Debugger attached : %s ", show_server_console_value)
-    showServerConsole: bpy.props.BoolProperty(
-        default=show_server_console_value)
+    showServerConsole: bpy.props.BoolProperty(default=False)
 
     VRtist: bpy.props.StringProperty(name="VRtist", default=os.environ.get(
         "VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe"))

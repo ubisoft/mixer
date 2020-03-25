@@ -1,104 +1,33 @@
 import unittest
 import testcase
 from pathlib import Path
-
-
-def new_to_scene(name: str):
-    import bpy
-    collection = bpy.data.collections.new(name)
-    bpy.context.scene.collection.children.link(collection)
-
-
-def create_collection_in_collection(parent_name: str, child_name: str):
-    import bpy
-    parent = bpy.data.collections[parent_name]
-    child = bpy.data.collections.new(child_name)
-    parent.children.link(child)
-
-
-def remove_collection_from_collection(parent_name: str, child_name: str):
-    import bpy
-    parent = bpy.data.collections[parent_name]
-    child = parent.children[child_name]
-    parent.children.unlink(child)
-
-
-def create_object_in_collection(parent_name: str, child_name: str):
-    import bpy
-    parent = bpy.data.collections[parent_name]
-    child = bpy.data.objects.new(child_name, None)
-    parent.objects.link(child)
-
-
-def add_object_to_collection(parent_name: str, child_name: str):
-    import bpy
-    parent = bpy.data.collections[parent_name]
-    child = bpy.data.objects[child_name]
-    parent.objects.link(child)
-
-
-def remove_object_from_collection(parent_name: str, child_name: str):
-    import bpy
-    parent = bpy.data.collections[parent_name]
-    child = bpy.data.objects[child_name]
-    parent.objects.unlink(child)
-
-
-def remove_collection(name: str):
-    import bpy
-    c = bpy.data.collections[name]
-    bpy.data.collections.remove(c)
-
-
-def rename_collection(old_name: str, new_name: str):
-    import bpy
-    c = bpy.data.collections[old_name]
-    c.name = new_name
-
-
-def instanciate_collection(collection_name: str, instance_name: str):
-    import bpy
-    collection = bpy.data.collections[collection_name]
-    instance = bpy.data.objects.new(name=instance_name, object_data=None)
-    instance.instance_collection = collection
-    instance.instance_type = 'COLLECTION'
-    layer = bpy.context.view_layer
-    layer.update()
-    c = bpy.data.collections.new("__ploip__")
-    bpy.data.collections.remove(c)
+import blender_lib as bl
 
 
 class CollectionTestCase(testcase.BlenderTestCase):
     def create_collection_in_collection(self, parent_name: str, child_name: str):
-        self._sender.send_function(create_collection_in_collection, parent_name, child_name)
+        self._sender.send_function(bl.create_collection_in_collection, parent_name, child_name)
 
     def remove_collection_from_collection(self, parent_name: str, child_name: str):
-        self._sender.send_function(remove_collection_from_collection, parent_name, child_name)
+        self._sender.send_function(bl.remove_collection_from_collection, parent_name, child_name)
 
     def remove_collection(self, collection_name: str):
-        self._sender.send_function(remove_collection, collection_name)
+        self._sender.send_function(bl.remove_collection, collection_name)
 
     def rename_collection(self, old_name: str, new_name: str):
-        self._sender.send_function(rename_collection, old_name, new_name)
+        self._sender.send_function(bl.rename_collection, old_name, new_name)
 
     def create_object_in_collection(self, collection_name: str, object_name: str):
-        self._sender.send_function(create_object_in_collection, collection_name, object_name)
+        self._sender.send_function(bl.create_object_in_collection, collection_name, object_name)
 
     def add_object_to_collection(self, collection_name: str, object_name: str):
-        self._sender.send_function(add_object_to_collection, collection_name, object_name)
+        self._sender.send_function(bl.add_object_to_collection, collection_name, object_name)
 
     def remove_object_from_collection(self, collection_name: str, object_name: str):
-        self._sender.send_function(remove_object_from_collection, collection_name, object_name)
+        self._sender.send_function(bl.remove_object_from_collection, collection_name, object_name)
 
     def instanciate_collection(self, collection_name: str, instance_name: str):
-        self._sender.send_function(instanciate_collection, collection_name, instance_name)
-
-
-class test_scene_collection_default_doc(CollectionTestCase):
-
-    def test_scene_collection_create_FAILS(self):
-        self._sender.send_function(new_to_scene, 'plop')
-        self.assertUserSuccess()
+        self._sender.send_function(bl.instanciate_collection, collection_name, instance_name)
 
 
 class test_collection_default_doc(CollectionTestCase):

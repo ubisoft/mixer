@@ -42,12 +42,15 @@ class MessageType(Enum):
     SEND_TO_TRASH = 107
     RESTORE_FROM_TRASH = 108
     TEXTURE = 109
+
     ADD_COLLECTION_TO_COLLECTION = 110
     REMOVE_COLLECTION_FROM_COLLECTION = 111
     ADD_OBJECT_TO_COLLECTION = 112
     REMOVE_OBJECT_FROM_COLLECTION = 113
+
     ADD_OBJECT_TO_SCENE = 114
     ADD_COLLECTION_TO_SCENE = 115
+
     INSTANCE_COLLECTION = 116
     COLLECTION = 117
     COLLECTION_REMOVED = 118
@@ -59,6 +62,13 @@ class MessageType(Enum):
     FRAME = 124
     FRAME_START_END = 125
     CAMERA_ANIMATION = 126
+
+    REMOVE_OBJECT_FROM_SCENE = 127
+    REMOVE_COLLECTION_FROM_SCENE = 128
+
+    SCENE = 129
+    SCENE_REMOVED = 130
+
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
     MESH = 202
@@ -366,12 +376,3 @@ def writeMessage(sock: socket.socket, command: Command):
             sent = send(sock, buffer[currentIndex:])
             remainingSize -= sent
             currentIndex += sent
-
-
-def is_debugger_attached():
-    try:
-        import ptvsd
-        return ptvsd.is_attached()
-    except Exception:
-        pass
-    return False

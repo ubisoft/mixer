@@ -1,0 +1,111 @@
+from ..broadcaster import common
+from ..shareData import shareData
+from ..clientBlender import ClientBlender
+import logging
+import bpy
+
+logger = logging.getLogger('scene')
+logger.setLevel(logging.DEBUG)
+
+
+def sendScene(client: ClientBlender, scene_name: str):
+    logger.debug("sendScene %s", scene_name)
+    buffer = common.encodeString(scene_name)
+    client.addCommand(common.Command(
+        common.MessageType.SCENE, buffer, 0))
+
+
+def buildScene(data):
+    scene_name, _ = common.decodeString(data, 0)
+    logger.debug("buildScene %s", scene_name)
+    scene = shareData.blenderScenes.get(scene_name)
+    if scene is None:
+        scene = bpy.data.scenes.new(scene_name)
+        shareData.blenderScenes[scene_name] = scene
+
+
+def sendSceneRemoved(client: ClientBlender, scene_name: str):
+    logger.debug("sendSceneRemoved %s", scene_name)
+    buffer = common.encodeString(scene_name)
+    client.addCommand(common.Command(
+        common.MessageType.SCENE_REMOVED, buffer, 0))
+
+
+def buildSceneRemoved(data):
+    scene_name, _ = common.decodeString(data, 0)
+    logger.debug("buildSceneRemoved %s", scene_name)
+    scene = shareData.blenderScenes.get(scene_name)
+    bpy.data.scene.remove(scene)
+    del shareData.blenderScenes[scene_name]
+
+
+def sendAddCollectionToScene(client: ClientBlender, scene_name: str, collection_name: str):
+    logger.debug("sendAddCollectionToScene %s <- %s", scene_name, collection_name)
+
+    buffer = common.encodeString(scene_name) + common.encodeString(collection_name)
+    client.addCommand(common.Command(
+        common.MessageType.ADD_COLLECTION_TO_SCENE, buffer, 0))
+
+
+def buildCollectionToScene(data):
+    scene_name, index = common.decodeString(data, 0)
+    collection_name, _ = common.decodeString(data, index)
+    logger.debug("buildCollectionToScene %s <- %s", scene_name, collection_name)
+
+    scene = shareData.blenderScenes[scene_name]
+    collection = shareData.blenderCollections[collection_name]
+    scene.collection.children.link(collection)
+
+
+def sendRemoveCollectionFromScene(client: ClientBlender, scene_name: str, collection_name: str):
+    logger.debug("sendRemoveCollectionFromScene %s <- %s", scene_name, collection_name)
+
+    buffer = common.encodeString(scene_name) + common.encodeString(collection_name)
+    client.addCommand(common.Command(
+        common.MessageType.REMOVE_COLLECTION_FROM_SCENE, buffer, 0))
+
+
+def buildRemoveCollectionFromScene(data):
+    scene_name, index = common.decodeString(data, 0)
+    collection_name, _ = common.decodeString(data, index)
+    logger.debug("buildRemoveCollectionFromScene %s <- %s", scene_name, collection_name)
+    scene = shareData.blenderScenes[scene_name]
+    collection = shareData.blenderCollections[collection_name]
+    scene.collection.children.unlink(collection)
+
+
+def sendAddObjectToScene(client: ClientBlender, sceneName: str, objName: str):
+    logger.debug("sendAddObjectToCollection %s <- %s", sceneName, objName)
+    buffer = common.encodeString(
+        sceneName) + common.encodeString(objName)
+    client.addCommand(common.Command(
+        common.MessageType.ADD_OBJECT_TO_SCENE, buffer, 0))
+
+
+def buildAddObjectToScene(data):
+    scene_name, index = common.decodeString(data, 0)
+    object_name, _ = common.decodeString(data, index)
+    logger.debug("buildAddObjectToCollection %s <- %s", scene_name, object_name)
+
+    scene = shareData.blenderScenes[scene_name]
+    # We may have received an object creation message before this collection link message
+    # and object creation will have created and linked the collecetion if needed
+    if scene.collection.objects.get(object_name) is None:
+        object_ = shareData.blenderObjects[object_name]
+        scene.collection.objects.link(object_)
+
+
+def sendRemoveObjectFromScene(client: ClientBlender, scene_name: str, object_name: str):
+    logger.debug("sendRemoveObjectFromScene %s <- %s", scene_name, object_name)
+    buffer = common.encodeString(scene_name) + common.encodeString(object_name)
+    client.addCommand(common.Command(
+        common.MessageType.REMOVE_OBJECT_FROM_SCENE, buffer, 0))
+
+
+def buildRemoveObjectFromScene(data):
+    scene_name, index = common.decodeString(data, 0)
+    object_name, _ = common.decodeString(data, index)
+    logger.debug("buildRemoveObjectFromScene %s <- %s", scene_name, object_name)
+    scene = shareData.blenderscenes[scene_name]
+    object_ = shareData.blenderObjects[object_name]
+    scene.collection.objects.unlink(object_)
