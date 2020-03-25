@@ -160,9 +160,9 @@ def updateScenesState():
     # walk the old scenes
     for sceneName, sceneInfo in shareData.scenesInfo.items():
         scene = getScene(sceneName)
-        sceneName = scene.name_full
         if not scene:
             continue
+        sceneName = scene.name_full
         oldChildren = set(sceneInfo.children)
         newChildren = set([x.name_full for x in scene.collection.children])
 
@@ -170,7 +170,7 @@ def updateScenesState():
             shareData.collectionsAddedToScene.add((sceneName, x))
 
         for x in oldChildren - newChildren:
-            shareData.collectionsRemovedFromCollection.add((sceneName, x))
+            shareData.collectionsRemovedFromScene.add((sceneName, x))
 
         oldObjects = {shareData.objectsRenamed.get(x, x) for x in sceneInfo.objects}
         newObjects = {x.name_full for x in scene.collection.objects}
@@ -304,7 +304,7 @@ def isInObjectMode():
 
 def removeObjectsFromScenes():
     changed = False
-    for scene_name, neName, object_names in shareData.objectsRemovedFromScene.items():
+    for scene_name, object_names in shareData.objectsRemovedFromScene.items():
         for object_name in object_names:
             scene_lib.sendRemoveObjectFromScene(shareData.client, scene_name, object_name)
             changed = True

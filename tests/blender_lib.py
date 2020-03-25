@@ -141,6 +141,17 @@ def rename_scene(old_name: str, new_name: str):
     scene.name = new_name
 
 #
+# object
+#
+
+
+def rename_object(old_name: str, new_name: str):
+    import bpy
+    obj = bpy.data.objects[old_name]
+    obj.name = new_name
+
+
+#
 # misc
 #
 

@@ -23,9 +23,6 @@ class SceneTestCase(testcase.BlenderTestCase):
     def unlink_collection_from_scene(self, scene_name: str, collection_name: str):
         self._sender.send_function(bl.unlink_collection_from_scene, scene_name, collection_name)
 
-    def link_object_in_scene(self, scene_name: str, object_name: str):
-        self._sender.send_function(bl.link_object_to_scene, scene_name, object_name)
-
     def link_object_to_scene(self, scene_name: str, object_name: str):
         self._sender.send_function(bl.link_object_to_scene, scene_name, object_name)
 
@@ -34,6 +31,12 @@ class SceneTestCase(testcase.BlenderTestCase):
 
     def rename_scene(self, old_name: str, new_name: str):
         self._sender.send_function(bl.rename_scene, old_name, new_name)
+
+    def rename_object(self, old_name: str, new_name: str):
+        self._sender.send_function(bl.rename_object, old_name, new_name)
+
+    def rename_collection(self, old_name: str, new_name: str):
+        self._sender.send_function(bl.rename_collection, old_name, new_name)
 
 
 class test_scene_empty_doc(SceneTestCase):
@@ -60,7 +63,16 @@ class test_scene_empty_doc(SceneTestCase):
         self.link_collection_to_scene('scene_1', 'collection_1_1')
         self.assertUserSuccess()
 
-    def test_new_object_in_scene(self):
+    def test_unlink_collection_from_scene(self):
+        self.new_collection('UNLINKED_collection_1_0')
+        self.new_collection('LINKED_collection_1_1')
+        self.new_scene('scene_1')
+        self.link_collection_to_scene('scene_1', 'UNLINKED_collection_1_0')
+        self.link_collection_to_scene('scene_1', 'LINKED_collection_1_1')
+        self.unlink_collection_from_scene('scene_1', 'UNLINKED_collection_1_0')
+        self.assertUserSuccess()
+
+    def test_link_object_to_scene(self):
         self.new_object('object_0_0')
         self.link_object_to_scene('Scene', 'object_0_0')
         self.new_scene('scene_1')
@@ -77,6 +89,24 @@ class test_scene_empty_doc(SceneTestCase):
         self.link_object_to_scene('scene_1', 'UNLINKED_object_1_0')
         self.link_object_to_scene('scene_1', 'LINKED_object_1_1')
         self.unlink_object_from_scene('scene_1', 'UNLINKED_object_1_0')
+        self.assertUserSuccess()
+
+    def test_rename_object_in_scene(self):
+        self.new_object('object_1_0')
+        self.new_object('OLD_object_1_1')
+        self.new_scene('scene_1')
+        self.link_object_to_scene('scene_1', 'object_1_0')
+        self.link_object_to_scene('scene_1', 'OLD_object_1_1')
+        self.rename_object('OLD_object_1_1', 'NEW_object_1_1')
+        self.assertUserSuccess()
+
+    def test_rename_collection_in_scene(self):
+        self.new_collection('collection_1_0')
+        self.new_collection('OLD_collection_1_1')
+        self.new_scene('scene_1')
+        self.link_collection_to_scene('scene_1', 'collection_1_0')
+        self.link_collection_to_scene('scene_1', 'OLD_collection_1_1')
+        self.rename_collection('OLD_collection_1_1', 'NEW_collection_1_1')
         self.assertUserSuccess()
 
     def test_rename_scene(self):

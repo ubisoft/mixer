@@ -75,7 +75,7 @@ def buildRemoveCollectionFromScene(data):
 
 
 def sendAddObjectToScene(client: ClientBlender, sceneName: str, objName: str):
-    logger.debug("sendAddObjectToCollection %s <- %s", sceneName, objName)
+    logger.debug("sendAddObjectToScene %s <- %s", sceneName, objName)
     buffer = common.encodeString(
         sceneName) + common.encodeString(objName)
     client.addCommand(common.Command(
@@ -85,7 +85,7 @@ def sendAddObjectToScene(client: ClientBlender, sceneName: str, objName: str):
 def buildAddObjectToScene(data):
     scene_name, index = common.decodeString(data, 0)
     object_name, _ = common.decodeString(data, index)
-    logger.debug("buildAddObjectToCollection %s <- %s", scene_name, object_name)
+    logger.debug("buildAddObjectToScene %s <- %s", scene_name, object_name)
 
     scene = shareData.blenderScenes[scene_name]
     # We may have received an object creation message before this collection link message
@@ -106,6 +106,6 @@ def buildRemoveObjectFromScene(data):
     scene_name, index = common.decodeString(data, 0)
     object_name, _ = common.decodeString(data, index)
     logger.debug("buildRemoveObjectFromScene %s <- %s", scene_name, object_name)
-    scene = shareData.blenderscenes[scene_name]
+    scene = shareData.blenderScenes[scene_name]
     object_ = shareData.blenderObjects[object_name]
     scene.collection.objects.unlink(object_)
