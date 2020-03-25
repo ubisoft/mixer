@@ -633,14 +633,24 @@ class ClientBlender(Client):
         meshName = self.getMeshName(mesh)
         path = self.getObjectPath(obj)
 
+        binary_buffer = bytes()
+
         if data.get_dcc_sync_props().sync_blender:
-            sourceMeshBuffer = mesh_functions.getSourceMeshBuffers(obj, meshName)
-            self.addCommand(common.Command(common.MessageType.SOURCE_MESH,
-                                           common.encodeString(path) + sourceMeshBuffer, 0))
+            mesh_buffer = mesh_functions.getSourceMeshBuffers(obj)
+            binary_buffer += common.encodeInt(len(mesh_buffer))
+            binary_buffer += mesh_buffer
+        else:
+            binary_buffer += common.encodeInt(0)
 
         if data.get_dcc_sync_props().sync_vrtist:
-            meshBuffer = mesh_functions.getMeshBuffers(obj, meshName)
-            self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
+            mesh_buffer = mesh_functions.getMeshBuffers(obj)
+            binary_buffer += common.encodeInt(len(mesh_buffer))
+            binary_buffer += mesh_buffer
+        else:
+            binary_buffer += common.encodeInt(0)
+
+        self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(
+            path) + common.encodeString(meshName) + binary_buffer, 0))
 
     def sendCollectionInstance(self, obj):
         if not obj.instance_collection:
@@ -1124,8 +1134,8 @@ class ClientBlender(Client):
 
                 elif command.type == common.MessageType.CLEAR_CONTENT:
                     self.clearContent()
-                elif command.type == common.MessageType.SOURCE_MESH:
-                    mesh_functions.buildSourceMesh(self, command.data)
+                elif command.type == common.MessageType.MESH:
+                    mesh_functions.buildMesh(self, command.data)
                 elif command.type == common.MessageType.TRANSFORM:
                     self.buildTransform(command.data)
                 elif command.type == common.MessageType.MATERIAL:

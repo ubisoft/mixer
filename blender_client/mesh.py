@@ -12,11 +12,14 @@ from mathutils import Vector
 logger = logging.getLogger(f"dccsync")
 
 
-def deprecated_buildMesh(client, data):
+def deprecated_buildMesh(client, data, obj):
     # Deprecated: Blender does not load a baked mesh
     index = 0
-    path, index = common.decodeString(data, index)
-    meshName, index = common.decodeString(data, index)
+
+    byte_size, index = common.decodeInt(data, index)
+    if byte_size == 0:
+        return
+
     positions, index = common.decodeVector3Array(data, index)
     normals, index = common.decodeVector3Array(data, index)
     uvs, index = common.decodeVector2Array(data, index)
@@ -67,9 +70,10 @@ def deprecated_buildMesh(client, data):
         except:
             pass
 
-    me = client.getOrCreateMesh(meshName)
+    me = obj.data
 
     bm.to_mesh(me)
+    bm.free()
 
     # hack ! Since bmesh cannot be used to set custom normals
     normals2 = []
@@ -82,9 +86,6 @@ def deprecated_buildMesh(client, data):
         material = client.getOrCreateMaterial(materialName)
         if not materialName in me.materials:
             me.materials.append(material)
-
-    bm.free()
-    client.getOrCreateObjectData(path, me)
 
 
 def decode_layer_float(elmt, layer, data, index):
@@ -192,14 +193,22 @@ def loops_iterator(bm):
             yield loop
 
 
-def buildSourceMesh(client, data):
+@stats_timer(shareData)
+def buildMesh(client, data):
     index = 0
+
     path, index = common.decodeString(data, index)
     meshName, index = common.decodeString(data, index)
 
     obj = client.getOrCreateObjectData(path, client.getOrCreateMesh(meshName))
     if obj.mode == 'EDIT':
         logger.error("Received a mesh for object %s while begin in EDIT mode, ignoring.", path)
+        return
+
+    byte_size, index = common.decodeInt(data, index)
+    if byte_size == 0:
+        # No Blender mesh, lets read the baked mesh
+        deprecated_buildMesh(client, data[index:], obj)
         return
 
     bm = bmesh.new()
@@ -322,7 +331,7 @@ def buildSourceMesh(client, data):
 
 
 @stats_timer(shareData)
-def getMeshBuffers(obj, meshName):
+def getMeshBuffers(obj):
     stats_timer = shareData.current_stats_timer
 
     vertices = []
@@ -431,7 +440,7 @@ def getMeshBuffers(obj, meshName):
 
     stats_timer.checkpoint("write_material_names")
 
-    return common.encodeString(meshName) + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
+    return binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
 
 
 @stats_timer(shareData)
@@ -567,7 +576,7 @@ def dump_mesh(mesh_data):
 
 
 @stats_timer(shareData)
-def getSourceMeshBuffers(obj, meshName):
+def getSourceMeshBuffers(obj):
     mesh_data = obj.to_mesh()
     if not mesh_data:
         return None
@@ -621,4 +630,4 @@ def getSourceMeshBuffers(obj, meshName):
     for material in materials:
         binary_buffer += common.intToBytes(len(material), 4) + material
 
-    return common.encodeString(meshName) + binary_buffer
+    return binary_buffer
