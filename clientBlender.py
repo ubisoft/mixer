@@ -649,8 +649,40 @@ class ClientBlender(Client):
         else:
             binary_buffer += common.encodeInt(0)
 
+        # Materials
+        materials = []
+        for slot in obj.material_slots[:]:
+            if slot.material:
+                materials.append(slot.material.name_full.encode())
+            else:
+                materials.append("Default".encode())
+        binary_buffer += common.intToBytes(len(materials), 4)
+        for material in materials:
+            binary_buffer += common.intToBytes(len(material), 4) + material
+
         self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(
             path) + common.encodeString(meshName) + binary_buffer, 0))
+
+    @stats_timer(shareData)
+    def buildMesh(self, commandData):
+        index = 0
+
+        path, index = common.decodeString(commandData, index)
+        meshName, index = common.decodeString(commandData, index)
+
+        obj = self.getOrCreateObjectData(path, self.getOrCreateMesh(meshName))
+        if obj.mode == 'EDIT':
+            logger.error("Received a mesh for object %s while begin in EDIT mode, ignoring.", path)
+            return
+
+        index = mesh_functions.buildMesh(obj, commandData, index)
+
+        # Materials
+        materialNames, index = common.decodeStringArray(commandData, index)
+        for materialName in materialNames:
+            material = self.getOrCreateMaterial(materialName)
+            if not materialName in obj.data.materials:
+                obj.data.materials.append(material)
 
     def sendCollectionInstance(self, obj):
         if not obj.instance_collection:
@@ -1135,7 +1167,7 @@ class ClientBlender(Client):
                 elif command.type == common.MessageType.CLEAR_CONTENT:
                     self.clearContent()
                 elif command.type == common.MessageType.MESH:
-                    mesh_functions.buildMesh(self, command.data)
+                    self.buildMesh(command.data)
                 elif command.type == common.MessageType.TRANSFORM:
                     self.buildTransform(command.data)
                 elif command.type == common.MessageType.MATERIAL:

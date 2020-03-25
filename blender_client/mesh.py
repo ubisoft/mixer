@@ -12,13 +12,13 @@ from mathutils import Vector
 logger = logging.getLogger(f"dccsync")
 
 
-def deprecated_buildMesh(client, data, obj):
+def deprecated_buildMesh(obj, data):
     # Deprecated: Blender does not load a baked mesh
     index = 0
 
     byte_size, index = common.decodeInt(data, index)
     if byte_size == 0:
-        return
+        return index
 
     positions, index = common.decodeVector3Array(data, index)
     normals, index = common.decodeVector3Array(data, index)
@@ -82,10 +82,7 @@ def deprecated_buildMesh(client, data, obj):
     me.normals_split_custom_set(normals2)
     me.use_auto_smooth = True
 
-    for materialName in materialNames:
-        material = client.getOrCreateMaterial(materialName)
-        if not materialName in me.materials:
-            me.materials.append(material)
+    return index
 
 
 def decode_layer_float(elmt, layer, data, index):
@@ -194,22 +191,11 @@ def loops_iterator(bm):
 
 
 @stats_timer(shareData)
-def buildMesh(client, data):
-    index = 0
-
-    path, index = common.decodeString(data, index)
-    meshName, index = common.decodeString(data, index)
-
-    obj = client.getOrCreateObjectData(path, client.getOrCreateMesh(meshName))
-    if obj.mode == 'EDIT':
-        logger.error("Received a mesh for object %s while begin in EDIT mode, ignoring.", path)
-        return
-
+def buildMesh(obj, data, index):
     byte_size, index = common.decodeInt(data, index)
     if byte_size == 0:
         # No Blender mesh, lets read the baked mesh
-        deprecated_buildMesh(client, data[index:], obj)
-        return
+        return deprecated_buildMesh(obj, data[index:])
 
     bm = bmesh.new()
 
@@ -322,12 +308,9 @@ def buildMesh(client, data):
         vertex_colors.name, index = common.decodeString(data, index)
         vertex_colors.active_render, index = common.decodeBool(data, index)
 
-    # Materials
-    materialNames, index = common.decodeStringArray(data, index)
-    for materialName in materialNames:
-        material = client.getOrCreateMaterial(materialName)
-        if not materialName in obj.data.materials:
-            obj.data.materials.append(material)
+    baked_mesh_byte_size, index = common.decodeInt(data, index)
+
+    return index + baked_mesh_byte_size
 
 
 @stats_timer(shareData)
@@ -338,7 +321,6 @@ def getMeshBuffers(obj):
     normals = []
     uvs = []
     indices = []
-    materials = []
     materialIndices = []  # array of triangle index, material index
 
     # compute modifiers
@@ -346,14 +328,6 @@ def getMeshBuffers(obj):
     obj = obj.evaluated_get(depsgraph)
 
     stats_timer.checkpoint("eval_depsgraph")
-
-    for slot in obj.material_slots[:]:
-        if slot.material:
-            materials.append(slot.material.name_full.encode())
-        else:
-            materials.append("Default".encode())
-
-    stats_timer.checkpoint("make_material_list")
 
     # triangulate mesh (before calculating normals)
     mesh = obj.to_mesh()
@@ -432,15 +406,7 @@ def getMeshBuffers(obj):
 
     stats_timer.checkpoint("write_tri_idx_buff")
 
-    # material names count + binary material bnames buffer
-    size = len(materials)
-    binaryMaterialNames = common.intToBytes(size, 4)
-    for material in materials:
-        binaryMaterialNames += common.intToBytes(len(material), 4) + material
-
-    stats_timer.checkpoint("write_material_names")
-
-    return binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
+    return binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer
 
 
 @stats_timer(shareData)
@@ -618,16 +584,5 @@ def getSourceMeshBuffers(obj):
     # if mesh_data.has_custom_normals:
     #         # Custom normals are all (0, 0, 0) until calling calc_normals_split() or calc_tangents().
     #     mesh_data.calc_normals_split()
-
-    # Materials
-    materials = []
-    for slot in obj.material_slots[:]:
-        if slot.material:
-            materials.append(slot.material.name_full.encode())
-        else:
-            materials.append("Default".encode())
-    binary_buffer += common.intToBytes(len(materials), 4)
-    for material in materials:
-        binary_buffer += common.intToBytes(len(material), 4) + material
 
     return binary_buffer
