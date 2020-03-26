@@ -638,6 +638,8 @@ class ClientBlender(Client):
         binary_buffer += mesh_functions.encodeMesh(obj, data.get_dcc_sync_props().send_base_meshes,
                                                    data.get_dcc_sync_props().send_baked_meshes)
 
+        # For now include material slots in the same message, but maybe it should be a separated message
+        # like Transform
         material_link_dict = {
             'OBJECT': 0,
             'DATA': 1
