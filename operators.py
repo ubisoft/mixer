@@ -99,10 +99,7 @@ def leave_current_room():
         shareData.currentRoom = None
         set_handlers(False)
 
-    # These objects contain the "before" state when entering the update_post handler
-    shareData.oldObjects = {}
-    shareData.collectionsInfo = {}
-    shareData.scenesInfo = {}
+    shareData.clearBeforeState()
 
     if shareData.current_statistics is not None and shareData.auto_save_statistics:
         save_statistics(shareData.current_statistics,
@@ -758,6 +755,8 @@ def isParentInCollection(collection, obj):
 def send_scene_content():
     if get_dcc_sync_props().no_send_scene_content:
         return
+
+    shareData.clearBeforeState()
     sendSceneDataToServer()
 
     # TODO_ could also send scene name here
@@ -915,7 +914,6 @@ class JoinRoomOperator(bpy.types.Operator):
     def execute(self, context):
         assert not shareData.currentRoom
         shareData.setDirty()
-        shareData.updateCurrentData()
         shareData.currentRoom = None
 
         if not connect():

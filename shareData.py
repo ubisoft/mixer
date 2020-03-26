@@ -103,6 +103,13 @@ class ShareData:
         self._blenderScenes: Mapping[str, bpy.types.Scene] = {}
         self.blenderScenesDirty = True
 
+    def clearBeforeState(self):
+        # These objects contain the "before" state when entering the update_post handler
+        # They must be empty before the first update so that the whole scene is sent
+        self.oldObjects = {}
+        self.collectionsInfo = {}
+        self.scenesInfo = {}
+
     def setDirty(self):
         self.blenderObjectsDirty = True
         self.blenderMaterialsDirty = True
