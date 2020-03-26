@@ -631,6 +631,8 @@ def decodeBaseMesh(client, obj, data, index):
 
 @stats_timer(shareData)
 def decodeMesh(client, obj, data, index):
+    obj.data.materials.clear()
+
     byte_size, index = common.decodeInt(data, index)
     if byte_size == 0:
         # No base mesh, lets read the baked mesh
