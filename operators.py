@@ -216,8 +216,11 @@ def updateCollectionsState():
         newChildren = set([x.name_full for x in collection.children])
 
         for x in newChildren - oldChildren:
-            shareData.collectionsAddedToCollection.add(
-                (getParentCollection(x).name_full, x))
+            parent = getParentCollection(x)
+            if parent is not None:
+                shareData.collectionsAddedToCollection.add((parent.name_full, x))
+            else:
+                logger.warning('UpdateCollectionState(): Collection not found or has no parent "%s"', x)
 
         for x in oldChildren - newChildren:
             shareData.collectionsRemovedFromCollection.add(
@@ -242,8 +245,11 @@ def updateCollectionsState():
             continue
         newChildren = set([x.name_full for x in collection.children])
         for x in newChildren:
-            shareData.collectionsAddedToCollection.add(
-                (getParentCollection(x).name_full, x))
+            parent = getParentCollection(x)
+            if parent is not None:
+                shareData.collectionsAddedToCollection.add((parent.name_full, x))
+            else:
+                logger.warning('UpdateCollectionState(): Collection not found or has no parent "%s"', x)
 
         addedObjects = set([x.name_full for x in collection.objects])
         if len(addedObjects) > 0:
@@ -513,6 +519,7 @@ def updateObjectsData():
 
 @persistent
 def sendFrameChanged(scene):
+    logger.info("sendFrameChanged")
     if not shareData.client:
         return
 
@@ -746,16 +753,6 @@ def isParentInCollection(collection, obj):
             return True
         parent = parent.parent
     return False
-
-
-def send_collection_content(collection):
-    for obj in collection.objects:
-        shareData.client.sendAddObjectToCollection(
-            collection.name_full, obj.name_full)
-
-    for childCollection in collection.children:
-        shareData.client.sendAddCollectionToCollection(
-            collection.name_full, childCollection.name_full)
 
 
 def send_scene_content():

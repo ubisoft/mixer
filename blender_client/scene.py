@@ -35,8 +35,12 @@ def buildSceneRemoved(data):
     scene_name, _ = common.decodeString(data, 0)
     logger.debug("buildSceneRemoved %s", scene_name)
     scene = shareData.blenderScenes.get(scene_name)
-    bpy.data.scene.remove(scene)
     del shareData.blenderScenes[scene_name]
+
+    # in the tests this crashes (see readme.md):
+    #   bpy.data.scenes.remove(scene)
+    # but this succeeds
+    bpy.ops.scene.delete({'scene': scene})
 
 
 def sendAddCollectionToScene(client: ClientBlender, scene_name: str, collection_name: str):

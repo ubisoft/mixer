@@ -144,3 +144,7 @@ class BlenderTestCase(unittest.TestCase):
         p0, h0 = hashes[0]
         for (p,  h) in attrs:
             self.assertEqual(h0, h, f'Hashes differ for {p0} ({h0.hex()}) and {p} ({h.hex()})')
+
+    def disconnect(self):
+        self._sender.send_function(dccsync_lib.disconnect)
+        self._receiver.send_function(dccsync_lib.disconnect)

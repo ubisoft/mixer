@@ -26,8 +26,8 @@ def buildCollectionRemoved(data):
     name_full, index = common.decodeString(data, 0)
     collection_logger.debug("buildCollectionRemove %s", name_full)
     collection = shareData.blenderCollections[name_full]
-    bpy.data.collections.remove(collection)
     del shareData.blenderCollections[name_full]
+    bpy.data.collections.remove(collection)
 
 
 def buildCollectionToCollection(data):
