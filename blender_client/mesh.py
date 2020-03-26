@@ -237,7 +237,7 @@ def encodeBaseMeshGeometry(mesh_data):
 
     verts_array = []
     for vert in bm.verts:
-        verts_array.extend((*vert.co, *vert.normal))
+        verts_array.extend((*vert.co,))
 
     stats_timer.checkpoint("make_verts_buffer")
 
@@ -514,9 +514,7 @@ def decodeBaseMesh(client, obj, data, index):
 
     for pos_idx in range(position_count):
         co, index = common.decodeVector3(data, index)
-        normal, index = common.decodeVector3(data, index)
         vert = bm.verts.new(co)
-        vert.normal = normal
 
     bm.verts.ensure_lookup_table()
 
@@ -557,6 +555,7 @@ def decodeBaseMesh(client, obj, data, index):
     index = decode_bmesh_layer(data, index, bm.loops.layers.uv, loops_iterator(bm), decode_layer_uv)
     index = decode_bmesh_layer(data, index, bm.loops.layers.color, loops_iterator(bm), decode_layer_color)
 
+    bm.normal_update()
     bm.to_mesh(obj.data)
     bm.free()
 
