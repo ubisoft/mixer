@@ -79,6 +79,9 @@ class ShareData:
         # {objectPath: [collectionName]}
         self.restoreToCollections: Mapping[str, List[str]] = {}
 
+        # {objectPath: [collectionName]}
+        self.restoreToCollections: Mapping[str, List[str]] = {}
+
         self.current_statistics = None
         self.current_stats_timer = None
         self.auto_save_statistics = False

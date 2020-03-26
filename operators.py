@@ -756,6 +756,7 @@ def isParentInCollection(collection, obj):
     return False
 
 
+@stats_timer(shareData)
 def send_scene_content():
     if get_dcc_sync_props().no_send_scene_content:
         return
