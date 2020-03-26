@@ -73,6 +73,7 @@ class MessageType(Enum):
     TRANSFORM = 201
     MESH = 202
     MATERIAL = 203
+    SOURCE_MESH = 204  # Original unbaked mesh
 
 
 class LightType(Enum):
@@ -153,7 +154,7 @@ def encodeInt(value):
 
 
 def decodeInt(data, index):
-    return struct.unpack('I', data[index:index+4])[0], index+4
+    return struct.unpack('i', data[index:index+4])[0], index+4
 
 
 def encodeVector2(value):
@@ -167,10 +168,24 @@ def decodeVector2(data, index):
 def encodeVector3(value):
     return struct.pack('3f', *(value.x, value.y, value.z))
 
-
 def decodeVector3(data, index):
     return struct.unpack('3f', data[index:index+3*4]), index+3*4
 
+def encodeVector4(value):
+    return struct.pack('4f', *(value[0], value[1], value[2], value[3]))
+
+def decodeVector4(data, index):
+    return struct.unpack('4f', data[index:index+4*4]), index+4*4
+
+def encodeMatrix(value):
+    return encodeVector4(value.col[0]) + encodeVector4(value.col[1]) + encodeVector4(value.col[2]) + encodeVector4(value.col[3])
+
+def decodeMatrix(data, index):
+    c0, index = decodeVector4(data, index)
+    c1, index = decodeVector4(data, index)
+    c2, index = decodeVector4(data, index)
+    c3, index = decodeVector4(data, index)
+    return (c0,c1,c2,c3), index
 
 def encodeColor(value):
     if len(value) == 3:
@@ -182,12 +197,11 @@ def encodeColor(value):
 def decodeColor(data, index):
     return struct.unpack('4f', data[index:index+4*4]), index+4*4
 
+def encodeQuaternion(value):
+    return struct.pack('4f', *(value.w, value.x, value.y, value.z))
 
-def encodeVector4(value):
-    return struct.pack('4f', *(value.x, value.y, value.z, value.w))
 
-
-def decodeVector4(data, index):
+def decodeQuaternion(data, index):
     return struct.unpack('4f', data[index:index+4*4]), index+4*4
 
 

@@ -16,7 +16,7 @@ from .blender_client import scene as scene_lib
 from . import clientBlender
 from . import ui
 from .data import get_dcc_sync_props
-from .stats import StatsTimer, get_stats_filename, save_statistics
+from .stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
 
 logger = logging.getLogger(__package__)
 logger.setLevel(logging.INFO)
@@ -262,7 +262,10 @@ def updateFrameChangedRelatedObjectsState(oldObjects: dict, newObjects: dict):
             shareData.objectsTransformed.add(objName)
 
 
-def updateObjectsState(oldObjects: dict, newObjects: dict, stats_timer: StatsTimer):
+@stats_timer(shareData)
+def updateObjectsState(oldObjects: dict, newObjects: dict):
+    stats_timer = shareData.current_stats_timer
+
     with stats_timer.child("checkObjectsAddedAndRemoved"):
         objects = set(newObjects.keys())
         shareData.objectsAdded = objects - oldObjects.keys()
@@ -479,6 +482,9 @@ def reparentObjects():
 
 
 def updateObjectsData():
+    if len(shareData.depsgraph.updates) == 0:
+        return  # Exit here to avoid noise if you want to put breakpoints in this function
+
     dataContainer = {}
     data = set()
     transforms = set()
@@ -520,7 +526,7 @@ def sendFrameChanged(scene):
     if not shareData.client:
         return
 
-    with StatsTimer(shareData.current_statistics, "sendFrameChanged") as timer:
+    with StatsTimer(shareData, "sendFrameChanged") as timer:
         with timer.child("setFrame"):
             shareData.client.sendFrame(scene.frame_current)
 
@@ -539,69 +545,67 @@ def sendFrameChanged(scene):
             shareData.updateObjectsInfo()
 
 
+@stats_timer(shareData)
 @persistent
-def sendSceneDataToServer(_=None):
-    """
-    depsgraph_update_post handler
-    """
+def sendSceneDataToServer(scene, dummy):
+    timer = shareData.current_stats_timer
+
     logger.info("sendSceneDataToServer")
     if not shareData.client:
         return
 
     shareData.setDirty()
-    with StatsTimer(shareData.current_statistics, "sendSceneDataToServer") as timer:
-        with timer.child("clearLists"):
-            shareData.clearLists()
+    with timer.child("clearLists"):
+        shareData.clearLists()
 
-        # prevent processing self events
-        if shareData.client.receivedCommandsProcessed:
-            if not shareData.client.blockSignals:
-                shareData.client.receivedCommandsProcessed = False
-            return
+    # prevent processing self events
+    if shareData.client.receivedCommandsProcessed:
+        if not shareData.client.blockSignals:
+            shareData.client.receivedCommandsProcessed = False
+        return
 
-        if not isInObjectMode():
-            return
+    if not isInObjectMode():
+        return
 
-        with timer.child("updateObjectsState") as child_timer:
-            updateObjectsState(shareData.oldObjects,
-                               shareData.blenderObjects, child_timer)
+    updateObjectsState(shareData.oldObjects,
+                       shareData.blenderObjects)
 
-        with timer.child("updateScenesState"):
-            updateScenesState()
+    with timer.child("updateScenesState"):
+        updateScenesState()
 
-        with timer.child("updateCollectionsState"):
-            updateCollectionsState()
+    with timer.child("updateCollectionsState"):
+        updateCollectionsState()
 
-        changed = False
-        with timer.child("checkForChangeAndSendUpdates"):
-            changed |= removeObjectsFromCollections()
-            changed |= removeObjectsFromScenes()
-            changed |= removeCollectionsFromCollections()
-            changed |= removeCollectionsFromScenes()
-            changed |= removeCollections()
-            changed |= removeScenes()
-            changed |= addObjects()
-            changed |= addCollections()
-            changed |= addScenes()
-            changed |= addCollectionsToScenes()
-            changed |= addCollectionsToCollections()
-            changed |= addObjectsToCollections()
-            changed |= addObjectsToScenes()
-            changed |= updateCollectionsParameters()
-            changed |= deleteSceneObjects()
-            changed |= renameObjects()
-            changed |= updateObjectsVisibility()
-            changed |= updateObjectsTransforms()
-            changed |= reparentObjects()
+    changed = False
+    with timer.child("checkForChangeAndSendUpdates"):
+        changed |= removeObjectsFromCollections()
+        changed |= removeObjectsFromScenes()
+        changed |= removeCollectionsFromCollections()
+        changed |= removeCollectionsFromScenes()
+        changed |= removeCollections()
+        changed |= removeScenes()
+        changed |= addObjects()
+        changed |= addCollections()
+        changed |= addScenes()
+        changed |= addCollectionsToScenes()
+        changed |= addCollectionsToCollections()
+        changed |= addObjectsToCollections()
+        changed |= addObjectsToScenes()
+        changed |= updateCollectionsParameters()
+        changed |= deleteSceneObjects()
+        changed |= renameObjects()
+        changed |= updateObjectsVisibility()
+        changed |= updateObjectsTransforms()
+        changed |= reparentObjects()
 
-        if not changed:
-            with timer.child("updateObjectsData"):
-                shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
-                updateObjectsData()
+    if not changed:
+        with timer.child("updateObjectsData"):
+            shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
+            updateObjectsData()
 
-        # update for next change
-        with timer.child("updateCurrentData"):
-            shareData.updateCurrentData()
+    # update for next change
+    with timer.child("updateCurrentData"):
+        shareData.updateCurrentData()
 
 
 @persistent
@@ -646,8 +650,9 @@ def remapObjectsInfo():
     shareData.oldObjects = shareData.blenderObjects
 
 
+@stats_timer(shareData)
 @persistent
-def onUndoRedoPost(scene):
+def onUndoRedoPost(scene, dummy):
     shareData.setDirty()
     # apply only in object mode
     if not isInObjectMode():
@@ -660,10 +665,9 @@ def onUndoRedoPost(scene):
         if k in oldObjectsName:
             oldObjectsName[k] = v
 
-    with StatsTimer(shareData.current_statistics, "onUndoRedoPost") as timer:
-        with timer.child("updateObjectsState") as child_timer:
-            updateObjectsState(
-                oldObjectsName, shareData.oldObjects, child_timer)
+    with StatsTimer(shareData, "updateObjectsState") as child_timer:
+        updateObjectsState(
+            oldObjectsName, shareData.oldObjects, child_timer)
 
     updateCollectionsState()
     updateScenesState()
@@ -757,10 +761,8 @@ def send_scene_content():
         return
 
     shareData.clearBeforeState()
-    sendSceneDataToServer()
+    sendSceneDataToServer(None, None)
 
-    # TODO_ could also send scene name here
-    # TODO_ also send frame info updates
     shareData.client.sendFrameStartEnd(
         bpy.context.scene.frame_start, bpy.context.scene.frame_end)
     shareData.client.sendFrame(bpy.context.scene.frame_current)

@@ -6,12 +6,27 @@ import copy
 import tempfile
 from datetime import datetime
 from pathlib import Path
+import functools
 
 logger = logging.getLogger(__package__)
 
 
 class StatsTimer():
-    def __init__(self, parent_stats_dict, key, log=False):
+    def __init__(self, share_data, key, log=None):
+        assert(share_data.current_statistics)
+
+        if log == None:
+            if share_data.current_stats_timer == None:
+                log = False
+            else:
+                log = share_data.current_stats_timer.log
+
+        self.share_data = share_data
+        if not share_data.current_stats_timer:
+            parent_stats_dict = share_data.current_statistics
+        else:
+            parent_stats_dict = share_data.current_stats_timer.stats_dict
+
         if log:
             logger.info(key)
         if not "children" in parent_stats_dict:
@@ -29,6 +44,8 @@ class StatsTimer():
     def __enter__(self):
         self.start = time.time()
         self.last_checkpoint_time = self.start
+        self.previous_stats_timer = self.share_data.current_stats_timer
+        self.share_data.current_stats_timer = self
         return self
 
     def __exit__(self, *args):
@@ -36,23 +53,21 @@ class StatsTimer():
         self.stats_dict["time"] += t
         self.stats_dict["max_time"] = max(t, self.stats_dict["max_time"])
         self.stats_dict["hit_count"] += 1
+        self.share_data.current_stats_timer = self.previous_stats_timer
+        if self.log:
+            logger.info(f"{self.key} done. Time = %f", t)
         return
 
     def reset_checkpoint(self):
         self.last_checkpoint_time = time.time()
 
     def checkpoint(self, key, log=None):
-        if log == None:
-            log = self.log
-        t = StatsTimer(self.stats_dict, key, log)
-        t.start = self.last_checkpoint_time
-        t.__exit__()
+        with StatsTimer(self.share_data, key, log) as t:
+            t.start = self.last_checkpoint_time  # Change start to measure time since previous checkpoint
         self.last_checkpoint_time = time.time()
 
     def child(self, key, log=None):
-        if log == None:
-            log = self.log
-        return StatsTimer(self.stats_dict, key, log)
+        return StatsTimer(self.share_data, key, log)
 
 
 def get_stats_directory():
@@ -93,3 +108,13 @@ def save_statistics(stats_dict, stats_directory):
     file = os.path.join(stats_directory, stats_dict["statsfile"])
     with open(file, "w") as f:
         json.dump(compute_final_statistics(stats_dict), f, indent=2)
+
+
+def stats_timer(shareData, log=None):
+    def innerDecorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with StatsTimer(shareData, func.__name__, log):
+                return func(*args, **kwargs)
+        return wrapper
+    return innerDecorator

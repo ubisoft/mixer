@@ -4,14 +4,17 @@ import os
 
 import bmesh
 import bpy
-from mathutils import Quaternion
+from mathutils import *
 from . import ui
 from . import operators
+from . import data
 from .shareData import shareData
 from .broadcaster import common
 from .broadcaster.client import Client
 from .blender_client import collection as collection_api
 from .blender_client import scene as scene_api
+from .blender_client import mesh as mesh_functions
+from .stats import stats_timer
 
 _STILL_ACTIVE = 259
 
@@ -56,7 +59,7 @@ class ClientBlender(Client):
         return path
 
     # get first collection
-    def getOrCreateCollection(self, name="Collection"):
+    def getOrCreateCollection(self, name: str):
         collection = shareData.blenderCollections.get(name)
         if not collection:
             bpy.ops.collection.create(name=name)
@@ -65,7 +68,7 @@ class ClientBlender(Client):
             bpy.context.scene.collection.children.link(collection)
         return collection
 
-    def getOrCreatePath(self, path, data=None):
+    def getOrCreatePath(self, path, data=None) -> bpy.types.Object:
         pathElem = path.split('/')
         parent = None
         ob = None
@@ -88,7 +91,7 @@ class ClientBlender(Client):
         return ob
 
     def getOrCreateObjectData(self, path, data):
-        self.getOrCreatePath(path, data)
+        return self.getOrCreatePath(path, data)
 
     def getOrCreateCamera(self, cameraName):
         camera = shareData.blenderCameras.get(cameraName)
@@ -165,101 +168,35 @@ class ClientBlender(Client):
             shareData._blenderMeshes[me.name_full] = me
         return me
 
-    def buildMesh(self, data):
-        index = 0
-        path, index = common.decodeString(data, index)
-        meshName, index = common.decodeString(data, index)
-        positions, index = common.decodeVector3Array(data, index)
-        normals, index = common.decodeVector3Array(data, index)
-        uvs, index = common.decodeVector2Array(data, index)
-        materialIndices, index = common.decodeInt2Array(data, index)
-        triangles, index = common.decodeInt3Array(data, index)
-        materialNames, index = common.decodeStringArray(data, index)
+    def setTransform(self, obj, parentInverseMatrix, basisMatrix, localMatrix):
+        obj.matrix_parent_inverse = parentInverseMatrix
+        obj.matrix_basis = basisMatrix
+        obj.matrix_local = localMatrix
 
-        bm = bmesh.new()
-        verts = []
-        for i in range(len(positions)):
-            vertex = bm.verts.new(positions[i])
-            # according to https://blender.stackexchange.com/questions/49357/bmesh-how-can-i-import-custom-vertex-normals
-            # normals are not working for bmesh...
-            vertex.normal = normals[i]
-            verts.append(vertex)
+    def buildMatrixFromComponents(self, translate, rotate, scale):
+        t = Matrix.Translation(translate)
+        r = Quaternion(rotate).to_matrix().to_4x4()
+        s = Matrix()
+        s[0][0] = scale[0]
+        s[1][1] = scale[1]
+        s[2][2] = scale[2]
+        return s @ r @ t
 
-        uv_layer = None
-        if len(uvs) > 0:
-            uv_layer = bm.loops.layers.uv.new()
-
-        currentMaterialIndex = 0
-        indexInMaterialIndices = 0
-        nextriangleIndex = len(triangles)
-        if len(materialIndices) > 1:
-            nextriangleIndex = materialIndices[indexInMaterialIndices + 1][0]
-        if len(materialIndices) > 0:
-            currentMaterialIndex = materialIndices[indexInMaterialIndices][1]
-
-        for i in range(len(triangles)):
-            if i >= nextriangleIndex:
-                indexInMaterialIndices = indexInMaterialIndices + 1
-                nextriangleIndex = len(triangles)
-                if len(materialIndices) > indexInMaterialIndices + 1:
-                    nextriangleIndex = materialIndices[indexInMaterialIndices + 1][0]
-                currentMaterialIndex = materialIndices[indexInMaterialIndices][1]
-
-            triangle = triangles[i]
-            i1 = triangle[0]
-            i2 = triangle[1]
-            i3 = triangle[2]
-            try:
-                face = bm.faces.new((verts[i1], verts[i2], verts[i3]))
-                face.material_index = currentMaterialIndex
-                if uv_layer:
-                    face.loops[0][uv_layer].uv = uvs[i1]
-                    face.loops[1][uv_layer].uv = uvs[i2]
-                    face.loops[2][uv_layer].uv = uvs[i3]
-            except:
-                pass
-
-        me = self.getOrCreateMesh(meshName)
-
-        bm.to_mesh(me)
-
-        # hack ! Since bmesh cannot be used to set custom normals
-        normals2 = []
-        for l in me.loops:
-            normals2.append(normals[l.vertex_index])
-        me.normals_split_custom_set(normals2)
-        me.use_auto_smooth = True
-
-        for materialName in materialNames:
-            material = self.getOrCreateMaterial(materialName)
-            if not materialName in me.materials:
-                me.materials.append(material)
-
-        bm.free()
-        self.getOrCreateObjectData(path, me)
-
-    def setTransform(self, obj, position, rotation, scale):
-        obj.location = position
-        quaternion = (rotation[3], rotation[0], rotation[1], rotation[2])
-        if obj.rotation_mode == 'AXIS_ANGLE':
-            axisAngle = Quaternion(quaternion).to_axis_angle()
-            obj.rotation_axis_angle[0] = axisAngle[1]
-            obj.rotation_axis_angle[1] = axisAngle[0][0]
-            obj.rotation_axis_angle[2] = axisAngle[0][1]
-            obj.rotation_axis_angle[3] = axisAngle[0][2]
-        elif obj.rotation_mode == 'QUATERNION':
-            obj.rotation_quaternion = quaternion
-        else:
-            obj.rotation_euler = Quaternion(
-                quaternion).to_euler(obj.rotation_mode)
-        obj.scale = scale
+    def decodeMatrix(self, data, index):
+        matrix_data, index = common.decodeMatrix(data, index)
+        m = Matrix()
+        m.col[0] = matrix_data[0]
+        m.col[1] = matrix_data[1]
+        m.col[2] = matrix_data[2]
+        m.col[3] = matrix_data[3]
+        return m, index
 
     def buildTransform(self, data):
         start = 0
         objectPath, start = common.decodeString(data, start)
-        position, start = common.decodeVector3(data, start)
-        rotation, start = common.decodeVector4(data, start)
-        scale, start = common.decodeVector3(data, start)
+        parentInvertMatrix, start = self.decodeMatrix(data, start)
+        basisMatrix, start = self.decodeMatrix(data, start)
+        localMatrix, start = self.decodeMatrix(data, start)
         visible, start = common.decodeBool(data, start)
 
         try:
@@ -268,7 +205,7 @@ class ClientBlender(Client):
             # Object doesn't exist anymore
             return
         if obj:
-            self.setTransform(obj, position, rotation, scale)
+            self.setTransform(obj, parentInvertMatrix, basisMatrix, localMatrix)
             obj.hide_viewport = not visible
 
     def getOrCreateMaterial(self, materialName):
@@ -389,9 +326,7 @@ class ClientBlender(Client):
     def buildDuplicate(self, data):
         srcPath, index = common.decodeString(data, 0)
         dstName, index = common.decodeString(data, index)
-        dstPosition, index = common.decodeVector3(data, index)
-        dstRotation, index = common.decodeVector4(data, index)
-        dstScale, index = common.decodeVector3(data, index)
+        basisMatrix, index = self.decodeMatrix(data, index)
 
         try:
             obj = self.getOrCreatePath(srcPath)
@@ -400,10 +335,10 @@ class ClientBlender(Client):
             if hasattr(obj, "data"):
                 newObj.data = obj.data.copy()
                 newObj.animation_data_clear()
-            collection = self.getOrCreateCollection()
-            collection.objects.link(newObj)
+            for collection in obj.users_collection:
+                collection.objects.link(newObj)
 
-            self.setTransform(newObj, dstPosition, dstRotation, dstScale)
+            self.setTransform(newObj, obj.matrix_parent_invert, basisMatrix, obj.matrix_parent_invert @ basisMatrix)
         except Exception:
             pass
 
@@ -422,8 +357,10 @@ class ClientBlender(Client):
         path, _ = common.decodeString(data, 0)
         obj = self.getOrCreatePath(path)
 
-        collections = obj.users_collection
-        for collection in collections:
+        shareData.restoreToCollections[obj.name_full] = []
+        restoreTo = shareData.restoreToCollections[obj.name_full]
+        for collection in obj.users_collection:
+            restoreTo.append(collection.name_full)
             collection.objects.unlink(obj)
         # collection = self.getOrCreateCollection()
         # collection.objects.unlink(obj)
@@ -439,19 +376,19 @@ class ClientBlender(Client):
         trashCollection = self.getOrCreateCollection("__Trash__")
         trashCollection.hide_viewport = True
         trashCollection.objects.unlink(obj)
-        collection = self.getOrCreateCollection()
-        collection.objects.link(obj)
+        restoreTo = shareData.restoreToCollections[obj.name_full]
+        for collectionName in restoreTo:
+            collection = self.getOrCreateCollection(collectionName)
+            collection.objects.link(obj)
+        del shareData.restoreToCollections[obj.name_full]
         if len(path) > 0:
-            obj.parent = shareData.blenderObjects[path.split('/')[-1]]
+            parentName = path.split('/')[-1]
+            obj.parent = shareData.blenderObjects.get(parentName, None)
 
     def getTransformBuffer(self, obj):
         path = self.getObjectPath(obj)
-        matrix = obj.matrix_local
-        translate = matrix.to_translation()
-        quaternion = matrix.to_quaternion()
-        scale = matrix.to_scale()
         visible = not obj.hide_viewport
-        return common.encodeString(path) + common.encodeVector3(translate) + common.encodeVector4(quaternion) + common.encodeVector3(scale) + common.encodeBool(visible)
+        return common.encodeString(path) + common.encodeMatrix(obj.matrix_parent_inverse) + common.encodeMatrix(obj.matrix_basis) + common.encodeMatrix(obj.matrix_local) + common.encodeBool(visible)
 
     def sendTransform(self, obj):
         transformBuffer = self.getTransformBuffer(obj)
@@ -686,107 +623,22 @@ class ClientBlender(Client):
     def getMeshName(self, mesh):
         return mesh.name_full
 
-    class CurrentBuffers:
-        vertices = []
-        normals = []
-        uvs = []
-        indices = []
-        materials = []
-        materialIndices = []    # array of triangle index, material index
-
-    def getMeshBuffers(self, obj, meshName):
-        self.CurrentBuffers.vertices = []
-        self.CurrentBuffers.normals = []
-        self.CurrentBuffers.uvs = []
-        self.CurrentBuffers.indices = []
-        self.CurrentBuffers.materials = []
-        self.CurrentBuffers.materialIndices = []
-
-        # compute modifiers
-        depsgraph = bpy.context.evaluated_depsgraph_get()
-        obj = obj.evaluated_get(depsgraph)
-
-        for slot in obj.material_slots[:]:
-            if slot.material:
-                self.CurrentBuffers.materials.append(
-                    slot.material.name_full.encode())
-            else:
-                self.CurrentBuffers.materials.append("Default".encode())
-
-        # triangulate mesh (before calculating normals)
-        mesh = obj.to_mesh()
-        if not mesh:
-            return None
-        bm = bmesh.new()
-        bm.from_mesh(mesh)
-        bmesh.ops.triangulate(bm, faces=bm.faces)
-        bm.to_mesh(mesh)
-        bm.free()
-
-        # Calculate normals, necessary if auto-smooth option enabled
-        mesh.calc_normals()
-        mesh.calc_normals_split()
-        # calc_loop_triangles resets normals so... don't use it
-
-        # get uv layer
-        uvlayer = mesh.uv_layers.active
-
-        currentMaterialIndex = -1
-        currentfaceIndex = 0
-        for f in mesh.polygons:
-            for loop_id in f.loop_indices:
-                index = mesh.loops[loop_id].vertex_index
-                self.CurrentBuffers.vertices.extend(mesh.vertices[index].co)
-                self.CurrentBuffers.normals.extend(mesh.loops[loop_id].normal)
-                if uvlayer:
-                    self.CurrentBuffers.uvs.extend(
-                        [x for x in uvlayer.data[loop_id].uv])
-                self.CurrentBuffers.indices.append(loop_id)
-
-            if f.material_index != currentMaterialIndex:
-                currentMaterialIndex = f.material_index
-                self.CurrentBuffers.materialIndices.append(currentfaceIndex)
-                self.CurrentBuffers.materialIndices.append(
-                    currentMaterialIndex)
-            currentfaceIndex = currentfaceIndex + 1
-
-        # Vericex count + binary vertices buffer
-        size = len(self.CurrentBuffers.vertices) // 3
-        binaryVerticesBuffer = common.intToBytes(
-            size, 4) + struct.pack(f'{len(self.CurrentBuffers.vertices)}f', *self.CurrentBuffers.vertices)
-        # Normals count + binary normals buffer
-        size = len(self.CurrentBuffers.normals) // 3
-        binaryNormalsBuffer = common.intToBytes(
-            size, 4) + struct.pack(f'{len(self.CurrentBuffers.normals)}f', *self.CurrentBuffers.normals)
-        # UVs count + binary uvs buffer
-        size = len(self.CurrentBuffers.uvs) // 2
-        binaryUVsBuffer = common.intToBytes(
-            size, 4) + struct.pack(f'{len(self.CurrentBuffers.uvs)}f', *self.CurrentBuffers.uvs)
-        # material indices + binary material indices buffer
-        size = len(self.CurrentBuffers.materialIndices) // 2
-        binaryMaterialIndicesBuffer = common.intToBytes(
-            size, 4) + struct.pack(f'{len(self.CurrentBuffers.materialIndices)}I', *self.CurrentBuffers.materialIndices)
-        # triangle indices count + binary triangle indices buffer
-        size = len(self.CurrentBuffers.indices) // 3
-        binaryIndicesBuffer = common.intToBytes(
-            size, 4) + struct.pack(f'{len(self.CurrentBuffers.indices)}I', *self.CurrentBuffers.indices)
-        # material names count + binary material bnames buffer
-        size = len(self.CurrentBuffers.materials)
-        binaryMaterialNames = common.intToBytes(size, 4)
-        for material in self.CurrentBuffers.materials:
-            binaryMaterialNames += common.intToBytes(
-                len(material), 4) + material
-
-        return common.encodeString(meshName) + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
-
+    @stats_timer(shareData)
     def sendMesh(self, obj):
         mesh = obj.data
         meshName = self.getMeshName(mesh)
         path = self.getObjectPath(obj)
-        meshBuffer = self.getMeshBuffers(obj, meshName)
-        if meshBuffer:
-            self.addCommand(common.Command(
-                common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
+
+        if data.get_dcc_sync_props().sync_blender:
+            sourceMeshBuffer = mesh_functions.getSourceMeshBuffers(obj, meshName)
+            if sourceMeshBuffer:
+                self.addCommand(common.Command(common.MessageType.SOURCE_MESH,
+                                               common.encodeString(path) + sourceMeshBuffer, 0))
+
+        if data.get_dcc_sync_props().sync_vrtist:
+            meshBuffer = mesh_functions.getMeshBuffers(obj, meshName)
+            if meshBuffer:
+                self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
 
     def sendCollectionInstance(self, obj):
         if not obj.instance_collection:
@@ -1244,7 +1096,7 @@ class ClientBlender(Client):
                 # this was a room protocol command that was processed
                 self.receivedCommandsProcessed = False
             else:
-                logging.info("Client %s Command %s received", self.name, command.type)
+                logger.info("Client %s Command %s received", self.name, command.type)
                 if command.type == common.MessageType.CONTENT:
                     self.receivedCommandsProcessed = False
                     self.sendSceneContent()
@@ -1258,8 +1110,8 @@ class ClientBlender(Client):
 
                 elif command.type == common.MessageType.CLEAR_CONTENT:
                     self.clearContent()
-                elif command.type == common.MessageType.MESH:
-                    self.buildMesh(command.data)
+                elif command.type == common.MessageType.SOURCE_MESH:
+                    mesh_functions.buildSourceMesh(self, command.data)
                 elif command.type == common.MessageType.TRANSFORM:
                     self.buildTransform(command.data)
                 elif command.type == common.MessageType.MATERIAL:

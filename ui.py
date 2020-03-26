@@ -172,6 +172,8 @@ class SettingsPanel(bpy.types.Panel):
             col.operator(operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
             col.prop(dcc_sync_props, "auto_save_statistics", text="Auto Save Statistics")
             col.prop(dcc_sync_props, "no_send_scene_content", text="No send_scene_content")
+            col.prop(dcc_sync_props, "sync_blender", text="Sync Blender")
+            col.prop(dcc_sync_props, "sync_vrtist", text="Sync VRtist")
 
 
 classes = (

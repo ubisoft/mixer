@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime
 
 import bpy
 
@@ -15,6 +16,10 @@ class RoomItem(bpy.types.PropertyGroup):
 
 class UserItem(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name")
+
+
+def stats_file_path_suffix():
+    return datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
 
 class DCCSyncProperties(bpy.types.PropertyGroup):
@@ -60,6 +65,9 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
     # Allow to quickly iterate debugging/test on large scenes with only one client in room
     # Main usage: optimization of client timers to check if updates are required
     no_send_scene_content: bpy.props.BoolProperty(default=False)
+
+    sync_blender: bpy.props.BoolProperty(default=True)
+    sync_vrtist: bpy.props.BoolProperty(default=True)
 
 
 def get_dcc_sync_props() -> DCCSyncProperties:
