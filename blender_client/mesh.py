@@ -12,10 +12,8 @@ from mathutils import Vector
 logger = logging.getLogger(f"dccsync")
 
 
-def deprecated_buildMesh(obj, data):
+def deprecated_buildMesh(obj, data, index):
     # Deprecated: Blender does not load a baked mesh
-    index = 0
-
     byte_size, index = common.decodeInt(data, index)
     if byte_size == 0:
         return index
@@ -25,7 +23,6 @@ def deprecated_buildMesh(obj, data):
     uvs, index = common.decodeVector2Array(data, index)
     materialIndices, index = common.decodeInt2Array(data, index)
     triangles, index = common.decodeInt3Array(data, index)
-    materialNames, index = common.decodeStringArray(data, index)
 
     bm = bmesh.new()
     verts = []
@@ -195,7 +192,7 @@ def buildMesh(obj, data, index):
     byte_size, index = common.decodeInt(data, index)
     if byte_size == 0:
         # No Blender mesh, lets read the baked mesh
-        return deprecated_buildMesh(obj, data[index:])
+        return deprecated_buildMesh(obj, data, index)
 
     bm = bmesh.new()
 
