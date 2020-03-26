@@ -117,138 +117,6 @@ def loops_iterator(bm):
 
 
 @stats_timer(shareData)
-def dump_mesh(mesh_data):
-    stats_timer = shareData.current_stats_timer
-
-    # We do not synchronize "select" and "hide" state of mesh elements
-    # because we consider them user specific.
-
-    bm = bmesh.new()
-    bm.from_mesh(mesh_data)
-
-    stats_timer.checkpoint("bmesh_from_mesh")
-
-    binary_buffer = bytes()
-
-    logger.debug("Writing %d vertices", len(bm.verts))
-    bm.verts.ensure_lookup_table()
-
-    verts_array = []
-    for vert in bm.verts:
-        verts_array.extend((*vert.co, *vert.normal))
-
-    stats_timer.checkpoint("make_verts_buffer")
-
-    binary_buffer += struct.pack(f"1I{len(verts_array)}f", len(bm.verts), *verts_array)
-
-    stats_timer.checkpoint("encode_verts_buffer")
-
-    # Vertex layers
-    # Ignored layers for now:
-    # - skin (BMVertSkin)
-    # - deform (BMDeformVert)
-    # - paint_mask (float)
-    # Other ignored layers:
-    # - shape: shape keys are handled with Shape Keys at the mesh and object level
-    # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.verts.layers.bevel_weight, bm.verts, extract_layer_float)
-
-    stats_timer.checkpoint("verts_layers")
-
-    logger.debug("Writing %d edges", len(bm.edges))
-    bm.edges.ensure_lookup_table()
-
-    edges_array = []
-    for edge in bm.edges:
-        edges_array.extend((edge.verts[0].index, edge.verts[1].index, edge.smooth, edge.seam))
-
-    stats_timer.checkpoint("make_edges_buffer")
-
-    binary_buffer += struct.pack(f"1I{len(edges_array)}I", len(bm.edges), *edges_array)
-
-    stats_timer.checkpoint("encode_edges_buffer")
-
-    # Edge layers
-    # Ignored layers for now: None
-    # Other ignored layers:
-    # - freestyle: of type NotImplementedType, maybe reserved for future dev
-    # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.edges.layers.bevel_weight, bm.edges, extract_layer_float)
-    binary_buffer += encode_bmesh_layer(bm.edges.layers.crease, bm.edges, extract_layer_float)
-
-    stats_timer.checkpoint("edges_layers")
-
-    logger.debug("Writing %d faces", len(bm.faces))
-    bm.faces.ensure_lookup_table()
-
-    faces_array = []
-    for face in bm.faces:
-        faces_array.extend((face.material_index, face.smooth, len(face.verts)))
-        faces_array.extend((vert.index for vert in face.verts))
-
-    stats_timer.checkpoint("make_faces_buffer")
-
-    binary_buffer += struct.pack(f"1I{len(faces_array)}I", len(bm.faces), *faces_array)
-
-    stats_timer.checkpoint("encode_faces_buffer")
-
-    # Face layers
-    # Ignored layers for now: None
-    # Other ignored layers:
-    # - freestyle: of type NotImplementedType, maybe reserved for future dev
-    # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.faces.layers.face_map, bm.faces, extract_layer_int)
-
-    stats_timer.checkpoint("faces_layers")
-
-    # Loops layers
-    # A loop is an edge attached to a face (so each edge of a manifold can have 2 loops at most).
-    # Ignored layers for now: None
-    # Other ignored layers:
-    # - float, int, string: don't really know their role
-    binary_buffer += encode_bmesh_layer(bm.loops.layers.uv, loops_iterator(bm), extract_layer_uv)
-    binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), extract_layer_color)
-
-    stats_timer.checkpoint("loops_layers")
-
-    bm.free()
-
-    # Shape keys
-    # source https://blender.stackexchange.com/questions/111661/creating-shape-keys-using-python
-    if mesh_data.shape_keys == None:
-        binary_buffer += common.encodeInt(0)  # Indicate 0 key blocks
-    else:
-        logger.debug("Writing %d shape keys", len(mesh_data.shape_keys.key_blocks))
-
-        binary_buffer += common.encodeInt(len(mesh_data.shape_keys.key_blocks))
-        # Encode names
-        for key_block in mesh_data.shape_keys.key_blocks:
-            binary_buffer += common.encodeString(key_block.name)
-        # Encode vertex group names
-        for key_block in mesh_data.shape_keys.key_blocks:
-            binary_buffer += common.encodeString(key_block.vertex_group)
-        # Encode relative key names
-        for key_block in mesh_data.shape_keys.key_blocks:
-            binary_buffer += common.encodeString(key_block.relative_key.name)
-        # Encode data
-        shape_keys_buffer = []
-        fmt_str = ""
-        for key_block in mesh_data.shape_keys.key_blocks:
-            shape_keys_buffer.extend((key_block.mute, key_block.value, key_block.slider_min,
-                                      key_block.slider_max, len(key_block.data)))
-            fmt_str += f"1I1f1f1f1I{(3 * len(key_block.data))}f"
-            for i in range(len(key_block.data)):
-                shape_keys_buffer.extend(key_block.data[i].co)
-        binary_buffer += struct.pack(f"{fmt_str}", *shape_keys_buffer)
-
-        binary_buffer += common.encodeBool(mesh_data.shape_keys.use_relative)
-
-    stats_timer.checkpoint("shape_keys")
-
-    return binary_buffer
-
-
-@stats_timer(shareData)
 def encodeBakedMesh(obj):
     """
     Bake an object as a triangle mesh and encode it.
@@ -351,13 +219,145 @@ def encodeBakedMesh(obj):
 
 
 @stats_timer(shareData)
+def encodeMeshGeometry(mesh_data):
+    stats_timer = shareData.current_stats_timer
+
+    # We do not synchronize "select" and "hide" state of mesh elements
+    # because we consider them user specific.
+
+    bm = bmesh.new()
+    bm.from_mesh(mesh_data)
+
+    stats_timer.checkpoint("bmesh_from_mesh")
+
+    binary_buffer = bytes()
+
+    logger.debug("Writing %d vertices", len(bm.verts))
+    bm.verts.ensure_lookup_table()
+
+    verts_array = []
+    for vert in bm.verts:
+        verts_array.extend((*vert.co, *vert.normal))
+
+    stats_timer.checkpoint("make_verts_buffer")
+
+    binary_buffer += struct.pack(f"1I{len(verts_array)}f", len(bm.verts), *verts_array)
+
+    stats_timer.checkpoint("encode_verts_buffer")
+
+    # Vertex layers
+    # Ignored layers for now:
+    # - skin (BMVertSkin)
+    # - deform (BMDeformVert)
+    # - paint_mask (float)
+    # Other ignored layers:
+    # - shape: shape keys are handled with Shape Keys at the mesh and object level
+    # - float, int, string: don't really know their role
+    binary_buffer += encode_bmesh_layer(bm.verts.layers.bevel_weight, bm.verts, extract_layer_float)
+
+    stats_timer.checkpoint("verts_layers")
+
+    logger.debug("Writing %d edges", len(bm.edges))
+    bm.edges.ensure_lookup_table()
+
+    edges_array = []
+    for edge in bm.edges:
+        edges_array.extend((edge.verts[0].index, edge.verts[1].index, edge.smooth, edge.seam))
+
+    stats_timer.checkpoint("make_edges_buffer")
+
+    binary_buffer += struct.pack(f"1I{len(edges_array)}I", len(bm.edges), *edges_array)
+
+    stats_timer.checkpoint("encode_edges_buffer")
+
+    # Edge layers
+    # Ignored layers for now: None
+    # Other ignored layers:
+    # - freestyle: of type NotImplementedType, maybe reserved for future dev
+    # - float, int, string: don't really know their role
+    binary_buffer += encode_bmesh_layer(bm.edges.layers.bevel_weight, bm.edges, extract_layer_float)
+    binary_buffer += encode_bmesh_layer(bm.edges.layers.crease, bm.edges, extract_layer_float)
+
+    stats_timer.checkpoint("edges_layers")
+
+    logger.debug("Writing %d faces", len(bm.faces))
+    bm.faces.ensure_lookup_table()
+
+    faces_array = []
+    for face in bm.faces:
+        faces_array.extend((face.material_index, face.smooth, len(face.verts)))
+        faces_array.extend((vert.index for vert in face.verts))
+
+    stats_timer.checkpoint("make_faces_buffer")
+
+    binary_buffer += struct.pack(f"1I{len(faces_array)}I", len(bm.faces), *faces_array)
+
+    stats_timer.checkpoint("encode_faces_buffer")
+
+    # Face layers
+    # Ignored layers for now: None
+    # Other ignored layers:
+    # - freestyle: of type NotImplementedType, maybe reserved for future dev
+    # - float, int, string: don't really know their role
+    binary_buffer += encode_bmesh_layer(bm.faces.layers.face_map, bm.faces, extract_layer_int)
+
+    stats_timer.checkpoint("faces_layers")
+
+    # Loops layers
+    # A loop is an edge attached to a face (so each edge of a manifold can have 2 loops at most).
+    # Ignored layers for now: None
+    # Other ignored layers:
+    # - float, int, string: don't really know their role
+    binary_buffer += encode_bmesh_layer(bm.loops.layers.uv, loops_iterator(bm), extract_layer_uv)
+    binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), extract_layer_color)
+
+    stats_timer.checkpoint("loops_layers")
+
+    bm.free()
+
+    return binary_buffer
+
+
+@stats_timer(shareData)
 def encodeBaseMesh(obj):
     # Temporary for curves and other objects that support to_mesh()
     # #todo Implement correct base encoding for these objects
     mesh_data = obj.data if obj.type == 'MESH' else obj.to_mesh()
     assert(mesh_data != None)
 
-    binary_buffer = dump_mesh(mesh_data)
+    binary_buffer = encodeMeshGeometry(mesh_data)
+
+    # Shape keys
+    # source https://blender.stackexchange.com/questions/111661/creating-shape-keys-using-python
+    if mesh_data.shape_keys == None:
+        binary_buffer += common.encodeInt(0)  # Indicate 0 key blocks
+    else:
+        logger.debug("Writing %d shape keys", len(mesh_data.shape_keys.key_blocks))
+
+        binary_buffer += common.encodeInt(len(mesh_data.shape_keys.key_blocks))
+        # Encode names
+        for key_block in mesh_data.shape_keys.key_blocks:
+            binary_buffer += common.encodeString(key_block.name)
+        # Encode vertex group names
+        for key_block in mesh_data.shape_keys.key_blocks:
+            binary_buffer += common.encodeString(key_block.vertex_group)
+        # Encode relative key names
+        for key_block in mesh_data.shape_keys.key_blocks:
+            binary_buffer += common.encodeString(key_block.relative_key.name)
+        # Encode data
+        shape_keys_buffer = []
+        fmt_str = ""
+        for key_block in mesh_data.shape_keys.key_blocks:
+            shape_keys_buffer.extend((key_block.mute, key_block.value, key_block.slider_min,
+                                      key_block.slider_max, len(key_block.data)))
+            fmt_str += f"1I1f1f1f1I{(3 * len(key_block.data))}f"
+            for i in range(len(key_block.data)):
+                shape_keys_buffer.extend(key_block.data[i].co)
+        binary_buffer += struct.pack(f"{fmt_str}", *shape_keys_buffer)
+
+        binary_buffer += common.encodeBool(mesh_data.shape_keys.use_relative)
+
+    stats_timer.checkpoint("shape_keys")
 
     # Vertex Groups
     verts_per_group = {}
