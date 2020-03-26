@@ -219,7 +219,7 @@ def encodeBakedMesh(obj):
 
 
 @stats_timer(shareData)
-def encodeMeshGeometry(mesh_data):
+def encodeBaseMeshGeometry(mesh_data):
     stats_timer = shareData.current_stats_timer
 
     # We do not synchronize "select" and "hide" state of mesh elements
@@ -320,12 +320,14 @@ def encodeMeshGeometry(mesh_data):
 
 @stats_timer(shareData)
 def encodeBaseMesh(obj):
+    stats_timer = shareData.current_stats_timer
+
     # Temporary for curves and other objects that support to_mesh()
     # #todo Implement correct base encoding for these objects
     mesh_data = obj.data if obj.type == 'MESH' else obj.to_mesh()
     assert(mesh_data != None)
 
-    binary_buffer = encodeMeshGeometry(mesh_data)
+    binary_buffer = encodeBaseMeshGeometry(mesh_data)
 
     # Shape keys
     # source https://blender.stackexchange.com/questions/111661/creating-shape-keys-using-python
@@ -402,10 +404,32 @@ def encodeBaseMesh(obj):
     if obj.type != 'MESH':
         obj.to_mesh_clear()
 
-    # todo: custom split normals
-    # if mesh_data.has_custom_normals:
-    #         # Custom normals are all (0, 0, 0) until calling calc_normals_split() or calc_tangents().
-    #     mesh_data.calc_normals_split()
+    return binary_buffer
+
+
+@stats_timer(shareData)
+def encodeMesh(obj, encode_base_mesh, encode_baked_mesh):
+    binary_buffer = bytes()
+
+    if encode_base_mesh:
+        mesh_buffer = encodeBaseMesh(obj)
+        binary_buffer += common.encodeInt(len(mesh_buffer))
+        binary_buffer += mesh_buffer
+    else:
+        binary_buffer += common.encodeInt(0)
+
+    if encode_baked_mesh:
+        mesh_buffer = encodeBakedMesh(obj)
+        binary_buffer += common.encodeInt(len(mesh_buffer))
+        binary_buffer += mesh_buffer
+    else:
+        binary_buffer += common.encodeInt(0)
+
+    # Materials
+    materials = []
+    for material in obj.data.materials:
+        materials.append(material.name_full if material != None else "")
+    binary_buffer += common.encodeStringArray(materials)
 
     return binary_buffer
 
@@ -482,12 +506,7 @@ def decodeBakedMesh(obj, data, index):
 
 
 @stats_timer(shareData)
-def decodeMesh(client, obj, data, index):
-    byte_size, index = common.decodeInt(data, index)
-    if byte_size == 0:
-        # No base mesh, lets read the baked mesh
-        return decodeBakedMesh(obj, data, index)
-
+def decodeBaseMesh(client, obj, data, index):
     bm = bmesh.new()
 
     position_count, index = common.decodeInt(data, index)
@@ -608,9 +627,20 @@ def decodeMesh(client, obj, data, index):
         vertex_colors.name, index = common.decodeString(data, index)
         vertex_colors.active_render, index = common.decodeBool(data, index)
 
-    # Skip the baked mesh (its size is encoded here)
-    baked_mesh_byte_size, index = common.decodeInt(data, index)
-    index += baked_mesh_byte_size
+    return index
+
+
+@stats_timer(shareData)
+def decodeMesh(client, obj, data, index):
+    byte_size, index = common.decodeInt(data, index)
+    if byte_size == 0:
+        # No base mesh, lets read the baked mesh
+        index = decodeBakedMesh(obj, data, index)
+    else:
+        index = decodeBaseMesh(client, obj, data, index)
+        # Skip the baked mesh (its size is encoded here)
+        baked_mesh_byte_size, index = common.decodeInt(data, index)
+        index += baked_mesh_byte_size
 
     # Materials
     materialNames, index = common.decodeStringArray(data, index)
@@ -619,30 +649,3 @@ def decodeMesh(client, obj, data, index):
         obj.data.materials.append(material)
 
     return index
-
-
-@stats_timer(shareData)
-def encodeMesh(obj, encode_base_mesh, encode_baked_mesh):
-    binary_buffer = bytes()
-
-    if encode_base_mesh:
-        mesh_buffer = encodeBaseMesh(obj)
-        binary_buffer += common.encodeInt(len(mesh_buffer))
-        binary_buffer += mesh_buffer
-    else:
-        binary_buffer += common.encodeInt(0)
-
-    if encode_baked_mesh:
-        mesh_buffer = encodeBakedMesh(obj)
-        binary_buffer += common.encodeInt(len(mesh_buffer))
-        binary_buffer += mesh_buffer
-    else:
-        binary_buffer += common.encodeInt(0)
-
-    # Materials
-    materials = []
-    for material in obj.data.materials:
-        materials.append(material.name_full if material != None else "")
-    binary_buffer += common.encodeStringArray(materials)
-
-    return binary_buffer
