@@ -633,27 +633,10 @@ class ClientBlender(Client):
         meshName = self.getMeshName(mesh)
         path = self.getObjectPath(obj)
 
-        binary_buffer = bytes()
+        binary_buffer = common.encodeString(path) + common.encodeString(meshName)
 
-        if data.get_dcc_sync_props().sync_blender:
-            mesh_buffer = mesh_functions.getSourceMeshBuffers(obj)
-            binary_buffer += common.encodeInt(len(mesh_buffer))
-            binary_buffer += mesh_buffer
-        else:
-            binary_buffer += common.encodeInt(0)
-
-        if data.get_dcc_sync_props().sync_vrtist:
-            mesh_buffer = mesh_functions.getMeshBuffers(obj)
-            binary_buffer += common.encodeInt(len(mesh_buffer))
-            binary_buffer += mesh_buffer
-        else:
-            binary_buffer += common.encodeInt(0)
-
-        # Materials
-        materials = []
-        for material in obj.data.materials:
-            materials.append(material.name_full if material != None else "")
-        binary_buffer += common.encodeStringArray(materials)
+        binary_buffer += mesh_functions.encodeMesh(obj, data.get_dcc_sync_props().send_base_meshes,
+                                                   data.get_dcc_sync_props().send_baked_meshes)
 
         material_link_dict = {
             'OBJECT': 0,
@@ -669,8 +652,7 @@ class ClientBlender(Client):
             else:
                 binary_buffer += common.encodeString(slot.material.name if slot.material != None else "")
 
-        self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(
-            path) + common.encodeString(meshName) + binary_buffer, 0))
+        self.addCommand(common.Command(common.MessageType.MESH, binary_buffer, 0))
 
     @stats_timer(shareData)
     def buildMesh(self, commandData):
@@ -684,22 +666,17 @@ class ClientBlender(Client):
             logger.error("Received a mesh for object %s while begin in EDIT mode, ignoring.", path)
             return
 
-        index = mesh_functions.buildMesh(obj, commandData, index)
+        index = mesh_functions.decodeMesh(self, obj, commandData, index)
 
-        # Materials
-        materialNames, index = common.decodeStringArray(commandData, index)
-        for materialName in materialNames:
-            material = self.getOrCreateMaterial(materialName) if materialName != "" else None
-            obj.data.materials.append(material)
-
+        material_slot_count = len(obj.data.materials)
         material_link_dict = [
             'OBJECT',
             'DATA'
         ]
-        material_links = struct.unpack(f'{len(materialNames)}I', commandData[index: index + 4 * len(materialNames)])
+        material_links = struct.unpack(f'{material_slot_count}I', commandData[index: index + 4 * material_slot_count])
         for link, slot in zip(material_links, obj.material_slots):
             slot.link = material_link_dict[link]
-        index += 4 * len(materialNames)
+        index += 4 * material_slot_count
 
         for slot in obj.material_slots:
             material_name, index = common.decodeString(commandData, index)

@@ -67,8 +67,8 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
     # Main usage: optimization of client timers to check if updates are required
     no_send_scene_content: bpy.props.BoolProperty(default=False)
 
-    sync_blender: bpy.props.BoolProperty(default=True)
-    sync_vrtist: bpy.props.BoolProperty(default=True)
+    send_base_meshes: bpy.props.BoolProperty(default=True)
+    send_baked_meshes: bpy.props.BoolProperty(default=True)
 
 
 def get_dcc_sync_props() -> DCCSyncProperties:
