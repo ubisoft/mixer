@@ -166,16 +166,16 @@ def register():
 if __name__ == '__main__':
 
     args = parse()
-    try:
-        import ptvsd
-    except ImportError:
-        ptvsd = None
 
-    if ptvsd:
-        if args.ptvsd:
+    if args.ptvsd:
+        # do not attempt to load ptvsd by default as it tends to crash Blender
+        try:
+            import ptvsd
             ptvsd.enable_attach(address=('localhost', args.ptvsd), redirect_output=True)
-        if args.wait_for_debugger:
-            ptvsd.wait_for_attach()
+            if args.wait_for_debugger:
+                ptvsd.wait_for_attach()
+        except ImportError:
+            pass
 
     logger.info('Starting:')
     logger.info('  python port %s', args.port)

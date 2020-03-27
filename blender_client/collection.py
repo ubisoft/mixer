@@ -26,19 +26,8 @@ def buildCollectionRemoved(data):
     name_full, index = common.decodeString(data, 0)
     collection_logger.debug("buildCollectionRemove %s", name_full)
     collection = shareData.blenderCollections[name_full]
-    bpy.data.collections.remove(collection)
     del shareData.blenderCollections[name_full]
-
-
-def buildCollectionToScene(data):
-    name_full, _ = common.decodeString(data, 0)
-    collection_logger.debug("buildCollectionToScene %s", name_full)
-    collection = shareData.blenderCollections[name_full]
-
-    # We may have received an object creation message before this collection link message
-    # and object creation will have created and linked the collecetion if needed
-    if bpy.context.scene.collection.children.get(collection.name) is None:
-        bpy.context.scene.collection.children.link(collection)
+    bpy.data.collections.remove(collection)
 
 
 def buildCollectionToCollection(data):

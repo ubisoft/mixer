@@ -167,7 +167,7 @@ class Connection:
                 break
 
             if command is not None:
-                logging.debug("client % s: % s: % s received", self.address[0], self.address[1], command.type)
+                logging.debug("Received from %s:%s - %s", self.address[0], self.address[1], command.type)
 
                 if command.type == common.MessageType.JOIN_ROOM:
                     self.joinRoom(command.data.decode())

@@ -1,24 +1,20 @@
 import logging
-import queue
 import struct
+import os
+
 import bmesh
 import bpy
-from . import data
+from mathutils import *
 from . import ui
+from . import operators
+from . import data
 from .shareData import shareData
 from .broadcaster import common
 from .broadcaster.client import Client
-from .stats import stats_timer
-from mathutils import *
-import os
-import platform
-import ctypes
-from . import operators
-
-from .blender_client import collection
+from .blender_client import collection as collection_api
+from .blender_client import scene as scene_api
 from .blender_client import mesh as mesh_functions
-
-from .shareData import shareData
+from .stats import stats_timer
 
 _STILL_ACTIVE = 259
 
@@ -36,9 +32,8 @@ class ClientBlender(Client):
             host, port, name=name, delegate=self)
 
         self.textures = set()
-        self.currentSceneName = ""
-
         self.callbacks = {}
+
         self.blenderPID = os.getpid()
 
     def blenderExists(self):
@@ -638,7 +633,7 @@ class ClientBlender(Client):
             sourceMeshBuffer = mesh_functions.getSourceMeshBuffers(obj, meshName)
             if sourceMeshBuffer:
                 self.addCommand(common.Command(common.MessageType.SOURCE_MESH,
-                                           common.encodeString(path) + sourceMeshBuffer, 0))
+                                               common.encodeString(path) + sourceMeshBuffer, 0))
 
         if data.get_dcc_sync_props().sync_vrtist:
             meshBuffer = mesh_functions.getMeshBuffers(obj, meshName)
@@ -654,19 +649,6 @@ class ClientBlender(Client):
             instanceName) + common.encodeString(instantiatedCollection)
         self.addCommand(common.Command(
             common.MessageType.INSTANCE_COLLECTION, buffer, 0))
-
-    def sendSceneObject(self, obj):
-        buffer = common.encodeString(obj.name_full)
-        self.addCommand(common.Command(
-            common.MessageType.ADD_OBJECT_TO_SCENE, buffer, 0))
-
-    def sendSceneCollection(self, col):
-        # TODO a bit shaky. Collections that are children of scene collection at
-        # startup are sent with ADD_COLLECTION_TO_SCENE, but adter startup they are sent with
-        # ADD_COLLECTION_TO_COLLECTION
-        buffer = common.encodeString(col.name_full)
-        self.addCommand(common.Command(
-            common.MessageType.ADD_COLLECTION_TO_SCENE, buffer, 0))
 
     def sendSetCurrentScene(self, name):
         buffer = common.encodeString(name)
@@ -1114,9 +1096,10 @@ class ClientBlender(Client):
                 # this was a room protocol command that was processed
                 self.receivedCommandsProcessed = False
             else:
+                logger.info("Client %s Command %s received", self.name, command.type)
                 if command.type == common.MessageType.CONTENT:
-                    self.sendSceneContent()
                     self.receivedCommandsProcessed = False
+                    self.sendSceneContent()
 
                 elif command.type == common.MessageType.GREASE_PENCIL_MESH:
                     self.buildGreasePencilMesh(command.data)
@@ -1151,21 +1134,35 @@ class ClientBlender(Client):
                     self.buildTextureFile(command.data)
 
                 elif command.type == common.MessageType.COLLECTION:
-                    collection.buildCollection(command.data)
+                    collection_api.buildCollection(command.data)
                 elif command.type == common.MessageType.COLLECTION_REMOVED:
-                    collection.buildCollectionRemoved(command.data)
-                elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
-                    collection.buildCollectionToScene(command.data)
-                elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
-                    collection.buildCollectionToCollection(command.data)
-                elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
-                    collection.buildRemoveCollectionFromCollection(command.data)
-                elif command.type == common.MessageType.ADD_OBJECT_TO_COLLECTION:
-                    collection.buildAddObjectToCollection(command.data)
-                elif command.type == common.MessageType.REMOVE_OBJECT_FROM_COLLECTION:
-                    collection.buildRemoveObjectFromCollection(command.data)
+                    collection_api.buildCollectionRemoved(command.data)
+
                 elif command.type == common.MessageType.INSTANCE_COLLECTION:
-                    collection.buildCollectionInstance(command.data)
+                    collection_api. buildCollectionInstance(command.data)
+
+                elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
+                    collection_api.buildCollectionToCollection(command.data)
+                elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
+                    collection_api.buildRemoveCollectionFromCollection(command.data)
+                elif command.type == common.MessageType.ADD_OBJECT_TO_COLLECTION:
+                    collection_api.buildAddObjectToCollection(command.data)
+                elif command.type == common.MessageType.REMOVE_OBJECT_FROM_COLLECTION:
+                    collection_api.buildRemoveObjectFromCollection(command.data)
+
+                elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
+                    scene_api.buildCollectionToScene(command.data)
+                elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_SCENE:
+                    scene_api.buildRemoveCollectionFromScene(command.data)
+                elif command.type == common.MessageType.ADD_OBJECT_TO_SCENE:
+                    scene_api.buildAddObjectToScene(command.data)
+                elif command.type == common.MessageType.REMOVE_OBJECT_FROM_SCENE:
+                    scene_api.buildRemoveObjectFromScene(command.data)
+
+                elif command.type == common.MessageType.SCENE:
+                    scene_api.buildScene(command.data)
+                elif command.type == common.MessageType.SCENE_REMOVED:
+                    scene_api.buildSceneRemoved(command.data)
 
                 self.receivedCommands.task_done()
                 self.blockSignals = False
