@@ -131,7 +131,9 @@ def encodeBakedMesh(obj):
 
     # Triangulate mesh (before calculating normals)
     mesh = obj.data if obj.type == 'MESH' else obj.to_mesh()
-    assert(mesh != None)
+    if mesh == None:
+        # This happens for empty curves
+        return bytes()
 
     bm = bmesh.new()
     bm.from_mesh(mesh)
@@ -325,7 +327,10 @@ def encodeBaseMesh(obj):
     # Temporary for curves and other objects that support to_mesh()
     # #todo Implement correct base encoding for these objects
     mesh_data = obj.data if obj.type == 'MESH' else obj.to_mesh()
-    assert(mesh_data != None)
+    if mesh_data == None:
+        # This happens for empty curves
+        # This is temporary, when curves will be fully implemented we will encode something
+        return bytes()
 
     binary_buffer = encodeBaseMeshGeometry(mesh_data)
 
@@ -358,8 +363,6 @@ def encodeBaseMesh(obj):
         binary_buffer += struct.pack(f"{fmt_str}", *shape_keys_buffer)
 
         binary_buffer += common.encodeBool(mesh_data.shape_keys.use_relative)
-
-    stats_timer.checkpoint("shape_keys")
 
     # Vertex Groups
     verts_per_group = {}
@@ -631,6 +634,9 @@ def decodeBaseMesh(client, obj, data, index):
 
 @stats_timer(shareData)
 def decodeMesh(client, obj, data, index):
+    assert(obj.data)
+
+    # Clear materials before building faces because it erase material idx of faces
     obj.data.materials.clear()
 
     byte_size, index = common.decodeInt(data, index)
