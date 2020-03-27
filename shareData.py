@@ -19,6 +19,9 @@ class ShareData:
         self.sessionId = 0  # For logging and debug
         self.client: clientBlender.ClientBlender = None
 
+        self.clearAll()
+
+    def clearAll(self):
         # equivalent to handlers set
         self.currentRoom: str = None
 
@@ -76,6 +79,13 @@ class ShareData:
 
         self._blenderCollections = {}
         self.blenderCollectionsDirty = True
+
+        self.pendingParenting = set()
+
+    def leaveCurrentRoom(self):
+        if self.client:
+            self.client.leaveRoom(shareData.currentRoom)
+        self.clearAll()
 
     def setDirty(self):
         self.blenderObjectsDirty = True

@@ -97,9 +97,7 @@ def leave_current_room():
     # room ==> client
     assert not shareData.currentRoom or shareData.client
     if shareData.currentRoom:
-        if shareData.client:
-            shareData.client.leaveRoom(shareData.currentRoom)
-        shareData.currentRoom = None
+        shareData.leaveCurrentRoom()
         set_handlers(False)
 
     if None != shareData.current_statistics and shareData.auto_save_statistics:
@@ -622,34 +620,34 @@ def updateListUsers(client_ids: Mapping[str, str] = None):
 def clear_scene_content():
     set_handlers(False)
 
-    collections = []
-    objs = []
-    for collection in bpy.data.collections:
-        collections.append(collection)
-        for obj in collection.objects:
-            if obj.type == 'MESH' or obj.type == 'LIGHT' or obj.type == 'CAMERA':
-                objs.append(obj)
+    for obj in bpy.data.objects:
+        bpy.data.objects.remove(obj)
 
-    for obj in objs:
-        bpy.data.objects.remove(obj, do_unlink=True)
+    for obj in bpy.data.cameras:
+        bpy.data.cameras.remove(obj)
+
+    for obj in bpy.data.lights:
+        bpy.data.lights.remove(obj)
 
     for block in bpy.data.meshes:
-        if block.users == 0:
-            bpy.data.meshes.remove(block)
+        bpy.data.meshes.remove(block)
+
+    for block in bpy.data.curves:
+        bpy.data.curves.remove(block)
+
+    for block in bpy.data.grease_pencils:
+        bpy.data.grease_pencils.remove(block)
 
     for block in bpy.data.materials:
-        if block.users == 0:
-            bpy.data.materials.remove(block)
+        bpy.data.materials.remove(block)
 
     for block in bpy.data.textures:
-        if block.users == 0:
-            bpy.data.textures.remove(block)
+        bpy.data.textures.remove(block)
 
     for block in bpy.data.images:
-        if block.users == 0:
-            bpy.data.images.remove(block)
+        bpy.data.images.remove(block)
 
-    for collection in collections:
+    for collection in bpy.data.collections:
         bpy.data.collections.remove(collection)
 
     set_handlers(True)
