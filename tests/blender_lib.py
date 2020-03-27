@@ -49,7 +49,7 @@ def create_object_in_collection(parent_name: str, child_name: str):
     parent.objects.link(child)
 
 
-def add_object_to_collection(parent_name: str, child_name: str):
+def link_object_to_collection(parent_name: str, child_name: str):
     import bpy
     parent = bpy.data.collections[parent_name]
     child = bpy.data.objects[child_name]
@@ -75,16 +75,12 @@ def rename_collection(old_name: str, new_name: str):
     c.name = new_name
 
 
-def instanciate_collection(collection_name: str, instance_name: str):
+def new_collection_instance(collection_name: str, instance_name: str):
     import bpy
     collection = bpy.data.collections[collection_name]
     instance = bpy.data.objects.new(name=instance_name, object_data=None)
     instance.instance_collection = collection
     instance.instance_type = 'COLLECTION'
-    layer = bpy.context.view_layer
-    layer.update()
-    c = bpy.data.collections.new("__ploip__")
-    bpy.data.collections.remove(c)
 
 #
 # Scenes

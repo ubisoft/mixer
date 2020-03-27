@@ -584,9 +584,9 @@ def sendSceneDataToServer(scene, dummy):
         changed |= removeCollectionsFromScenes()
         changed |= removeCollections()
         changed |= removeScenes()
-        changed |= addObjects()
-        changed |= addCollections()
         changed |= addScenes()
+        changed |= addCollections()
+        changed |= addObjects()
         changed |= addCollectionsToScenes()
         changed |= addCollectionsToCollections()
         changed |= addObjectsToCollections()
@@ -743,6 +743,14 @@ def clear_scene_content():
 
     for collection in collections:
         bpy.data.collections.remove(collection)
+
+    # Cannot remove the last scene at this point, treat it differently
+    for scene in bpy.data.scenes[:-1]:
+        bpy.data.scenes.remove(scene)
+
+    if len(bpy.data.scenes) == 1:
+        scene = bpy.data.scenes[0]
+        scene.name = '__last_scene_to_be_removed__'
 
     set_handlers(True)
 

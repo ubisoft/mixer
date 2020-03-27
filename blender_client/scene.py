@@ -18,10 +18,20 @@ def sendScene(client: ClientBlender, scene_name: str):
 def buildScene(data):
     scene_name, _ = common.decodeString(data, 0)
     logger.debug("buildScene %s", scene_name)
+
+    # remove what was previously the last scene that could not be removed
+    to_remove = None
+    if len(bpy.data.scenes) == 1 and bpy.data.scenes[0].name == '__last_scene_to_be_removed__':
+        to_remove = bpy.data.scenes[0]
+
     scene = shareData.blenderScenes.get(scene_name)
     if scene is None:
         scene = bpy.data.scenes.new(scene_name)
         shareData.blenderScenes[scene_name] = scene
+
+    if to_remove is not None:
+        # bpy.data.scenes.remove(to_remove)
+        bpy.ops.scene.delete({'scene': to_remove})
 
 
 def sendSceneRemoved(client: ClientBlender, scene_name: str):
@@ -38,7 +48,7 @@ def buildSceneRemoved(data):
     del shareData.blenderScenes[scene_name]
 
     # in the tests this crashes (see readme.md):
-    #   bpy.data.scenes.remove(scene)
+    # bpy.data.scenes.remove(scene)
     # but this succeeds
     bpy.ops.scene.delete({'scene': scene})
 

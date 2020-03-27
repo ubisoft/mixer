@@ -65,7 +65,7 @@ class Blender(Process):
             popen_args.append('--')
             popen_args.extend([str(arg) for arg in script_args])
 
-        print(' ' + ' '.join(popen_args))
+        # print(' ' + ' '.join(popen_args))
 
         other_args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
         try:

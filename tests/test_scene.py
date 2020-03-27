@@ -5,38 +5,7 @@ import blender_lib as bl
 
 
 class SceneTestCase(testcase.BlenderTestCase):
-    def new_object(self, name: str):
-        self._sender.send_function(bl.new_object, name)
-
-    def new_collection(self, name: str):
-        self._sender.send_function(bl.new_collection, name)
-
-    def new_scene(self, name: str):
-        self._sender.send_function(bl.new_scene, name)
-
-    def remove_scene(self, name: str):
-        self._sender.send_function(bl.remove_scene, name)
-
-    def link_collection_to_scene(self, scene_name: str, collection_name: str):
-        self._sender.send_function(bl.link_collection_to_scene, scene_name, collection_name)
-
-    def unlink_collection_from_scene(self, scene_name: str, collection_name: str):
-        self._sender.send_function(bl.unlink_collection_from_scene, scene_name, collection_name)
-
-    def link_object_to_scene(self, scene_name: str, object_name: str):
-        self._sender.send_function(bl.link_object_to_scene, scene_name, object_name)
-
-    def unlink_object_from_scene(self, scene_name: str, object_name: str):
-        self._sender.send_function(bl.unlink_object_from_scene, scene_name, object_name)
-
-    def rename_scene(self, old_name: str, new_name: str):
-        self._sender.send_function(bl.rename_scene, old_name, new_name)
-
-    def rename_object(self, old_name: str, new_name: str):
-        self._sender.send_function(bl.rename_object, old_name, new_name)
-
-    def rename_collection(self, old_name: str, new_name: str):
-        self._sender.send_function(bl.rename_collection, old_name, new_name)
+    pass
 
 
 class test_scene_empty_doc(SceneTestCase):
@@ -48,7 +17,7 @@ class test_scene_empty_doc(SceneTestCase):
         super().setUp(sender_blendfile, receiver_blendfile)
 
     def end_test(self):
-        # work around a crash on change scene whend connected
+        # work around a crash on change scene when connected
         self.disconnect()
         self.assertUserSuccess()
 
@@ -132,6 +101,33 @@ class test_scene_empty_doc(SceneTestCase):
         self.unlink_object_from_scene('new_scene_1', 'REMOVED_object_1_0')
         self.unlink_collection_from_scene('new_scene_1', 'REMOVED_collection_1_0')
 
+        self.end_test()
+
+    def test_create_instance_in_scene_after_join(self):
+        self.new_scene('scene_1')
+        self.new_collection('src')
+        self.link_collection_to_scene('scene_1', 'src')
+        self.create_object_in_collection('src', 'object_0')
+        self.new_collection_instance('src', 'instance_1')
+        self.link_object_to_scene('Scene', 'instance_1')
+        self.end_test()
+
+    @unittest.skip('scene remove/rename fails in test')
+    def test_create_instance_in_scene_before_join(self):
+        import time
+        self._sender.disconnect_dccsync()
+        self._receiver.disconnect_dccsync()
+        time.sleep(1)
+
+        self.new_scene('scene_1')
+        self.new_collection('src')
+        self.link_collection_to_scene('scene_1', 'src')
+        self.create_object_in_collection('src', 'object_0')
+        self.new_collection_instance('src', 'instance_1')
+        self.link_object_to_scene('Scene', 'instance_1')
+
+        self._sender.connect_and_join_dccsync()
+        self._receiver.connect_and_join_dccsync()
         self.end_test()
 
 

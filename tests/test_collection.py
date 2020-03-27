@@ -5,29 +5,7 @@ import blender_lib as bl
 
 
 class CollectionTestCase(testcase.BlenderTestCase):
-    def create_collection_in_collection(self, parent_name: str, child_name: str):
-        self._sender.send_function(bl.create_collection_in_collection, parent_name, child_name)
-
-    def remove_collection_from_collection(self, parent_name: str, child_name: str):
-        self._sender.send_function(bl.remove_collection_from_collection, parent_name, child_name)
-
-    def remove_collection(self, collection_name: str):
-        self._sender.send_function(bl.remove_collection, collection_name)
-
-    def rename_collection(self, old_name: str, new_name: str):
-        self._sender.send_function(bl.rename_collection, old_name, new_name)
-
-    def create_object_in_collection(self, collection_name: str, object_name: str):
-        self._sender.send_function(bl.create_object_in_collection, collection_name, object_name)
-
-    def add_object_to_collection(self, collection_name: str, object_name: str):
-        self._sender.send_function(bl.add_object_to_collection, collection_name, object_name)
-
-    def remove_object_from_collection(self, collection_name: str, object_name: str):
-        self._sender.send_function(bl.remove_object_from_collection, collection_name, object_name)
-
-    def instanciate_collection(self, collection_name: str, instance_name: str):
-        self._sender.send_function(bl.instanciate_collection, collection_name, instance_name)
+    pass
 
 
 class test_collection_default_doc(CollectionTestCase):
@@ -80,7 +58,6 @@ class test_collection_default_doc(CollectionTestCase):
         self.assertUserSuccess()
 
     def test_remove_collection_from_collection(self):
-        # TODO
         self.create_collection_in_collection('Collection', 'plaf0')
         self.create_collection_in_collection('Collection', 'plaf1')
         self.remove_collection_from_collection('Collection', 'plaf0')
@@ -93,15 +70,32 @@ class test_collection_default_doc(CollectionTestCase):
         self.remove_collection_from_collection('Collection', 'plaf1')
         self.assertUserSuccess()
 
-    def test_create_collection_instance(self):
+    def test_create_instance_in_collection_after_join(self):
         self.create_collection_in_collection('Collection', 'src')
         self.create_object_in_collection('src', 'new_object_0_0')
-        self.create_object_in_collection('src', 'new_object_0_1')
         self.create_collection_in_collection('Collection', 'dst')
-        self.instanciate_collection('src', 'instance_0')
-        self.instanciate_collection('src', 'instance_1')
-        self.add_object_to_collection('dst', 'instance_0')
-        self.add_object_to_collection('dst', 'instance_1')
+        self.new_collection_instance('src', 'src_instance_in_Collection')
+        self.new_collection_instance('src', 'src_instance_in_dst')
+        self.link_object_to_collection('Collection', 'src_instance_in_Collection')
+        self.link_object_to_collection('dst', 'src_instance_in_dst')
+        self.assertUserSuccess()
+
+    def test_create_instance_in_collection_before_join(self):
+        # if collection instances are create before join we need to ensure that
+        # the collection is received before the instance
+        import time
+        self._sender.disconnect_dccsync()
+        self._receiver.disconnect_dccsync()
+        time.sleep(1)
+        self.create_collection_in_collection('Collection', 'src')
+        self.create_object_in_collection('src', 'new_object_0_0')
+        self.create_collection_in_collection('Collection', 'dst')
+        self.new_collection_instance('src', 'src_instance_in_Collection')
+        self.new_collection_instance('src', 'src_instance_in_dst')
+        self.link_object_to_collection('Collection', 'src_instance_in_Collection')
+        self.link_object_to_collection('dst', 'src_instance_in_dst')
+        self._sender.connect_and_join_dccsync()
+        self._receiver.connect_and_join_dccsync()
         self.assertUserSuccess()
 
     def test_rename_collection(self):
