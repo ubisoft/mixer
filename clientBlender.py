@@ -74,25 +74,16 @@ class ClientBlender(Client):
         return collection
 
     def getOrCreatePath(self, path, data=None) -> bpy.types.Object:
-        pathElem = path.split('/')
-        parent = None
-        ob = None
-        # Create or get parents
-        for elem in pathElem[:-1]:
-            ob = shareData.blenderObjects.get(elem)
-            if not ob:
-                ob = bpy.data.objects.new(elem, None)
-                shareData._blenderObjects[ob.name_full] = ob
-            ob.parent = parent
-            parent = ob
+        index = path.rfind('/')
+        if index != -1:
+            shareData.pendingParenting.add(path)  # Parenting is resolved after consumption of all messages
+
         # Create or get object
-        elem = pathElem[-1]
+        elem = path[index + 1:]
         ob = shareData.blenderObjects.get(elem)
         if not ob:
             ob = bpy.data.objects.new(elem, data)
             shareData._blenderObjects[ob.name_full] = ob
-        else:
-            ob.parent = parent
         return ob
 
     def getOrCreateObjectData(self, path, data):
@@ -1141,9 +1132,7 @@ class ClientBlender(Client):
         while True:
             command, processed = self.consume_one()
             if command is None:
-                if not setDirty:
-                    shareData.updateCurrentData()
-                return 0.01
+                break
 
             if setDirty:
                 shareData.setDirty()
@@ -1210,3 +1199,23 @@ class ClientBlender(Client):
 
                 self.receivedCommands.task_done()
                 self.blockSignals = False
+
+        if not setDirty:
+            shareData.updateCurrentData()
+
+        if len(shareData.pendingParenting) > 0:
+            remainingParentings = set()
+            for path in shareData.pendingParenting:
+                pathElem = path.split('/')
+                ob = None
+                parent = None
+                for elem in pathElem:
+                    ob = shareData.blenderObjects.get(elem)
+                    if not ob:
+                        remainingParentings.add(path)
+                        break
+                    ob.parent = parent
+                    parent = ob
+            shareData.pendingParenting = remainingParentings
+
+        return 0.01
