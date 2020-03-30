@@ -12,6 +12,11 @@ def connect():
     bpy.ops.dcc_sync.connect()
 
 
+def disconnect():
+    import bpy
+    bpy.ops.dcc_sync.disconnect()
+
+
 def create_room():
     import bpy
     bpy.ops.dcc_sync.create_room()

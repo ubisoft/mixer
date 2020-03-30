@@ -1,24 +1,20 @@
-import asyncio
-from contextlib import contextmanager
-import subprocess
 import logging
+import os
+import socket
+import subprocess
 import time
-from typing import Mapping
-import json
-import copy
+
 from pathlib import Path
-from datetime import datetime
+from typing import Mapping
 
 import bpy
-import socket
-import os
-from . import clientBlender
-from . import ui
-from .shareData import shareData
 from bpy.app.handlers import persistent
 
-from .shareData import shareData
+from .shareData import ShareData, shareData
+from .blender_client import scene as scene_lib
 
+from . import clientBlender
+from . import ui
 from .data import get_dcc_sync_props
 from .stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
 
@@ -78,6 +74,7 @@ def join_room(room_name: str):
     shareData.currentRoom = room_name
     shareData.client.joinRoom(room_name)
     shareData.client.setClientName(user)
+    shareData.client.sendSetCurrentScene(bpy.context.scene.name_full)
 
     shareData.current_statistics = {
         "session_id": shareData.sessionId,
@@ -100,7 +97,9 @@ def leave_current_room():
         shareData.leaveCurrentRoom()
         set_handlers(False)
 
-    if None != shareData.current_statistics and shareData.auto_save_statistics:
+    shareData.clearBeforeState()
+
+    if shareData.current_statistics is not None and shareData.auto_save_statistics:
         save_statistics(shareData.current_statistics,
                         shareData.statistics_directory)
     shareData.current_statistics = None
@@ -118,48 +117,90 @@ def onLoad(scene):
     disconnect()
 
 
-def updateSceneChanged():
-    shareData.client.sendSetCurrentScene(bpy.context.scene.name_full)
-
-    # send scene objects
-    for obj in bpy.context.scene.objects:
-        shareData.client.sendSceneObject(obj)
-
-    # send scene collections
-    for col in bpy.context.scene.collection.children:
-        shareData.client.sendSceneCollection(col)
-
-    shareData.client.currentSceneName = bpy.context.scene.name_full
+def getScene(sceneName):
+    return shareData.blenderScenes.get(sceneName)
 
 
 def getCollection(collectionName):
-    collection = shareData.blenderCollections.get(collectionName)
-    if collection:
-        return collection
-    if bpy.context.scene.collection.name_full == collectionName:
-        return bpy.context.scene.collection
-    return None
+    """
+    May only return a non master collection
+    """
+    return shareData.blenderCollections.get(collectionName)
 
 
 def getParentCollection(collectionName):
-    if collectionName in bpy.context.scene.collection.children:
-        return bpy.context.scene.collection
+    """
+    May return a master or non master collection
+    """
+    for scene in bpy.data.scenes:
+        if collectionName in scene.collection.children:
+            return scene.collection
     for col in shareData.blenderCollections.values():
         if collectionName in col.children:
             return col
     return None
 
 
+def updateScenesState():
+    """
+    Must be called before updateCollectionsState so that non empty collections added to master
+    collection are processed
+    """
+    newNames = shareData.blenderScenes.keys()
+    oldNames = shareData.scenesInfo.keys()
+
+    shareData.scenesAdded |= newNames - oldNames
+    shareData.scenesRemoved |= oldNames - newNames
+
+    # walk the old scenes
+    for sceneName, sceneInfo in shareData.scenesInfo.items():
+        scene = getScene(sceneName)
+        if not scene:
+            continue
+        sceneName = scene.name_full
+        oldChildren = set(sceneInfo.children)
+        newChildren = set([x.name_full for x in scene.collection.children])
+
+        for x in newChildren - oldChildren:
+            shareData.collectionsAddedToScene.add((sceneName, x))
+
+        for x in oldChildren - newChildren:
+            shareData.collectionsRemovedFromScene.add((sceneName, x))
+
+        oldObjects = {shareData.objectsRenamed.get(x, x) for x in sceneInfo.objects}
+        newObjects = {x.name_full for x in scene.collection.objects}
+
+        addedObjects = list(newObjects - oldObjects)
+        if len(addedObjects) > 0:
+            shareData.objectsAddedToScene[sceneName] = addedObjects
+
+        removedObjects = list(oldObjects - newObjects)
+        if len(removedObjects) > 0:
+            shareData.objectsRemovedFromScene[sceneName] = removedObjects
+
+    # now the new scenes (in case of rename)
+    for sceneName in shareData.scenesAdded:
+        scene = getScene(sceneName)
+        if not scene:
+            continue
+        newChildren = {x.name_full for x in scene.collection.children}
+        for x in newChildren:
+            shareData.collectionsAddedToScene.add((sceneName, x))
+
+        addedObjects = set([x.name_full for x in scene.collection.objects])
+        if len(addedObjects) > 0:
+            shareData.objectsAddedToScene[sceneName] = addedObjects
+
+
 def updateCollectionsState():
-    newCollectionsNames = set(
-        [bpy.context.scene.collection.name] + list(shareData.blenderCollections.keys()))
-    oldCollectionsNames = set(shareData.collectionsInfo.keys())
+    """
+    Update non master collection state
+    """
+    newCollectionsNames = shareData.blenderCollections.keys()
+    oldCollectionsNames = shareData.collectionsInfo.keys()
 
-    shareData.collectionsAdded = newCollectionsNames - oldCollectionsNames
-    shareData.collectionsRemoved = oldCollectionsNames - newCollectionsNames
-
-    shareData.collectionsAddedToCollection.clear()
-    shareData.collectionsRemovedFromCollection.clear()
+    shareData.collectionsAdded |= newCollectionsNames - oldCollectionsNames
+    shareData.collectionsRemoved |= oldCollectionsNames - newCollectionsNames
 
     # walk the old collections
     for collectionName, collectionInfo in shareData.collectionsInfo.items():
@@ -170,8 +211,11 @@ def updateCollectionsState():
         newChildren = set([x.name_full for x in collection.children])
 
         for x in newChildren - oldChildren:
-            shareData.collectionsAddedToCollection.add(
-                (getParentCollection(x).name_full, x))
+            parent = getParentCollection(x)
+            if parent is not None:
+                shareData.collectionsAddedToCollection.add((parent.name_full, x))
+            else:
+                logger.warning('UpdateCollectionState(): Collection not found or has no parent "%s"', x)
 
         for x in oldChildren - newChildren:
             shareData.collectionsRemovedFromCollection.add(
@@ -196,8 +240,11 @@ def updateCollectionsState():
             continue
         newChildren = set([x.name_full for x in collection.children])
         for x in newChildren:
-            shareData.collectionsAddedToCollection.add(
-                (getParentCollection(x).name_full, x))
+            parent = getParentCollection(x)
+            if parent is not None:
+                shareData.collectionsAddedToCollection.add((parent.name_full, x))
+            else:
+                logger.warning('UpdateCollectionState(): Collection not found or has no parent "%s"', x)
 
         addedObjects = set([x.name_full for x in collection.objects])
         if len(addedObjects) > 0:
@@ -237,10 +284,10 @@ def updateObjectsState(oldObjects: dict, newObjects: dict):
 
     with stats_timer.child("updateObjectsParentingChanged"):
         for objName, parent in shareData.objectsParents.items():
-            if not objName in shareData.oldObjects:
+            if objName not in shareData.oldObjects:
                 continue
             newObj = shareData.oldObjects[objName]
-            newObjParent = "" if newObj.parent == None else newObj.parent.name_full
+            newObjParent = "" if newObj.parent is None else newObj.parent.name_full
             if newObjParent != parent:
                 shareData.objectsReparented.add(objName)
 
@@ -256,25 +303,61 @@ def updateObjectsState(oldObjects: dict, newObjects: dict):
 
 
 def isInObjectMode():
-    return hasattr(bpy.context, "active_object") and (not bpy.context.active_object or bpy.context.active_object.mode == 'OBJECT')
+    return not hasattr(bpy.context, "active_object") or (not bpy.context.active_object or bpy.context.active_object.mode == 'OBJECT')
 
 
-def removeObjectsFromCollections():
+def removeObjectsFromScenes():
     changed = False
-    for collectionName in shareData.objectsRemovedFromCollection:
-        objectNames = shareData.objectsRemovedFromCollection.get(
-            collectionName)
-        for objName in objectNames:
-            shareData.client.sendRemoveObjectFromCollection(
-                collectionName, objName)
+    for scene_name, object_names in shareData.objectsRemovedFromScene.items():
+        for object_name in object_names:
+            scene_lib.sendRemoveObjectFromScene(shareData.client, scene_name, object_name)
             changed = True
     return changed
 
 
-def removeCollectionsFromCollections():
+def removeObjectsFromCollections():
+    """
+    Non master collections, actually
+    """
     changed = False
-    for item in shareData.collectionsRemovedFromCollection:
-        shareData.client.sendRemoveCollectionFromCollection(item[0], item[1])
+    for collection_name, object_names in shareData.objectsRemovedFromCollection.items():
+        for object_name in object_names:
+            shareData.client.sendRemoveObjectFromCollection(collection_name, object_name)
+            changed = True
+    return changed
+
+
+def removeCollectionsFromScenes():
+    changed = False
+    for scene_name, collection_name in shareData.collectionsRemovedFromScene:
+        scene_lib.sendRemoveCollectionFromScene(shareData.client, scene_name, collection_name)
+        changed = True
+    return changed
+
+
+def removeCollectionsFromCollections():
+    """
+    Non master collections, actually
+    """
+    changed = False
+    for parent_name, child_name in shareData.collectionsRemovedFromCollection:
+        shareData.client.sendRemoveCollectionFromCollection(parent_name, child_name)
+        changed = True
+    return changed
+
+
+def addScenes():
+    changed = False
+    for scene in shareData.scenesAdded:
+        scene_lib.sendScene(shareData.client, scene)
+        changed = True
+    return changed
+
+
+def removeScenes():
+    changed = False
+    for scene in shareData.scenesRemoved:
+        scene_lib.sendSceneRemoved(shareData.client, scene)
         changed = True
     return changed
 
@@ -308,19 +391,35 @@ def addCollections():
 
 def addCollectionsToCollections():
     changed = False
-    for item in shareData.collectionsAddedToCollection:
-        shareData.client.sendAddCollectionToCollection(item[0], item[1])
+    for parent_name, child_name in shareData.collectionsAddedToCollection:
+        shareData.client.sendAddCollectionToCollection(parent_name, child_name)
+        changed = True
+    return changed
+
+
+def addCollectionsToScenes():
+    changed = False
+    for scene_name, collection_name in shareData.collectionsAddedToScene:
+        scene_lib.sendAddCollectionToScene(shareData.client, scene_name, collection_name)
         changed = True
     return changed
 
 
 def addObjectsToCollections():
     changed = False
-    for collectionName in shareData.objectsAddedToCollection:
-        objectNames = shareData.objectsAddedToCollection.get(collectionName)
+    for collectionName, objectNames in shareData.objectsAddedToCollection.items():
         for objectName in objectNames:
             shareData.client.sendAddObjectToCollection(
                 collectionName, objectName)
+            changed = True
+    return changed
+
+
+def addObjectsToScenes():
+    changed = False
+    for sceneName, objectNames in shareData.objectsAddedToScene.items():
+        for objectName in objectNames:
+            scene_lib.sendAddObjectToScene(shareData.client, sceneName, objectName)
             changed = True
     return changed
 
@@ -333,16 +432,6 @@ def updateCollectionsParameters():
             if info.hide_viewport != collection.hide_viewport or info.instance_offset != collection.instance_offset:
                 shareData.client.sendCollection(collection)
                 changed = True
-    return changed
-
-
-def createSceneObjects():
-    changed = False
-    for objName in shareData.objectsAdded:
-        if objName in bpy.context.scene.objects:
-            obj = bpy.context.scene.objects[objName]
-            shareData.client.sendSceneObject(obj)
-            changed = True
     return changed
 
 
@@ -431,6 +520,7 @@ def updateObjectsData():
 
 @persistent
 def sendFrameChanged(scene):
+    logger.info("sendFrameChanged")
     if not shareData.client:
         return
 
@@ -472,16 +562,14 @@ def sendSceneDataToServer(scene, dummy):
             shareData.client.receivedCommandsProcessed = False
         return
 
-    if shareData.client.currentSceneName != bpy.context.scene.name_full:
-        shareData.updateCurrentData()
-        updateSceneChanged()
-        return
-
     if not isInObjectMode():
         return
 
     updateObjectsState(shareData.oldObjects,
                        shareData.blenderObjects)
+
+    with timer.child("updateScenesState"):
+        updateScenesState()
 
     with timer.child("updateCollectionsState"):
         updateCollectionsState()
@@ -489,14 +577,19 @@ def sendSceneDataToServer(scene, dummy):
     changed = False
     with timer.child("checkForChangeAndSendUpdates"):
         changed |= removeObjectsFromCollections()
+        changed |= removeObjectsFromScenes()
         changed |= removeCollectionsFromCollections()
+        changed |= removeCollectionsFromScenes()
         changed |= removeCollections()
-        changed |= addObjects()
+        changed |= removeScenes()
+        changed |= addScenes()
         changed |= addCollections()
+        changed |= addObjects()
+        changed |= addCollectionsToScenes()
         changed |= addCollectionsToCollections()
         changed |= addObjectsToCollections()
+        changed |= addObjectsToScenes()
         changed |= updateCollectionsParameters()
-        changed |= createSceneObjects()
         changed |= deleteSceneObjects()
         changed |= renameObjects()
         changed |= updateObjectsVisibility()
@@ -521,8 +614,6 @@ def onUndoRedoPre(scene):
     #    shareData.selectedObjectsNames.add(obj.name)
     if not isInObjectMode():
         return
-
-    shareData.client.currentSceneName = bpy.context.scene.name_full
 
     shareData.clearLists()
     shareData.updateCurrentData()
@@ -565,10 +656,6 @@ def onUndoRedoPost(scene, dummy):
     if not isInObjectMode():
         return
 
-    if shareData.client.currentSceneName != bpy.context.scene.name_full:
-        updateSceneChanged()
-        return
-
     oldObjectsName = dict(
         [(k, None) for k in shareData.oldObjects.keys()])  # value not needed
     remapObjectsInfo()
@@ -581,16 +668,21 @@ def onUndoRedoPost(scene, dummy):
             oldObjectsName, shareData.oldObjects, child_timer)
 
     updateCollectionsState()
+    updateScenesState()
 
+    removeObjectsFromScenes()
     removeObjectsFromCollections()
+    removeCollectionsFromScenes()
     removeCollectionsFromCollections()
+
     removeCollections()
+    removeScenes()
+    addScenes()
     addObjects()
     addCollections()
     addCollectionsToCollections()
     addObjectsToCollections()
     updateCollectionsParameters()
-    createSceneObjects()
     deleteSceneObjects()
     renameObjects()
     updateObjectsVisibility()
@@ -650,6 +742,14 @@ def clear_scene_content():
     for collection in bpy.data.collections:
         bpy.data.collections.remove(collection)
 
+    # Cannot remove the last scene at this point, treat it differently
+    for scene in bpy.data.scenes[:-1]:
+        bpy.data.scenes.remove(scene)
+
+    if len(bpy.data.scenes) == 1:
+        scene = bpy.data.scenes[0]
+        scene.name = '__last_scene_to_be_removed__'
+
     set_handlers(True)
 
 
@@ -662,58 +762,13 @@ def isParentInCollection(collection, obj):
     return False
 
 
-def send_collection_content(collection):
-    for obj in collection.objects:
-        shareData.client.sendAddObjectToCollection(
-            collection.name_full, obj.name_full)
-
-    for childCollection in collection.children:
-        shareData.client.sendAddCollectionToCollection(
-            collection.name_full, childCollection.name_full)
-
-
-def send_collections():
-    for collection in shareData.blenderCollections.values():
-        shareData.client.sendCollection(collection)
-        send_collection_content(collection)
-
-
 @stats_timer(shareData)
 def send_scene_content():
     if get_dcc_sync_props().no_send_scene_content:
         return
 
-    shareData.setDirty()
-    shareData.client.currentSceneName = bpy.context.scene.name_full
-
-    # First step : Send all Blender data (materials, objects, collection) existing in file
-    # ====================================================================================
-
-    with StatsTimer(shareData, "sendAllMaterials"):
-        for material in bpy.data.materials:
-            shareData.client.sendMaterial(material)
-
-    with StatsTimer(shareData, "sendAllObjects") as child_timer:
-        for obj in bpy.data.objects:
-            updateParams(obj)
-            updateTransform(obj)
-
-    # send all collections
-    with StatsTimer(shareData, "sendAllCollections"):
-        send_collections()
-
-    # Second step : send current scene content
-    # ========================================
-    with StatsTimer(shareData, "sendSetCurrentScene"):
-        shareData.client.sendSetCurrentScene(bpy.context.scene.name_full)
-
-    with StatsTimer(shareData, "sendSceneObjects"):
-        for obj in bpy.context.scene.objects:
-            shareData.client.sendSceneObject(obj)
-
-    with StatsTimer(shareData, "sendSceneCollections"):
-        for col in bpy.context.scene.collection.children:
-            shareData.client.sendSceneCollection(col)
+    shareData.clearBeforeState()
+    sendSceneDataToServer(None, None)
 
     shareData.client.sendFrameStartEnd(
         bpy.context.scene.frame_start, bpy.context.scene.frame_end)
@@ -762,7 +817,6 @@ def start_local_server(wait_for_server=False):
     if get_dcc_sync_props().showServerConsole:
         args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
     else:
-        #args = {'stdout': subprocess.PIPE, 'stderr': subprocess.STDOUT}
         args = {}
 
     shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(
@@ -862,14 +916,13 @@ class JoinRoomOperator(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     @classmethod
-    def poll(self, context):
+    def poll(cls, context):
         roomIndex = get_dcc_sync_props().room_index
         return isClientConnected() and roomIndex < len(get_dcc_sync_props().rooms)
 
     def execute(self, context):
         assert not shareData.currentRoom
         shareData.setDirty()
-        shareData.updateCurrentData()
         shareData.currentRoom = None
 
         if not connect():
@@ -969,8 +1022,6 @@ class LaunchVRtistOperator(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         return True
-        #props = get_dcc_sync_props()
-        # return not shareData.currentRoom and bool(props.room)
 
     def execute(self, context):
         dcc_sync_props = get_dcc_sync_props()
@@ -998,7 +1049,7 @@ class WriteStatisticsOperator(bpy.types.Operator):
     bl_options = {'REGISTER'}
 
     def execute(self, context):
-        if None != shareData.current_statistics:
+        if shareData.current_statistics is not None:
             save_statistics(shareData.current_statistics,
                             get_dcc_sync_props().statistics_directory)
         return {'FINISHED'}

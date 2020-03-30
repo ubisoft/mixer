@@ -65,6 +65,10 @@ Ensuite:
 - démarrer l'exécution du test unitaire : Blender se bloque en attendant l'attachement
 - attacher le debugger : l'exécution continue jusqu'au breakpoint
 
+## Caveat
+```bpy.context.window``` is ```None``` and may cause crashes. For ```instance bpy.data.scenes.remove(my_scene)``` because ```CTX_wm_window()``` returns ```NULL```, but ```bpy.ops.scene.delete({'scene': my_scene})``` succeeds. In fact ```bpy.context.window``` is ```None``` in a script run from ```--python``` argument.
+
+A possible solution could be to run the asyncio operator in python_server from a load handler.
 
 # Misc
 ## Guidelines

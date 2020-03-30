@@ -1,6 +1,6 @@
 import unittest
 import time
-import blender_lib
+import blender_lib as bl
 import dccsync_lib
 from process import BlenderServer
 from typing import List
@@ -20,8 +20,14 @@ class Blender:
         self._blender = BlenderServer(self._port, self._ptvsd_port, self._wait_for_debugger)
         self._blender.start(blender_args)
         self._blender.connect()
+        self.connect_and_join_dccsync()
+
+    def connect_and_join_dccsync(self):
         self._blender.send_function(dccsync_lib.connect)
         self._blender.send_function(dccsync_lib.join_room)
+
+    def disconnect_dccsync(self):
+        self._blender.send_function(dccsync_lib.disconnect)
 
     def wait(self, timeout: float = None):
         return self._blender.wait(timeout)
@@ -85,7 +91,7 @@ class BlenderTestCase(unittest.TestCase):
             if rc is not None:
                 self._receiver.kill()
                 if rc != 0:
-                    self.fail(f'sender return code {rc}')
+                    self.fail(f'sender return code {rc} ({hex(rc)})')
                 else:
                     return
 
@@ -93,7 +99,7 @@ class BlenderTestCase(unittest.TestCase):
             if rc is not None:
                 self._sender.kill()
                 if rc != 0:
-                    self.fail(f'receiver return code {rc}')
+                    self.fail(f'receiver return code {rc} ({hex(rc)})')
                 else:
                     return
 
@@ -144,3 +150,66 @@ class BlenderTestCase(unittest.TestCase):
         p0, h0 = hashes[0]
         for (p,  h) in attrs:
             self.assertEqual(h0, h, f'Hashes differ for {p0} ({h0.hex()}) and {p} ({h.hex()})')
+
+    def connect(self):
+        self._sender.connect_and_join_dccsync()
+        time.sleep(1)
+        self._receiver.connect_and_join_dccsync()
+
+    def disconnect(self):
+        self._sender.disconnect_dccsync()
+        self._receiver.disconnect_dccsync()
+
+    def create_collection_in_collection(self, parent_name: str, child_name: str):
+        self._sender.send_function(bl.create_collection_in_collection, parent_name, child_name)
+
+    def remove_collection_from_collection(self, parent_name: str, child_name: str):
+        self._sender.send_function(bl.remove_collection_from_collection, parent_name, child_name)
+
+    def remove_collection(self, collection_name: str):
+        self._sender.send_function(bl.remove_collection, collection_name)
+
+    def rename_collection(self, old_name: str, new_name: str):
+        self._sender.send_function(bl.rename_collection, old_name, new_name)
+
+    def create_object_in_collection(self, collection_name: str, object_name: str):
+        self._sender.send_function(bl.create_object_in_collection, collection_name, object_name)
+
+    def link_object_to_collection(self, collection_name: str, object_name: str):
+        self._sender.send_function(bl.link_object_to_collection, collection_name, object_name)
+
+    def remove_object_from_collection(self, collection_name: str, object_name: str):
+        self._sender.send_function(bl.remove_object_from_collection, collection_name, object_name)
+
+    def new_collection_instance(self, collection_name: str, instance_name: str):
+        self._sender.send_function(bl.new_collection_instance, collection_name, instance_name)
+
+    def new_object(self, name: str):
+        self._sender.send_function(bl.new_object, name)
+
+    def new_collection(self, name: str):
+        self._sender.send_function(bl.new_collection, name)
+
+    def new_scene(self, name: str):
+        self._sender.send_function(bl.new_scene, name)
+
+    def remove_scene(self, name: str):
+        self._sender.send_function(bl.remove_scene, name)
+
+    def link_collection_to_scene(self, scene_name: str, collection_name: str):
+        self._sender.send_function(bl.link_collection_to_scene, scene_name, collection_name)
+
+    def unlink_collection_from_scene(self, scene_name: str, collection_name: str):
+        self._sender.send_function(bl.unlink_collection_from_scene, scene_name, collection_name)
+
+    def link_object_to_scene(self, scene_name: str, object_name: str):
+        self._sender.send_function(bl.link_object_to_scene, scene_name, object_name)
+
+    def unlink_object_from_scene(self, scene_name: str, object_name: str):
+        self._sender.send_function(bl.unlink_object_from_scene, scene_name, object_name)
+
+    def rename_scene(self, old_name: str, new_name: str):
+        self._sender.send_function(bl.rename_scene, old_name, new_name)
+
+    def rename_object(self, old_name: str, new_name: str):
+        self._sender.send_function(bl.rename_object, old_name, new_name)
