@@ -110,15 +110,13 @@ class ShareData:
         self._blenderCollections: Mapping[str, bpy.types.Collection] = {}
         self.blenderCollectionsDirty = True
 
-
-<< << << < HEAD
         self.pendingParenting = set()
 
     def leaveCurrentRoom(self):
         if self.client:
             self.client.leaveRoom(shareData.currentRoom)
         self.clearRoomData()
-=======
+
         self._blenderScenes: Mapping[str, bpy.types.Scene] = {}
         self.blenderScenesDirty = True
 
@@ -128,7 +126,6 @@ class ShareData:
         self.oldObjects = {}
         self.collectionsInfo = {}
         self.scenesInfo = {}
->>>>>>> master
 
     def setDirty(self):
         self.blenderObjectsDirty = True
