@@ -69,6 +69,8 @@ class MessageType(Enum):
     SCENE = 129
     SCENE_REMOVED = 130
 
+    ADD_OBJECT_TO_DOCUMENT = 131
+
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
     MESH = 202
