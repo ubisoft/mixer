@@ -87,12 +87,13 @@ def buildRemoveCollectionFromScene(data):
     collection = shareData.blenderCollections[collection_name]
     scene.collection.children.unlink(collection)
 
-def sendAddObjectToDocument(client: ClientBlender, sceneName: str, objName: str):
-    logger.debug("sendAddObjectToDocument %s <- %s", sceneName, objName)
+
+def sendAddObjectToVRtist(client: ClientBlender, sceneName: str, objName: str):
+    logger.debug("sendAddObjectToVRtist %s <- %s", sceneName, objName)
     buffer = common.encodeString(
         sceneName) + common.encodeString(objName)
     client.addCommand(common.Command(
-        common.MessageType.ADD_OBJECT_TO_DOCUMENT, buffer, 0))
+        common.MessageType.ADD_OBJECT_TO_VRTIST, buffer, 0))
 
 
 def sendAddObjectToScene(client: ClientBlender, sceneName: str, objName: str):

@@ -481,14 +481,20 @@ def reparentObjects():
             changed = True
     return changed
 
-def createDocumentObjects():
+
+def createVRtistObjects():
+    """
+    VRtist will filter the received messages and handle only the objects that belong to the 
+    same scene as the one initially synchronized
+    """
     changed = False
     for objName in shareData.objectsAdded:
         if objName in bpy.context.scene.objects:
             obj = bpy.context.scene.objects[objName]
-            scene_lib.sendAddObjectToDocument(shareData.client, bpy.context.scene.name_full, obj.name_full)
+            scene_lib.sendAddObjectToVRtist(shareData.client, bpy.context.scene.name_full, obj.name_full)
             changed = True
     return changed
+
 
 def updateObjectsData():
     if len(shareData.depsgraph.updates) == 0:
@@ -553,6 +559,7 @@ def sendFrameChanged(scene):
         with timer.child("updateObjectsInfo"):
             shareData.updateObjectsInfo()
 
+
 @stats_timer(shareData)
 @persistent
 def sendSceneDataToServer(scene, dummy):
@@ -600,7 +607,7 @@ def sendSceneDataToServer(scene, dummy):
         changed |= addObjectsToCollections()
         changed |= addObjectsToScenes()
         changed |= updateCollectionsParameters()
-        changed |= createDocumentObjects()
+        changed |= createVRtistObjects()
         changed |= deleteSceneObjects()
         changed |= renameObjects()
         changed |= updateObjectsVisibility()
@@ -694,7 +701,7 @@ def onUndoRedoPost(scene, dummy):
     addCollectionsToCollections()
     addObjectsToCollections()
     updateCollectionsParameters()
-    createDocumentObjects()
+    createVRtistObjects()
     deleteSceneObjects()
     renameObjects()
     updateObjectsVisibility()
@@ -781,13 +788,14 @@ def send_scene_content():
 
     shareData.clearBeforeState()
 
+    # Temporary waiting for material sync. Should move to sendSceneDataToServer
     for material in bpy.data.materials:
         shareData.client.sendMaterial(material)
 
     sendSceneDataToServer(None, None)
 
     for obj in bpy.context.scene.objects:
-        scene_lib.sendAddObjectToDocument(shareData.client, bpy.context.scene.name_full, obj.name_full)
+        scene_lib.sendAddObjectToVRtist(shareData.client, bpy.context.scene.name_full, obj.name_full)
 
     shareData.client.sendFrameStartEnd(
         bpy.context.scene.frame_start, bpy.context.scene.frame_end)
