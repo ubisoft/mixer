@@ -4,7 +4,7 @@ import logging
 import bpy
 
 collection_logger = logging.getLogger('collection')
-collection_logger.setLevel(logging.DEBUG)
+collection_logger.setLevel(logging.INFO)
 
 
 def buildCollection(data):

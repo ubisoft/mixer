@@ -23,7 +23,7 @@ logger = logging.getLogger(__package__)
 logger.setLevel(logging.INFO)
 
 collection_logger = logging.getLogger('collection')
-collection_logger.setLevel(logging.DEBUG)
+collection_logger.setLevel(logging.INFO)
 
 
 class ClientBlender(Client):
@@ -1096,7 +1096,7 @@ class ClientBlender(Client):
                 # this was a room protocol command that was processed
                 self.receivedCommandsProcessed = False
             else:
-                logger.info("Client %s Command %s received", self.name, command.type)
+                logger.debug("Client %s Command %s received", self.name, command.type)
                 if command.type == common.MessageType.CONTENT:
                     self.receivedCommandsProcessed = False
                     self.sendSceneContent()
