@@ -350,7 +350,13 @@ def readMessage(socket: socket.socket) -> Command:
     r, _, _ = select.select([socket], [], [], 0.0001)
     if len(r) > 0:
         try:
-            msg = recv(socket, 14)
+            prefix_size = 14
+            msg = b''
+            while prefix_size != 0:
+                tmp = recv(socket, prefix_size)
+                msg += tmp
+                prefix_size -= len(tmp)
+
             frameSize = bytesToInt(msg[:8])
             commandId = bytesToInt(msg[8:12])
             messageType = bytesToInt(msg[12:])
