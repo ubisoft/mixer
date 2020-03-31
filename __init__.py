@@ -70,12 +70,11 @@ def register():
 
 
 def unregister():
-    operators.leave_current_room()
+    operators.disconnect()
 
     if shareData:
         if shareData.client and bpy.app.timers.is_registered(shareData.client.networkConsumer):
             bpy.app.timers.unregister(shareData.client.networkConsumer)
-    operators.disconnect()
 
     operators.unregister()
     ui.unregister()

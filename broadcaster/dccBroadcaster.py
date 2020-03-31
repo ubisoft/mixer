@@ -85,6 +85,7 @@ class Connection:
             self.commands.append(command)
 
     def sendListRoomClients(self, room_name: str = None, client_ids: Union[Mapping, List[Mapping]] = None):
+        logger.debug("sendListRoomClients")
         with common.mutex:
             # ensure we use only one since each message ovewrites the previous one
             # on the client
@@ -207,6 +208,7 @@ class Connection:
             if len(self.commands) > 0:
                 with common.mutex:
                     for command in self.commands:
+                        logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
                         common.writeMessage(self.socket, command)
                     self.commands = []
 

@@ -107,6 +107,7 @@ class Client:
                     except queue.Empty:
                         break
                     else:
+                        logger.info("Send %s (queue size = %d)", command.type, self.pendingCommands.qsize())
                         common.writeMessage(self.socket, command)
                         self.pendingCommands.task_done()
 
@@ -119,7 +120,7 @@ class Client:
         except queue.Empty:
             return None, None
         else:
-            logger.info("Command %s received (queue size = %d)", command.type, self.receivedCommands.qsize())
+            logger.info("Receive %s (queue size = %d)", command.type, self.receivedCommands.qsize())
 
             if command.type == common.MessageType.LIST_ROOMS:
                 if self._delegate:
