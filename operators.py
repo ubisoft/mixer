@@ -543,6 +543,19 @@ def sendFrameChanged(scene):
     logger.info("sendFrameChanged")
 
     if not shareData.client:
+        logger.info("sendFrameChanged cancelled (no client instance)")
+        return
+
+    # We can arrive here because of scene deletion (bpy.ops.scene.delete({'scene': to_remove}) that append during buildScene)
+    # so we need to prevent processing self events
+    if shareData.client.receivedCommandsProcessed:
+        if not shareData.client.blockSignals:
+            shareData.client.receivedCommandsProcessed = False
+        logger.info("sendFrameChanged canceled (receivedCommandsProcessed = True)")
+        return
+
+    if not isInObjectMode():
+        logger.info("sendFrameChanged canceled (not isInObjectMode)")
         return
 
     with StatsTimer(shareData, "sendFrameChanged") as timer:
@@ -572,6 +585,7 @@ def sendSceneDataToServer(scene, dummy):
     timer = shareData.current_stats_timer
 
     if not shareData.client:
+        logger.info("sendSceneDataToServer canceled (no client instance)")
         return
 
     shareData.setDirty()
@@ -582,9 +596,11 @@ def sendSceneDataToServer(scene, dummy):
     if shareData.client.receivedCommandsProcessed:
         if not shareData.client.blockSignals:
             shareData.client.receivedCommandsProcessed = False
+        logger.info("sendSceneDataToServer canceled (receivedCommandsProcessed = True)")
         return
 
     if not isInObjectMode():
+        logger.info("sendSceneDataToServer canceled (not isInObjectMode)")
         return
 
     updateObjectsState(shareData.oldObjects,
@@ -1022,6 +1038,8 @@ class DisconnectOperator(bpy.types.Operator):
 
     def execute(self, context):
         disconnect()
+        self.report(
+            {'INFO'}, f'Disconnected ...')
         ui.update_ui_lists()
         ui.redraw()
         return {'FINISHED'}
