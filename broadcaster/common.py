@@ -295,6 +295,9 @@ def recv(socket, size):
         try:
             tmp = socket.recv(size)
             return tmp
+        except (ConnectionAbortedError, ConnectionResetError) as e:
+            logger.warning(e)
+            raise ClientDisconnectedException()
         except:
             if attempts == 0:
                 raise
@@ -372,7 +375,7 @@ def readMessage(socket: socket.socket) -> Command:
             raise
         except Exception as e:
             logger.error(e, exc_info=True)
-            raise ClientDisconnectedException()
+            raise
 
     return None
 
@@ -392,7 +395,7 @@ def send(socket, buffer):
 
 
 def writeMessage(sock: socket.socket, command: Command):
-    if not socket:
+    if not sock:
         return
     size = intToBytes(len(command.data), 8)
     commandId = intToBytes(command.id, 4)

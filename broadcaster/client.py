@@ -91,9 +91,9 @@ class Client:
                 command = common.readMessage(self.socket)
             except common.ClientDisconnectedException:
                 logger.info("Connection lost for %s:%s", self.host, self.port)
+                self.socket = None  # Set socket to None before putting CONNECTION_LIST message to avoid sending/reading new messages
                 command = common.Command(common.MessageType.CONNECTION_LOST)
                 self.receivedCommands.put(command)
-                self.socket = None
                 break
 
             if command is not None:
