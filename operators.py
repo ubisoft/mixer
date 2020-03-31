@@ -135,7 +135,8 @@ def getParentCollection(collectionName):
         if collectionName in scene.collection.children:
             return scene.collection
     for col in shareData.blenderCollections.values():
-        if collectionName in col.children:
+        childrenNames = set([x.name_full for x in col.children])
+        if collectionName in childrenNames:
             return col
     return None
 
@@ -372,8 +373,8 @@ def removeCollections():
 def addObjects():
     changed = False
     for objName in shareData.objectsAdded:
-        if objName in bpy.data.objects:
-            obj = bpy.data.objects[objName]
+        obj = shareData.blenderObjects.get(objName)
+        if obj:
             updateParams(obj)
             updateTransform(obj)
             changed = True
@@ -474,6 +475,20 @@ def reparentObjects():
         obj = shareData.blenderObjects.get(objName)
         if obj:
             updateTransform(obj)
+            changed = True
+    return changed
+
+
+def createVRtistObjects():
+    """
+    VRtist will filter the received messages and handle only the objects that belong to the 
+    same scene as the one initially synchronized
+    """
+    changed = False
+    for objName in shareData.objectsAdded:
+        if objName in bpy.context.scene.objects:
+            obj = bpy.context.scene.objects[objName]
+            scene_lib.sendAddObjectToVRtist(shareData.client, bpy.context.scene.name_full, obj.name_full)
             changed = True
     return changed
 
@@ -589,6 +604,7 @@ def sendSceneDataToServer(scene, dummy):
         changed |= addObjectsToCollections()
         changed |= addObjectsToScenes()
         changed |= updateCollectionsParameters()
+        changed |= createVRtistObjects()
         changed |= deleteSceneObjects()
         changed |= renameObjects()
         changed |= updateObjectsVisibility()
@@ -682,6 +698,7 @@ def onUndoRedoPost(scene, dummy):
     addCollectionsToCollections()
     addObjectsToCollections()
     updateCollectionsParameters()
+    createVRtistObjects()
     deleteSceneObjects()
     renameObjects()
     updateObjectsVisibility()
@@ -767,7 +784,15 @@ def send_scene_content():
         return
 
     shareData.clearBeforeState()
+
+    # Temporary waiting for material sync. Should move to sendSceneDataToServer
+    for material in bpy.data.materials:
+        shareData.client.sendMaterial(material)
+
     sendSceneDataToServer(None, None)
+
+    for obj in bpy.context.scene.objects:
+        scene_lib.sendAddObjectToVRtist(shareData.client, bpy.context.scene.name_full, obj.name_full)
 
     shareData.client.sendFrameStartEnd(
         bpy.context.scene.frame_start, bpy.context.scene.frame_end)

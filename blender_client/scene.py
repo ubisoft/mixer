@@ -87,6 +87,14 @@ def buildRemoveCollectionFromScene(data):
     scene.collection.children.unlink(collection)
 
 
+def sendAddObjectToVRtist(client: ClientBlender, sceneName: str, objName: str):
+    logger.debug("sendAddObjectToVRtist %s <- %s", sceneName, objName)
+    buffer = common.encodeString(
+        sceneName) + common.encodeString(objName)
+    client.addCommand(common.Command(
+        common.MessageType.ADD_OBJECT_TO_VRTIST, buffer, 0))
+
+
 def sendAddObjectToScene(client: ClientBlender, sceneName: str, objName: str):
     logger.debug("sendAddObjectToScene %s <- %s", sceneName, objName)
     buffer = common.encodeString(

@@ -72,6 +72,8 @@ class MessageType(Enum):
     SCENE = 129
     SCENE_REMOVED = 130
 
+    ADD_OBJECT_TO_VRTIST = 131
+
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
     MESH = 202
