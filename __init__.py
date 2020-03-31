@@ -17,6 +17,8 @@ bl_info = {
     "category": "Generic"
 }
 
+logger = logging.getLogger(__name__)
+
 
 def cleanup():
     shareData = operators.shareData
@@ -30,12 +32,12 @@ def cleanup():
 
 
 def register():
-    logger = logging.getLogger(__package__)
     if len(logger.handlers) == 0:
         logger.setLevel(logging.INFO)
         handler = logging.StreamHandler()
         logger.addHandler(handler)
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s [ %(pathname)s:%(lineno)d ]'))
 
     operators.register()
     ui.register()

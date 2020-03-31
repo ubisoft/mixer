@@ -3,12 +3,13 @@ import socket
 import threading
 import logging
 
-logging.basicConfig(level=logging.INFO)
 
 try:
     from . import common
 except ImportError:
     import common
+
+logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
 
 
 class Client:
@@ -35,10 +36,10 @@ class Client:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.host, self.port))
             self._local_address = self.socket.getsockname()
-            logging.info("Connecting from local %s:%s to %s:%s",
-                         self._local_address[0], self._local_address[1], self.host, self.port)
+            logger.info("Connecting from local %s:%s to %s:%s",
+                        self._local_address[0], self._local_address[1], self.host, self.port)
         except Exception as e:
-            logging.error("Connection error %s", e)
+            logger.error("Connection error %s", e, exc_info=True)
             self.socket = None
             raise
 
@@ -89,7 +90,7 @@ class Client:
                     break
                 command = common.readMessage(self.socket)
             except common.ClientDisconnectedException:
-                logging.info("Connection lost for %s:%s", self.host, self.port)
+                logger.info("Connection lost for %s:%s", self.host, self.port)
                 command = common.Command(common.MessageType.CONNECTION_LOST)
                 self.receivedCommands.put(command)
                 self.socket = None
@@ -118,8 +119,8 @@ class Client:
         except queue.Empty:
             return None, None
         else:
-            logging.info("Client %s Command %s received (queue size = %d)",
-                         self.name, command.type, self.receivedCommands.qsize())
+            logger.info("Client %s Command %s received (queue size = %d)",
+                        self.name, command.type, self.receivedCommands.qsize())
 
             if command.type == common.MessageType.LIST_ROOMS:
                 if self._delegate:

@@ -9,7 +9,7 @@ import bpy
 import bmesh
 from mathutils import Vector
 
-logger = logging.getLogger(f"dccsync")
+logger = logging.getLogger(__name__)
 
 
 def decode_layer_float(elmt, layer, data, index):

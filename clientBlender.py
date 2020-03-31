@@ -19,11 +19,7 @@ from .stats import stats_timer
 _STILL_ACTIVE = 259
 
 
-logger = logging.getLogger(__package__)
-logger.setLevel(logging.INFO)
-
-collection_logger = logging.getLogger('collection')
-collection_logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 class ClientBlender(Client):
@@ -42,7 +38,7 @@ class ClientBlender(Client):
             if len(bpy.context.window_manager.windows) == 0:
                 return False
         except Exception as e:
-            print(e)
+            logger.error(e, exc_info=True)
             return False
         return True
 
@@ -242,7 +238,7 @@ class ClientBlender(Client):
                     break
 
         if not principled:
-            print("Cannot find Principled BSDF node")
+            logger.error("Cannot find Principled BSDF node")
             return
 
         index = start
@@ -261,7 +257,7 @@ class ClientBlender(Client):
                 texImage.image = bpy.data.images.load(fileName)
                 texImage.image.colorspace_settings.name = 'Non-Color'
             except:
-                print("could not load : " + fileName)
+                logger.error("could not load : " + fileName)
                 pass
             material.node_tree.links.new(
                 invert.inputs['Color'], texImage.outputs['Color'])
@@ -296,7 +292,7 @@ class ClientBlender(Client):
                 texImage.image = bpy.data.images.load(fileName)
                 texImage.image.colorspace_settings.name = 'Non-Color'
             except:
-                print("could not load : " + fileName)
+                logger.error("could not load : " + fileName)
                 pass
             material.node_tree.links.new(
                 normalMap.inputs['Color'], texImage.outputs['Color'])
@@ -396,7 +392,7 @@ class ClientBlender(Client):
                 f.close()
                 self.textures.add(path)
             except:
-                print("Could not write : " + path)
+                logger.error("Could not write : " + path)
 
     def sendTextureFile(self, path):
         if path in self.textures:
@@ -408,7 +404,7 @@ class ClientBlender(Client):
                 f.close()
                 self.sendTextureData(path, data)
             except:
-                print("Could not read : " + path)
+                logger.error("Could not read : " + path)
 
     def sendTextureData(self, path, data):
         nameBuffer = common.encodeString(path)
@@ -600,7 +596,7 @@ class ClientBlender(Client):
                     buffers.append(buffer)
             return buffers
         except:
-            print('not found')
+            logger.error('not found')
 
     def sendMaterial(self, material):
         if not material:
@@ -796,7 +792,7 @@ class ClientBlender(Client):
                 common.MessageType.LIGHT, lightBuffer, 0))
 
     def sendAddCollectionToCollection(self, parentCollectionName, collectionName):
-        collection_logger.debug("sendAddCollectionToCollection %s <- %s", parentCollectionName, collectionName)
+        collection_api.logger.debug("sendAddCollectionToCollection %s <- %s", parentCollectionName, collectionName)
 
         buffer = common.encodeString(
             parentCollectionName) + common.encodeString(collectionName)
@@ -804,7 +800,7 @@ class ClientBlender(Client):
             common.MessageType.ADD_COLLECTION_TO_COLLECTION, buffer, 0))
 
     def sendRemoveCollectionFromCollection(self, parentCollectionName, collectionName):
-        collection_logger.debug("sendRemoveCollectionFromCollection %s <- %s", parentCollectionName, collectionName)
+        collection_api.logger.debug("sendRemoveCollectionFromCollection %s <- %s", parentCollectionName, collectionName)
 
         buffer = common.encodeString(
             parentCollectionName) + common.encodeString(collectionName)
@@ -812,27 +808,27 @@ class ClientBlender(Client):
             common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION, buffer, 0))
 
     def sendAddObjectToCollection(self, collectionName, objName):
-        collection_logger.debug("sendAddObjectToCollection %s <- %s", collectionName, objName)
+        collection_api.logger.debug("sendAddObjectToCollection %s <- %s", collectionName, objName)
         buffer = common.encodeString(
             collectionName) + common.encodeString(objName)
         self.addCommand(common.Command(
             common.MessageType.ADD_OBJECT_TO_COLLECTION, buffer, 0))
 
     def sendRemoveObjectFromCollection(self, collectionName, objName):
-        collection_logger.debug("sendRemoveObjectFromCollection %s <- %s", collectionName, objName)
+        collection_api.logger.debug("sendRemoveObjectFromCollection %s <- %s", collectionName, objName)
         buffer = common.encodeString(
             collectionName) + common.encodeString(objName)
         self.addCommand(common.Command(
             common.MessageType.REMOVE_OBJECT_FROM_COLLECTION, buffer, 0))
 
     def sendCollectionRemoved(self, collectionName):
-        collection_logger.debug("sendCollectionRemoved %s", collectionName)
+        collection_api.logger.debug("sendCollectionRemoved %s", collectionName)
         buffer = common.encodeString(collectionName)
         self.addCommand(common.Command(
             common.MessageType.COLLECTION_REMOVED, buffer, 0))
 
     def sendCollection(self, collection):
-        collection_logger.debug("sendCollection %s", collection.name_full)
+        collection_api.logger.debug("sendCollection %s", collection.name_full)
         collectionInstanceOffset = collection.instance_offset
         buffer = common.encodeString(collection.name_full) + common.encodeBool(not collection.hide_viewport) + \
             common.encodeVector3(collectionInstanceOffset)

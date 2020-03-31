@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 import functools
 
-logger = logging.getLogger(__package__)
+logger = logging.getLogger(__name__)
 
 
 class StatsTimer():

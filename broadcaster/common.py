@@ -5,12 +5,15 @@ import socket
 import struct
 import json
 import time
+import logging
 
 
 mutex = threading.RLock()
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12800
+
+logger = logging.getLogger(__name__)
 
 
 class MessageType(Enum):
@@ -167,24 +170,30 @@ def decodeVector2(data, index):
 def encodeVector3(value):
     return struct.pack('3f', *(value.x, value.y, value.z))
 
+
 def decodeVector3(data, index):
     return struct.unpack('3f', data[index:index+3*4]), index+3*4
+
 
 def encodeVector4(value):
     return struct.pack('4f', *(value[0], value[1], value[2], value[3]))
 
+
 def decodeVector4(data, index):
     return struct.unpack('4f', data[index:index+4*4]), index+4*4
 
+
 def encodeMatrix(value):
     return encodeVector4(value.col[0]) + encodeVector4(value.col[1]) + encodeVector4(value.col[2]) + encodeVector4(value.col[3])
+
 
 def decodeMatrix(data, index):
     c0, index = decodeVector4(data, index)
     c1, index = decodeVector4(data, index)
     c2, index = decodeVector4(data, index)
     c3, index = decodeVector4(data, index)
-    return (c0,c1,c2,c3), index
+    return (c0, c1, c2, c3), index
+
 
 def encodeColor(value):
     if len(value) == 3:
@@ -195,6 +204,7 @@ def encodeColor(value):
 
 def decodeColor(data, index):
     return struct.unpack('4f', data[index:index+4*4]), index+4*4
+
 
 def encodeQuaternion(value):
     return struct.pack('4f', *(value.w, value.x, value.y, value.z))
@@ -353,7 +363,7 @@ def readMessage(socket: socket.socket) -> Command:
         except ClientDisconnectedException:
             raise
         except Exception as e:
-            print(e)
+            logger.error(e, exc_info=True)
             raise ClientDisconnectedException()
 
     return None

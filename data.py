@@ -9,6 +9,8 @@ from .shareData import shareData
 from .stats import get_stats_directory
 from . import ui
 
+logger = logging.getLogger(__name__)
+
 
 class RoomItem(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name")
@@ -20,6 +22,20 @@ class UserItem(bpy.types.PropertyGroup):
 
 def stats_file_path_suffix():
     return datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+
+log_level_enum_items = [('WARNING', 'Warning', '', logging.WARNING),
+                        ('INFO', 'Info', '', logging.INFO),
+                        ('DEBUG', 'Debug', '', logging.DEBUG)]
+
+
+def get_log_level(self):
+    return logging.getLogger(__package__).level
+
+
+def set_log_level(self, value):
+    logging.getLogger(__package__).setLevel(value)
+    logger.log(value, "Logging level changed")
 
 
 class DCCSyncProperties(bpy.types.PropertyGroup):
@@ -68,6 +84,13 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
 
     send_base_meshes: bpy.props.BoolProperty(default=True)
     send_baked_meshes: bpy.props.BoolProperty(default=True)
+
+    log_level: bpy.props.EnumProperty(name="Log Level",
+                                      description="Logging level to use",
+                                      items=log_level_enum_items,
+                                      set=set_log_level,
+                                      get=get_log_level)
+    log_level_value = logging.INFO
 
 
 def get_dcc_sync_props() -> DCCSyncProperties:

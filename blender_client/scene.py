@@ -4,8 +4,7 @@ from ..clientBlender import ClientBlender
 import logging
 import bpy
 
-logger = logging.getLogger('scene')
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 def sendScene(client: ClientBlender, scene_name: str):

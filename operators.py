@@ -18,8 +18,7 @@ from . import ui
 from .data import get_dcc_sync_props
 from .stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
 
-logger = logging.getLogger(__package__)
-logger.setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class TransformStruct:
@@ -1005,7 +1004,7 @@ class SendSelectionOperator(bpy.types.Operator):
                 for slot in obj.material_slots[:]:
                     shareData.client.sendMaterial(slot.material)
             except Exception:
-                print('materials not found')
+                logger.error('materials not found')
 
             updateParams(obj)
             updateTransform(obj)
