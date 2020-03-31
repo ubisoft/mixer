@@ -1076,9 +1076,9 @@ class ClientBlender(Client):
             self.callbacks['ClearContent']()
 
     def networkConsumer(self):
+        self.runOnce()
 
         setDirty = True
-
         while True:
             command, processed = self.consume_one()
             if command is None:

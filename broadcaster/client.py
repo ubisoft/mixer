@@ -27,7 +27,7 @@ class Client:
         self.socket = None
         self.thread = None
 
-    def connect(self):
+    def connect(self, useThread=False):
         if self.isConnected():
             raise RuntimeError("Client.connect : already connected")
 
@@ -42,7 +42,7 @@ class Client:
             self.socket = None
             raise
 
-        if self.socket:
+        if self.socket and useThread:
             self.threadAlive = True
             self.thread = threading.Thread(None, self.run)
             self.thread.start()
@@ -65,6 +65,8 @@ class Client:
             self.socket = None
 
     def isConnected(self):
+        if self.socket:
+            return True
         if self.thread and self.socket:
             return True
         return False
@@ -81,6 +83,34 @@ class Client:
     def setClientName(self, userName):
         common.writeMessage(self.socket, common.Command(
             common.MessageType.SET_CLIENT_NAME, userName.encode('utf8'), 0))
+
+    def runOnce(self):
+        while True:
+            try:
+                if not self.blenderExists():
+                    break
+                command = common.readMessage(self.socket)
+            except common.ClientDisconnectedException:
+                logger.info("Connection lost for %s:%s", self.host, self.port)
+                self.socket = None  # Set socket to None before putting CONNECTION_LIST message to avoid sending/reading new messages
+                command = common.Command(common.MessageType.CONNECTION_LOST)
+                self.receivedCommands.put(command)
+                break
+
+            if command is not None:
+                self.receivedCommands.put(command)
+            else:
+                break
+
+        while True:
+            try:
+                command = self.pendingCommands.get_nowait()
+            except queue.Empty:
+                break
+            else:
+                logger.info("Send %s (queue size = %d)", command.type, self.pendingCommands.qsize())
+                common.writeMessage(self.socket, command)
+                self.pendingCommands.task_done()
 
     def run(self):
         while(self.threadAlive):
