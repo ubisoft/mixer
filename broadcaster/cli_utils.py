@@ -12,7 +12,7 @@ def init_logging(args):
         raise ValueError(f'Invalid log level: {args.log_level}')
 
     formatter = logging.Formatter(
-        fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s [ %(pathname)s:%(lineno)d ]')
+        fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d]')
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
