@@ -205,12 +205,15 @@ class Connection:
                     else:
                         logger.error("COMMAND received but no room was joined")
 
-            if len(self.commands) > 0:
-                with common.mutex:
-                    for command in self.commands:
-                        logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
-                        common.writeMessage(self.socket, command)
-                    self.commands = []
+            try:
+                if len(self.commands) > 0:
+                    with common.mutex:
+                        for command in self.commands:
+                            logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
+                            common.writeMessage(self.socket, command)
+                        self.commands = []
+            except common.ClientDisconnectedException:
+                break
 
         self.close()
         self.onClientDisconnected()

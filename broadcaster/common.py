@@ -387,6 +387,9 @@ def send(socket, buffer):
         try:
             tmp = socket.send(buffer)
             return tmp
+        except (ConnectionAbortedError, ConnectionResetError) as e:
+            logger.warning(e)
+            raise ClientDisconnectedException()
         except:
             if attempts == 0:
                 raise
@@ -407,6 +410,12 @@ def writeMessage(sock: socket.socket, command: Command):
     while remainingSize > 0:
         _, w, _ = select.select([], [sock], [], 0.0001)
         if len(w) > 0:
-            sent = send(sock, buffer[currentIndex:])
-            remainingSize -= sent
-            currentIndex += sent
+            try:
+                sent = send(sock, buffer[currentIndex:])
+                remainingSize -= sent
+                currentIndex += sent
+            except ClientDisconnectedException:
+                raise
+            except Exception as e:
+                logger.error(e, exc_info=True)
+                raise
