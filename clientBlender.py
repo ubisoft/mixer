@@ -13,7 +13,7 @@ from .broadcaster import common
 from .broadcaster.client import Client
 from .blender_client import collection as collection_api
 from .blender_client import scene as scene_api
-from .blender_client import mesh as mesh_functions
+from .blender_client import mesh as mesh_api
 from .stats import stats_timer
 
 _STILL_ACTIVE = 259
@@ -622,8 +622,8 @@ class ClientBlender(Client):
 
         binary_buffer = common.encodeString(path) + common.encodeString(meshName)
 
-        binary_buffer += mesh_functions.encodeMesh(obj, data.get_dcc_sync_props().send_base_meshes,
-                                                   data.get_dcc_sync_props().send_baked_meshes)
+        binary_buffer += mesh_api.encodeMesh(obj, data.get_dcc_sync_props().send_base_meshes,
+                                             data.get_dcc_sync_props().send_baked_meshes)
 
         # For now include material slots in the same message, but maybe it should be a separated message
         # like Transform
@@ -655,7 +655,7 @@ class ClientBlender(Client):
             logger.error("Received a mesh for object %s while begin in EDIT mode, ignoring.", path)
             return
 
-        index = mesh_functions.decodeMesh(self, obj, commandData, index)
+        index = mesh_api.decodeMesh(self, obj, commandData, index)
 
         material_slot_count = len(obj.data.materials)
         material_link_dict = [

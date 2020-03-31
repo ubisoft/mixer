@@ -575,7 +575,6 @@ def decodeBaseMesh(client, obj, data, index):
             shapes_keys_list[i].vertex_group, index = common.decodeString(data, index)
         for i in range(shape_keys_count):
             relative_key_name, index = common.decodeString(data, index)
-            print(relative_key_name)
             shapes_keys_list[i].relative_key = obj.data.shape_keys.key_blocks[relative_key_name]
 
         for i in range(shape_keys_count):
