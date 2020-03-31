@@ -1,5 +1,6 @@
 import os
 import logging
+import tempfile
 from datetime import datetime
 
 import bpy
@@ -36,6 +37,21 @@ def get_log_level(self):
 def set_log_level(self, value):
     logging.getLogger(__package__).setLevel(value)
     logger.log(value, "Logging level changed")
+
+
+def get_logs_directory():
+    if "DCCSYNC_USER_LOGS_DIR" in os.environ:
+        username = os.getlogin()
+        base_shared_path = Path(os.environ["DCCSYNC_USER_LOGS_DIR"])
+        if os.path.exists(base_shared_path):
+            return os.path.join(os.fspath(base_shared_path), username)
+        logger.error(
+            f"DCCSYNC_USER_LOGS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location.")
+    return os.path.join(os.fspath(tempfile.gettempdir()), "dcc_sync")
+
+
+def get_log_file():
+    return os.path.join(get_logs_directory(), f"dccsync_logs_{shareData.runId}.log")
 
 
 class DCCSyncProperties(bpy.types.PropertyGroup):

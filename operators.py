@@ -67,6 +67,8 @@ def updateTransform(obj):
 
 
 def join_room(room_name: str):
+    logger.info("join_room")
+
     assert shareData.currentRoom is None
     user = get_dcc_sync_props().user
     shareData.sessionId += 1
@@ -90,6 +92,8 @@ def join_room(room_name: str):
 
 
 def leave_current_room():
+    logger.info("leave_current_room")
+
     # room ==> client
     assert not shareData.currentRoom or shareData.client
     if shareData.currentRoom:
@@ -113,6 +117,8 @@ def is_joined():
 
 @persistent
 def onLoad(scene):
+    logger.info("onLoad")
+
     disconnect()
 
 
@@ -535,6 +541,7 @@ def updateObjectsData():
 @persistent
 def sendFrameChanged(scene):
     logger.info("sendFrameChanged")
+
     if not shareData.client:
         return
 
@@ -560,9 +567,10 @@ def sendFrameChanged(scene):
 @stats_timer(shareData)
 @persistent
 def sendSceneDataToServer(scene, dummy):
+    logger.info("sendSceneDataToServer")
+
     timer = shareData.current_stats_timer
 
-    logger.info("sendSceneDataToServer")
     if not shareData.client:
         return
 
@@ -623,6 +631,8 @@ def sendSceneDataToServer(scene, dummy):
 
 @persistent
 def onUndoRedoPre(scene):
+    logger.info("onUndoRedoPre")
+
     shareData.setDirty()
     # shareData.selectedObjectsNames = set()
     # for obj in bpy.context.selected_objects:
@@ -666,6 +676,8 @@ def remapObjectsInfo():
 @stats_timer(shareData)
 @persistent
 def onUndoRedoPost(scene, dummy):
+    logger.info("onUndoRedoPost")
+
     shareData.setDirty()
     # apply only in object mode
     if not isInObjectMode():
@@ -862,6 +874,8 @@ def is_localhost(host):
 
 
 def connect():
+    logger.info("connect")
+
     props = get_dcc_sync_props()
     if not server_is_up(props.host, props.port):
         if is_localhost(props.host):
@@ -877,6 +891,8 @@ def connect():
 
 
 def disconnect():
+    logger.info("disconnect")
+
     leave_current_room()
 
     # the socket has already been disconnected

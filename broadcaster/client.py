@@ -119,8 +119,7 @@ class Client:
         except queue.Empty:
             return None, None
         else:
-            logger.info("Client %s Command %s received (queue size = %d)",
-                        self.name, command.type, self.receivedCommands.qsize())
+            logger.info("Command %s received (queue size = %d)", command.type, self.receivedCommands.qsize())
 
             if command.type == common.MessageType.LIST_ROOMS:
                 if self._delegate:

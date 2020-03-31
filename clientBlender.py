@@ -1122,7 +1122,7 @@ class ClientBlender(Client):
                 # this was a room protocol command that was processed
                 self.receivedCommandsProcessed = False
             else:
-                logger.info("Client %s Command %s received", self.name, command.type)
+                logger.info("Command %s received", self.name, command.type)
                 if command.type == common.MessageType.CONTENT:
                     self.receivedCommandsProcessed = False
                     self.sendSceneContent()
