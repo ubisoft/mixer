@@ -1076,9 +1076,7 @@ class ClientBlender(Client):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
 
     def on_connection_lost(self):
-        shareData.client_ids = None
-        operators.disconnect()
-        ui.update_ui_lists()
+        bpy.ops.dcc_sync.disconnect()
 
     def buildListAllClients(self, client_ids):
         shareData.client_ids = client_ids
@@ -1123,6 +1121,7 @@ class ClientBlender(Client):
                 self.receivedCommandsProcessed = False
             else:
                 if command.type == common.MessageType.CONTENT:
+                    # The server asks for scene content (at room creation)
                     self.receivedCommandsProcessed = False
                     self.sendSceneContent()
 
