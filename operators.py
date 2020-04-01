@@ -681,9 +681,8 @@ def onUndoRedoPost(scene, dummy):
         if k in oldObjectsName:
             oldObjectsName[k] = v
 
-    with StatsTimer(shareData, "updateObjectsState") as child_timer:
-        updateObjectsState(
-            oldObjectsName, shareData.oldObjects, child_timer)
+    with StatsTimer(shareData, "updateObjectsState"):
+        updateObjectsState(oldObjectsName, shareData.oldObjects)
 
     updateCollectionsState()
     updateScenesState()
