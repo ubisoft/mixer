@@ -765,6 +765,8 @@ def clear_scene_content():
     for scene in bpy.data.scenes[:-1]:
         bpy.data.scenes.remove(scene)
 
+    shareData.clearBeforeState()
+
     if len(bpy.data.scenes) == 1:
         scene = bpy.data.scenes[0]
         scene.name = '__last_scene_to_be_removed__'
