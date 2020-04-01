@@ -722,6 +722,8 @@ def onUndoRedoPost(scene, dummy):
         shareData.client.sendMaterial(material)
 
     shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
+    shareData.clearLists()
+    shareData.updateCurrentData()
 
 
 def updateListUsers(client_ids: Mapping[str, str] = None):
