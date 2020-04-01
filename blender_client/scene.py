@@ -30,8 +30,10 @@ def buildScene(data):
         shareData.blenderScenes[scene_name] = scene
 
     if to_remove is not None:
-        # bpy.data.scenes.remove(to_remove)
-        bpy.ops.scene.delete({'scene': to_remove})
+        # see https://developer.blender.org/T71422
+        window = bpy.context.window_manager.windows[0]
+        ctx = {'window': window, 'screen': window.screen, 'scene': to_remove}
+        bpy.ops.scene.delete(ctx)
 
 
 def sendSceneRemoved(client: ClientBlender, scene_name: str):
@@ -47,10 +49,10 @@ def buildSceneRemoved(data):
     scene = shareData.blenderScenes.get(scene_name)
     del shareData.blenderScenes[scene_name]
 
-    # in the tests this crashes (see readme.md):
-    # bpy.data.scenes.remove(scene)
-    # but this succeeds
-    bpy.ops.scene.delete({'scene': scene})
+    # see https://developer.blender.org/T71422
+    window = bpy.context.window_manager.windows[0]
+    ctx = {'window': window, 'screen': window.screen, 'scene': scene}
+    bpy.ops.scene.delete(ctx)
 
 
 def sendAddCollectionToScene(client: ClientBlender, scene_name: str, collection_name: str):
