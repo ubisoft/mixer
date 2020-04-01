@@ -13,17 +13,13 @@ from .broadcaster import common
 from .broadcaster.client import Client
 from .blender_client import collection as collection_api
 from .blender_client import scene as scene_api
-from .blender_client import mesh as mesh_functions
+from .blender_client import mesh as mesh_api
 from .stats import stats_timer
 
 _STILL_ACTIVE = 259
 
 
-logger = logging.getLogger(__package__)
-logger.setLevel(logging.INFO)
-
-collection_logger = logging.getLogger('collection')
-collection_logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 class ClientBlender(Client):
@@ -42,7 +38,7 @@ class ClientBlender(Client):
             if len(bpy.context.window_manager.windows) == 0:
                 return False
         except Exception as e:
-            print(e)
+            logger.error(e, exc_info=True)
             return False
         return True
 
@@ -69,25 +65,16 @@ class ClientBlender(Client):
         return collection
 
     def getOrCreatePath(self, path, data=None) -> bpy.types.Object:
-        pathElem = path.split('/')
-        parent = None
-        ob = None
-        # Create or get parents
-        for elem in pathElem[:-1]:
-            ob = shareData.blenderObjects.get(elem)
-            if not ob:
-                ob = bpy.data.objects.new(elem, None)
-                shareData._blenderObjects[ob.name_full] = ob
-            ob.parent = parent
-            parent = ob
+        index = path.rfind('/')
+        if index != -1:
+            shareData.pendingParenting.add(path)  # Parenting is resolved after consumption of all messages
+
         # Create or get object
-        elem = pathElem[-1]
+        elem = path[index + 1:]
         ob = shareData.blenderObjects.get(elem)
         if not ob:
             ob = bpy.data.objects.new(elem, data)
             shareData._blenderObjects[ob.name_full] = ob
-        else:
-            ob.parent = parent
         return ob
 
     def getOrCreateObjectData(self, path, data):
@@ -251,7 +238,7 @@ class ClientBlender(Client):
                     break
 
         if not principled:
-            print("Cannot find Principled BSDF node")
+            logger.error("Cannot find Principled BSDF node")
             return
 
         index = start
@@ -270,7 +257,7 @@ class ClientBlender(Client):
                 texImage.image = bpy.data.images.load(fileName)
                 texImage.image.colorspace_settings.name = 'Non-Color'
             except:
-                print("could not load : " + fileName)
+                logger.error("could not load : " + fileName)
                 pass
             material.node_tree.links.new(
                 invert.inputs['Color'], texImage.outputs['Color'])
@@ -305,7 +292,7 @@ class ClientBlender(Client):
                 texImage.image = bpy.data.images.load(fileName)
                 texImage.image.colorspace_settings.name = 'Non-Color'
             except:
-                print("could not load : " + fileName)
+                logger.error("could not load : " + fileName)
                 pass
             material.node_tree.links.new(
                 normalMap.inputs['Color'], texImage.outputs['Color'])
@@ -405,7 +392,7 @@ class ClientBlender(Client):
                 f.close()
                 self.textures.add(path)
             except:
-                print("Could not write : " + path)
+                logger.error("Could not write : " + path)
 
     def sendTextureFile(self, path):
         if path in self.textures:
@@ -417,7 +404,7 @@ class ClientBlender(Client):
                 f.close()
                 self.sendTextureData(path, data)
             except:
-                print("Could not read : " + path)
+                logger.error("Could not read : " + path)
 
     def sendTextureData(self, path, data):
         nameBuffer = common.encodeString(path)
@@ -609,7 +596,7 @@ class ClientBlender(Client):
                     buffers.append(buffer)
             return buffers
         except:
-            print('not found')
+            logger.error('not found')
 
     def sendMaterial(self, material):
         if not material:
@@ -629,16 +616,57 @@ class ClientBlender(Client):
         meshName = self.getMeshName(mesh)
         path = self.getObjectPath(obj)
 
-        if data.get_dcc_sync_props().sync_blender:
-            sourceMeshBuffer = mesh_functions.getSourceMeshBuffers(obj, meshName)
-            if sourceMeshBuffer:
-                self.addCommand(common.Command(common.MessageType.SOURCE_MESH,
-                                               common.encodeString(path) + sourceMeshBuffer, 0))
+        binary_buffer = common.encodeString(path) + common.encodeString(meshName)
 
-        if data.get_dcc_sync_props().sync_vrtist:
-            meshBuffer = mesh_functions.getMeshBuffers(obj, meshName)
-            if meshBuffer:
-                self.addCommand(common.Command(common.MessageType.MESH, common.encodeString(path) + meshBuffer, 0))
+        binary_buffer += mesh_api.encodeMesh(obj, data.get_dcc_sync_props().send_base_meshes,
+                                             data.get_dcc_sync_props().send_baked_meshes)
+
+        # For now include material slots in the same message, but maybe it should be a separated message
+        # like Transform
+        material_link_dict = {
+            'OBJECT': 0,
+            'DATA': 1
+        }
+        material_links = [material_link_dict[slot.link] for slot in obj.material_slots]
+        assert(len(material_links) == len(obj.data.materials))
+        binary_buffer += struct.pack(f'{len(material_links)}I', *material_links)
+
+        for slot in obj.material_slots:
+            if slot.link == 'DATA':
+                binary_buffer += common.encodeString("")
+            else:
+                binary_buffer += common.encodeString(slot.material.name if slot.material != None else "")
+
+        self.addCommand(common.Command(common.MessageType.MESH, binary_buffer, 0))
+
+    @stats_timer(shareData)
+    def buildMesh(self, commandData):
+        index = 0
+
+        path, index = common.decodeString(commandData, index)
+        meshName, index = common.decodeString(commandData, index)
+
+        obj = self.getOrCreateObjectData(path, self.getOrCreateMesh(meshName))
+        if obj.mode == 'EDIT':
+            logger.error("Received a mesh for object %s while begin in EDIT mode, ignoring.", path)
+            return
+
+        index = mesh_api.decodeMesh(self, obj, commandData, index)
+
+        material_slot_count = len(obj.data.materials)
+        material_link_dict = [
+            'OBJECT',
+            'DATA'
+        ]
+        material_links = struct.unpack(f'{material_slot_count}I', commandData[index: index + 4 * material_slot_count])
+        for link, slot in zip(material_links, obj.material_slots):
+            slot.link = material_link_dict[link]
+        index += 4 * material_slot_count
+
+        for slot in obj.material_slots:
+            material_name, index = common.decodeString(commandData, index)
+            if slot.link == 'OBJECT' and material_name != "":
+                slot.material = self.getOrCreateMaterial(material_name)
 
     def sendCollectionInstance(self, obj):
         if not obj.instance_collection:
@@ -764,7 +792,7 @@ class ClientBlender(Client):
                 common.MessageType.LIGHT, lightBuffer, 0))
 
     def sendAddCollectionToCollection(self, parentCollectionName, collectionName):
-        collection_logger.debug("sendAddCollectionToCollection %s <- %s", parentCollectionName, collectionName)
+        collection_api.logger.debug("sendAddCollectionToCollection %s <- %s", parentCollectionName, collectionName)
 
         buffer = common.encodeString(
             parentCollectionName) + common.encodeString(collectionName)
@@ -772,7 +800,7 @@ class ClientBlender(Client):
             common.MessageType.ADD_COLLECTION_TO_COLLECTION, buffer, 0))
 
     def sendRemoveCollectionFromCollection(self, parentCollectionName, collectionName):
-        collection_logger.debug("sendRemoveCollectionFromCollection %s <- %s", parentCollectionName, collectionName)
+        collection_api.logger.debug("sendRemoveCollectionFromCollection %s <- %s", parentCollectionName, collectionName)
 
         buffer = common.encodeString(
             parentCollectionName) + common.encodeString(collectionName)
@@ -780,27 +808,27 @@ class ClientBlender(Client):
             common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION, buffer, 0))
 
     def sendAddObjectToCollection(self, collectionName, objName):
-        collection_logger.debug("sendAddObjectToCollection %s <- %s", collectionName, objName)
+        collection_api.logger.debug("sendAddObjectToCollection %s <- %s", collectionName, objName)
         buffer = common.encodeString(
             collectionName) + common.encodeString(objName)
         self.addCommand(common.Command(
             common.MessageType.ADD_OBJECT_TO_COLLECTION, buffer, 0))
 
     def sendRemoveObjectFromCollection(self, collectionName, objName):
-        collection_logger.debug("sendRemoveObjectFromCollection %s <- %s", collectionName, objName)
+        collection_api.logger.debug("sendRemoveObjectFromCollection %s <- %s", collectionName, objName)
         buffer = common.encodeString(
             collectionName) + common.encodeString(objName)
         self.addCommand(common.Command(
             common.MessageType.REMOVE_OBJECT_FROM_COLLECTION, buffer, 0))
 
     def sendCollectionRemoved(self, collectionName):
-        collection_logger.debug("sendCollectionRemoved %s", collectionName)
+        collection_api.logger.debug("sendCollectionRemoved %s", collectionName)
         buffer = common.encodeString(collectionName)
         self.addCommand(common.Command(
             common.MessageType.COLLECTION_REMOVED, buffer, 0))
 
     def sendCollection(self, collection):
-        collection_logger.debug("sendCollection %s", collection.name_full)
+        collection_api.logger.debug("sendCollection %s", collection.name_full)
         collectionInstanceOffset = collection.instance_offset
         buffer = common.encodeString(collection.name_full) + common.encodeBool(not collection.hide_viewport) + \
             common.encodeVector3(collectionInstanceOffset)
@@ -1048,9 +1076,7 @@ class ClientBlender(Client):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
 
     def on_connection_lost(self):
-        shareData.client_ids = None
-        operators.disconnect()
-        ui.update_ui_lists()
+        bpy.ops.dcc_sync.disconnect()
 
     def buildListAllClients(self, client_ids):
         shareData.client_ids = client_ids
@@ -1082,9 +1108,7 @@ class ClientBlender(Client):
         while True:
             command, processed = self.consume_one()
             if command is None:
-                if not setDirty:
-                    shareData.updateCurrentData()
-                return 0.01
+                break
 
             if setDirty:
                 shareData.setDirty()
@@ -1096,8 +1120,8 @@ class ClientBlender(Client):
                 # this was a room protocol command that was processed
                 self.receivedCommandsProcessed = False
             else:
-                logger.info("Client %s Command %s received", self.name, command.type)
                 if command.type == common.MessageType.CONTENT:
+                    # The server asks for scene content (at room creation)
                     self.receivedCommandsProcessed = False
                     self.sendSceneContent()
 
@@ -1110,8 +1134,8 @@ class ClientBlender(Client):
 
                 elif command.type == common.MessageType.CLEAR_CONTENT:
                     self.clearContent()
-                elif command.type == common.MessageType.SOURCE_MESH:
-                    mesh_functions.buildSourceMesh(self, command.data)
+                elif command.type == common.MessageType.MESH:
+                    self.buildMesh(command.data)
                 elif command.type == common.MessageType.TRANSFORM:
                     self.buildTransform(command.data)
                 elif command.type == common.MessageType.MATERIAL:
@@ -1166,3 +1190,23 @@ class ClientBlender(Client):
 
                 self.receivedCommands.task_done()
                 self.blockSignals = False
+
+        if not setDirty:
+            shareData.updateCurrentData()
+
+        if len(shareData.pendingParenting) > 0:
+            remainingParentings = set()
+            for path in shareData.pendingParenting:
+                pathElem = path.split('/')
+                ob = None
+                parent = None
+                for elem in pathElem:
+                    ob = shareData.blenderObjects.get(elem)
+                    if not ob:
+                        remainingParentings.add(path)
+                        break
+                    ob.parent = parent
+                    parent = ob
+            shareData.pendingParenting = remainingParentings
+
+        return 0.01

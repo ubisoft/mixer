@@ -30,9 +30,6 @@ class ShareData:
         self.sessionId = 0  # For logging and debug
         self.client: "clientBlender.ClientBlender" = None
 
-        # equivalent to handlers set
-        self.currentRoom: str = None
-
         # as received fom LIST_ALL_CLIENTS
         self.client_ids: List[Mapping[str, str]] = None
 
@@ -40,6 +37,17 @@ class ShareData:
         self.localServerProcess = None
         self.selectedObjectsNames = []
         self.depsgraph = None
+
+        self.current_statistics = None
+        self.current_stats_timer = None
+        self.auto_save_statistics = False
+        self.statistics_directory = None
+
+        self.clearRoomData()
+
+    def clearRoomData(self):
+        # equivalent to handlers set
+        self.currentRoom: str = None
 
         self.objectsAdded: Set(str) = set()
         self.objectsRemoved: Set(str) = set()
@@ -82,11 +90,6 @@ class ShareData:
         # {objectPath: [collectionName]}
         self.restoreToCollections: Mapping[str, List[str]] = {}
 
-        self.current_statistics = None
-        self.current_stats_timer = None
-        self.auto_save_statistics = False
-        self.statistics_directory = None
-
         self._blenderObjects = {}
         self.blenderObjectsDirty = True
 
@@ -106,6 +109,13 @@ class ShareData:
         self.blenderLightsDirty = True
         self._blenderCollections: Mapping[str, bpy.types.Collection] = {}
         self.blenderCollectionsDirty = True
+
+        self.pendingParenting = set()
+
+    def leaveCurrentRoom(self):
+        if self.client:
+            self.client.leaveRoom(shareData.currentRoom)
+        self.clearRoomData()
 
         self._blenderScenes: Mapping[str, bpy.types.Scene] = {}
         self.blenderScenesDirty = True

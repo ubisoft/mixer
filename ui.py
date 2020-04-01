@@ -6,9 +6,6 @@ from .shareData import shareData
 import logging
 
 logger = logging.Logger(__name__)
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger.setLevel(logging.INFO)
 
 
 def redraw():
@@ -172,8 +169,9 @@ class SettingsPanel(bpy.types.Panel):
             col.operator(operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
             col.prop(dcc_sync_props, "auto_save_statistics", text="Auto Save Statistics")
             col.prop(dcc_sync_props, "no_send_scene_content", text="No send_scene_content")
-            col.prop(dcc_sync_props, "sync_blender", text="Sync Blender")
-            col.prop(dcc_sync_props, "sync_vrtist", text="Sync VRtist")
+            col.prop(dcc_sync_props, "send_base_meshes", text="Send Base Meshes")
+            col.prop(dcc_sync_props, "send_baked_meshes", text="Send Baked Meshes")
+            col.prop(dcc_sync_props, "log_level", text="Log Level")
 
 
 classes = (

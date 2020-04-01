@@ -1,5 +1,6 @@
 import os
 import logging
+import tempfile
 from datetime import datetime
 
 import bpy
@@ -8,6 +9,8 @@ from .broadcaster import common
 from .shareData import shareData
 from .stats import get_stats_directory
 from . import ui
+
+logger = logging.getLogger(__name__)
 
 
 class RoomItem(bpy.types.PropertyGroup):
@@ -20,6 +23,38 @@ class UserItem(bpy.types.PropertyGroup):
 
 def stats_file_path_suffix():
     return datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+
+
+log_level_enum_items = [
+    ('ERROR', 'Error', '', logging.ERROR),
+    ('WARNING', 'Warning', '', logging.WARNING),
+    ('INFO', 'Info', '', logging.INFO),
+    ('DEBUG', 'Debug', '', logging.DEBUG)
+]
+
+
+def get_log_level(self):
+    return logging.getLogger(__package__).level
+
+
+def set_log_level(self, value):
+    logging.getLogger(__package__).setLevel(value)
+    logger.log(value, "Logging level changed")
+
+
+def get_logs_directory():
+    if "DCCSYNC_USER_LOGS_DIR" in os.environ:
+        username = os.getlogin()
+        base_shared_path = Path(os.environ["DCCSYNC_USER_LOGS_DIR"])
+        if os.path.exists(base_shared_path):
+            return os.path.join(os.fspath(base_shared_path), username)
+        logger.error(
+            f"DCCSYNC_USER_LOGS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location.")
+    return os.path.join(os.fspath(tempfile.gettempdir()), "dcc_sync")
+
+
+def get_log_file():
+    return os.path.join(get_logs_directory(), f"dccsync_logs_{shareData.runId}.log")
 
 
 class DCCSyncProperties(bpy.types.PropertyGroup):
@@ -66,8 +101,14 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
     # Main usage: optimization of client timers to check if updates are required
     no_send_scene_content: bpy.props.BoolProperty(default=False)
 
-    sync_blender: bpy.props.BoolProperty(default=True)
-    sync_vrtist: bpy.props.BoolProperty(default=True)
+    send_base_meshes: bpy.props.BoolProperty(default=True)
+    send_baked_meshes: bpy.props.BoolProperty(default=True)
+
+    log_level: bpy.props.EnumProperty(name="Log Level",
+                                      description="Logging level to use",
+                                      items=log_level_enum_items,
+                                      set=set_log_level,
+                                      get=get_log_level)
 
 
 def get_dcc_sync_props() -> DCCSyncProperties:

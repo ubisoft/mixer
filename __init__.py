@@ -6,6 +6,7 @@ from .shareData import shareData
 import bpy
 import atexit
 import logging
+from pathlib import Path
 
 bl_info = {
     "name": "VRtist",
@@ -16,6 +17,9 @@ bl_info = {
     "warning": "",
     "category": "Generic"
 }
+
+logger = logging.getLogger(__name__)
+MODULE_PATH = Path(__file__).parent
 
 
 def cleanup():
@@ -29,13 +33,34 @@ def cleanup():
         pass
 
 
+class Formatter(logging.Formatter):
+    def __init__(self, fmt):
+        super().__init__(fmt)
+
+    def format(self, record: logging.LogRecord):
+        """
+        The role of this custom formatter is:
+        - append filepath and lineno to logging format but shorten path to files, to make logs more clear
+        - to append "./" at the begining to permit going to the line quickly with VS Code CTRL+click from terminal
+        """
+        s = super().format(record)
+        pathname = Path(record.pathname).relative_to(MODULE_PATH)
+        s += f" [./{pathname}:{record.lineno}]"
+        return s
+
+
 def register():
-    logger = logging.getLogger(__package__)
     if len(logger.handlers) == 0:
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.WARNING)
+        formatter = Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
         logger.addHandler(handler)
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+        handler = logging.FileHandler(data.get_log_file())
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
 
     operators.register()
     ui.register()
@@ -45,12 +70,11 @@ def register():
 
 
 def unregister():
-    operators.leave_current_room()
+    operators.disconnect()
 
     if shareData:
         if shareData.client and bpy.app.timers.is_registered(shareData.client.networkConsumer):
             bpy.app.timers.unregister(shareData.client.networkConsumer)
-    operators.disconnect()
 
     operators.unregister()
     ui.unregister()

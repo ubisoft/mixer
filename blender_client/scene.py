@@ -4,8 +4,7 @@ from ..clientBlender import ClientBlender
 import logging
 import bpy
 
-logger = logging.getLogger('scene')
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 def sendScene(client: ClientBlender, scene_name: str):
@@ -30,8 +29,15 @@ def buildScene(data):
         shareData.blenderScenes[scene_name] = scene
 
     if to_remove is not None:
-        # bpy.data.scenes.remove(to_remove)
-        bpy.ops.scene.delete({'scene': to_remove})
+        # This one is so fucking tricky that it deserve an explanation:
+        # Due to bug mentionned here https://developer.blender.org/T71422, deleting a scene with D.scenes.remove() in a function called from a timer
+        # gives a hard crash.
+        # This is due to context.window being None.
+        # To overcome this issue, we call an operator with a custom context that define window, screen and scene.
+        window = bpy.context.window_manager.windows[0]
+        ctx = {'window': window, 'screen': window.screen, 'scene': to_remove}
+        # todo: replace with an operator from our addon that calls D.scenes.remove() , it is safer to have full control
+        bpy.ops.scene.delete(ctx)
 
 
 def sendSceneRemoved(client: ClientBlender, scene_name: str):
