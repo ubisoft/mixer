@@ -51,7 +51,7 @@ class Formatter(logging.Formatter):
 
 def register():
     if len(logger.handlers) == 0:
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.WARNING)
         formatter = Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler = logging.StreamHandler()

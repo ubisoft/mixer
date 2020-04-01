@@ -25,9 +25,12 @@ def stats_file_path_suffix():
     return datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
 
-log_level_enum_items = [('WARNING', 'Warning', '', logging.WARNING),
-                        ('INFO', 'Info', '', logging.INFO),
-                        ('DEBUG', 'Debug', '', logging.DEBUG)]
+log_level_enum_items = [
+    ('ERROR', 'Error', '', logging.ERROR),
+    ('WARNING', 'Warning', '', logging.WARNING),
+    ('INFO', 'Info', '', logging.INFO),
+    ('DEBUG', 'Debug', '', logging.DEBUG)
+]
 
 
 def get_log_level(self):
@@ -106,7 +109,6 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
                                       items=log_level_enum_items,
                                       set=set_log_level,
                                       get=get_log_level)
-    log_level_value = logging.INFO
 
 
 def get_dcc_sync_props() -> DCCSyncProperties:

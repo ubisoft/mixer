@@ -35,5 +35,5 @@ def add_logging_cli_args(parser: argparse.ArgumentParser):
     """
     Set CLI arguments for logger configuration.
     """
-    parser.add_argument('--log-level', default='INFO', help='Level of log to use by default.')
+    parser.add_argument('--log-level', default='WARNING', help='Level of log to use by default.')
     parser.add_argument('--log-file', help='Path to log file.')

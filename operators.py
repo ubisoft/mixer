@@ -817,9 +817,6 @@ def send_scene_content():
 
     sendSceneDataToServer(None, None)
 
-    for obj in bpy.context.scene.objects:
-        scene_lib.sendAddObjectToVRtist(shareData.client, bpy.context.scene.name_full, obj.name_full)
-
     shareData.client.sendFrameStartEnd(
         bpy.context.scene.frame_start, bpy.context.scene.frame_end)
     shareData.client.sendFrame(bpy.context.scene.frame_current)

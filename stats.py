@@ -28,7 +28,7 @@ class StatsTimer():
             parent_stats_dict = share_data.current_stats_timer.stats_dict
 
         if log:
-            logger.info(key)
+            logger.debug(key)
         if not "children" in parent_stats_dict:
             parent_stats_dict["children"] = {}
         if not key in parent_stats_dict["children"]:
@@ -55,7 +55,7 @@ class StatsTimer():
         self.stats_dict["hit_count"] += 1
         self.share_data.current_stats_timer = self.previous_stats_timer
         if self.log:
-            logger.info(f"{self.key} done. Time = %f", t)
+            logger.debug(f"{self.key} done. Time = %f", t)
         return
 
     def reset_checkpoint(self):

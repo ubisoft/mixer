@@ -566,7 +566,7 @@ def decodeBaseMesh(client, obj, data, index):
     shape_keys_count, index = common.decodeInt(data, index)
     obj.shape_key_clear()
     if shape_keys_count > 0:
-        logger.info("Loading %d shape keys", shape_keys_count)
+        logger.debug("Loading %d shape keys", shape_keys_count)
         shapes_keys_list = []
         for i in range(shape_keys_count):
             shape_key_name, index = common.decodeString(data, index)
