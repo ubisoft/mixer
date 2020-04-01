@@ -698,8 +698,13 @@ def onUndoRedoPost(scene, dummy):
     addScenes()
     addObjects()
     addCollections()
+
+    addCollectionsToScenes()
     addCollectionsToCollections()
+
     addObjectsToCollections()
+    addObjectsToScenes()
+
     updateCollectionsParameters()
     createVRtistObjects()
     deleteSceneObjects()
