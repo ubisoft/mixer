@@ -734,15 +734,7 @@ def updateListUsers(client_ids: Mapping[str, str] = None):
 def clear_scene_content():
     set_handlers(False)
 
-    collections = []
-    objs = []
-    for collection in bpy.data.collections:
-        collections.append(collection)
-        for obj in collection.objects:
-            if obj.type == 'MESH' or obj.type == 'LIGHT' or obj.type == 'CAMERA':
-                objs.append(obj)
-
-    for obj in objs:
+    for obj in bpy.data.objects:
         bpy.data.objects.remove(obj, do_unlink=True)
 
     for block in bpy.data.meshes:
@@ -761,7 +753,7 @@ def clear_scene_content():
         if block.users == 0:
             bpy.data.images.remove(block)
 
-    for collection in collections:
+    for collection in bpy.data.collections:
         bpy.data.collections.remove(collection)
 
     # Cannot remove the last scene at this point, treat it differently
