@@ -2,6 +2,7 @@ import logging
 import argparse
 import os
 import socket
+import select
 import sys
 import threading
 import time
@@ -12,9 +13,7 @@ import common
 
 sys.path.append(os.getcwd())
 
-TIMEOUT = 60.0
 BINDING_HOST = ''
-
 SHUTDOWN = False
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
@@ -288,7 +287,7 @@ class Room:
             self._server.delete_room(self.name)
             logger.info("No more clients in room \"%s\". Room deleted", self.name)
         else:
-            logger.info(f'Connections left : "{len(self._connections)}".')
+            logger.info(f'Connections left : {len(self._connections)}.')
             self.broadcast_user_list()
 
     def send_client_ids(self, client_ids):
@@ -431,23 +430,20 @@ class Server:
         logger.info("Listening on port % s", common.DEFAULT_PORT)
         while not self._shutdown:
             try:
-                (conn, remote_address) = sock.accept()
-                connection = Connection(self, conn, remote_address)
-                assert connection.address not in self._unjoined_connections
-                self._unjoined_connections[connection.address] = connection
-                connection.start()
-                logger.info(f"New connection from {remote_address}")
+                timeout = 0.1  # Check for a new client every 10th of a second
+                readable, _, _ = select.select([sock], [], [], timeout)
+                if len(readable) > 0:
+                    client_socket, client_address = sock.accept()
+                    connection = Connection(self, client_socket, client_address)
+                    assert connection.address not in self._unjoined_connections
+                    self._unjoined_connections[connection.address] = connection
+                    connection.start()
+                    logger.info(f"New connection from {client_address}")
 
-                # Let the new client know the room and user lists
-                self.broadcast_user_list()
-
+                    # Let the new client know the room and user lists
+                    self.broadcast_user_list()
             except KeyboardInterrupt:
-                break
-            except BlockingIOError:
-                try:
-                    time.sleep(60.0 / 1000.0)
-                except KeyboardInterrupt:
-                    break
+                self.shutdown()
 
         logger.info("Shutting down server")
         SHUTDOWN = True

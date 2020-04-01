@@ -288,21 +288,23 @@ class Command:
             Command._id += 1
 
 
-def recv(socket, size):
-    attempts = 5
-    timeout = 0.01
-    while True:
-        try:
-            tmp = socket.recv(size)
-            return tmp
-        except (ConnectionAbortedError, ConnectionResetError) as e:
-            logger.warning(e)
-            raise ClientDisconnectedException()
-        except:
-            if attempts == 0:
-                raise
-            attempts -= 1
-            time.sleep(timeout)
+def recv(socket: socket.socket, size: int):
+    result = b''
+    while size != 0:
+        r, _, _ = select.select([socket], [], [], 0.1)
+        if len(r) > 0:
+            try:
+                tmp = socket.recv(size)
+            except (ConnectionAbortedError, ConnectionResetError) as e:
+                logger.warning(e)
+                raise ClientDisconnectedException()
+
+            if len(tmp) == 0:
+                raise ClientDisconnectedException()
+
+            result += tmp
+            size -= len(tmp)
+    return result
 
 
 class CommandFormatter:
@@ -349,35 +351,30 @@ class CommandFormatter:
 
 def readMessage(socket: socket.socket) -> Command:
     if not socket:
+        logger.warning("readMessage called with no socket")
         return None
+
     r, _, _ = select.select([socket], [], [], 0.0001)
-    if len(r) > 0:
-        try:
-            prefix_size = 14
-            msg = b''
-            while prefix_size != 0:
-                tmp = recv(socket, prefix_size)
-                msg += tmp
-                prefix_size -= len(tmp)
+    if len(r) == 0:
+        return None
 
-            frameSize = bytesToInt(msg[:8])
-            commandId = bytesToInt(msg[8:12])
-            messageType = bytesToInt(msg[12:])
-            currentSize = frameSize
-            msg = b''
-            while currentSize != 0:
-                tmp = recv(socket, currentSize)
-                msg += tmp
-                currentSize -= len(tmp)
-            return Command(intToMessageType(messageType), msg, commandId)
+    try:
+        prefix_size = 14
+        msg = recv(socket, prefix_size)
 
-        except ClientDisconnectedException:
-            raise
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            raise
+        frameSize = bytesToInt(msg[:8])
+        commandId = bytesToInt(msg[8:12])
+        messageType = bytesToInt(msg[12:])
 
-    return None
+        msg = recv(socket, frameSize)
+
+        return Command(intToMessageType(messageType), msg, commandId)
+
+    except ClientDisconnectedException:
+        raise
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        raise
 
 
 def send(socket, buffer):
@@ -399,23 +396,19 @@ def send(socket, buffer):
 
 def writeMessage(sock: socket.socket, command: Command):
     if not sock:
+        logger.warning("writeMessage called with no socket")
         return
+
     size = intToBytes(len(command.data), 8)
     commandId = intToBytes(command.id, 4)
     mtype = intToBytes(command.type.value, 2)
 
     buffer = size + commandId + mtype + command.data
-    remainingSize = len(buffer)
-    currentIndex = 0
-    while remainingSize > 0:
-        _, w, _ = select.select([], [sock], [], 0.0001)
-        if len(w) > 0:
-            try:
-                sent = send(sock, buffer[currentIndex:])
-                remainingSize -= sent
-                currentIndex += sent
-            except ClientDisconnectedException:
-                raise
-            except Exception as e:
-                logger.error(e, exc_info=True)
-                raise
+
+    try:
+        _, w, _ = select.select([], [sock], [])
+        if sock.sendall(buffer) is not None:
+            raise ClientDisconnectedException()
+    except (ConnectionAbortedError, ConnectionResetError) as e:
+        logger.warning(e)
+        raise ClientDisconnectedException()
