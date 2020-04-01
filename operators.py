@@ -134,9 +134,6 @@ def getParentCollection(collectionName):
     """
     May return a master or non master collection
     """
-    for scene in bpy.data.scenes:
-        if collectionName in scene.collection.children:
-            return scene.collection
     for col in shareData.blenderCollections.values():
         childrenNames = set([x.name_full for x in col.children])
         if collectionName in childrenNames:
