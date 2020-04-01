@@ -3,8 +3,7 @@ from ..shareData import shareData
 import logging
 import bpy
 
-collection_logger = logging.getLogger('collection')
-collection_logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 def buildCollection(data):
@@ -13,7 +12,7 @@ def buildCollection(data):
     hide_viewport = not visible
     offset, _ = common.decodeVector3(data, index)
 
-    collection_logger.debug("buildCollection %s", name_full)
+    logger.debug("buildCollection %s", name_full)
     collection = shareData.blenderCollections.get(name_full)
     if collection is None:
         collection = bpy.data.collections.new(name_full)
@@ -24,7 +23,7 @@ def buildCollection(data):
 
 def buildCollectionRemoved(data):
     name_full, index = common.decodeString(data, 0)
-    collection_logger.debug("buildCollectionRemove %s", name_full)
+    logger.debug("buildCollectionRemove %s", name_full)
     collection = shareData.blenderCollections[name_full]
     del shareData.blenderCollections[name_full]
     bpy.data.collections.remove(collection)
@@ -33,7 +32,7 @@ def buildCollectionRemoved(data):
 def buildCollectionToCollection(data):
     parent_name, index = common.decodeString(data, 0)
     child_name, _ = common.decodeString(data, index)
-    collection_logger.debug("buildCollectionToCollection %s <- %s", parent_name, child_name)
+    logger.debug("buildCollectionToCollection %s <- %s", parent_name, child_name)
 
     parent = shareData.blenderCollections[parent_name]
     child = shareData.blenderCollections[child_name]
@@ -43,7 +42,7 @@ def buildCollectionToCollection(data):
 def buildRemoveCollectionFromCollection(data):
     parent_name, index = common.decodeString(data, 0)
     child_name, _ = common.decodeString(data, index)
-    collection_logger.debug("buildRemoveCollectionFromCollection %s <- %s", parent_name, child_name)
+    logger.debug("buildRemoveCollectionFromCollection %s <- %s", parent_name, child_name)
 
     parent = shareData.blenderCollections[parent_name]
     child = shareData.blenderCollections[child_name]
@@ -53,7 +52,7 @@ def buildRemoveCollectionFromCollection(data):
 def buildAddObjectToCollection(data):
     collection_name, index = common.decodeString(data, 0)
     object_name, _ = common.decodeString(data, index)
-    collection_logger.debug("buildAddObjectToCollection %s <- %s", collection_name, object_name)
+    logger.debug("buildAddObjectToCollection %s <- %s", collection_name, object_name)
 
     collection = shareData.blenderCollections[collection_name]
 
@@ -67,7 +66,7 @@ def buildAddObjectToCollection(data):
 def buildRemoveObjectFromCollection(data):
     collection_name, index = common.decodeString(data, 0)
     object_name, _ = common.decodeString(data, index)
-    collection_logger.debug("buildRemoveObjectFromCollection %s <- %s", collection_name, object_name)
+    logger.debug("buildRemoveObjectFromCollection %s <- %s", collection_name, object_name)
 
     collection = shareData.blenderCollections[collection_name]
     object_ = shareData.blenderObjects[object_name]

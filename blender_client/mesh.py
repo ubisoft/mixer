@@ -9,82 +9,7 @@ import bpy
 import bmesh
 from mathutils import Vector
 
-logger = logging.getLogger(f"dccsync")
-
-
-def deprecated_buildMesh(client, data):
-    # Deprecated: Blender does not load a baked mesh
-    index = 0
-    path, index = common.decodeString(data, index)
-    meshName, index = common.decodeString(data, index)
-    positions, index = common.decodeVector3Array(data, index)
-    normals, index = common.decodeVector3Array(data, index)
-    uvs, index = common.decodeVector2Array(data, index)
-    materialIndices, index = common.decodeInt2Array(data, index)
-    triangles, index = common.decodeInt3Array(data, index)
-    materialNames, index = common.decodeStringArray(data, index)
-
-    bm = bmesh.new()
-    verts = []
-    for i in range(len(positions)):
-        vertex = bm.verts.new(positions[i])
-        # according to https://blender.stackexchange.com/questions/49357/bmesh-how-can-i-import-custom-vertex-normals
-        # normals are not working for bmesh...
-        vertex.normal = normals[i]
-        verts.append(vertex)
-
-    uv_layer = None
-    if len(uvs) > 0:
-        uv_layer = bm.loops.layers.uv.new()
-
-    currentMaterialIndex = 0
-    indexInMaterialIndices = 0
-    nextriangleIndex = len(triangles)
-    if len(materialIndices) > 1:
-        nextriangleIndex = materialIndices[indexInMaterialIndices + 1][0]
-    if len(materialIndices) > 0:
-        currentMaterialIndex = materialIndices[indexInMaterialIndices][1]
-
-    for i in range(len(triangles)):
-        if i >= nextriangleIndex:
-            indexInMaterialIndices = indexInMaterialIndices + 1
-            nextriangleIndex = len(triangles)
-            if len(materialIndices) > indexInMaterialIndices + 1:
-                nextriangleIndex = materialIndices[indexInMaterialIndices + 1][0]
-            currentMaterialIndex = materialIndices[indexInMaterialIndices][1]
-
-        triangle = triangles[i]
-        i1 = triangle[0]
-        i2 = triangle[1]
-        i3 = triangle[2]
-        try:
-            face = bm.faces.new((verts[i1], verts[i2], verts[i3]))
-            face.material_index = currentMaterialIndex
-            if uv_layer:
-                face.loops[0][uv_layer].uv = uvs[i1]
-                face.loops[1][uv_layer].uv = uvs[i2]
-                face.loops[2][uv_layer].uv = uvs[i3]
-        except:
-            pass
-
-    me = client.getOrCreateMesh(meshName)
-
-    bm.to_mesh(me)
-
-    # hack ! Since bmesh cannot be used to set custom normals
-    normals2 = []
-    for l in me.loops:
-        normals2.append(normals[l.vertex_index])
-    me.normals_split_custom_set(normals2)
-    me.use_auto_smooth = True
-
-    for materialName in materialNames:
-        material = client.getOrCreateMaterial(materialName)
-        if not materialName in me.materials:
-            me.materials.append(material)
-
-    bm.free()
-    client.getOrCreateObjectData(path, me)
+logger = logging.getLogger(__name__)
 
 
 def decode_layer_float(elmt, layer, data, index):
@@ -183,173 +108,33 @@ def encode_bmesh_layer(layer_collection, element_seq, extract_layer_tuple_func):
         binary_buffer += struct.pack(extract_layer_tuple_func.struct * count, *buffer)
     return binary_buffer
 
-# We cannot iterate directory over bm.loops, so we use a generator
 
-
+# We cannot iterate directly over bm.loops, so we use a generator
 def loops_iterator(bm):
     for face in bm.faces:
         for loop in face.loops:
             yield loop
 
 
-def buildSourceMesh(client, data):
-    index = 0
-    path, index = common.decodeString(data, index)
-    meshName, index = common.decodeString(data, index)
-
-    obj = client.getOrCreateObjectData(path, client.getOrCreateMesh(meshName))
-    if obj.mode == 'EDIT':
-        logger.error("Received a mesh for object %s while begin in EDIT mode, ignoring.", path)
-        return
-
-    bm = bmesh.new()
-
-    position_count, index = common.decodeInt(data, index)
-    logger.debug("Reading %d vertices", position_count)
-
-    for pos_idx in range(position_count):
-        co, index = common.decodeVector3(data, index)
-        normal, index = common.decodeVector3(data, index)
-        vert = bm.verts.new(co)
-        vert.normal = normal
-
-    bm.verts.ensure_lookup_table()
-
-    index = decode_bmesh_layer(data, index, bm.verts.layers.bevel_weight, bm.verts, decode_layer_float)
-
-    edgeCount, index = common.decodeInt(data, index)
-    logger.debug("Reading %d edges", edgeCount)
-
-    edgesData = struct.unpack(f'{edgeCount * 4}I', data[index:index + edgeCount * 4 * 4])
-    index += edgeCount * 4 * 4
-
-    for edgeIdx in range(edgeCount):
-        v1 = edgesData[edgeIdx * 4]
-        v2 = edgesData[edgeIdx * 4 + 1]
-        edge = bm.edges.new((bm.verts[v1], bm.verts[v2]))
-        edge.smooth = bool(edgesData[edgeIdx * 4 + 2])
-        edge.seam = bool(edgesData[edgeIdx * 4 + 3])
-
-    index = decode_bmesh_layer(data, index, bm.edges.layers.bevel_weight, bm.edges, decode_layer_float)
-    index = decode_bmesh_layer(data, index, bm.edges.layers.crease, bm.edges, decode_layer_float)
-
-    faceCount, index = common.decodeInt(data, index)
-    logger.debug("Reading %d faces", faceCount)
-
-    for fIdx in range(faceCount):
-        materialIdx, index = common.decodeInt(data, index)
-        smooth, index = common.decodeBool(data, index)
-        vertCount, index = common.decodeInt(data, index)
-        faceVertices = struct.unpack(f'{vertCount}I', data[index:index + vertCount * 4])
-        index += vertCount * 4
-        verts = [bm.verts[i] for i in faceVertices]
-        face = bm.faces.new(verts)
-        face.material_index = materialIdx
-        face.smooth = smooth
-
-    index = decode_bmesh_layer(data, index, bm.faces.layers.face_map, bm.faces, decode_layer_int)
-
-    index = decode_bmesh_layer(data, index, bm.loops.layers.uv, loops_iterator(bm), decode_layer_uv)
-    index = decode_bmesh_layer(data, index, bm.loops.layers.color, loops_iterator(bm), decode_layer_color)
-
-    bm.to_mesh(obj.data)
-    bm.free()
-
-    # Load shape keys
-    shape_keys_count, index = common.decodeInt(data, index)
-    obj.shape_key_clear()
-    if shape_keys_count > 0:
-        logger.info("Loading %d shape keys", shape_keys_count)
-        shapes_keys_list = []
-        for i in range(shape_keys_count):
-            shape_key_name, index = common.decodeString(data, index)
-            shapes_keys_list.append(obj.shape_key_add(name=shape_key_name))
-        for i in range(shape_keys_count):
-            shapes_keys_list[i].vertex_group, index = common.decodeString(data, index)
-        for i in range(shape_keys_count):
-            relative_key_name, index = common.decodeString(data, index)
-            print(relative_key_name)
-            shapes_keys_list[i].relative_key = obj.data.shape_keys.key_blocks[relative_key_name]
-
-        for i in range(shape_keys_count):
-            shape_key = shapes_keys_list[i]
-            shape_key.mute, index = common.decodeBool(data, index)
-            shape_key.value, index = common.decodeFloat(data, index)
-            shape_key.slider_min, index = common.decodeFloat(data, index)
-            shape_key.slider_max, index = common.decodeFloat(data, index)
-            shape_key_data_size, index = common.decodeInt(data, index)
-            for i in range(shape_key_data_size):
-                shape_key.data[i].co = Vector(struct.unpack('3f', data[index:index + 3 * 4]))
-                index += 3 * 4
-        obj.data.shape_keys.use_relative, index = common.decodeBool(data, index)
-
-    # Vertex Groups
-    vg_count, index = common.decodeInt(data, index)
-    obj.vertex_groups.clear()
-    for i in range(vg_count):
-        vg_name, index = common.decodeString(data, index)
-        vertex_group = obj.vertex_groups.new(name=vg_name)
-        vertex_group.lock_weight, index = common.decodeBool(data, index)
-        vg_size, index = common.decodeInt(data, index)
-        for elmt_idx in range(vg_size):
-            vert_idx, index = common.decodeInt(data, index)
-            weight, index = common.decodeFloat(data, index)
-            vertex_group.add([vert_idx], weight, 'REPLACE')
-
-    # Normals
-    obj.data.use_auto_smooth, index = common.decodeBool(data, index)
-    obj.data.auto_smooth_angle, index = common.decodeFloat(data, index)
-
-    # UV Maps and Vertex Colors are added automatically based on layers in the bmesh
-    # We just need to update their name and active_render state:
-
-    # UV Maps
-    for uv_layer in obj.data.uv_layers:
-        uv_layer.name, index = common.decodeString(data, index)
-        uv_layer.active_render, index = common.decodeBool(data, index)
-
-    # Vertex Colors
-    for vertex_colors in obj.data.vertex_colors:
-        vertex_colors.name, index = common.decodeString(data, index)
-        vertex_colors.active_render, index = common.decodeBool(data, index)
-
-    # Materials
-    materialNames, index = common.decodeStringArray(data, index)
-    for materialName in materialNames:
-        material = client.getOrCreateMaterial(materialName)
-        if not materialName in obj.data.materials:
-            obj.data.materials.append(material)
-
-
 @stats_timer(shareData)
-def getMeshBuffers(obj, meshName):
+def encodeBakedMesh(obj):
+    """
+    Bake an object as a triangle mesh and encode it.
+    """
     stats_timer = shareData.current_stats_timer
 
-    vertices = []
-    normals = []
-    uvs = []
-    indices = []
-    materials = []
-    materialIndices = []  # array of triangle index, material index
-
-    # compute modifiers
+    # Bake modifiers
     depsgraph = bpy.context.evaluated_depsgraph_get()
     obj = obj.evaluated_get(depsgraph)
 
     stats_timer.checkpoint("eval_depsgraph")
 
-    for slot in obj.material_slots[:]:
-        if slot.material:
-            materials.append(slot.material.name_full.encode())
-        else:
-            materials.append("Default".encode())
+    # Triangulate mesh (before calculating normals)
+    mesh = obj.data if obj.type == 'MESH' else obj.to_mesh()
+    if mesh == None:
+        # This happens for empty curves
+        return bytes()
 
-    stats_timer.checkpoint("make_material_list")
-
-    # triangulate mesh (before calculating normals)
-    mesh = obj.to_mesh()
-    if not mesh:
-        return None
     bm = bmesh.new()
     bm.from_mesh(mesh)
     bmesh.ops.triangulate(bm, faces=bm.faces)
@@ -365,8 +150,14 @@ def getMeshBuffers(obj, meshName):
 
     stats_timer.checkpoint("calc_normals")
 
-    # get uv layer
+    # get active uv layer
     uvlayer = mesh.uv_layers.active
+
+    vertices = []
+    normals = []
+    uvs = []
+    indices = []
+    materialIndices = []  # array of triangle index, material index
 
     currentMaterialIndex = -1
     currentfaceIndex = 0
@@ -385,6 +176,9 @@ def getMeshBuffers(obj, meshName):
             materialIndices.append(currentfaceIndex)
             materialIndices.append(currentMaterialIndex)
         currentfaceIndex = currentfaceIndex + 1
+
+    if obj.type != 'MESH':
+        obj.to_mesh_clear()
 
     stats_timer.checkpoint("make_buffers")
 
@@ -423,19 +217,11 @@ def getMeshBuffers(obj, meshName):
 
     stats_timer.checkpoint("write_tri_idx_buff")
 
-    # material names count + binary material bnames buffer
-    size = len(materials)
-    binaryMaterialNames = common.intToBytes(size, 4)
-    for material in materials:
-        binaryMaterialNames += common.intToBytes(len(material), 4) + material
-
-    stats_timer.checkpoint("write_material_names")
-
-    return common.encodeString(meshName) + binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer + binaryMaterialNames
+    return binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer
 
 
 @stats_timer(shareData)
-def dump_mesh(mesh_data):
+def encodeBaseMeshGeometry(mesh_data):
     stats_timer = shareData.current_stats_timer
 
     # We do not synchronize "select" and "hide" state of mesh elements
@@ -453,7 +239,7 @@ def dump_mesh(mesh_data):
 
     verts_array = []
     for vert in bm.verts:
-        verts_array.extend((*vert.co, *vert.normal))
+        verts_array.extend((*vert.co,))
 
     stats_timer.checkpoint("make_verts_buffer")
 
@@ -531,6 +317,23 @@ def dump_mesh(mesh_data):
 
     bm.free()
 
+    return binary_buffer
+
+
+@stats_timer(shareData)
+def encodeBaseMesh(obj):
+    stats_timer = shareData.current_stats_timer
+
+    # Temporary for curves and other objects that support to_mesh()
+    # #todo Implement correct base encoding for these objects
+    mesh_data = obj.data if obj.type == 'MESH' else obj.to_mesh()
+    if mesh_data == None:
+        # This happens for empty curves
+        # This is temporary, when curves will be fully implemented we will encode something
+        return bytes()
+
+    binary_buffer = encodeBaseMeshGeometry(mesh_data)
+
     # Shape keys
     # source https://blender.stackexchange.com/questions/111661/creating-shape-keys-using-python
     if mesh_data.shape_keys == None:
@@ -561,18 +364,6 @@ def dump_mesh(mesh_data):
 
         binary_buffer += common.encodeBool(mesh_data.shape_keys.use_relative)
 
-    stats_timer.checkpoint("shape_keys")
-
-    return binary_buffer
-
-
-@stats_timer(shareData)
-def getSourceMeshBuffers(obj, meshName):
-    mesh_data = obj.to_mesh()
-    if not mesh_data:
-        return None
-    binary_buffer = dump_mesh(mesh_data)
-
     # Vertex Groups
     verts_per_group = {}
     for vertex_group in obj.vertex_groups:
@@ -594,6 +385,14 @@ def getSourceMeshBuffers(obj, meshName):
     # Normals
     binary_buffer += common.encodeBool(mesh_data.use_auto_smooth)
     binary_buffer += common.encodeFloat(mesh_data.auto_smooth_angle)
+    binary_buffer += common.encodeBool(mesh_data.has_custom_normals)
+
+    if mesh_data.has_custom_normals:
+        mesh_data.calc_normals_split()  # Required otherwise all normals are (0, 0, 0)
+        normals = []
+        for loop in mesh_data.loops:
+            normals.extend((*loop.normal,))
+        binary_buffer += struct.pack(f"{len(normals)}f", *normals)
 
     # UV Maps
     for uv_layer in mesh_data.uv_layers:
@@ -605,20 +404,254 @@ def getSourceMeshBuffers(obj, meshName):
         binary_buffer += common.encodeString(vertex_colors.name)
         binary_buffer += common.encodeBool(vertex_colors.active_render)
 
-    # todo: custom split normals
-    # if mesh_data.has_custom_normals:
-    #         # Custom normals are all (0, 0, 0) until calling calc_normals_split() or calc_tangents().
-    #     mesh_data.calc_normals_split()
+    if obj.type != 'MESH':
+        obj.to_mesh_clear()
+
+    return binary_buffer
+
+
+@stats_timer(shareData)
+def encodeMesh(obj, encode_base_mesh, encode_baked_mesh):
+    binary_buffer = bytes()
+
+    if encode_base_mesh:
+        mesh_buffer = encodeBaseMesh(obj)
+        binary_buffer += common.encodeInt(len(mesh_buffer))
+        binary_buffer += mesh_buffer
+    else:
+        binary_buffer += common.encodeInt(0)
+
+    if encode_baked_mesh:
+        mesh_buffer = encodeBakedMesh(obj)
+        binary_buffer += common.encodeInt(len(mesh_buffer))
+        binary_buffer += mesh_buffer
+    else:
+        binary_buffer += common.encodeInt(0)
 
     # Materials
     materials = []
-    for slot in obj.material_slots[:]:
-        if slot.material:
-            materials.append(slot.material.name_full.encode())
-        else:
-            materials.append("Default".encode())
-    binary_buffer += common.intToBytes(len(materials), 4)
-    for material in materials:
-        binary_buffer += common.intToBytes(len(material), 4) + material
+    for material in obj.data.materials:
+        materials.append(material.name_full if material != None else "")
+    binary_buffer += common.encodeStringArray(materials)
 
-    return common.encodeString(meshName) + binary_buffer
+    return binary_buffer
+
+
+@stats_timer(shareData)
+def decodeBakedMesh(obj, data, index):
+    # Note: Blender should not load a baked mesh but we have this function to debug the encoding part
+    # and as an exemple for implementations that load baked meshes
+    byte_size, index = common.decodeInt(data, index)
+    if byte_size == 0:
+        return index
+
+    positions, index = common.decodeVector3Array(data, index)
+    normals, index = common.decodeVector3Array(data, index)
+    uvs, index = common.decodeVector2Array(data, index)
+    materialIndices, index = common.decodeInt2Array(data, index)
+    triangles, index = common.decodeInt3Array(data, index)
+
+    bm = bmesh.new()
+    for i in range(len(positions)):
+        vertex = bm.verts.new(positions[i])
+        # according to https://blender.stackexchange.com/questions/49357/bmesh-how-can-i-import-custom-vertex-normals
+        # normals are not working for bmesh...
+        vertex.normal = normals[i]
+    bm.verts.ensure_lookup_table()
+
+    uv_layer = None
+    if len(uvs) > 0:
+        uv_layer = bm.loops.layers.uv.new()
+
+    currentMaterialIndex = 0
+    indexInMaterialIndices = 0
+    nextriangleIndex = len(triangles)
+    if len(materialIndices) > 1:
+        nextriangleIndex = materialIndices[indexInMaterialIndices + 1][0]
+    if len(materialIndices) > 0:
+        currentMaterialIndex = materialIndices[indexInMaterialIndices][1]
+
+    for i in range(len(triangles)):
+        if i >= nextriangleIndex:
+            indexInMaterialIndices = indexInMaterialIndices + 1
+            nextriangleIndex = len(triangles)
+            if len(materialIndices) > indexInMaterialIndices + 1:
+                nextriangleIndex = materialIndices[indexInMaterialIndices + 1][0]
+            currentMaterialIndex = materialIndices[indexInMaterialIndices][1]
+
+        triangle = triangles[i]
+        i1 = triangle[0]
+        i2 = triangle[1]
+        i3 = triangle[2]
+        try:
+            face = bm.faces.new((bm.verts[i1], bm.verts[i2], bm.verts[i3]))
+            face.material_index = currentMaterialIndex
+            if uv_layer:
+                face.loops[0][uv_layer].uv = uvs[i1]
+                face.loops[1][uv_layer].uv = uvs[i2]
+                face.loops[2][uv_layer].uv = uvs[i3]
+        except:
+            pass
+
+    me = obj.data
+
+    bm.to_mesh(me)
+    bm.free()
+
+    # hack ! Since bmesh cannot be used to set custom normals
+    normals2 = []
+    for l in me.loops:
+        normals2.append(normals[l.vertex_index])
+    me.normals_split_custom_set(normals2)
+    me.use_auto_smooth = True
+
+    return index
+
+
+@stats_timer(shareData)
+def decodeBaseMesh(client, obj, data, index):
+    bm = bmesh.new()
+
+    position_count, index = common.decodeInt(data, index)
+    logger.debug("Reading %d vertices", position_count)
+
+    for pos_idx in range(position_count):
+        co, index = common.decodeVector3(data, index)
+        vert = bm.verts.new(co)
+
+    bm.verts.ensure_lookup_table()
+
+    index = decode_bmesh_layer(data, index, bm.verts.layers.bevel_weight, bm.verts, decode_layer_float)
+
+    edgeCount, index = common.decodeInt(data, index)
+    logger.debug("Reading %d edges", edgeCount)
+
+    edgesData = struct.unpack(f'{edgeCount * 4}I', data[index:index + edgeCount * 4 * 4])
+    index += edgeCount * 4 * 4
+
+    for edgeIdx in range(edgeCount):
+        v1 = edgesData[edgeIdx * 4]
+        v2 = edgesData[edgeIdx * 4 + 1]
+        edge = bm.edges.new((bm.verts[v1], bm.verts[v2]))
+        edge.smooth = bool(edgesData[edgeIdx * 4 + 2])
+        edge.seam = bool(edgesData[edgeIdx * 4 + 3])
+
+    index = decode_bmesh_layer(data, index, bm.edges.layers.bevel_weight, bm.edges, decode_layer_float)
+    index = decode_bmesh_layer(data, index, bm.edges.layers.crease, bm.edges, decode_layer_float)
+
+    faceCount, index = common.decodeInt(data, index)
+    logger.debug("Reading %d faces", faceCount)
+
+    for fIdx in range(faceCount):
+        materialIdx, index = common.decodeInt(data, index)
+        smooth, index = common.decodeBool(data, index)
+        vertCount, index = common.decodeInt(data, index)
+        faceVertices = struct.unpack(f'{vertCount}I', data[index:index + vertCount * 4])
+        index += vertCount * 4
+        verts = [bm.verts[i] for i in faceVertices]
+        face = bm.faces.new(verts)
+        face.material_index = materialIdx
+        face.smooth = smooth
+
+    index = decode_bmesh_layer(data, index, bm.faces.layers.face_map, bm.faces, decode_layer_int)
+
+    index = decode_bmesh_layer(data, index, bm.loops.layers.uv, loops_iterator(bm), decode_layer_uv)
+    index = decode_bmesh_layer(data, index, bm.loops.layers.color, loops_iterator(bm), decode_layer_color)
+
+    bm.normal_update()
+    bm.to_mesh(obj.data)
+    bm.free()
+
+    # Load shape keys
+    shape_keys_count, index = common.decodeInt(data, index)
+    obj.shape_key_clear()
+    if shape_keys_count > 0:
+        logger.debug("Loading %d shape keys", shape_keys_count)
+        shapes_keys_list = []
+        for i in range(shape_keys_count):
+            shape_key_name, index = common.decodeString(data, index)
+            shapes_keys_list.append(obj.shape_key_add(name=shape_key_name))
+        for i in range(shape_keys_count):
+            shapes_keys_list[i].vertex_group, index = common.decodeString(data, index)
+        for i in range(shape_keys_count):
+            relative_key_name, index = common.decodeString(data, index)
+            shapes_keys_list[i].relative_key = obj.data.shape_keys.key_blocks[relative_key_name]
+
+        for i in range(shape_keys_count):
+            shape_key = shapes_keys_list[i]
+            shape_key.mute, index = common.decodeBool(data, index)
+            shape_key.value, index = common.decodeFloat(data, index)
+            shape_key.slider_min, index = common.decodeFloat(data, index)
+            shape_key.slider_max, index = common.decodeFloat(data, index)
+            shape_key_data_size, index = common.decodeInt(data, index)
+            for i in range(shape_key_data_size):
+                shape_key.data[i].co = Vector(struct.unpack('3f', data[index:index + 3 * 4]))
+                index += 3 * 4
+        obj.data.shape_keys.use_relative, index = common.decodeBool(data, index)
+
+    # Vertex Groups
+    vg_count, index = common.decodeInt(data, index)
+    obj.vertex_groups.clear()
+    for i in range(vg_count):
+        vg_name, index = common.decodeString(data, index)
+        vertex_group = obj.vertex_groups.new(name=vg_name)
+        vertex_group.lock_weight, index = common.decodeBool(data, index)
+        vg_size, index = common.decodeInt(data, index)
+        for elmt_idx in range(vg_size):
+            vert_idx, index = common.decodeInt(data, index)
+            weight, index = common.decodeFloat(data, index)
+            vertex_group.add([vert_idx], weight, 'REPLACE')
+
+    # Normals
+    obj.data.use_auto_smooth, index = common.decodeBool(data, index)
+    obj.data.auto_smooth_angle, index = common.decodeFloat(data, index)
+
+    has_custom_normal, index = common.decodeBool(data, index)
+
+    if has_custom_normal:
+        normals = []
+        for loop in obj.data.loops:
+            normal, index = common.decodeVector3(data, index)
+            normals.append(normal)
+        obj.data.normals_split_custom_set(normals)
+
+    # UV Maps and Vertex Colors are added automatically based on layers in the bmesh
+    # We just need to update their name and active_render state:
+
+    # UV Maps
+    for uv_layer in obj.data.uv_layers:
+        uv_layer.name, index = common.decodeString(data, index)
+        uv_layer.active_render, index = common.decodeBool(data, index)
+
+    # Vertex Colors
+    for vertex_colors in obj.data.vertex_colors:
+        vertex_colors.name, index = common.decodeString(data, index)
+        vertex_colors.active_render, index = common.decodeBool(data, index)
+
+    return index
+
+
+@stats_timer(shareData)
+def decodeMesh(client, obj, data, index):
+    assert(obj.data)
+
+    # Clear materials before building faces because it erase material idx of faces
+    obj.data.materials.clear()
+
+    byte_size, index = common.decodeInt(data, index)
+    if byte_size == 0:
+        # No base mesh, lets read the baked mesh
+        index = decodeBakedMesh(obj, data, index)
+    else:
+        index = decodeBaseMesh(client, obj, data, index)
+        # Skip the baked mesh (its size is encoded here)
+        baked_mesh_byte_size, index = common.decodeInt(data, index)
+        index += baked_mesh_byte_size
+
+    # Materials
+    materialNames, index = common.decodeStringArray(data, index)
+    for materialName in materialNames:
+        material = client.getOrCreateMaterial(materialName) if materialName != "" else None
+        obj.data.materials.append(material)
+
+    return index
