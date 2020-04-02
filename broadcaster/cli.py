@@ -3,15 +3,15 @@ import queue
 import argparse
 import logging
 import time
-import common
-import client
 import threading
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
-
+import client
+import common
+import cli_utils
 
 TIMEOUT = 10  # in seconds
+
+logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
 
 
 class ServerError(RuntimeError):
@@ -108,7 +108,7 @@ def process_room_command(args):
             else:
                 print('Expected one or more room names')
     except ServerError as e:
-        logging.error(e)
+        logger.error(e, exc_info=True)
     finally:
         if client:
             client.disconnect()
@@ -123,7 +123,7 @@ def process_client_command(args):
             client.connect()
             client.listClients()
     except ServerError as e:
-        logging.error(e)
+        logger.error(e, exc_info=True)
     finally:
         if client is not None:
             client.disconnect()
@@ -155,7 +155,7 @@ def help():
     print()
 
 
-def interactive_loop():
+def interactive_loop(args):
     client = CliClient(args)
     client.connect()
     done = False
@@ -214,30 +214,44 @@ def interactive_loop():
                 else:
                     pass
         except Exception as e:
-            print(f'Exception: {e}')
+            logger.error(f'Exception: {e}', exc_info=True)
 
 
-parser = argparse.ArgumentParser(prog='cli', description='Command Line Interface for VRtist server')
-sub_parsers = parser.add_subparsers()
+def main():
+    args, args_parser = parse_cli_args()
+    cli_utils.init_logging(args)
 
-parser.add_argument('--host', help='Host name', default=common.DEFAULT_HOST)
-parser.add_argument('--port', help='Port', default=common.DEFAULT_PORT)
-parser.add_argument('--timeout', help='Timeout for server response', default=TIMEOUT)
+    if hasattr(args, 'func'):
+        args.func(args)
+    else:
+        interactive_loop(args)
 
-# Room commands are relative to... a room!
-room_parser = sub_parsers.add_parser('room', help='Rooms related commands')
-room_parser.add_argument('command', help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.', choices=(
-    'list', 'delete', 'clear', 'clients'))
-room_parser.add_argument('name', help='Room name. You can specify multiple room names separated by spaces.', nargs='*')
-room_parser.set_defaults(func=process_room_command)
 
-# Client commands are relative to a client independently of any room
-client_parser = sub_parsers.add_parser('client', help='Clients related commands')
-client_parser.add_argument('command', help='', choices=('list', 'disconnect'))
-client_parser.set_defaults(func=process_client_command)
+def parse_cli_args():
+    parser = argparse.ArgumentParser(prog='cli', description='Command Line Interface for DCC Sync server')
+    cli_utils.add_logging_cli_args(parser)
 
-args = parser.parse_args()
-if hasattr(args, 'func'):
-    args.func(args)
-else:
-    interactive_loop()
+    sub_parsers = parser.add_subparsers()
+
+    parser.add_argument('--host', help='Host name', default=common.DEFAULT_HOST)
+    parser.add_argument('--port', help='Port', default=common.DEFAULT_PORT)
+    parser.add_argument('--timeout', help='Timeout for server response', default=TIMEOUT)
+
+    # Room commands are relative to... a room!
+    room_parser = sub_parsers.add_parser('room', help='Rooms related commands')
+    room_parser.add_argument('command', help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.', choices=(
+        'list', 'delete', 'clear', 'clients'))
+    room_parser.add_argument(
+        'name', help='Room name. You can specify multiple room names separated by spaces.', nargs='*')
+    room_parser.set_defaults(func=process_room_command)
+
+    # Client commands are relative to a client independently of any room
+    client_parser = sub_parsers.add_parser('client', help='Clients related commands')
+    client_parser.add_argument('command', help='', choices=('list', 'disconnect'))
+    client_parser.set_defaults(func=process_client_command)
+
+    return parser.parse_args(), parser
+
+
+if __name__ == "__main__":
+    main()

@@ -5,12 +5,15 @@ import socket
 import struct
 import json
 import time
+import logging
 
 
 mutex = threading.RLock()
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12800
+
+logger = logging.getLogger(__name__)
 
 
 class MessageType(Enum):
@@ -75,7 +78,6 @@ class MessageType(Enum):
     TRANSFORM = 201
     MESH = 202
     MATERIAL = 203
-    SOURCE_MESH = 204  # Original unbaked mesh
 
 
 class LightType(Enum):
@@ -286,18 +288,23 @@ class Command:
             Command._id += 1
 
 
-def recv(socket, size):
-    attempts = 5
-    timeout = 0.01
-    while True:
-        try:
-            tmp = socket.recv(size)
-            return tmp
-        except:
-            if attempts == 0:
-                raise
-            attempts -= 1
-            time.sleep(timeout)
+def recv(socket: socket.socket, size: int):
+    result = b''
+    while size != 0:
+        r, _, _ = select.select([socket], [], [], 0.1)
+        if len(r) > 0:
+            try:
+                tmp = socket.recv(size)
+            except (ConnectionAbortedError, ConnectionResetError) as e:
+                logger.warning(e)
+                raise ClientDisconnectedException()
+
+            if len(tmp) == 0:
+                raise ClientDisconnectedException()
+
+            result += tmp
+            size -= len(tmp)
+    return result
 
 
 class CommandFormatter:
@@ -344,29 +351,30 @@ class CommandFormatter:
 
 def readMessage(socket: socket.socket) -> Command:
     if not socket:
+        logger.warning("readMessage called with no socket")
         return None
+
     r, _, _ = select.select([socket], [], [], 0.0001)
-    if len(r) > 0:
-        try:
-            msg = recv(socket, 14)
-            frameSize = bytesToInt(msg[:8])
-            commandId = bytesToInt(msg[8:12])
-            messageType = bytesToInt(msg[12:])
-            currentSize = frameSize
-            msg = b''
-            while currentSize != 0:
-                tmp = recv(socket, currentSize)
-                msg += tmp
-                currentSize -= len(tmp)
-            return Command(intToMessageType(messageType), msg, commandId)
+    if len(r) == 0:
+        return None
 
-        except ClientDisconnectedException:
-            raise
-        except Exception as e:
-            print(e)
-            raise ClientDisconnectedException()
+    try:
+        prefix_size = 14
+        msg = recv(socket, prefix_size)
 
-    return None
+        frameSize = bytesToInt(msg[:8])
+        commandId = bytesToInt(msg[8:12])
+        messageType = bytesToInt(msg[12:])
+
+        msg = recv(socket, frameSize)
+
+        return Command(intToMessageType(messageType), msg, commandId)
+
+    except ClientDisconnectedException:
+        raise
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        raise
 
 
 def send(socket, buffer):
@@ -376,6 +384,9 @@ def send(socket, buffer):
         try:
             tmp = socket.send(buffer)
             return tmp
+        except (ConnectionAbortedError, ConnectionResetError) as e:
+            logger.warning(e)
+            raise ClientDisconnectedException()
         except:
             if attempts == 0:
                 raise
@@ -384,18 +395,20 @@ def send(socket, buffer):
 
 
 def writeMessage(sock: socket.socket, command: Command):
-    if not socket:
+    if not sock:
+        logger.warning("writeMessage called with no socket")
         return
+
     size = intToBytes(len(command.data), 8)
     commandId = intToBytes(command.id, 4)
     mtype = intToBytes(command.type.value, 2)
 
     buffer = size + commandId + mtype + command.data
-    remainingSize = len(buffer)
-    currentIndex = 0
-    while remainingSize > 0:
-        _, w, _ = select.select([], [sock], [], 0.0001)
-        if len(w) > 0:
-            sent = send(sock, buffer[currentIndex:])
-            remainingSize -= sent
-            currentIndex += sent
+
+    try:
+        _, w, _ = select.select([], [sock], [])
+        if sock.sendall(buffer) is not None:
+            raise ClientDisconnectedException()
+    except (ConnectionAbortedError, ConnectionResetError) as e:
+        logger.warning(e)
+        raise ClientDisconnectedException()

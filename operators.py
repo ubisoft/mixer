@@ -18,8 +18,7 @@ from . import ui
 from .data import get_dcc_sync_props
 from .stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
 
-logger = logging.getLogger(__package__)
-logger.setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class TransformStruct:
@@ -68,6 +67,8 @@ def updateTransform(obj):
 
 
 def join_room(room_name: str):
+    logger.info("join_room")
+
     assert shareData.currentRoom is None
     user = get_dcc_sync_props().user
     shareData.sessionId += 1
@@ -91,12 +92,12 @@ def join_room(room_name: str):
 
 
 def leave_current_room():
+    logger.info("leave_current_room")
+
     # room ==> client
     assert not shareData.currentRoom or shareData.client
     if shareData.currentRoom:
-        if shareData.client:
-            shareData.client.leaveRoom(shareData.currentRoom)
-        shareData.currentRoom = None
+        shareData.leaveCurrentRoom()
         set_handlers(False)
 
     shareData.clearBeforeState()
@@ -116,6 +117,8 @@ def is_joined():
 
 @persistent
 def onLoad(scene):
+    logger.info("onLoad")
+
     disconnect()
 
 
@@ -535,7 +538,21 @@ def updateObjectsData():
 @persistent
 def sendFrameChanged(scene):
     logger.info("sendFrameChanged")
+
     if not shareData.client:
+        logger.info("sendFrameChanged cancelled (no client instance)")
+        return
+
+    # We can arrive here because of scene deletion (bpy.ops.scene.delete({'scene': to_remove}) that append during buildScene)
+    # so we need to prevent processing self events
+    if shareData.client.receivedCommandsProcessed:
+        if not shareData.client.blockSignals:
+            shareData.client.receivedCommandsProcessed = False
+        logger.info("sendFrameChanged canceled (receivedCommandsProcessed = True)")
+        return
+
+    if not isInObjectMode():
+        logger.info("sendFrameChanged canceled (not isInObjectMode)")
         return
 
     with StatsTimer(shareData, "sendFrameChanged") as timer:
@@ -560,10 +577,12 @@ def sendFrameChanged(scene):
 @stats_timer(shareData)
 @persistent
 def sendSceneDataToServer(scene, dummy):
+    logger.info("sendSceneDataToServer")
+
     timer = shareData.current_stats_timer
 
-    logger.info("sendSceneDataToServer")
     if not shareData.client:
+        logger.info("sendSceneDataToServer canceled (no client instance)")
         return
 
     shareData.setDirty()
@@ -574,9 +593,11 @@ def sendSceneDataToServer(scene, dummy):
     if shareData.client.receivedCommandsProcessed:
         if not shareData.client.blockSignals:
             shareData.client.receivedCommandsProcessed = False
+        logger.info("sendSceneDataToServer canceled (receivedCommandsProcessed = True)")
         return
 
     if not isInObjectMode():
+        logger.info("sendSceneDataToServer canceled (not isInObjectMode)")
         return
 
     updateObjectsState(shareData.oldObjects,
@@ -623,6 +644,8 @@ def sendSceneDataToServer(scene, dummy):
 
 @persistent
 def onUndoRedoPre(scene):
+    logger.info("onUndoRedoPre")
+
     shareData.setDirty()
     # shareData.selectedObjectsNames = set()
     # for obj in bpy.context.selected_objects:
@@ -666,6 +689,8 @@ def remapObjectsInfo():
 @stats_timer(shareData)
 @persistent
 def onUndoRedoPost(scene, dummy):
+    logger.info("onUndoRedoPost")
+
     shareData.setDirty()
     # apply only in object mode
     if not isInObjectMode():
@@ -678,8 +703,7 @@ def onUndoRedoPost(scene, dummy):
         if k in oldObjectsName:
             oldObjectsName[k] = v
 
-    with StatsTimer(shareData, "updateObjectsState"):
-        updateObjectsState(oldObjectsName, shareData.oldObjects)
+    updateObjectsState(oldObjectsName, shareData.oldObjects)
 
     updateCollectionsState()
     updateScenesState()
@@ -735,23 +759,31 @@ def clear_scene_content():
     set_handlers(False)
 
     for obj in bpy.data.objects:
-        bpy.data.objects.remove(obj, do_unlink=True)
+        bpy.data.objects.remove(obj)
+
+    for obj in bpy.data.cameras:
+        bpy.data.cameras.remove(obj)
+
+    for obj in bpy.data.lights:
+        bpy.data.lights.remove(obj)
 
     for block in bpy.data.meshes:
-        if block.users == 0:
-            bpy.data.meshes.remove(block)
+        bpy.data.meshes.remove(block)
+
+    for block in bpy.data.curves:
+        bpy.data.curves.remove(block)
+
+    for block in bpy.data.grease_pencils:
+        bpy.data.grease_pencils.remove(block)
 
     for block in bpy.data.materials:
-        if block.users == 0:
-            bpy.data.materials.remove(block)
+        bpy.data.materials.remove(block)
 
     for block in bpy.data.textures:
-        if block.users == 0:
-            bpy.data.textures.remove(block)
+        bpy.data.textures.remove(block)
 
     for block in bpy.data.images:
-        if block.users == 0:
-            bpy.data.images.remove(block)
+        bpy.data.images.remove(block)
 
     for collection in bpy.data.collections:
         bpy.data.collections.remove(collection)
@@ -790,9 +822,6 @@ def send_scene_content():
         shareData.client.sendMaterial(material)
 
     sendSceneDataToServer(None, None)
-
-    for obj in bpy.context.scene.objects:
-        scene_lib.sendAddObjectToVRtist(shareData.client, bpy.context.scene.name_full, obj.name_full)
 
     shareData.client.sendFrameStartEnd(
         bpy.context.scene.frame_start, bpy.context.scene.frame_end)
@@ -864,6 +893,8 @@ def is_localhost(host):
 
 
 def connect():
+    logger.info("connect")
+
     props = get_dcc_sync_props()
     if not server_is_up(props.host, props.port):
         if is_localhost(props.host):
@@ -879,6 +910,8 @@ def connect():
 
 
 def disconnect():
+    logger.info("disconnect")
+
     leave_current_room()
 
     # the socket has already been disconnected
@@ -1008,6 +1041,8 @@ class DisconnectOperator(bpy.types.Operator):
 
     def execute(self, context):
         disconnect()
+        self.report(
+            {'INFO'}, f'Disconnected ...')
         ui.update_ui_lists()
         ui.redraw()
         return {'FINISHED'}
@@ -1029,7 +1064,7 @@ class SendSelectionOperator(bpy.types.Operator):
                 for slot in obj.material_slots[:]:
                     shareData.client.sendMaterial(slot.material)
             except Exception:
-                print('materials not found')
+                logger.error('materials not found')
 
             updateParams(obj)
             updateTransform(obj)
