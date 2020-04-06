@@ -137,9 +137,6 @@ def getParentCollection(collectionName):
     """
     May return a master or non master collection
     """
-    for scene in bpy.data.scenes:
-        if collectionName in scene.collection.children:
-            return scene.collection
     for col in shareData.blenderCollections.values():
         childrenNames = set([x.name_full for x in col.children])
         if collectionName in childrenNames:
@@ -721,8 +718,13 @@ def onUndoRedoPost(scene, dummy):
     addScenes()
     addObjects()
     addCollections()
+
+    addCollectionsToScenes()
     addCollectionsToCollections()
+
     addObjectsToCollections()
+    addObjectsToScenes()
+
     updateCollectionsParameters()
     createVRtistObjects()
     deleteSceneObjects()
@@ -745,6 +747,8 @@ def onUndoRedoPost(scene, dummy):
         shareData.client.sendMaterial(material)
 
     shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
+    shareData.clearLists()
+    shareData.updateCurrentData()
 
 
 def updateListUsers(client_ids: Mapping[str, str] = None):
@@ -787,6 +791,8 @@ def clear_scene_content():
     # Cannot remove the last scene at this point, treat it differently
     for scene in bpy.data.scenes[:-1]:
         bpy.data.scenes.remove(scene)
+
+    shareData.clearBeforeState()
 
     if len(bpy.data.scenes) == 1:
         scene = bpy.data.scenes[0]

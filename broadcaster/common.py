@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import IntEnum
 import threading
 import select
 import socket
@@ -16,7 +16,7 @@ DEFAULT_PORT = 12800
 logger = logging.getLogger(__name__)
 
 
-class MessageType(Enum):
+class MessageType(IntEnum):
     JOIN_ROOM = 1
     CREATE_ROOM = 2
     LEAVE_ROOM = 3
@@ -80,13 +80,13 @@ class MessageType(Enum):
     FRAME = 204
 
 
-class LightType(Enum):
+class LightType(IntEnum):
     SPOT = 0  # directly mapped from Unity enum
     SUN = 1
     POINT = 2
 
 
-class SensorFitMode(Enum):
+class SensorFitMode(IntEnum):
     AUTO = 0
     VERTICAL = 1
     HORIZONTAL = 2

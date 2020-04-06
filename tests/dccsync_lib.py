@@ -22,6 +22,6 @@ def create_room():
     bpy.ops.dcc_sync.create_room()
 
 
-def join_room():
+def join_room(room_name: str = 'dccsync_unittest'):
     import dccsync
-    dccsync.operators.join_room('dccsync_unittest')
+    dccsync.operators.join_room(room_name)
