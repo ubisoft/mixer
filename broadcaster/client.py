@@ -1,6 +1,5 @@
 import queue
 import socket
-import threading
 import logging
 
 
@@ -13,9 +12,7 @@ logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__
 
 
 class Client:
-    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT, name=None, delegate=None):
-
-        self.name = name
+    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT, delegate=None):
         self.host = host
         self.port = port
         self.receivedCommands = queue.Queue()
@@ -24,9 +21,11 @@ class Client:
         self.receivedCommandsProcessed = False
         self.blockSignals = False
         self._local_address = None
-        self._delegate = delegate
         self.socket = None
-        self.thread = None
+
+    def __del__(self):
+        if self.socket is not None:
+            self.disconnect()
 
     def connect(self, useThread=False):
         if self.isConnected():
@@ -43,34 +42,14 @@ class Client:
             self.socket = None
             raise
 
-        if self.socket and useThread:
-            self.threadAlive = True
-            self.thread = threading.Thread(None, self.run)
-            self.thread.start()
-        else:
-            self.thread = None
-
-    def __del__(self):
-        if self.socket is not None:
-            self.disconnect()
-
     def disconnect(self):
-        if self.thread is not None:
-            self.threadAlive = False
-            self.thread.join()
-            self.thread = None
-
         if self.socket:
             self.socket.shutdown(socket.SHUT_RDWR)
             self.socket.close()
             self.socket = None
 
     def isConnected(self):
-        if self.socket:
-            return True
-        if self.thread and self.socket:
-            return True
-        return False
+        return self.socket is not None
 
     def addCommand(self, command):
         self.pendingCommands.put(command)
@@ -85,11 +64,12 @@ class Client:
         common.writeMessage(self.socket, common.Command(
             common.MessageType.SET_CLIENT_NAME, userName.encode('utf8'), 0))
 
-    def runOnce(self):
+    def fetchCommands(self):
+        """
+        Gather incoming commands in receivedCommands, send outgoing commands stored in pendingCommands
+        """
         while True:
             try:
-                if not self.blenderExists():
-                    break
                 command = common.readMessage(self.socket)
             except common.ClientDisconnectedException:
                 logger.info("Connection lost for %s:%s", self.host, self.port)
@@ -98,10 +78,10 @@ class Client:
                 self.receivedCommands.put(command)
                 break
 
-            if command is not None:
-                self.receivedCommands.put(command)
-            else:
+            if command is None:
                 break
+
+            self.receivedCommands.put(command)
 
         while True:
             try:
@@ -113,79 +93,18 @@ class Client:
                 common.writeMessage(self.socket, command)
                 self.pendingCommands.task_done()
 
-    def run(self):
-        while(self.threadAlive):
-            try:
-                if not self.blenderExists():
-                    break
-                command = common.readMessage(self.socket)
-            except common.ClientDisconnectedException:
-                logger.info("Connection lost for %s:%s", self.host, self.port)
-                self.socket = None  # Set socket to None before putting CONNECTION_LIST message to avoid sending/reading new messages
-                command = common.Command(common.MessageType.CONNECTION_LOST)
-                self.receivedCommands.put(command)
-                break
-
-            if command is not None:
-                with common.mutex:
-                    self.receivedCommands.put(command)
-
-            with common.mutex:
-                while True:
-                    try:
-                        command = self.pendingCommands.get_nowait()
-                    except queue.Empty:
-                        break
-                    else:
-                        logger.debug("Send %s (queue size = %d)", command.type, self.pendingCommands.qsize())
-                        common.writeMessage(self.socket, command)
-                        self.pendingCommands.task_done()
-
-        self.threadAlive = False
-        self.thread = None
-
-    def consume_one(self):
+    def getNextReceivedCommand(self):
         try:
             command = self.receivedCommands.get_nowait()
-        except queue.Empty:
-            return None, None
-        else:
             logger.debug("Receive %s (queue size = %d)", command.type, self.receivedCommands.qsize())
-
-            if command.type == common.MessageType.LIST_ROOMS:
-                if self._delegate:
-                    self._delegate.buildListRooms(command.data)
-                return command, True
-            elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
-                if self._delegate:
-                    clients, _ = common.decodeJson(command.data, 0)
-                    self._delegate.buildListRoomClients(clients)
-                return command, True
-            elif command.type == common.MessageType.LIST_ALL_CLIENTS:
-                if self._delegate:
-                    clients, _ = common.decodeJson(command.data, 0)
-                    self._delegate.buildListAllClients(clients)
-                return command, True
-            elif command.type == common.MessageType.CONNECTION_LOST:
-                if self._delegate:
-                    self._delegate.on_connection_lost()
-                return command, True
-
-            return command, False
-
-    def blenderExists(self):
-        return True
+            return command
+        except queue.Empty:
+            return None
 
 
 class TestClient(Client):
     def __init__(self, *args, **kwargs):
         super(TestClient, self).__init__("noname", *args, **kwargs)
-
-    def networkConsumer(self):
-        while True:
-            command, processed = super().consume_one()
-            if command is None:
-                return
 
 
 # For tests

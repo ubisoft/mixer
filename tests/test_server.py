@@ -3,6 +3,7 @@ import threading
 import time
 from broadcaster.dccBroadcaster import Server
 from broadcaster.client import TestClient
+import broadcaster.common as common
 import logging
 
 
@@ -28,6 +29,26 @@ class Delegate:
 
     def on_connection_lost(self):
         return None
+
+
+def networkConsumer(client, delegate):
+    client.fetchCommands()
+
+    while True:
+        command = client.getNextReceivedCommand()
+        if command is None:
+            return
+
+        if command.type == common.MessageType.LIST_ROOMS:
+            delegate.buildListRooms(command.data)
+        elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
+            clients, _ = common.decodeJson(command.data, 0)
+            delegate.buildListRoomClients(clients)
+        elif command.type == common.MessageType.LIST_ALL_CLIENTS:
+            clients, _ = common.decodeJson(command.data, 0)
+            delegate.buildListAllClients(clients)
+        elif command.type == common.MessageType.CONNECTION_LOST:
+            delegate.on_connection_lost()
 
 
 class Test_Server(unittest.TestCase):
@@ -102,7 +123,7 @@ class Test_Server(unittest.TestCase):
         c0.setClientName(c0_name)
         c0.joinRoom(c0_room)
         delay()
-        c0.networkConsumer()
+        networkConsumer(c0, self._delegate)
         expected = (c0_name, c0_room)
         self.assertEqual(server.client_count(), (1, 0))
         self.assertEqual(len(d0.name_room), 1)
@@ -130,8 +151,8 @@ class Test_Server(unittest.TestCase):
 
         delay()
 
-        c0.networkConsumer()
-        c1.networkConsumer()
+        networkConsumer(c0, self._delegate)
+        networkConsumer(c1, self._delegate)
         expected = [(c0_name, c0_room), (c1_name, c1_room)]
         self.assertEqual(server.client_count(), (2, 0))
         self.assertEqual(len(d0.name_room), 2)
@@ -162,8 +183,8 @@ class Test_Server(unittest.TestCase):
         c1.leaveRoom(c1_room)
 
         delay()
-        c0.networkConsumer()
-        c1.networkConsumer()
+        networkConsumer(c0, self._delegate)
+        networkConsumer(c1, self._delegate)
         expected = [(c0_name, c0_room)]
         self.assertEqual(server.client_count(), (1, 1))
         self.assertEqual(len(d0.name_room), 1)

@@ -929,8 +929,7 @@ def isClientConnected():
 
 def create_main_client(host: str, port: int):
     assert shareData.client is None
-    client = clientBlender.ClientBlender(
-        f"syncClient {shareData.sessionId}", host, port)
+    client = clientBlender.ClientBlender(host, port)
     client.connect()
     if not client.isConnected():
         return False

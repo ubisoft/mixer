@@ -2,11 +2,9 @@ import logging
 import struct
 import os
 
-import bmesh
 import bpy
-from mathutils import *
+from mathutils import Matrix, Quaternion
 from . import ui
-from . import operators
 from . import data
 from .shareData import shareData
 from .broadcaster import common
@@ -23,24 +21,14 @@ logger = logging.getLogger(__name__)
 
 
 class ClientBlender(Client):
-    def __init__(self, name, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
+    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(
-            host, port, name=name, delegate=self)
+            host, port, delegate=self)
 
         self.textures = set()
         self.callbacks = {}
 
         self.blenderPID = os.getpid()
-
-    def blenderExists(self):
-        # Hack, check if a window still exists
-        try:
-            if len(bpy.context.window_manager.windows) == 0:
-                return False
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            return False
-        return True
 
     def addCallback(self, name, func):
         self.callbacks[name] = func
@@ -134,7 +122,7 @@ class ClientBlender(Client):
         light = self.getOrCreateLight(lightName, blighttype)
 
         shadow, start = common.decodeInt(data, start)
-        if shadow is not 0:
+        if shadow != 0:
             light.use_shadow = True
         else:
             light.use_shadow = False
@@ -214,8 +202,8 @@ class ClientBlender(Client):
                 texImage.image = bpy.data.images.load(fileName)
                 if not isColor:
                     texImage.image.colorspace_settings.name = 'Non-Color'
-            except:
-                pass
+            except Exception as e:
+                logger.log(e)
             material.node_tree.links.new(
                 principled.inputs[channel], texImage.outputs['Color'])
         return index
@@ -256,9 +244,8 @@ class ClientBlender(Client):
             try:
                 texImage.image = bpy.data.images.load(fileName)
                 texImage.image.colorspace_settings.name = 'Non-Color'
-            except:
-                logger.error("could not load : " + fileName)
-                pass
+            except Exception as e:
+                logger.error("could not load file %s (%s)", fileName, e)
             material.node_tree.links.new(
                 invert.inputs['Color'], texImage.outputs['Color'])
 
@@ -291,9 +278,8 @@ class ClientBlender(Client):
             try:
                 texImage.image = bpy.data.images.load(fileName)
                 texImage.image.colorspace_settings.name = 'Non-Color'
-            except:
-                logger.error("could not load : " + fileName)
-                pass
+            except Exception as e:
+                logger.error("could not load file %s (%s)", fileName, e)
             material.node_tree.links.new(
                 normalMap.inputs['Color'], texImage.outputs['Color'])
 
@@ -375,7 +361,8 @@ class ClientBlender(Client):
     def getTransformBuffer(self, obj):
         path = self.getObjectPath(obj)
         visible = not obj.hide_viewport
-        return common.encodeString(path) + common.encodeMatrix(obj.matrix_parent_inverse) + common.encodeMatrix(obj.matrix_basis) + common.encodeMatrix(obj.matrix_local) + common.encodeBool(visible)
+        return common.encodeString(path) + common.encodeMatrix(obj.matrix_parent_inverse) + \
+            common.encodeMatrix(obj.matrix_basis) + common.encodeMatrix(obj.matrix_local) + common.encodeBool(visible)
 
     def sendTransform(self, obj):
         transformBuffer = self.getTransformBuffer(obj)
@@ -391,8 +378,8 @@ class ClientBlender(Client):
                 f.write(data[index:index+size])
                 f.close()
                 self.textures.add(path)
-            except:
-                logger.error("Could not write : " + path)
+            except Exception as e:
+                logger.error("could not write file %s (%s)", path, e)
 
     def sendTextureFile(self, path):
         if path in self.textures:
@@ -403,8 +390,8 @@ class ClientBlender(Client):
                 data = f.read()
                 f.close()
                 self.sendTextureData(path, data)
-            except:
-                logger.error("Could not read : " + path)
+            except Exception as e:
+                logger.error("could not read file %s (%s)", path, e)
 
     def sendTextureData(self, path, data):
         nameBuffer = common.encodeString(path)
@@ -592,11 +579,11 @@ class ClientBlender(Client):
             buffers = []
             for slot in obj.material_slots[:]:
                 if slot.material:
-                    buffer = getMaterialBuffer(slot.material)
+                    buffer = self.getMaterialBuffer(slot.material)
                     buffers.append(buffer)
             return buffers
-        except:
-            logger.error('not found')
+        except Exception as e:
+            logger.error(e)
 
     def sendMaterial(self, material):
         if not material:
@@ -635,7 +622,7 @@ class ClientBlender(Client):
             if slot.link == 'DATA':
                 binary_buffer += common.encodeString("")
             else:
-                binary_buffer += common.encodeString(slot.material.name if slot.material != None else "")
+                binary_buffer += common.encodeString(slot.material.name if slot.material is not None else "")
 
         self.addCommand(common.Command(common.MessageType.MESH, binary_buffer, 0))
 
@@ -1082,9 +1069,6 @@ class ClientBlender(Client):
         shareData.client_ids = client_ids
         ui.update_ui_lists()
 
-    def buildListRoomClients(self, client_ids):
-        pass
-
     def sendSceneContent(self):
         if 'SendContent' in self.callbacks:
             self.callbacks['SendContent']()
@@ -1102,12 +1086,21 @@ class ClientBlender(Client):
             self.callbacks['ClearContent']()
 
     def networkConsumer(self):
-        self.runOnce()
+        self.fetchCommands()
 
         setDirty = True
         while True:
-            command, processed = self.consume_one()
+            command = self.getNextReceivedCommand()
             if command is None:
+                break
+
+            processed = False
+            if command.type == common.MessageType.LIST_ALL_CLIENTS:
+                clients, _ = common.decodeJson(command.data, 0)
+                self.buildListAllClients(clients)
+                processed = True
+            elif command.type == common.MessageType.CONNECTION_LOST:
+                self.on_connection_lost()
                 break
 
             if setDirty:
@@ -1205,7 +1198,7 @@ class ClientBlender(Client):
                     if not ob:
                         remainingParentings.add(path)
                         break
-                    if ob.parent != parent: # do it only if needed, otherwise it resets matrix_parent_inverse
+                    if ob.parent != parent:  # do it only if needed, otherwise it resets matrix_parent_inverse
                         ob.parent = parent
                     parent = ob
             shareData.pendingParenting = remainingParentings

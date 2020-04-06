@@ -50,8 +50,8 @@ class CliClient(client.Client):
 
         received = None
         while received is None or (expected_response_type is not None and received.type != expected_response_type):
-            self.runOnce()
-            received, _ = self.consume_one()
+            self.fetchCommands()
+            received = self.getNextReceivedCommand()
 
             if received is not None:
                 if received.type == common.MessageType.CONNECTION_LOST:
