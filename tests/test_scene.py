@@ -69,6 +69,21 @@ class test_scene_empty_doc(SceneTestCase):
         }
         self.end_test()
 
+    def test_link_object_to_scene_twice(self):
+        self.new_object('object')
+        self.link_object_to_scene('Scene', 'object')
+        self.new_scene('scene_1')
+        self.link_object_to_scene('scene_1', 'object')
+        self.end_test()
+
+    def test_link_object_to_scene_and_collection(self):
+        self.new_object('object')
+        self.link_object_to_scene('Scene', 'object')
+        self.new_collection('collection')
+        self.link_collection_to_scene('Scene', 'collection')
+        self.link_object_to_collection('collection', 'object')
+        self.end_test()
+
     def test_unlink_object_from_scene(self):
         self.new_object('UNLINKED_object_1_0')
         self.new_object('LINKED_object_1_1')
