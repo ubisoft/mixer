@@ -4,7 +4,6 @@ import select
 import socket
 import struct
 import json
-import time
 import logging
 
 
@@ -27,13 +26,17 @@ class MessageType(Enum):
     CLEAR_ROOM = 8
     # All clients that have joined a room
     LIST_ROOM_CLIENTS = 9
-    # All joined clients for all rooes
+    # All joined clients for all rooms
     LIST_CLIENTS = 10
     SET_CLIENT_NAME = 11
     SEND_ERROR = 12
     CONNECTION_LOST = 13
     # All all joined and un joined clients
     LIST_ALL_CLIENTS = 14
+    # Start / End a group of command. Allows to inform clients that they must process multiple commands
+    # before giving back control to they users.
+    GROUP_BEGIN = 15
+    GROUP_END = 16
 
     COMMAND = 100
     DELETE = 101
@@ -186,7 +189,8 @@ def decodeVector4(data, index):
 
 
 def encodeMatrix(value):
-    return encodeVector4(value.col[0]) + encodeVector4(value.col[1]) + encodeVector4(value.col[2]) + encodeVector4(value.col[3])
+    return encodeVector4(value.col[0]) + encodeVector4(value.col[1]) + encodeVector4(value.col[2]) + \
+        encodeVector4(value.col[3])
 
 
 def decodeMatrix(data, index):
@@ -288,25 +292,6 @@ class Command:
             Command._id += 1
 
 
-def recv(socket: socket.socket, size: int):
-    result = b''
-    while size != 0:
-        r, _, _ = select.select([socket], [], [], 0.1)
-        if len(r) > 0:
-            try:
-                tmp = socket.recv(size)
-            except (ConnectionAbortedError, ConnectionResetError) as e:
-                logger.warning(e)
-                raise ClientDisconnectedException()
-
-            if len(tmp) == 0:
-                raise ClientDisconnectedException()
-
-            result += tmp
-            size -= len(tmp)
-    return result
-
-
 class CommandFormatter:
     def format_clients(self, clients):
         s = ''
@@ -349,6 +334,25 @@ class CommandFormatter:
         return s
 
 
+def recv(socket: socket.socket, size: int):
+    result = b''
+    while size != 0:
+        r, _, _ = select.select([socket], [], [], 0.1)
+        if len(r) > 0:
+            try:
+                tmp = socket.recv(size)
+            except (ConnectionAbortedError, ConnectionResetError) as e:
+                logger.warning(e)
+                raise ClientDisconnectedException()
+
+            if len(tmp) == 0:
+                raise ClientDisconnectedException()
+
+            result += tmp
+            size -= len(tmp)
+    return result
+
+
 def readMessage(socket: socket.socket) -> Command:
     if not socket:
         logger.warning("readMessage called with no socket")
@@ -375,23 +379,6 @@ def readMessage(socket: socket.socket) -> Command:
     except Exception as e:
         logger.error(e, exc_info=True)
         raise
-
-
-def send(socket, buffer):
-    attempts = 5
-    timeout = 0.01
-    while True:
-        try:
-            tmp = socket.send(buffer)
-            return tmp
-        except (ConnectionAbortedError, ConnectionResetError) as e:
-            logger.warning(e)
-            raise ClientDisconnectedException()
-        except:
-            if attempts == 0:
-                raise
-            attempts -= 1
-            time.sleep(timeout)
 
 
 def writeMessage(sock: socket.socket, command: Command):
