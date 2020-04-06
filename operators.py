@@ -133,15 +133,16 @@ def getCollection(collectionName):
     return shareData.blenderCollections.get(collectionName)
 
 
-def getParentCollection(collectionName):
+def getParentCollections(collectionName):
     """
     May return a master or non master collection
     """
+    parents = []
     for col in shareData.blenderCollections.values():
         childrenNames = set([x.name_full for x in col.children])
         if collectionName in childrenNames:
-            return col
-    return None
+            parents.append(col)
+    return parents
 
 
 def updateScenesState():
@@ -214,11 +215,7 @@ def updateCollectionsState():
         newChildren = set([x.name_full for x in collection.children])
 
         for x in newChildren - oldChildren:
-            parent = getParentCollection(x)
-            if parent is not None:
-                shareData.collectionsAddedToCollection.add((parent.name_full, x))
-            else:
-                logger.warning('UpdateCollectionState(): Collection not found or has no parent "%s"', x)
+            shareData.collectionsAddedToCollection.add((collection.name_full, x))
 
         for x in oldChildren - newChildren:
             shareData.collectionsRemovedFromCollection.add(
@@ -243,11 +240,7 @@ def updateCollectionsState():
             continue
         newChildren = set([x.name_full for x in collection.children])
         for x in newChildren:
-            parent = getParentCollection(x)
-            if parent is not None:
-                shareData.collectionsAddedToCollection.add((parent.name_full, x))
-            else:
-                logger.warning('UpdateCollectionState(): Collection not found or has no parent "%s"', x)
+            shareData.collectionsAddedToCollection.add((collection.name_full, x))
 
         addedObjects = set([x.name_full for x in collection.objects])
         if len(addedObjects) > 0:

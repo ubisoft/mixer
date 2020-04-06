@@ -27,7 +27,11 @@ class Blender:
         self._port = port
         self._ptvsd_port = ptvsd_port
         self._wait_for_debugger = wait_for_debugger
-        self.__blender: BlenderServer = None
+        self._blender: BlenderServer = None
+        self._log_level = None
+
+    def set_log_level(self, log_level: int):
+        self._log_level = log_level
 
     def setup(self, blender_args: List = None):
         self._blender = BlenderServer(self._port, self._ptvsd_port, self._wait_for_debugger)
@@ -36,6 +40,8 @@ class Blender:
         self.connect_and_join_dccsync()
 
     def connect_and_join_dccsync(self, room_name='dccsync_unittest'):
+        if self._log_level is not None:
+            self._blender.send_function(dccsync_lib.set_log_level, self._log_level)
         self._blender.send_function(dccsync_lib.connect)
         self._blender.send_function(dccsync_lib.join_room, room_name)
 
@@ -65,6 +71,10 @@ class BlenderTestCase(unittest.TestCase):
         self._receiver_wait_for_debugger = False
         self.expected_counts = {}
         super().__init__(*args, **kwargs)
+        self._log_level = None
+
+    def set_log_level(self, log_level):
+        self._log_level = log_level
 
     def assertStreamEquals(self, a_stream: CommandStream, b_stream: CommandStream, msg: str = None):
         a, b = a_stream.data, b_stream.data
@@ -99,12 +109,14 @@ class BlenderTestCase(unittest.TestCase):
         if sender_blendfile is not None:
             sender_args.append(str(sender_blendfile))
         self._sender = Blender(python_port + 0, ptvsd_port + 0, sender_wait_for_debugger)
+        self._sender.set_log_level(self._log_level)
         self._sender.setup(sender_args)
 
         receiver_args = ["--window-geometry", "960", "0", "960", "1080"]
         if receiver_blendfile is not None:
             receiver_args.append(str(receiver_blendfile))
         self._receiver = Blender(python_port + 1, ptvsd_port + 1, receiver_wait_for_debugger)
+        self._receiver.set_log_level(self._log_level)
         self._receiver.setup(receiver_args)
 
     def assertMatches(self):
@@ -225,6 +237,9 @@ class BlenderTestCase(unittest.TestCase):
     def disconnect(self):
         self._sender.disconnect_dccsync()
         self._receiver.disconnect_dccsync()
+
+    def link_collection_to_collection(self, parent_name: str, child_name: str):
+        self._sender.send_function(bl.link_collection_to_collection, parent_name, child_name)
 
     def create_collection_in_collection(self, parent_name: str, child_name: str):
         self._sender.send_function(bl.create_collection_in_collection, parent_name, child_name)

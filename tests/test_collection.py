@@ -2,6 +2,7 @@ import unittest
 import testcase
 from pathlib import Path
 import blender_lib as bl
+import logging
 
 
 class test_collection_default_doc(testcase.BlenderTestCase):
@@ -11,24 +12,43 @@ class test_collection_default_doc(testcase.BlenderTestCase):
         receiver_blendfile = folder / "empty.blend"
         sender_wait_for_debugger = False
         receiver_wait_for_debugger = False
+        self.set_log_level(logging.DEBUG)
         super().setUp(sender_blendfile, receiver_blendfile,
                       sender_wait_for_debugger=sender_wait_for_debugger,
                       receiver_wait_for_debugger=receiver_wait_for_debugger)
 
     def test_create_collection_in_collection(self):
-        self.create_collection_in_collection('Collection', 'plop')
-        self.create_collection_in_collection('Collection', 'plaf')
-        self.create_collection_in_collection('plop', 'sous_plop')
-        self.create_collection_in_collection('plaf', 'sous_plaf')
+        self.new_collection('plop')
+        self.link_collection_to_collection('Collection', 'plop')
+        self.new_collection('plaf')
+        self.link_collection_to_collection('Collection', 'plaf')
+        self.new_collection('sous_plop')
+        self.link_collection_to_collection('plop', 'sous_plop')
+        self.new_collection('sous_plaf')
+        self.link_collection_to_collection('plaf', 'sous_plaf')
+        self.assertMatches()
+
+    def test_create_collection_linked_twice(self):
+        self.new_collection('C1')
+        self.new_collection('C2')
+        self.link_collection_to_collection('Collection', 'C1')
+        self.link_collection_to_collection('Collection', 'C2')
+        self.new_collection('CC')
+        self.link_collection_to_collection('C1', 'CC')
+        self.link_collection_to_collection('C2', 'CC')
         self.assertMatches()
 
     def test_create_collection_in_collection_1(self):
-        self.create_collection_in_collection('Collection', 'plop')
-        self.create_collection_in_collection('Collection', 'plaf')
+        self.new_collection('plop')
+        self.link_collection_to_collection('Collection', 'plop')
+        self.new_collection('plaf')
+        self.link_collection_to_collection('Collection', 'plaf')
         # it used to fail in this order and work after collection rename
         # so keep the test
-        self.create_collection_in_collection('plaf', 'sous_plaf')
-        self.create_collection_in_collection('plop', 'sous_plop')
+        self.new_collection('sous_plaf')
+        self.link_collection_to_collection('plaf', 'sous_plaf')
+        self.new_collection('sous_plop')
+        self.link_collection_to_collection('plop', 'sous_plop')
         self.assertMatches()
 
     def test_create_collection_in_collection_name_clash(self):
@@ -37,11 +57,22 @@ class test_collection_default_doc(testcase.BlenderTestCase):
         self.create_collection_in_collection('plop', 'plop')
         self.assertMatches()
 
-    def test_create_object_in_collection(self):
+    def test_create_object(self):
         self.create_object_in_collection('Collection', 'new_object_0_0')
         self.create_object_in_collection('Collection', 'new_object_0_1')
         self.create_collection_in_collection('Collection', 'sub_collection_0')
         self.create_object_in_collection('sub_collection_0', 'new_object_0_2')
+        self.assertMatches()
+
+    def test_create_object_linked(self):
+        self.new_collection('C1')
+        self.new_collection('C2')
+        self.link_collection_to_collection('Collection', 'C1')
+        self.link_collection_to_collection('Collection', 'C2')
+        self.new_object('OO')
+        self.link_object_to_collection('Collection', 'OO')
+        self.link_object_to_collection('C1', 'OO')
+        self.link_object_to_collection('C2', 'OO')
         self.assertMatches()
 
     def test_remove_object_from_collection(self):

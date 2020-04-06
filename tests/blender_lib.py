@@ -28,7 +28,17 @@ def new_collection(name: str):
     bpy.data.collections.new(name)
 
 
+def link_collection_to_collection(parent_name: str, child_name: str):
+    import bpy
+    parent = bpy.data.collections[parent_name]
+    child = bpy.data.collections[child_name]
+    parent.children.link(child)
+
+
 def create_collection_in_collection(parent_name: str, child_name: str):
+    """
+    Works even with a name clash (actual collection name is not child_name)
+    """
     import bpy
     parent = bpy.data.collections[parent_name]
     child = bpy.data.collections.new(child_name)
