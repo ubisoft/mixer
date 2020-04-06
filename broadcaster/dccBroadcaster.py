@@ -5,8 +5,7 @@ import socket
 import select
 import sys
 import threading
-import time
-from typing import Any, List, Mapping, Union, ValuesView
+from typing import List, Mapping, Union, ValuesView
 
 import cli_utils
 import common
@@ -152,6 +151,7 @@ class Connection:
         self._server.broadcast_user_list()
 
     def send_error(self, s: str):
+        logging.debug("Sending error %s", s)
         command = common.Command(common.MessageType.SEND_ERROR, common.encodeString(s))
         with common.mutex:
             self.commands.append(command)
@@ -409,7 +409,7 @@ class Server:
         Broadcast the list of all joined and unjoined clients to all
         joined and unjoined clients.
 
-        This is called for every connection/join/clinet name change
+        This is called for every connection/join/client name change
         """
         with common.mutex:
             client_ids = self.client_ids()
