@@ -1,9 +1,9 @@
-
 # Unit tests
 
 ## Fonctionnement en bref
+
 - La classe `BlenderTestCase` lance deux Blender (un sender et un receiver) qui exécutent `python_server.py`.
-- `python_server.py` enregistre un opérateur qui gère une boucle asyncio. 
+- `python_server.py` enregistre un opérateur qui gère une boucle asyncio.
 - La boucle exécute un serveur qui reçoit du source python, le compile et l'exécute. Blender n'est pa bloqué entre deux exécutions et on voit le déroulement du test
 - le test (voir `test_test.py`) envoie du code source au Blender 'sender'. D'abord une commande de connection et join room, puis les fonctions du test à proprement parler.
 - pour l'instant la conclusion est décidée manuellement
@@ -16,18 +16,24 @@ Evolution possible : on devrait pouvoir utiliser plusieurs sender et receiver po
 
 ## Activer les tests
 
-Command palette : **Python: Configure Tests**, choisir **unittest**, pattern : **test_***
+Command palette : **Python: Configure Tests**, choisir **unittest**, pattern : **test\_\***
 
 Definir la variables d'environnement DCCSYNC_BLENDER_EXE_PATH
 
 Détails dans https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework
 
 ## Ecrire un test
+
 Voir `tests\test_test.py`
 
 ## Debugger les tests
-Coté Blender, `python_server.py` autorise la connexion du debugger sur les ports spécifiés dans `BlenderTestCase`. Pour attacher le debugger, il faut ajouter deux  configuration de debug, une avec 5688 (sender) et une avec 5689 (receiver):
+
+To enable justMyCode in the uni tests, see https://github.com/microsoft/vscode-python/issues/7131#issuecomment-525873210
+
+Coté Blender, `python_server.py` autorise la connexion du debugger sur les ports spécifiés dans `BlenderTestCase`. Pour attacher le debugger, il faut ajouter deux configuration de debug, une avec 5688 (sender) et une avec 5689 (receiver):
+
 >
+
     {
         "name": "Attach to sender (5688)",
         "type": "python",
@@ -59,19 +65,16 @@ Coté Blender, `python_server.py` autorise la connexion du debugger sur les port
 
 Ensuite:
 
-- mettre un breakpoint dans le code de dccsync avec une des deux méthodes suivantes : 
+- mettre un breakpoint dans le code de dccsync avec une des deux méthodes suivantes :
   - ajouter un appel au builtin `breakpoint()` dans le code. Attention le breakpoint ouvrira le fichier qui est dans %ADDPATA% (vois ci dessous) et ne sera pas editable dans VSCode
   - Ouvrir le fichier de code situé dans `%APPDATA%Blender Foundation\Blender\2.82\scripts\addons\dccsync` et y mettre un breakpoint avec VSCode
 - démarrer l'exécution du test unitaire : Blender se bloque en attendant l'attachement
 - attacher le debugger : l'exécution continue jusqu'au breakpoint
 
-## Caveat
-```bpy.context.window``` is ```None``` and may cause crashes. For ```instance bpy.data.scenes.remove(my_scene)``` because ```CTX_wm_window()``` returns ```NULL```, but ```bpy.ops.scene.delete({'scene': my_scene})``` succeeds. In fact ```bpy.context.window``` is ```None``` in a script run from ```--python``` argument.
-
-A possible solution could be to run the asyncio operator in python_server from a load handler.
-
 # Misc
+
 ## Guidelines
+
 - Use name_full instead of name for Blender objects (because of external links)
 
 ## Blender stuff
@@ -127,12 +130,12 @@ mat.node_tree.links.new(bsdf.inputs['Base Color'], texImage.outputs['Color']) je
 set parametre sur une multi selection marche à moitié
 
 Si il manque des textures, le .blend ne se charge pas (à vérifier)
- 
+
 un fichier ne peut pas s'appeler null.blend (quelles sont les autres contraintes ?)
 
 normal map Red & Green inverted, quel est le standard ?
 
-pas (toujours) de messages de visibilité des objets / collections 
+pas (toujours) de messages de visibilité des objets / collections
 
 visible_get() vs hide_viewport
 
@@ -148,7 +151,7 @@ crash quand on lit des infos d'update liés à des collections ajoutées/détrui
 
 hide_viewport sur collection -> reception du message quand hide_viewport=True pas quand hide_viewport=False
 
-collection invisible, pre handler l'update remove from collection n'est pas notifié, 
+collection invisible, pre handler l'update remove from collection n'est pas notifié,
 changement de collection d'un object -> pas de notif du tout d'une collection invisible à une collection invisible
 
 material.grease_pencil !!!
