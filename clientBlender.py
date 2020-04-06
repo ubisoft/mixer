@@ -1205,7 +1205,8 @@ class ClientBlender(Client):
                     if not ob:
                         remainingParentings.add(path)
                         break
-                    ob.parent = parent
+                    if ob.parent != parent: # do it only if needed, otherwise it resets matrix_parent_inverse
+                        ob.parent = parent
                     parent = ob
             shareData.pendingParenting = remainingParentings
 
