@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class ClientBlender(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(
-            host, port, delegate=self)
+            host, port)
 
         self.textures = set()
         self.callbacks = {}
@@ -203,7 +203,7 @@ class ClientBlender(Client):
                 if not isColor:
                     texImage.image.colorspace_settings.name = 'Non-Color'
             except Exception as e:
-                logger.log(e)
+                logger.error(e)
             material.node_tree.links.new(
                 principled.inputs[channel], texImage.outputs['Color'])
         return index
