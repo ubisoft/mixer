@@ -1,13 +1,12 @@
 from ..broadcaster import common
 from ..shareData import shareData
-from ..clientBlender import ClientBlender
 import logging
 import bpy
 
 logger = logging.getLogger(__name__)
 
 
-def sendScene(client: ClientBlender, scene_name: str):
+def sendScene(client: 'ClientBlender', scene_name: str):
     logger.debug("sendScene %s", scene_name)
     buffer = common.encodeString(scene_name)
     client.addCommand(common.Command(
@@ -40,7 +39,7 @@ def buildScene(data):
         bpy.ops.scene.delete(ctx)
 
 
-def sendSceneRemoved(client: ClientBlender, scene_name: str):
+def sendSceneRemoved(client: 'ClientBlender', scene_name: str):
     logger.debug("sendSceneRemoved %s", scene_name)
     buffer = common.encodeString(scene_name)
     client.addCommand(common.Command(
@@ -59,7 +58,7 @@ def buildSceneRemoved(data):
     bpy.ops.scene.delete(ctx)
 
 
-def sendAddCollectionToScene(client: ClientBlender, scene_name: str, collection_name: str):
+def sendAddCollectionToScene(client: 'ClientBlender', scene_name: str, collection_name: str):
     logger.debug("sendAddCollectionToScene %s <- %s", scene_name, collection_name)
 
     buffer = common.encodeString(scene_name) + common.encodeString(collection_name)
@@ -77,7 +76,7 @@ def buildCollectionToScene(data):
     scene.collection.children.link(collection)
 
 
-def sendRemoveCollectionFromScene(client: ClientBlender, scene_name: str, collection_name: str):
+def sendRemoveCollectionFromScene(client: 'ClientBlender', scene_name: str, collection_name: str):
     logger.debug("sendRemoveCollectionFromScene %s <- %s", scene_name, collection_name)
 
     buffer = common.encodeString(scene_name) + common.encodeString(collection_name)
@@ -94,7 +93,7 @@ def buildRemoveCollectionFromScene(data):
     scene.collection.children.unlink(collection)
 
 
-def sendAddObjectToVRtist(client: ClientBlender, sceneName: str, objName: str):
+def sendAddObjectToVRtist(client: 'ClientBlender', sceneName: str, objName: str):
     logger.debug("sendAddObjectToVRtist %s <- %s", sceneName, objName)
     buffer = common.encodeString(
         sceneName) + common.encodeString(objName)
@@ -102,7 +101,7 @@ def sendAddObjectToVRtist(client: ClientBlender, sceneName: str, objName: str):
         common.MessageType.ADD_OBJECT_TO_VRTIST, buffer, 0))
 
 
-def sendAddObjectToScene(client: ClientBlender, sceneName: str, objName: str):
+def sendAddObjectToScene(client: 'ClientBlender', sceneName: str, objName: str):
     logger.debug("sendAddObjectToScene %s <- %s", sceneName, objName)
     buffer = common.encodeString(
         sceneName) + common.encodeString(objName)
@@ -123,7 +122,7 @@ def buildAddObjectToScene(data):
         scene.collection.objects.link(object_)
 
 
-def sendRemoveObjectFromScene(client: ClientBlender, scene_name: str, object_name: str):
+def sendRemoveObjectFromScene(client: 'ClientBlender', scene_name: str, object_name: str):
     logger.debug("sendRemoveObjectFromScene %s <- %s", scene_name, object_name)
     buffer = common.encodeString(scene_name) + common.encodeString(object_name)
     client.addCommand(common.Command(

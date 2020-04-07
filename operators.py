@@ -12,6 +12,7 @@ from bpy.app.handlers import persistent
 
 from .shareData import ShareData, shareData
 from .blender_client import scene as scene_lib
+from .blender_client import collection as collection_lib
 
 from . import clientBlender
 from . import ui
@@ -32,7 +33,7 @@ class TransformStruct:
 def updateParams(obj):
     # send collection instances
     if obj.instance_type == 'COLLECTION':
-        shareData.client.sendCollectionInstance(obj)
+        collection_lib.sendCollectionInstance(shareData.client, obj)
         return
 
     if not hasattr(obj, "data"):
@@ -139,7 +140,7 @@ def getParentCollections(collectionName):
     """
     parents = []
     for col in shareData.blenderCollections.values():
-        childrenNames = set([x.name_full for x in col.children])
+        childrenNames = {x.name_full for x in col.children}
         if collectionName in childrenNames:
             parents.append(col)
     return parents
@@ -163,7 +164,7 @@ def updateScenesState():
             continue
         sceneName = scene.name_full
         oldChildren = set(sceneInfo.children)
-        newChildren = set([x.name_full for x in scene.collection.children])
+        newChildren = {x.name_full for x in scene.collection.children}
 
         for x in newChildren - oldChildren:
             shareData.collectionsAddedToScene.add((sceneName, x))
@@ -191,7 +192,7 @@ def updateScenesState():
         for x in newChildren:
             shareData.collectionsAddedToScene.add((sceneName, x))
 
-        addedObjects = set([x.name_full for x in scene.collection.objects])
+        addedObjects = {x.name_full for x in scene.collection.objects}
         if len(addedObjects) > 0:
             shareData.objectsAddedToScene[sceneName] = addedObjects
 
@@ -212,18 +213,16 @@ def updateCollectionsState():
         if not collection:
             continue
         oldChildren = set(collectionInfo.children)
-        newChildren = set([x.name_full for x in collection.children])
+        newChildren = {x.name_full for x in collection.children}
 
         for x in newChildren - oldChildren:
             shareData.collectionsAddedToCollection.add((collection.name_full, x))
 
         for x in oldChildren - newChildren:
-            shareData.collectionsRemovedFromCollection.add(
-                (shareData.collectionsInfo[x].parent, x))
+            shareData.collectionsRemovedFromCollection.add((collectionName, x))
 
-        newObjects = set([x.name_full for x in collection.objects])
-        oldObjects = set([shareData.objectsRenamed.get(x, x)
-                          for x in collectionInfo.objects])
+        newObjects = {x.name_full for x in collection.objects}
+        oldObjects = {shareData.objectsRenamed.get(x, x) for x in collectionInfo.objects}
 
         addedObjects = [x for x in newObjects - oldObjects]
         if len(addedObjects) > 0:
@@ -238,11 +237,11 @@ def updateCollectionsState():
         collection = getCollection(collectionName)
         if not collection:
             continue
-        newChildren = set([x.name_full for x in collection.children])
+        newChildren = {x.name_full for x in collection.children}
         for x in newChildren:
             shareData.collectionsAddedToCollection.add((collection.name_full, x))
 
-        addedObjects = set([x.name_full for x in collection.objects])
+        addedObjects = {x.name_full for x in collection.objects}
         if len(addedObjects) > 0:
             shareData.objectsAddedToCollection[collectionName] = addedObjects
 
@@ -318,7 +317,7 @@ def removeObjectsFromCollections():
     changed = False
     for collection_name, object_names in shareData.objectsRemovedFromCollection.items():
         for object_name in object_names:
-            shareData.client.sendRemoveObjectFromCollection(collection_name, object_name)
+            collection_lib.sendRemoveObjectFromCollection(shareData.client, collection_name, object_name)
             changed = True
     return changed
 
@@ -337,7 +336,7 @@ def removeCollectionsFromCollections():
     """
     changed = False
     for parent_name, child_name in shareData.collectionsRemovedFromCollection:
-        shareData.client.sendRemoveCollectionFromCollection(parent_name, child_name)
+        collection_lib.sendRemoveCollectionFromCollection(shareData.client, parent_name, child_name)
         changed = True
     return changed
 
@@ -361,7 +360,7 @@ def removeScenes():
 def removeCollections():
     changed = False
     for collection in shareData.collectionsRemoved:
-        shareData.client.sendCollectionRemoved(collection)
+        collection_lib.sendCollectionRemoved(shareData.client, collection)
         changed = True
     return changed
 
@@ -380,7 +379,7 @@ def addObjects():
 def addCollections():
     changed = False
     for item in shareData.collectionsAdded:
-        shareData.client.sendCollection(getCollection(item))
+        collection_lib.sendCollection(shareData.client, getCollection(item))
         changed = True
     return changed
 
@@ -388,7 +387,7 @@ def addCollections():
 def addCollectionsToCollections():
     changed = False
     for parent_name, child_name in shareData.collectionsAddedToCollection:
-        shareData.client.sendAddCollectionToCollection(parent_name, child_name)
+        collection_lib.sendAddCollectionToCollection(shareData.client, parent_name, child_name)
         changed = True
     return changed
 
@@ -405,8 +404,8 @@ def addObjectsToCollections():
     changed = False
     for collectionName, objectNames in shareData.objectsAddedToCollection.items():
         for objectName in objectNames:
-            shareData.client.sendAddObjectToCollection(
-                collectionName, objectName)
+            collection_lib.sendAddObjectToCollection(shareData.client,
+                                                     collectionName, objectName)
             changed = True
     return changed
 
@@ -426,7 +425,7 @@ def updateCollectionsParameters():
         info = shareData.collectionsInfo.get(collection.name_full)
         if info:
             if info.hide_viewport != collection.hide_viewport or info.instance_offset != collection.instance_offset:
-                shareData.client.sendCollection(collection)
+                collection_lib.sendCollection(shareData.client, collection)
                 changed = True
     return changed
 
