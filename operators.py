@@ -218,8 +218,7 @@ def updateCollectionsState():
             shareData.collectionsAddedToCollection.add((collection.name_full, x))
 
         for x in oldChildren - newChildren:
-            shareData.collectionsRemovedFromCollection.add(
-                (shareData.collectionsInfo[x].parent, x))
+            shareData.collectionsRemovedFromCollection.add((collectionName, x))
 
         newObjects = set([x.name_full for x in collection.objects])
         oldObjects = set([shareData.objectsRenamed.get(x, x)
