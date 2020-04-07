@@ -637,16 +637,7 @@ def sendSceneDataToServer(scene, dummy):
 @persistent
 def onUndoRedoPre(scene):
     logger.info("onUndoRedoPre")
-
-    shareData.setDirty()
-    # shareData.selectedObjectsNames = set()
-    # for obj in bpy.context.selected_objects:
-    #    shareData.selectedObjectsNames.add(obj.name)
-    if not isInObjectMode():
-        return
-
-    shareData.clearLists()
-    shareData.updateCurrentData()
+    sendSceneDataToServer(scene, None)
 
 
 def remapObjectsInfo():
@@ -684,6 +675,7 @@ def onUndoRedoPost(scene, dummy):
     logger.info("onUndoRedoPost")
 
     shareData.setDirty()
+    shareData.clearLists()
     # apply only in object mode
     if not isInObjectMode():
         return
@@ -739,7 +731,7 @@ def onUndoRedoPost(scene, dummy):
         shareData.client.sendMaterial(material)
 
     shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
-    shareData.clearLists()
+
     shareData.updateCurrentData()
 
 
