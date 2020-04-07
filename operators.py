@@ -139,7 +139,7 @@ def getParentCollections(collectionName):
     """
     parents = []
     for col in shareData.blenderCollections.values():
-        childrenNames = set([x.name_full for x in col.children])
+        childrenNames = {x.name_full for x in col.children}
         if collectionName in childrenNames:
             parents.append(col)
     return parents
@@ -163,7 +163,7 @@ def updateScenesState():
             continue
         sceneName = scene.name_full
         oldChildren = set(sceneInfo.children)
-        newChildren = set([x.name_full for x in scene.collection.children])
+        newChildren = {x.name_full for x in scene.collection.children}
 
         for x in newChildren - oldChildren:
             shareData.collectionsAddedToScene.add((sceneName, x))
@@ -191,7 +191,7 @@ def updateScenesState():
         for x in newChildren:
             shareData.collectionsAddedToScene.add((sceneName, x))
 
-        addedObjects = set([x.name_full for x in scene.collection.objects])
+        addedObjects = {x.name_full for x in scene.collection.objects}
         if len(addedObjects) > 0:
             shareData.objectsAddedToScene[sceneName] = addedObjects
 
@@ -212,7 +212,7 @@ def updateCollectionsState():
         if not collection:
             continue
         oldChildren = set(collectionInfo.children)
-        newChildren = set([x.name_full for x in collection.children])
+        newChildren = {x.name_full for x in collection.children}
 
         for x in newChildren - oldChildren:
             shareData.collectionsAddedToCollection.add((collection.name_full, x))
@@ -220,9 +220,8 @@ def updateCollectionsState():
         for x in oldChildren - newChildren:
             shareData.collectionsRemovedFromCollection.add((collectionName, x))
 
-        newObjects = set([x.name_full for x in collection.objects])
-        oldObjects = set([shareData.objectsRenamed.get(x, x)
-                          for x in collectionInfo.objects])
+        newObjects = {x.name_full for x in collection.objects}
+        oldObjects = {shareData.objectsRenamed.get(x, x) for x in collectionInfo.objects}
 
         addedObjects = [x for x in newObjects - oldObjects]
         if len(addedObjects) > 0:
@@ -237,11 +236,11 @@ def updateCollectionsState():
         collection = getCollection(collectionName)
         if not collection:
             continue
-        newChildren = set([x.name_full for x in collection.children])
+        newChildren = {x.name_full for x in collection.children}
         for x in newChildren:
             shareData.collectionsAddedToCollection.add((collection.name_full, x))
 
-        addedObjects = set([x.name_full for x in collection.objects])
+        addedObjects = {x.name_full for x in collection.objects}
         if len(addedObjects) > 0:
             shareData.objectsAddedToCollection[collectionName] = addedObjects
 
