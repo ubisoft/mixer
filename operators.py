@@ -10,9 +10,10 @@ from typing import Mapping
 import bpy
 from bpy.app.handlers import persistent
 
-from .shareData import ShareData, shareData
+from .shareData import ShareData, shareData, objectVisibility
 from .blender_client import scene as scene_lib
 from .blender_client import collection as collection_lib
+from .blender_client import object_ as object_lib
 
 from . import clientBlender
 from . import ui
@@ -287,11 +288,11 @@ def updateObjectsState(oldObjects: dict, newObjects: dict):
                 shareData.objectsReparented.add(objName)
 
     with stats_timer.child("updateObjectsVisibilityChanged"):
-        for objName, visible in shareData.objectsVisibility.items():
+        for objName, visibility in shareData.objectsVisibility.items():
             newObj = shareData.oldObjects.get(objName)
             if not newObj:
                 continue
-            if visible != newObj.hide_viewport:
+            if visibility != objectVisibility(newObj):
                 shareData.objectsVisibilityChanged.add(objName)
 
     updateFrameChangedRelatedObjectsState(oldObjects, newObjects)
@@ -450,7 +451,9 @@ def updateObjectsVisibility():
     changed = False
     for objName in shareData.objectsVisibilityChanged:
         if objName in shareData.blenderObjects:
-            updateTransform(shareData.blenderObjects[objName])
+            obj = shareData.blenderObjects[objName]
+            updateTransform(obj)
+            object_lib.sendObjectVisibility(shareData.client, obj)
             changed = True
     return changed
 

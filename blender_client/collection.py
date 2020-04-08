@@ -6,7 +6,7 @@ import bpy
 logger = logging.getLogger(__name__)
 
 
-def sendCollection(client: 'ClientBlender', collection):
+def sendCollection(client: 'ClientBlender', collection: bpy.types.Collection):
     logger.debug("sendCollection %s", collection.name_full)
     collectionInstanceOffset = collection.instance_offset
     buffer = common.encodeString(collection.name_full) + common.encodeBool(not collection.hide_viewport) + \

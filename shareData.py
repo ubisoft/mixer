@@ -1,7 +1,18 @@
 from datetime import datetime
 from typing import List, Mapping, Set
-
+from collections import namedtuple
 import bpy
+
+ObjectVisibility = namedtuple('ObjectVisibility', [
+    'hide_viewport',
+    'hide_select',
+    'hide_render',
+    'visible_get'
+])
+
+
+def objectVisibility(o: bpy.types.Object):
+    return ObjectVisibility(o.hide_viewport, o.hide_select, o.hide_render, o.visible_get())
 
 
 class CollectionInfo:
@@ -79,8 +90,8 @@ class ShareData:
         self.objectsRenamed = {}
         self.objectsTransformed = set()
         self.objectsTransforms = {}
-        self.objectsVisibilityChanged = set()
-        self.objectsVisibility = {}
+        self.objectsVisibilityChanged: Set[str] = set()
+        self.objectsVisibility: Mapping[str, ObjectVisibility] = {}
 
         self.oldObjects: Mapping[str, bpy.types.Object] = {}
 
@@ -275,9 +286,11 @@ class ShareData:
         self.updateScenesInfo()
         self.updateCollectionsInfo()
         self.updateObjectsInfo()
-        self.objectsVisibility = dict((x.name_full, x.hide_viewport) for x in self.blenderObjects.values())
-        self.objectsParents = dict((x.name_full, x.parent.name_full if x.parent is not None else "")
-                                   for x in self.blenderObjects.values())
+        self.objectsVisibility = {x.name_full: objectVisibility(x)
+                                  for x in self.blenderObjects.values()}
+        self.objectsParents = {x.name_full: x.parent.name_full
+                               if x.parent is not None else ""
+                               for x in self.blenderObjects.values()}
 
 
 shareData = ShareData()

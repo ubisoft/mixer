@@ -12,8 +12,9 @@ from .shareData import shareData
 from .broadcaster import common
 from .broadcaster.client import Client
 from .blender_client import collection as collection_api
-from .blender_client import scene as scene_api
 from .blender_client import mesh as mesh_api
+from .blender_client import object_ as object_api
+from .blender_client import scene as scene_api
 from .stats import stats_timer
 
 _STILL_ACTIVE = 259
@@ -1133,6 +1134,9 @@ class ClientBlender(Client):
                     scene_api.buildScene(command.data)
                 elif command.type == common.MessageType.SCENE_REMOVED:
                     scene_api.buildSceneRemoved(command.data)
+
+                elif command.type == common.MessageType.OBJECT_VISIBILITY:
+                    object_api.buildObjectVisibility(command.data)
 
                 self.receivedCommands.task_done()
                 self.blockSignals = False
