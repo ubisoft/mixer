@@ -42,8 +42,13 @@ class Client:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.host, self.port))
             self._local_address = self.socket.getsockname()
-            logger.info("Connecting from local %s:%s to %s:%s",
-                        self._local_address[0], self._local_address[1], self.host, self.port)
+            logger.info(
+                "Connecting from local %s:%s to %s:%s",
+                self._local_address[0],
+                self._local_address[1],
+                self.host,
+                self.port,
+            )
         except Exception as e:
             logger.error("Connection error %s", e, exc_info=True)
             self.socket = None
@@ -62,14 +67,13 @@ class Client:
         self.pendingCommands.put(command)
 
     def joinRoom(self, roomName):
-        common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode('utf8'), 0))
+        common.writeMessage(self.socket, common.Command(common.MessageType.JOIN_ROOM, roomName.encode("utf8"), 0))
 
     def leaveRoom(self, roomName):
-        common.writeMessage(self.socket, common.Command(common.MessageType.LEAVE_ROOM, roomName.encode('utf8'), 0))
+        common.writeMessage(self.socket, common.Command(common.MessageType.LEAVE_ROOM, roomName.encode("utf8"), 0))
 
     def setClientName(self, userName):
-        common.writeMessage(self.socket, common.Command(
-            common.MessageType.SET_CLIENT_NAME, userName.encode('utf8'), 0))
+        common.writeMessage(self.socket, common.Command(common.MessageType.SET_CLIENT_NAME, userName.encode("utf8"), 0))
 
     def fetchIncomingCommands(self):
         """
@@ -118,7 +122,7 @@ class Client:
 
 
 # For tests
-if __name__ == '__main__':
+if __name__ == "__main__":
     client = Client()
 
     while True:
