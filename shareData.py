@@ -113,7 +113,7 @@ class ShareData:
         self.pendingParenting = set()
 
     def leaveCurrentRoom(self):
-        if self.client:
+        if self.client is not None:
             self.client.leaveRoom(shareData.currentRoom)
         self.clearRoomData()
 

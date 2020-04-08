@@ -49,6 +49,8 @@ class Client:
                 self.host,
                 self.port,
             )
+        except ConnectionRefusedError:
+            self.socket = None
         except Exception as e:
             logger.error("Connection error %s", e, exc_info=True)
             self.socket = None

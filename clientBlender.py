@@ -1069,7 +1069,8 @@ class ClientBlender(Client):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
 
     def on_connection_lost(self):
-        bpy.ops.dcc_sync.disconnect()
+        if 'Disconnect' in self.callbacks:
+            self.callbacks['Disconnect']()
 
     def buildListAllClients(self, client_ids):
         shareData.client_ids = client_ids
@@ -1094,103 +1095,119 @@ class ClientBlender(Client):
     def networkConsumer(self):
         assert(self.isConnected())
 
-        self.fetchCommands()
+        group_count = 0
 
-        setDirty = True
+        # Loop remains infinite while we have GROUP_BEGIN commands without their corresponding GROUP_END received
         while True:
-            command = self.getNextReceivedCommand()
-            if command is None:
-                break
+            self.fetchCommands()
 
-            processed = False
-            if command.type == common.MessageType.LIST_ALL_CLIENTS:
-                clients, _ = common.decodeJson(command.data, 0)
-                self.buildListAllClients(clients)
-                processed = True
-            elif command.type == common.MessageType.CONNECTION_LOST:
-                self.on_connection_lost()
-                break
+            setDirty = True
+            # Process all received commands
+            while True:
+                command = self.getNextReceivedCommand()
+                if command is None:
+                    break
 
-            if setDirty:
-                shareData.setDirty()
-                setDirty = False
+                if command.type == common.MessageType.GROUP_BEGIN:
+                    group_count += 1
+                    continue
 
-            self.blockSignals = True
-            self.receivedCommandsProcessed = True
-            if processed:
-                # this was a room protocol command that was processed
-                self.receivedCommandsProcessed = False
-            else:
-                if command.type == common.MessageType.CONTENT:
-                    # The server asks for scene content (at room creation)
+                if command.type == common.MessageType.GROUP_END:
+                    group_count -= 1
+                    continue
+
+                processed = False
+                if command.type == common.MessageType.LIST_ALL_CLIENTS:
+                    clients, _ = common.decodeJson(command.data, 0)
+                    self.buildListAllClients(clients)
+                    processed = True
+                elif command.type == common.MessageType.CONNECTION_LOST:
+                    self.on_connection_lost()
+                    break
+
+                if setDirty:
+                    shareData.setDirty()
+                    setDirty = False
+
+                self.blockSignals = True
+                self.receivedCommandsProcessed = True
+                if processed:
+                    # this was a room protocol command that was processed
                     self.receivedCommandsProcessed = False
-                    self.sendSceneContent()
+                else:
+                    if command.type == common.MessageType.CONTENT:
+                        # The server asks for scene content (at room creation)
+                        self.receivedCommandsProcessed = False
+                        self.sendSceneContent()
 
-                elif command.type == common.MessageType.GREASE_PENCIL_MESH:
-                    self.buildGreasePencilMesh(command.data)
-                elif command.type == common.MessageType.GREASE_PENCIL_MATERIAL:
-                    self.buildGreasePencilMaterial(command.data)
-                elif command.type == common.MessageType.GREASE_PENCIL_CONNECTION:
-                    self.buildGreasePencilConnection(command.data)
+                    elif command.type == common.MessageType.GREASE_PENCIL_MESH:
+                        self.buildGreasePencilMesh(command.data)
+                    elif command.type == common.MessageType.GREASE_PENCIL_MATERIAL:
+                        self.buildGreasePencilMaterial(command.data)
+                    elif command.type == common.MessageType.GREASE_PENCIL_CONNECTION:
+                        self.buildGreasePencilConnection(command.data)
 
-                elif command.type == common.MessageType.CLEAR_CONTENT:
-                    self.clearContent()
-                elif command.type == common.MessageType.MESH:
-                    self.buildMesh(command.data)
-                elif command.type == common.MessageType.TRANSFORM:
-                    self.buildTransform(command.data)
-                elif command.type == common.MessageType.MATERIAL:
-                    self.buildMaterial(command.data)
-                elif command.type == common.MessageType.DELETE:
-                    self.buildDelete(command.data)
-                elif command.type == common.MessageType.CAMERA:
-                    self.buildCamera(command.data)
-                elif command.type == common.MessageType.LIGHT:
-                    self.buildLight(command.data)
-                elif command.type == common.MessageType.RENAME:
-                    self.buildRename(command.data)
-                elif command.type == common.MessageType.DUPLICATE:
-                    self.buildDuplicate(command.data)
-                elif command.type == common.MessageType.SEND_TO_TRASH:
-                    self.buildSendToTrash(command.data)
-                elif command.type == common.MessageType.RESTORE_FROM_TRASH:
-                    self.buildRestoreFromTrash(command.data)
-                elif command.type == common.MessageType.TEXTURE:
-                    self.buildTextureFile(command.data)
+                    elif command.type == common.MessageType.CLEAR_CONTENT:
+                        self.clearContent()
+                    elif command.type == common.MessageType.MESH:
+                        self.buildMesh(command.data)
+                    elif command.type == common.MessageType.TRANSFORM:
+                        self.buildTransform(command.data)
+                    elif command.type == common.MessageType.MATERIAL:
+                        self.buildMaterial(command.data)
+                    elif command.type == common.MessageType.DELETE:
+                        self.buildDelete(command.data)
+                    elif command.type == common.MessageType.CAMERA:
+                        self.buildCamera(command.data)
+                    elif command.type == common.MessageType.LIGHT:
+                        self.buildLight(command.data)
+                    elif command.type == common.MessageType.RENAME:
+                        self.buildRename(command.data)
+                    elif command.type == common.MessageType.DUPLICATE:
+                        self.buildDuplicate(command.data)
+                    elif command.type == common.MessageType.SEND_TO_TRASH:
+                        self.buildSendToTrash(command.data)
+                    elif command.type == common.MessageType.RESTORE_FROM_TRASH:
+                        self.buildRestoreFromTrash(command.data)
+                    elif command.type == common.MessageType.TEXTURE:
+                        self.buildTextureFile(command.data)
 
-                elif command.type == common.MessageType.COLLECTION:
-                    collection_api.buildCollection(command.data)
-                elif command.type == common.MessageType.COLLECTION_REMOVED:
-                    collection_api.buildCollectionRemoved(command.data)
+                    elif command.type == common.MessageType.COLLECTION:
+                        collection_api.buildCollection(command.data)
+                    elif command.type == common.MessageType.COLLECTION_REMOVED:
+                        collection_api.buildCollectionRemoved(command.data)
 
-                elif command.type == common.MessageType.INSTANCE_COLLECTION:
-                    collection_api. buildCollectionInstance(command.data)
+                    elif command.type == common.MessageType.INSTANCE_COLLECTION:
+                        collection_api. buildCollectionInstance(command.data)
 
-                elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
-                    collection_api.buildCollectionToCollection(command.data)
-                elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
-                    collection_api.buildRemoveCollectionFromCollection(command.data)
-                elif command.type == common.MessageType.ADD_OBJECT_TO_COLLECTION:
-                    collection_api.buildAddObjectToCollection(command.data)
-                elif command.type == common.MessageType.REMOVE_OBJECT_FROM_COLLECTION:
-                    collection_api.buildRemoveObjectFromCollection(command.data)
+                    elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
+                        collection_api.buildCollectionToCollection(command.data)
+                    elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
+                        collection_api.buildRemoveCollectionFromCollection(command.data)
+                    elif command.type == common.MessageType.ADD_OBJECT_TO_COLLECTION:
+                        collection_api.buildAddObjectToCollection(command.data)
+                    elif command.type == common.MessageType.REMOVE_OBJECT_FROM_COLLECTION:
+                        collection_api.buildRemoveObjectFromCollection(command.data)
 
-                elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
-                    scene_api.buildCollectionToScene(command.data)
-                elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_SCENE:
-                    scene_api.buildRemoveCollectionFromScene(command.data)
-                elif command.type == common.MessageType.ADD_OBJECT_TO_SCENE:
-                    scene_api.buildAddObjectToScene(command.data)
-                elif command.type == common.MessageType.REMOVE_OBJECT_FROM_SCENE:
-                    scene_api.buildRemoveObjectFromScene(command.data)
+                    elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
+                        scene_api.buildCollectionToScene(command.data)
+                    elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_SCENE:
+                        scene_api.buildRemoveCollectionFromScene(command.data)
+                    elif command.type == common.MessageType.ADD_OBJECT_TO_SCENE:
+                        scene_api.buildAddObjectToScene(command.data)
+                    elif command.type == common.MessageType.REMOVE_OBJECT_FROM_SCENE:
+                        scene_api.buildRemoveObjectFromScene(command.data)
 
-                elif command.type == common.MessageType.SCENE:
-                    scene_api.buildScene(command.data)
-                elif command.type == common.MessageType.SCENE_REMOVED:
-                    scene_api.buildSceneRemoved(command.data)
+                    elif command.type == common.MessageType.SCENE:
+                        scene_api.buildScene(command.data)
+                    elif command.type == common.MessageType.SCENE_REMOVED:
+                        scene_api.buildSceneRemoved(command.data)
 
-                self.receivedCommands.task_done()
-                self.blockSignals = False
+                    self.receivedCommands.task_done()
+                    self.blockSignals = False
+
+            if group_count == 0:
+                break
 
         if not setDirty:
             shareData.updateCurrentData()
