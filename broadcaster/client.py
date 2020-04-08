@@ -117,14 +117,9 @@ class Client:
             return None
 
 
-class TestClient(Client):
-    def __init__(self, *args, **kwargs):
-        super(TestClient, self).__init__("noname", *args, **kwargs)
-
-
 # For tests
 if __name__ == '__main__':
-    client = TestClient()
+    client = Client()
 
     while True:
         msg = input("> ")
