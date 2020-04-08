@@ -10,7 +10,7 @@ from typing import Mapping
 import bpy
 from bpy.app.handlers import persistent
 
-from .shareData import ShareData, shareData
+from .shareData import shareData
 from .blender_client import scene as scene_lib
 
 from . import clientBlender
@@ -935,11 +935,22 @@ def isClientConnected():
 
 
 def networkConsumerTimer():
+    if not shareData.client.isConnected():
+        error_msg = "Timer still registered but client disconnected."
+        logger.error(error_msg)
+        if get_dcc_sync_props().env != "production":
+            raise RuntimeError(error_msg)
+        # Returning None from a timer unregister it
+        return None
+
     # Encapsulate call to shareData.client.networkConsumer because
     # if we register it directly, then bpy.app.timers.is_registered(shareData.client.networkConsumer)
     # return False...
     # However, with a simple function bpy.app.timers.is_registered works.
-    return shareData.client.networkConsumer()
+    shareData.client.networkConsumer()
+
+    # Run every 1 / 100 seconds
+    return 0.01
 
 
 def create_main_client(host: str, port: int):

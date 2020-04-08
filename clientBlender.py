@@ -1092,6 +1092,8 @@ class ClientBlender(Client):
             self.callbacks['ClearContent']()
 
     def networkConsumer(self):
+        assert(self.isConnected())
+
         self.fetchCommands()
 
         setDirty = True
@@ -1208,5 +1210,3 @@ class ClientBlender(Client):
                         ob.parent = parent
                     parent = ob
             shareData.pendingParenting = remainingParentings
-
-        return 0.01

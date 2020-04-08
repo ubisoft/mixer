@@ -72,6 +72,10 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
         if client and client.isConnected():
             client.setClientName(self.user)
 
+    # Allows to change behavior according to environment: production or development
+    env: bpy.props.StringProperty(
+        name="Env", default=os.environ.get("DCCSYNC_ENV", "production"))
+
     host: bpy.props.StringProperty(
         name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
     port: bpy.props.IntProperty(name="Port", default=common.DEFAULT_PORT)
