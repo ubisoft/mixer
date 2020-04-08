@@ -1,8 +1,16 @@
+# current
+
+### Fixes
+
+- Support more object visibility atributes (#54)
+- Collections linked to multiple collections (#44)
+- Undo failures for collection rename and other cases (#45)
+
 # 0.1.0alpha (2020-04-03)
 
 ### Release Highlights
 
-First *official* release of dccsync (to be renamed one day) addon for Blender. This addon allows to work collaboratively between multiple Blender and [VRtist](https://gitlab-ncsa.ubisoft.org/motion-pictures/vrtist).
+First _official_ release of dccsync (to be renamed one day) addon for Blender. This addon allows to work collaboratively between multiple Blender and [VRtist](https://gitlab-ncsa.ubisoft.org/motion-pictures/vrtist).
 
 This alpha version offers basic functionnality to start working in collaboration. However it is not safe at all and can break the scene of the first user that connects to a session.
 
@@ -33,6 +41,7 @@ Here are features supported for the synchronization of data among Blender client
 ### Known Bugs/Limitations
 
 These bugs and limitations are known and will be addressed in future releases:
+
 - Collections
   - Linked into multiple collections
 - Scenes
@@ -47,6 +56,7 @@ These bugs and limitations are known and will be addressed in future releases:
 - Working from computers on differents networks has not been tested enough
 
 Things that are not mentionned are not supported at all right know, in particular:
+
 - Modifiers
 - Contraints
 - Bones
@@ -59,10 +69,12 @@ Things that are not mentionned are not supported at all right know, in particula
 ### Reporting issues
 
 For now, if the issue is for sync Blender - Blender, send an email to:
+
 - laurent.noel@ubisoft.com
 - philippe.crassous@ubisoft.com
 
 If the issue if for sync Blender - VRtist, end an email to:
+
 - thomas.capelle@ubisoft.com
 - sylvain.magdelaine@ubisoft.com
 - nicolas.fauvet@ubisoft.com
