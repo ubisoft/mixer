@@ -585,6 +585,12 @@ class ClientBlender(Client):
         except Exception as e:
             logger.error(e)
 
+    def sendGroupBegin(self):
+        self.addCommand(common.Command(common.MessageType.GROUP_BEGIN, common.encodeInt(0)))
+
+    def sendGroupEnd(self):
+        self.addCommand(common.Command(common.MessageType.GROUP_END))
+
     def sendMaterial(self, material):
         if not material:
             return

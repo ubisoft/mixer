@@ -817,6 +817,8 @@ def send_scene_content():
 
     shareData.clearBeforeState()
 
+    shareData.client.sendGroupBegin()
+
     # Temporary waiting for material sync. Should move to sendSceneDataToServer
     for material in bpy.data.materials:
         shareData.client.sendMaterial(material)
@@ -826,6 +828,8 @@ def send_scene_content():
     shareData.client.sendFrameStartEnd(
         bpy.context.scene.frame_start, bpy.context.scene.frame_end)
     shareData.client.sendFrame(bpy.context.scene.frame_current)
+
+    shareData.client.sendGroupEnd()
 
 
 def set_handlers(connect: bool):
@@ -916,6 +920,9 @@ def disconnect():
 
     # the socket has already been disconnected
     if shareData.client is not None:
+        if bpy.app.timers.is_registered(networkConsumerTimer):
+            bpy.app.timers.unregister(networkConsumerTimer)
+
         if shareData.client.isConnected():
             shareData.client.disconnect()
         shareData.client_ids = None
@@ -925,6 +932,14 @@ def disconnect():
 
 def isClientConnected():
     return shareData.client is not None and shareData.client.isConnected()
+
+
+def networkConsumerTimer():
+    # Encapsulate call to shareData.client.networkConsumer because
+    # if we register it directly, then bpy.app.timers.is_registered(shareData.client.networkConsumer)
+    # return False...
+    # However, with a simple function bpy.app.timers.is_registered works.
+    return shareData.client.networkConsumer()
 
 
 def create_main_client(host: str, port: int):
@@ -937,8 +952,8 @@ def create_main_client(host: str, port: int):
     shareData.client = client
     shareData.client.addCallback('SendContent', send_scene_content)
     shareData.client.addCallback('ClearContent', clear_scene_content)
-    if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
-        bpy.app.timers.register(shareData.client.networkConsumer)
+    if not bpy.app.timers.is_registered(networkConsumerTimer):
+        bpy.app.timers.register(networkConsumerTimer)
 
     return True
 
@@ -1143,5 +1158,7 @@ def register():
 
 
 def unregister():
+    disconnect()
+
     for _ in classes:
         bpy.utils.unregister_class(_)
