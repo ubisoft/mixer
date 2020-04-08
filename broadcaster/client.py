@@ -12,7 +12,14 @@ logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__
 
 
 class Client:
-    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT, delegate=None):
+    """
+    The client class is responsible for:
+    - handling the connection with the server
+    - receiving packet of bytes to convert them to commands
+    - send commands
+    """
+
+    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         self.host = host
         self.port = port
         self.receivedCommands = queue.Queue()
@@ -27,7 +34,7 @@ class Client:
         if self.socket is not None:
             self.disconnect()
 
-    def connect(self, useThread=False):
+    def connect(self):
         if self.isConnected():
             raise RuntimeError("Client.connect : already connected")
 
@@ -64,9 +71,9 @@ class Client:
         common.writeMessage(self.socket, common.Command(
             common.MessageType.SET_CLIENT_NAME, userName.encode('utf8'), 0))
 
-    def fetchCommands(self):
+    def fetchIncomingCommands(self):
         """
-        Gather incoming commands in receivedCommands, send outgoing commands stored in pendingCommands
+        Gather incoming commands in receivedCommands queue.
         """
         while True:
             try:
@@ -83,15 +90,23 @@ class Client:
 
             self.receivedCommands.put(command)
 
+    def fetchOutgoingCommands(self):
+        """
+        Send commands in pendingCommands queue to the server.
+        """
         while True:
             try:
                 command = self.pendingCommands.get_nowait()
             except queue.Empty:
                 break
-            else:
-                logger.info("Send %s (queue size = %d)", command.type, self.pendingCommands.qsize())
-                common.writeMessage(self.socket, command)
-                self.pendingCommands.task_done()
+
+            logger.info("Send %s (queue size = %d)", command.type, self.pendingCommands.qsize())
+            common.writeMessage(self.socket, command)
+            self.pendingCommands.task_done()
+
+    def fetchCommands(self):
+        self.fetchIncomingCommands()
+        self.fetchOutgoingCommands()
 
     def getNextReceivedCommand(self):
         try:
