@@ -202,7 +202,8 @@ class Connection:
                     if self.room is not None:
                         self.room.addCommand(command, self)
                     else:
-                        logger.error("COMMAND received but no room was joined")
+                        logger.warning("%s:%s - %s received but no room was joined",
+                                       self.address[0], self.address[1], command.type.value)
 
             try:
                 if len(self.commands) > 0:
@@ -235,6 +236,13 @@ class Connection:
 
 
 class Room:
+    """
+    Room class is responsible for:
+    - handling its list of clients (as Connection instances)
+    - keep a list of commands, to be dispatched to new clients
+    - dispatch added commands to already clients already in the room
+    """
+
     def __init__(self, server: 'Server', roomName: str):
         self.name = roomName
         self._connections: List['Connection'] = []
