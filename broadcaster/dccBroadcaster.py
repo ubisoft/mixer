@@ -266,8 +266,6 @@ class Room:
             for command in self.commands:
                 connection.addCommand(command)
 
-        self._server.broadcast_user_list()
-
     def broadcast_user_list(self):
         for connection in self._connections:
             connection.send_client_ids(client_ids=self.client_ids())
