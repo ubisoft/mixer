@@ -33,10 +33,6 @@ class MessageType(Enum):
     CONNECTION_LOST = 13
     # All all joined and un joined clients
     LIST_ALL_CLIENTS = 14
-    # Start / End a group of command. Allows to inform clients that they must process multiple commands
-    # before giving back control to they users.
-    GROUP_BEGIN = 15
-    GROUP_END = 16
 
     COMMAND = 100
     DELETE = 101
@@ -75,6 +71,11 @@ class MessageType(Enum):
     SCENE_REMOVED = 129
 
     ADD_OBJECT_TO_VRTIST = 130
+
+    # Start / End a group of command. Allows to inform clients that they must process multiple commands
+    # before giving back control to they users.
+    GROUP_BEGIN = 131
+    GROUP_END = 132
 
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201

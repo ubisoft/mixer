@@ -106,7 +106,7 @@ class Client:
             except queue.Empty:
                 break
 
-            logger.info("Send %s (queue size = %d)", command.type, self.pendingCommands.qsize())
+            logger.debug("Send %s (queue size = %d)", command.type, self.pendingCommands.qsize())
             common.writeMessage(self.socket, command)
             self.pendingCommands.task_done()
 
