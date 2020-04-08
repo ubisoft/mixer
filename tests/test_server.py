@@ -2,7 +2,7 @@ import unittest
 import threading
 import time
 from broadcaster.dccBroadcaster import Server
-from broadcaster.client import TestClient
+from broadcaster.client import Client
 import broadcaster.common as common
 import logging
 
@@ -70,7 +70,7 @@ class Test_Server(unittest.TestCase):
         delay = self.delay
         server = self._server
 
-        client1 = TestClient()
+        client1 = Client()
         delay()
         self.assertTrue(client1.isConnected())
         self.assertEqual(server.client_count(), (0, 1))
@@ -81,12 +81,12 @@ class Test_Server(unittest.TestCase):
         self.assertEqual(server.client_count(), (0, 0))
 
         #
-        client2 = TestClient()
+        client2 = Client()
         delay()
         self.assertTrue(client2.isConnected())
         self.assertEqual(server.client_count(), (0, 1))
 
-        client3 = TestClient()
+        client3 = Client()
         delay()
         self.assertTrue(client3.isConnected())
         self.assertEqual(server.client_count(), (0, 2))
@@ -116,7 +116,7 @@ class Test_Server(unittest.TestCase):
         c0_room = 'c0_room'
 
         d0 = Delegate()
-        c0 = TestClient(delegate=d0)
+        c0 = Client()
         delay()
         self.assertEqual(server.client_count(), (0, 1))
 
@@ -140,12 +140,12 @@ class Test_Server(unittest.TestCase):
         c1_room = c0_room
 
         d0 = Delegate()
-        c0 = TestClient(delegate=d0)
+        c0 = Client()
         c0.joinRoom(c0_room)
         c0.setClientName(c0_name)
 
         d1 = Delegate()
-        c1 = TestClient(delegate=d1)
+        c1 = Client()
         c1.joinRoom(c1_room)
         c1.setClientName(c1_name)
 
@@ -171,12 +171,12 @@ class Test_Server(unittest.TestCase):
         c1_room = c0_room
 
         d0 = Delegate()
-        c0 = TestClient(delegate=d0)
+        c0 = Client()
         c0.joinRoom(c0_room)
         c0.setClientName(c0_name)
 
         d1 = Delegate()
-        c1 = TestClient(delegate=d1)
+        c1 = Client()
         c1.joinRoom(c1_room)
         c1.setClientName(c1_name)
 
