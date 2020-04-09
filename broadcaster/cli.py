@@ -18,7 +18,7 @@ class ServerError(RuntimeError):
 class CliClient(client.Client):
     def __init__(self, args):
         super().__init__(args.host, args.port)
-        self.connect(False)
+        self.connect()
         self.formatter = common.CommandFormatter()
 
     def listRooms(self):
