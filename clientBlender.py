@@ -586,6 +586,10 @@ class ClientBlender(Client):
             logger.error(e)
 
     def sendGroupBegin(self):
+        # The integer sent is for future use: the server might fill it with the group size once all messages
+        # have been received, and give the opportunity to future clients to know how many messages they need to process
+        # in the group (en probably show a progress bar to their user if their is a lot of message, e.g. initial scene
+        # creation)
         self.addCommand(common.Command(common.MessageType.GROUP_BEGIN, common.encodeInt(0)))
 
     def sendGroupEnd(self):
