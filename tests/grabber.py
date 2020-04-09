@@ -48,7 +48,7 @@ class Grabber():
         attempts = 0
         try:
             while attempts < attempts_max:
-                command, _ = client.consume_one()
+                command = client.getNextReceivedCommand()
                 if command is None:
                     attempts += 1
                     time.sleep(0.01)
