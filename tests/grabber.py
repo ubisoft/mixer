@@ -48,6 +48,7 @@ class Grabber():
         attempts = 0
         try:
             while attempts < attempts_max:
+                client.fetchCommands()
                 command = client.getNextReceivedCommand()
                 if command is None:
                     attempts += 1
