@@ -1,12 +1,25 @@
-import unittest
+import functools
+import hashlib
+import logging
+from pathlib import Path
+import tempfile
 import time
+from typing import List
+import unittest
+
 import blender_lib as bl
 import dccsync_lib
+from grabber import Grabber
+from grabber import CommandStream
 from process import BlenderServer
-from typing import List
-import hashlib
-import tempfile
-from pathlib import Path
+
+import sys  # nopep8
+sys.path.append(str(Path(__package__).parent))  # nopep8
+from broadcaster.common import MessageType
+
+logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+logger = logging.getLogger(__name__)
+# logger.setLevel(logging.INFO)
 
 
 class Blender:
@@ -14,7 +27,11 @@ class Blender:
         self._port = port
         self._ptvsd_port = ptvsd_port
         self._wait_for_debugger = wait_for_debugger
-        self.__blender: BlenderServer = None
+        self._blender: BlenderServer = None
+        self._log_level = None
+
+    def set_log_level(self, log_level: int):
+        self._log_level = log_level
 
     def setup(self, blender_args: List = None):
         self._blender = BlenderServer(self._port, self._ptvsd_port, self._wait_for_debugger)
@@ -22,9 +39,11 @@ class Blender:
         self._blender.connect()
         self.connect_and_join_dccsync()
 
-    def connect_and_join_dccsync(self):
+    def connect_and_join_dccsync(self, room_name='dccsync_unittest'):
+        if self._log_level is not None:
+            self._blender.send_function(dccsync_lib.set_log_level, self._log_level)
         self._blender.send_function(dccsync_lib.connect)
-        self._blender.send_function(dccsync_lib.join_room)
+        self._blender.send_function(dccsync_lib.join_room, room_name)
 
     def disconnect_dccsync(self):
         self._blender.send_function(dccsync_lib.disconnect)
@@ -42,7 +61,7 @@ class Blender:
         time.sleep(1)
 
     def quit(self):
-        self._blender.send_function(blender_lib.quit)
+        self._blender.send_function(bl.quit)
 
 
 class BlenderTestCase(unittest.TestCase):
@@ -50,7 +69,31 @@ class BlenderTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         self._sender_wait_for_debugger = False
         self._receiver_wait_for_debugger = False
+        self.expected_counts = {}
         super().__init__(*args, **kwargs)
+        self._log_level = None
+
+    def set_log_level(self, log_level):
+        self._log_level = log_level
+
+    def assertStreamEquals(self, a_stream: CommandStream, b_stream: CommandStream, msg: str = None):
+        a, b = a_stream.data, b_stream.data
+        self.assertEquals(a.keys(), b.keys())
+
+        # TODO clarify why we need to ignore TRANSFORM (float comparison)
+        ignore = [MessageType.TRANSFORM]
+        for k in a.keys():
+            message_type = str(MessageType(k))
+            message_count = len(a[k])
+            self.assertEquals(message_count, len(b[k]), f'len mismatch for {message_type}')
+            if message_count != 0:
+                logger.info(f'Message count for {message_type:16} : {message_count}')
+            if k not in ignore:
+                expected_count = self.expected_counts.get(k)
+                if expected_count is not None:
+                    self.assertEqual(expected_count, message_count,
+                                     f'Unexpected message count for message {message_type}. Expected {expected_count}: found {message_count}')
+                self.assertEquals(a[k], b[k], f'content mismatch for {message_type}')
 
     def setUp(self, sender_blendfile=None, receiver_blendfile=None,
               sender_wait_for_debugger=False, receiver_wait_for_debugger=False):
@@ -66,16 +109,51 @@ class BlenderTestCase(unittest.TestCase):
         if sender_blendfile is not None:
             sender_args.append(str(sender_blendfile))
         self._sender = Blender(python_port + 0, ptvsd_port + 0, sender_wait_for_debugger)
+        self._sender.set_log_level(self._log_level)
         self._sender.setup(sender_args)
 
         receiver_args = ["--window-geometry", "960", "0", "960", "1080"]
         if receiver_blendfile is not None:
             receiver_args.append(str(receiver_blendfile))
         self._receiver = Blender(python_port + 1, ptvsd_port + 1, receiver_wait_for_debugger)
+        self._receiver.set_log_level(self._log_level)
         self._receiver.setup(receiver_args)
 
+    def assertMatches(self):
+        # TODO add message cout dict as param
+
+        self._sender.disconnect_dccsync()
+        # time.sleep(1)
+        self._receiver.disconnect_dccsync()
+        # time.sleep(1)
+
+        host = '127.0.0.1'
+        port = 12800
+        self._sender.connect_and_join_dccsync('dccsync_grab_sender')
+        time.sleep(1)
+        sender_grabber = Grabber()
+        sender_grabber.grab(host, port, 'dccsync_grab_sender')
+        self._sender.disconnect_dccsync()
+
+        self._receiver.connect_and_join_dccsync('dccsync_grab_receiver')
+        time.sleep(1)
+        receiver_grabber = Grabber()
+        receiver_grabber.grab(host, port, 'dccsync_grab_receiver')
+        self._receiver.disconnect_dccsync()
+
+        # TODO_ timing error : sometimes succeeds
+        # TODO_ enhance comparison : check # elements, understandable comparison
+        s = sender_grabber.streams
+        r = receiver_grabber.streams
+        self.assertStreamEquals(s, r)
+
+    def end_test(self):
+        self.assertMatches()
+
     def tearDown(self):
-        self._wait_for_debugger = False
+        # quit and wait
+        self._sender.quit()
+        self._receiver.quit()
         self._sender.wait()
         self._receiver.wait()
         super().tearDown()
@@ -159,6 +237,9 @@ class BlenderTestCase(unittest.TestCase):
     def disconnect(self):
         self._sender.disconnect_dccsync()
         self._receiver.disconnect_dccsync()
+
+    def link_collection_to_collection(self, parent_name: str, child_name: str):
+        self._sender.send_function(bl.link_collection_to_collection, parent_name, child_name)
 
     def create_collection_in_collection(self, parent_name: str, child_name: str):
         self._sender.send_function(bl.create_collection_in_collection, parent_name, child_name)

@@ -34,8 +34,8 @@ def cleanup():
 
 
 class Formatter(logging.Formatter):
-    def __init__(self, fmt):
-        super().__init__(fmt)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def format(self, record: logging.LogRecord):
         """
@@ -53,7 +53,7 @@ def register():
     if len(logger.handlers) == 0:
         logger.setLevel(logging.WARNING)
         formatter = Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            '{asctime} - {name:<36} - {levelname:<8} - {message:<80}', style='{')
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         logger.addHandler(handler)

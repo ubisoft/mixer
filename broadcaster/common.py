@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import IntEnum
 import threading
 import select
 import socket
@@ -15,7 +15,7 @@ DEFAULT_PORT = 12800
 logger = logging.getLogger(__name__)
 
 
-class MessageType(Enum):
+class MessageType(IntEnum):
     JOIN_ROOM = 1
     CREATE_ROOM = 2
     LEAVE_ROOM = 3
@@ -71,11 +71,12 @@ class MessageType(Enum):
     SCENE_REMOVED = 129
 
     ADD_OBJECT_TO_VRTIST = 130
+    OBJECT_VISIBILITY = 131
 
     # Start / End a group of command. Allows to inform clients that they must process multiple commands
     # before giving back control to they users.
-    GROUP_BEGIN = 131
-    GROUP_END = 132
+    GROUP_BEGIN = 132
+    GROUP_END = 133
 
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
@@ -84,13 +85,13 @@ class MessageType(Enum):
     FRAME = 204
 
 
-class LightType(Enum):
+class LightType(IntEnum):
     SPOT = 0  # directly mapped from Unity enum
     SUN = 1
     POINT = 2
 
 
-class SensorFitMode(Enum):
+class SensorFitMode(IntEnum):
     AUTO = 0
     VERTICAL = 1
     HORIZONTAL = 2

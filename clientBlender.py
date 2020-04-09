@@ -10,8 +10,9 @@ from .shareData import shareData
 from .broadcaster import common
 from .broadcaster.client import Client
 from .blender_client import collection as collection_api
-from .blender_client import scene as scene_api
 from .blender_client import mesh as mesh_api
+from .blender_client import object_ as object_api
+from .blender_client import scene as scene_api
 from .stats import stats_timer
 
 _STILL_ACTIVE = 259
@@ -665,16 +666,6 @@ class ClientBlender(Client):
             if slot.link == 'OBJECT' and material_name != "":
                 slot.material = self.getOrCreateMaterial(material_name)
 
-    def sendCollectionInstance(self, obj):
-        if not obj.instance_collection:
-            return
-        instanceName = obj.name_full
-        instantiatedCollection = obj.instance_collection.name_full
-        buffer = common.encodeString(
-            instanceName) + common.encodeString(instantiatedCollection)
-        self.addCommand(common.Command(
-            common.MessageType.INSTANCE_COLLECTION, buffer, 0))
-
     def sendSetCurrentScene(self, name):
         buffer = common.encodeString(name)
         self.addCommand(common.Command(
@@ -787,50 +778,6 @@ class ClientBlender(Client):
         if lightBuffer:
             self.addCommand(common.Command(
                 common.MessageType.LIGHT, lightBuffer, 0))
-
-    def sendAddCollectionToCollection(self, parentCollectionName, collectionName):
-        collection_api.logger.debug("sendAddCollectionToCollection %s <- %s", parentCollectionName, collectionName)
-
-        buffer = common.encodeString(
-            parentCollectionName) + common.encodeString(collectionName)
-        self.addCommand(common.Command(
-            common.MessageType.ADD_COLLECTION_TO_COLLECTION, buffer, 0))
-
-    def sendRemoveCollectionFromCollection(self, parentCollectionName, collectionName):
-        collection_api.logger.debug("sendRemoveCollectionFromCollection %s <- %s", parentCollectionName, collectionName)
-
-        buffer = common.encodeString(
-            parentCollectionName) + common.encodeString(collectionName)
-        self.addCommand(common.Command(
-            common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION, buffer, 0))
-
-    def sendAddObjectToCollection(self, collectionName, objName):
-        collection_api.logger.debug("sendAddObjectToCollection %s <- %s", collectionName, objName)
-        buffer = common.encodeString(
-            collectionName) + common.encodeString(objName)
-        self.addCommand(common.Command(
-            common.MessageType.ADD_OBJECT_TO_COLLECTION, buffer, 0))
-
-    def sendRemoveObjectFromCollection(self, collectionName, objName):
-        collection_api.logger.debug("sendRemoveObjectFromCollection %s <- %s", collectionName, objName)
-        buffer = common.encodeString(
-            collectionName) + common.encodeString(objName)
-        self.addCommand(common.Command(
-            common.MessageType.REMOVE_OBJECT_FROM_COLLECTION, buffer, 0))
-
-    def sendCollectionRemoved(self, collectionName):
-        collection_api.logger.debug("sendCollectionRemoved %s", collectionName)
-        buffer = common.encodeString(collectionName)
-        self.addCommand(common.Command(
-            common.MessageType.COLLECTION_REMOVED, buffer, 0))
-
-    def sendCollection(self, collection):
-        collection_api.logger.debug("sendCollection %s", collection.name_full)
-        collectionInstanceOffset = collection.instance_offset
-        buffer = common.encodeString(collection.name_full) + common.encodeBool(not collection.hide_viewport) + \
-            common.encodeVector3(collectionInstanceOffset)
-        self.addCommand(common.Command(
-            common.MessageType.COLLECTION, buffer, 0))
 
     def sendDeletedObject(self, objName):
         self.sendDelete(objName)
@@ -1206,6 +1153,9 @@ class ClientBlender(Client):
                         scene_api.buildScene(command.data)
                     elif command.type == common.MessageType.SCENE_REMOVED:
                         scene_api.buildSceneRemoved(command.data)
+
+                    elif command.type == common.MessageType.OBJECT_VISIBILITY:
+                        object_api.buildObjectVisibility(command.data)
 
                     self.receivedCommands.task_done()
                     self.blockSignals = False

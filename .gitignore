@@ -57,3 +57,5 @@ $RECYCLE.BIN/
 
 # VS Code
 .vscode
+
+.local

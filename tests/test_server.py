@@ -51,6 +51,7 @@ def networkConsumer(client, delegate):
             delegate.on_connection_lost()
 
 
+@unittest.skip('')
 class Test_Server(unittest.TestCase):
 
     def setUp(self):
