@@ -24,7 +24,7 @@ MODULE_PATH = Path(__file__).parent
 
 def cleanup():
     shareData = operators.shareData
-    if None is shareData.current_statistics and shareData.auto_save_statistics:
+    if shareData.current_statistics is not None and shareData.auto_save_statistics:
         stats.save_statistics(shareData.current_statistics, shareData.statistics_directory)
     try:
         if shareData.localServerProcess:

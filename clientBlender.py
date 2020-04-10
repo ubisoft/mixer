@@ -1043,6 +1043,7 @@ class ClientBlender(Client):
         if 'ClearContent' in self.callbacks:
             self.callbacks['ClearContent']()
 
+    @stats_timer(shareData)
     def networkConsumer(self):
         assert(self.isConnected())
 

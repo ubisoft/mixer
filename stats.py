@@ -114,6 +114,9 @@ def stats_timer(shareData, log=None):
     def innerDecorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            if shareData.current_statistics is None:
+                return func(*args, **kwargs)
+
             with StatsTimer(shareData, func.__name__, log):
                 return func(*args, **kwargs)
         return wrapper
