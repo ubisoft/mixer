@@ -10,7 +10,7 @@ from typing import Mapping
 import bpy
 from bpy.app.handlers import persistent
 
-from .shareData import ShareData, shareData, objectVisibility
+from .shareData import shareData, objectVisibility
 from .blender_client import scene as scene_lib
 from .blender_client import collection as collection_lib
 from .blender_client import object_ as object_lib
@@ -96,8 +96,6 @@ def join_room(room_name: str):
 def leave_current_room():
     logger.info("leave_current_room")
 
-    # room ==> client
-    assert not shareData.currentRoom or shareData.client
     if shareData.currentRoom:
         shareData.leaveCurrentRoom()
         set_handlers(False)
@@ -804,6 +802,8 @@ def send_scene_content():
 
     shareData.clearBeforeState()
 
+    shareData.client.sendGroupBegin()
+
     # Temporary waiting for material sync. Should move to sendSceneDataToServer
     for material in bpy.data.materials:
         shareData.client.sendMaterial(material)
@@ -813,6 +813,8 @@ def send_scene_content():
     shareData.client.sendFrameStartEnd(
         bpy.context.scene.frame_start, bpy.context.scene.frame_end)
     shareData.client.sendFrame(bpy.context.scene.frame_current)
+
+    shareData.client.sendGroupEnd()
 
 
 def set_handlers(connect: bool):
@@ -844,13 +846,13 @@ def set_handlers(connect: bool):
 def wait_for_server(host, port):
     attempts = 0
     max_attempts = 10
-    while not server_is_up(host, port) and attempts < max_attempts:
+    while not create_main_client(host, port) and attempts < max_attempts:
         attempts += 1
         time.sleep(0.2)
     return attempts < max_attempts
 
 
-def start_local_server(wait_for_server=False):
+def start_local_server():
     dir_path = Path(__file__).parent
     serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
 
@@ -863,17 +865,6 @@ def start_local_server(wait_for_server=False):
         serverPath)], shell=False, **args)
 
 
-def server_is_up(address, port):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.connect((address, port))
-        s.shutdown(socket.SHUT_RDWR)
-        s.close()
-        return True
-    except Exception:
-        return False
-
-
 def is_localhost(host):
     # does not catch local address
     return host == "localhost" or host == "127.0.0.1"
@@ -882,17 +873,23 @@ def is_localhost(host):
 def connect():
     logger.info("connect")
 
-    props = get_dcc_sync_props()
-    if not server_is_up(props.host, props.port):
-        if is_localhost(props.host):
-            start_local_server(wait_for_server=True)
-            wait_for_server(props.host, props.port)
+    assert shareData.client is None
 
-    if not isClientConnected():
-        if not create_main_client(props.host, props.port):
+    props = get_dcc_sync_props()
+    if not create_main_client(props.host, props.port):
+        if is_localhost(props.host):
+            start_local_server()
+            if not wait_for_server(props.host, props.port):
+                logger.error("Unable to start local server")
+                return False
+        else:
+            logger.error("Unable to connect to remote server %s:%s", props.host, props.port)
             return False
 
+    assert isClientConnected()
+
     shareData.client.setClientName(props.user)
+
     return True
 
 
@@ -901,23 +898,53 @@ def disconnect():
 
     leave_current_room()
 
+    if bpy.app.timers.is_registered(networkConsumerTimer):
+        bpy.app.timers.unregister(networkConsumerTimer)
+
     # the socket has already been disconnected
     if shareData.client is not None:
         if shareData.client.isConnected():
             shareData.client.disconnect()
-        shareData.client_ids = None
         shareData.client = None
+
+    shareData.client_ids = None
     shareData.currentRoom = None
+
+    ui.update_ui_lists()
+    ui.redraw()
+
+
+def on_disconnect_from_server():
+    shareData.client = None
+    disconnect()
 
 
 def isClientConnected():
     return shareData.client is not None and shareData.client.isConnected()
 
 
+def networkConsumerTimer():
+    if not shareData.client.isConnected():
+        error_msg = "Timer still registered but client disconnected."
+        logger.error(error_msg)
+        if get_dcc_sync_props().env != "production":
+            raise RuntimeError(error_msg)
+        # Returning None from a timer unregister it
+        return None
+
+    # Encapsulate call to shareData.client.networkConsumer because
+    # if we register it directly, then bpy.app.timers.is_registered(shareData.client.networkConsumer)
+    # return False...
+    # However, with a simple function bpy.app.timers.is_registered works.
+    shareData.client.networkConsumer()
+
+    # Run every 1 / 100 seconds
+    return 0.01
+
+
 def create_main_client(host: str, port: int):
     assert shareData.client is None
-    client = clientBlender.ClientBlender(
-        f"syncClient {shareData.sessionId}", host, port)
+    client = clientBlender.ClientBlender(host, port)
     client.connect()
     if not client.isConnected():
         return False
@@ -925,8 +952,9 @@ def create_main_client(host: str, port: int):
     shareData.client = client
     shareData.client.addCallback('SendContent', send_scene_content)
     shareData.client.addCallback('ClearContent', clear_scene_content)
-    if not bpy.app.timers.is_registered(shareData.client.networkConsumer):
-        bpy.app.timers.register(shareData.client.networkConsumer)
+    shareData.client.addCallback('Disconnect', on_disconnect_from_server)
+    if not bpy.app.timers.is_registered(networkConsumerTimer):
+        bpy.app.timers.register(networkConsumerTimer)
 
     return True
 
@@ -940,12 +968,11 @@ class CreateRoomOperator(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         props = get_dcc_sync_props()
-        return not shareData.currentRoom and bool(props.room)
+        return isClientConnected() and not shareData.currentRoom and bool(props.room)
 
     def execute(self, context):
-        assert not shareData.currentRoom
-        shareData.currentRoom = None
-        if not connect():
+        assert shareData.currentRoom is None
+        if not isClientConnected():
             return {'CANCELLED'}
 
         props = get_dcc_sync_props()
@@ -969,9 +996,6 @@ class JoinRoomOperator(bpy.types.Operator):
         shareData.setDirty()
         shareData.currentRoom = None
 
-        if not connect():
-            self.report({'ERROR'})
-
         shareData.isLocal = False
         props = get_dcc_sync_props()
         roomIndex = props.room_index
@@ -986,6 +1010,10 @@ class LeaveRoomOperator(bpy.types.Operator):
     bl_label = "DCCSync Leave Room"
     bl_options = {'REGISTER'}
 
+    @classmethod
+    def poll(cls, context):
+        return isClientConnected() and shareData.currentRoom is not None
+
     def execute(self, context):
         leave_current_room()
         ui.update_ui_lists()
@@ -998,18 +1026,21 @@ class ConnectOperator(bpy.types.Operator):
     bl_label = "Connect to server"
     bl_options = {'REGISTER'}
 
+    @classmethod
+    def poll(cls, context):
+        return not isClientConnected()
+
     def execute(self, context):
         props = get_dcc_sync_props()
         try:
             self.report(
                 {'INFO'}, f'Connecting to "{props.host}:{props.port}" ...')
-            ok = connect()
-            if not ok:
+            if not connect():
                 self.report({'ERROR'}, "unknown error")
                 return {'CANCELLED'}
-            else:
-                self.report(
-                    {'INFO'}, f'Connected to "{props.host}:{props.port}" ...')
+
+            self.report(
+                {'INFO'}, f'Connected to "{props.host}:{props.port}" ...')
         except socket.gaierror:
             msg = f'Cannot connect to "{props.host}": invalid host name or address'
             self.report({'ERROR'}, msg)
@@ -1026,12 +1057,13 @@ class DisconnectOperator(bpy.types.Operator):
     bl_label = "Disconnect from server"
     bl_options = {'REGISTER'}
 
+    @classmethod
+    def poll(cls, context):
+        return isClientConnected()
+
     def execute(self, context):
         disconnect()
-        self.report(
-            {'INFO'}, f'Disconnected ...')
-        ui.update_ui_lists()
-        ui.redraw()
+        self.report({'INFO'}, f'Disconnected ...')
         return {'FINISHED'}
 
 
@@ -1131,5 +1163,7 @@ def register():
 
 
 def unregister():
+    disconnect()
+
     for _ in classes:
         bpy.utils.unregister_class(_)

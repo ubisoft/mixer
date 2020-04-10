@@ -5,8 +5,7 @@ import socket
 import select
 import sys
 import threading
-import time
-from typing import Any, List, Mapping, Union, ValuesView
+from typing import List, Mapping, Union, ValuesView
 
 import cli_utils
 import common
@@ -152,6 +151,7 @@ class Connection:
         self._server.broadcast_user_list()
 
     def send_error(self, s: str):
+        logging.debug("Sending error %s", s)
         command = common.Command(common.MessageType.SEND_ERROR, common.encodeString(s))
         with common.mutex:
             self.commands.append(command)
@@ -202,7 +202,8 @@ class Connection:
                     if self.room is not None:
                         self.room.addCommand(command, self)
                     else:
-                        logger.error("COMMAND received but no room was joined")
+                        logger.warning("%s:%s - %s received but no room was joined",
+                                       self.address[0], self.address[1], command.type.value)
 
             try:
                 if len(self.commands) > 0:
@@ -235,6 +236,13 @@ class Connection:
 
 
 class Room:
+    """
+    Room class is responsible for:
+    - handling its list of clients (as Connection instances)
+    - keep a list of commands, to be dispatched to new clients
+    - dispatch added commands to already clients already in the room
+    """
+
     def __init__(self, server: 'Server', roomName: str):
         self.name = roomName
         self._connections: List['Connection'] = []
@@ -257,8 +265,6 @@ class Room:
 
             for command in self.commands:
                 connection.addCommand(command)
-
-        self._server.broadcast_user_list()
 
     def broadcast_user_list(self):
         for connection in self._connections:
@@ -409,7 +415,7 @@ class Server:
         Broadcast the list of all joined and unjoined clients to all
         joined and unjoined clients.
 
-        This is called for every connection/join/clinet name change
+        This is called for every connection/join/client name change
         """
         with common.mutex:
             client_ids = self.client_ids()

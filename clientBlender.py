@@ -2,11 +2,9 @@ import logging
 import struct
 import os
 
-import bmesh
 import bpy
-from mathutils import *
+from mathutils import Matrix, Quaternion
 from . import ui
-from . import operators
 from . import data
 from .shareData import shareData
 from .broadcaster import common
@@ -24,24 +22,14 @@ logger = logging.getLogger(__name__)
 
 
 class ClientBlender(Client):
-    def __init__(self, name, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
+    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(
-            host, port, name=name, delegate=self)
+            host, port)
 
         self.textures = set()
         self.callbacks = {}
 
         self.blenderPID = os.getpid()
-
-    def blenderExists(self):
-        # Hack, check if a window still exists
-        try:
-            if len(bpy.context.window_manager.windows) == 0:
-                return False
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            return False
-        return True
 
     def addCallback(self, name, func):
         self.callbacks[name] = func
@@ -135,7 +123,7 @@ class ClientBlender(Client):
         light = self.getOrCreateLight(lightName, blighttype)
 
         shadow, start = common.decodeInt(data, start)
-        if shadow is not 0:
+        if shadow != 0:
             light.use_shadow = True
         else:
             light.use_shadow = False
@@ -215,8 +203,8 @@ class ClientBlender(Client):
                 texImage.image = bpy.data.images.load(fileName)
                 if not isColor:
                     texImage.image.colorspace_settings.name = 'Non-Color'
-            except:
-                pass
+            except Exception as e:
+                logger.error(e)
             material.node_tree.links.new(
                 principled.inputs[channel], texImage.outputs['Color'])
         return index
@@ -257,9 +245,8 @@ class ClientBlender(Client):
             try:
                 texImage.image = bpy.data.images.load(fileName)
                 texImage.image.colorspace_settings.name = 'Non-Color'
-            except:
-                logger.error("could not load : " + fileName)
-                pass
+            except Exception as e:
+                logger.error("could not load file %s (%s)", fileName, e)
             material.node_tree.links.new(
                 invert.inputs['Color'], texImage.outputs['Color'])
 
@@ -292,9 +279,8 @@ class ClientBlender(Client):
             try:
                 texImage.image = bpy.data.images.load(fileName)
                 texImage.image.colorspace_settings.name = 'Non-Color'
-            except:
-                logger.error("could not load : " + fileName)
-                pass
+            except Exception as e:
+                logger.error("could not load file %s (%s)", fileName, e)
             material.node_tree.links.new(
                 normalMap.inputs['Color'], texImage.outputs['Color'])
 
@@ -376,7 +362,8 @@ class ClientBlender(Client):
     def getTransformBuffer(self, obj):
         path = self.getObjectPath(obj)
         visible = not obj.hide_viewport
-        return common.encodeString(path) + common.encodeMatrix(obj.matrix_parent_inverse) + common.encodeMatrix(obj.matrix_basis) + common.encodeMatrix(obj.matrix_local) + common.encodeBool(visible)
+        return common.encodeString(path) + common.encodeMatrix(obj.matrix_parent_inverse) + \
+            common.encodeMatrix(obj.matrix_basis) + common.encodeMatrix(obj.matrix_local) + common.encodeBool(visible)
 
     def sendTransform(self, obj):
         transformBuffer = self.getTransformBuffer(obj)
@@ -392,8 +379,8 @@ class ClientBlender(Client):
                 f.write(data[index:index+size])
                 f.close()
                 self.textures.add(path)
-            except:
-                logger.error("Could not write : " + path)
+            except Exception as e:
+                logger.error("could not write file %s (%s)", path, e)
 
     def sendTextureFile(self, path):
         if path in self.textures:
@@ -404,8 +391,8 @@ class ClientBlender(Client):
                 data = f.read()
                 f.close()
                 self.sendTextureData(path, data)
-            except:
-                logger.error("Could not read : " + path)
+            except Exception as e:
+                logger.error("could not read file %s (%s)", path, e)
 
     def sendTextureData(self, path, data):
         nameBuffer = common.encodeString(path)
@@ -593,11 +580,21 @@ class ClientBlender(Client):
             buffers = []
             for slot in obj.material_slots[:]:
                 if slot.material:
-                    buffer = getMaterialBuffer(slot.material)
+                    buffer = self.getMaterialBuffer(slot.material)
                     buffers.append(buffer)
             return buffers
-        except:
-            logger.error('not found')
+        except Exception as e:
+            logger.error(e)
+
+    def sendGroupBegin(self):
+        # The integer sent is for future use: the server might fill it with the group size once all messages
+        # have been received, and give the opportunity to future clients to know how many messages they need to process
+        # in the group (en probably show a progress bar to their user if their is a lot of message, e.g. initial scene
+        # creation)
+        self.addCommand(common.Command(common.MessageType.GROUP_BEGIN, common.encodeInt(0)))
+
+    def sendGroupEnd(self):
+        self.addCommand(common.Command(common.MessageType.GROUP_END))
 
     def sendMaterial(self, material):
         if not material:
@@ -636,7 +633,7 @@ class ClientBlender(Client):
             if slot.link == 'DATA':
                 binary_buffer += common.encodeString("")
             else:
-                binary_buffer += common.encodeString(slot.material.name if slot.material != None else "")
+                binary_buffer += common.encodeString(slot.material.name if slot.material is not None else "")
 
         self.addCommand(common.Command(common.MessageType.MESH, binary_buffer, 0))
 
@@ -1023,14 +1020,12 @@ class ClientBlender(Client):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
 
     def on_connection_lost(self):
-        bpy.ops.dcc_sync.disconnect()
+        if 'Disconnect' in self.callbacks:
+            self.callbacks['Disconnect']()
 
     def buildListAllClients(self, client_ids):
         shareData.client_ids = client_ids
         ui.update_ui_lists()
-
-    def buildListRoomClients(self, client_ids):
-        pass
 
     def sendSceneContent(self):
         if 'SendContent' in self.callbacks:
@@ -1048,98 +1043,126 @@ class ClientBlender(Client):
         if 'ClearContent' in self.callbacks:
             self.callbacks['ClearContent']()
 
+    @stats_timer(shareData)
     def networkConsumer(self):
+        assert(self.isConnected())
 
-        setDirty = True
+        group_count = 0
 
+        # Loop remains infinite while we have GROUP_BEGIN commands without their corresponding GROUP_END received
         while True:
-            command, processed = self.consume_one()
-            if command is None:
-                break
+            self.fetchCommands()
 
-            if setDirty:
-                shareData.setDirty()
-                setDirty = False
+            setDirty = True
+            # Process all received commands
+            while True:
+                command = self.getNextReceivedCommand()
+                if command is None:
+                    break
 
-            self.blockSignals = True
-            self.receivedCommandsProcessed = True
-            if processed:
-                # this was a room protocol command that was processed
-                self.receivedCommandsProcessed = False
-            else:
-                if command.type == common.MessageType.CONTENT:
-                    # The server asks for scene content (at room creation)
+                if command.type == common.MessageType.GROUP_BEGIN:
+                    group_count += 1
+                    continue
+
+                if command.type == common.MessageType.GROUP_END:
+                    group_count -= 1
+                    continue
+
+                processed = False
+                if command.type == common.MessageType.LIST_ALL_CLIENTS:
+                    clients, _ = common.decodeJson(command.data, 0)
+                    self.buildListAllClients(clients)
+                    processed = True
+                elif command.type == common.MessageType.CONNECTION_LOST:
+                    self.on_connection_lost()
+                    break
+
+                if setDirty:
+                    shareData.setDirty()
+                    setDirty = False
+
+                self.blockSignals = True
+                self.receivedCommandsProcessed = True
+                if processed:
+                    # this was a room protocol command that was processed
                     self.receivedCommandsProcessed = False
-                    self.sendSceneContent()
+                else:
+                    if command.type == common.MessageType.CONTENT:
+                        # The server asks for scene content (at room creation)
+                        self.receivedCommandsProcessed = False
+                        self.sendSceneContent()
 
-                elif command.type == common.MessageType.GREASE_PENCIL_MESH:
-                    self.buildGreasePencilMesh(command.data)
-                elif command.type == common.MessageType.GREASE_PENCIL_MATERIAL:
-                    self.buildGreasePencilMaterial(command.data)
-                elif command.type == common.MessageType.GREASE_PENCIL_CONNECTION:
-                    self.buildGreasePencilConnection(command.data)
+                    elif command.type == common.MessageType.GREASE_PENCIL_MESH:
+                        self.buildGreasePencilMesh(command.data)
+                    elif command.type == common.MessageType.GREASE_PENCIL_MATERIAL:
+                        self.buildGreasePencilMaterial(command.data)
+                    elif command.type == common.MessageType.GREASE_PENCIL_CONNECTION:
+                        self.buildGreasePencilConnection(command.data)
 
-                elif command.type == common.MessageType.CLEAR_CONTENT:
-                    self.clearContent()
-                elif command.type == common.MessageType.MESH:
-                    self.buildMesh(command.data)
-                elif command.type == common.MessageType.TRANSFORM:
-                    self.buildTransform(command.data)
-                elif command.type == common.MessageType.MATERIAL:
-                    self.buildMaterial(command.data)
-                elif command.type == common.MessageType.DELETE:
-                    self.buildDelete(command.data)
-                elif command.type == common.MessageType.CAMERA:
-                    self.buildCamera(command.data)
-                elif command.type == common.MessageType.LIGHT:
-                    self.buildLight(command.data)
-                elif command.type == common.MessageType.RENAME:
-                    self.buildRename(command.data)
-                elif command.type == common.MessageType.DUPLICATE:
-                    self.buildDuplicate(command.data)
-                elif command.type == common.MessageType.SEND_TO_TRASH:
-                    self.buildSendToTrash(command.data)
-                elif command.type == common.MessageType.RESTORE_FROM_TRASH:
-                    self.buildRestoreFromTrash(command.data)
-                elif command.type == common.MessageType.TEXTURE:
-                    self.buildTextureFile(command.data)
+                    elif command.type == common.MessageType.CLEAR_CONTENT:
+                        self.clearContent()
+                    elif command.type == common.MessageType.MESH:
+                        self.buildMesh(command.data)
+                    elif command.type == common.MessageType.TRANSFORM:
+                        self.buildTransform(command.data)
+                    elif command.type == common.MessageType.MATERIAL:
+                        self.buildMaterial(command.data)
+                    elif command.type == common.MessageType.DELETE:
+                        self.buildDelete(command.data)
+                    elif command.type == common.MessageType.CAMERA:
+                        self.buildCamera(command.data)
+                    elif command.type == common.MessageType.LIGHT:
+                        self.buildLight(command.data)
+                    elif command.type == common.MessageType.RENAME:
+                        self.buildRename(command.data)
+                    elif command.type == common.MessageType.DUPLICATE:
+                        self.buildDuplicate(command.data)
+                    elif command.type == common.MessageType.SEND_TO_TRASH:
+                        self.buildSendToTrash(command.data)
+                    elif command.type == common.MessageType.RESTORE_FROM_TRASH:
+                        self.buildRestoreFromTrash(command.data)
+                    elif command.type == common.MessageType.TEXTURE:
+                        self.buildTextureFile(command.data)
 
-                elif command.type == common.MessageType.COLLECTION:
-                    collection_api.buildCollection(command.data)
-                elif command.type == common.MessageType.COLLECTION_REMOVED:
-                    collection_api.buildCollectionRemoved(command.data)
+                    elif command.type == common.MessageType.COLLECTION:
+                        collection_api.buildCollection(command.data)
+                    elif command.type == common.MessageType.COLLECTION_REMOVED:
+                        collection_api.buildCollectionRemoved(command.data)
 
-                elif command.type == common.MessageType.INSTANCE_COLLECTION:
-                    collection_api. buildCollectionInstance(command.data)
+                    elif command.type == common.MessageType.INSTANCE_COLLECTION:
+                        collection_api. buildCollectionInstance(command.data)
 
-                elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
-                    collection_api.buildCollectionToCollection(command.data)
-                elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
-                    collection_api.buildRemoveCollectionFromCollection(command.data)
-                elif command.type == common.MessageType.ADD_OBJECT_TO_COLLECTION:
-                    collection_api.buildAddObjectToCollection(command.data)
-                elif command.type == common.MessageType.REMOVE_OBJECT_FROM_COLLECTION:
-                    collection_api.buildRemoveObjectFromCollection(command.data)
+                    elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
+                        collection_api.buildCollectionToCollection(command.data)
+                    elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
+                        collection_api.buildRemoveCollectionFromCollection(command.data)
+                    elif command.type == common.MessageType.ADD_OBJECT_TO_COLLECTION:
+                        collection_api.buildAddObjectToCollection(command.data)
+                    elif command.type == common.MessageType.REMOVE_OBJECT_FROM_COLLECTION:
+                        collection_api.buildRemoveObjectFromCollection(command.data)
 
-                elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
-                    scene_api.buildCollectionToScene(command.data)
-                elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_SCENE:
-                    scene_api.buildRemoveCollectionFromScene(command.data)
-                elif command.type == common.MessageType.ADD_OBJECT_TO_SCENE:
-                    scene_api.buildAddObjectToScene(command.data)
-                elif command.type == common.MessageType.REMOVE_OBJECT_FROM_SCENE:
-                    scene_api.buildRemoveObjectFromScene(command.data)
+                    elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
+                        scene_api.buildCollectionToScene(command.data)
+                    elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_SCENE:
+                        scene_api.buildRemoveCollectionFromScene(command.data)
+                    elif command.type == common.MessageType.ADD_OBJECT_TO_SCENE:
+                        scene_api.buildAddObjectToScene(command.data)
+                    elif command.type == common.MessageType.REMOVE_OBJECT_FROM_SCENE:
+                        scene_api.buildRemoveObjectFromScene(command.data)
 
-                elif command.type == common.MessageType.SCENE:
-                    scene_api.buildScene(command.data)
-                elif command.type == common.MessageType.SCENE_REMOVED:
-                    scene_api.buildSceneRemoved(command.data)
+                    elif command.type == common.MessageType.SCENE:
+                        scene_api.buildScene(command.data)
+                    elif command.type == common.MessageType.SCENE_REMOVED:
+                        scene_api.buildSceneRemoved(command.data)
 
-                elif command.type == common.MessageType.OBJECT_VISIBILITY:
-                    object_api.buildObjectVisibility(command.data)
+                    elif command.type == common.MessageType.OBJECT_VISIBILITY:
+                        object_api.buildObjectVisibility(command.data)
 
-                self.receivedCommands.task_done()
-                self.blockSignals = False
+                    self.receivedCommands.task_done()
+                    self.blockSignals = False
+
+            if group_count == 0:
+                break
 
         if not setDirty:
             shareData.updateCurrentData()
@@ -1159,5 +1182,3 @@ class ClientBlender(Client):
                         ob.parent = parent
                     parent = ob
             shareData.pendingParenting = remainingParentings
-
-        return 0.01

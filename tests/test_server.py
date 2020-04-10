@@ -2,7 +2,8 @@ import unittest
 import threading
 import time
 from broadcaster.dccBroadcaster import Server
-from broadcaster.client import TestClient
+from broadcaster.client import Client
+import broadcaster.common as common
 import logging
 
 
@@ -30,6 +31,26 @@ class Delegate:
         return None
 
 
+def networkConsumer(client, delegate):
+    client.fetchCommands()
+
+    while True:
+        command = client.getNextReceivedCommand()
+        if command is None:
+            return
+
+        if command.type == common.MessageType.LIST_ROOMS:
+            delegate.buildListRooms(command.data)
+        elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
+            clients, _ = common.decodeJson(command.data, 0)
+            delegate.buildListRoomClients(clients)
+        elif command.type == common.MessageType.LIST_ALL_CLIENTS:
+            clients, _ = common.decodeJson(command.data, 0)
+            delegate.buildListAllClients(clients)
+        elif command.type == common.MessageType.CONNECTION_LOST:
+            delegate.on_connection_lost()
+
+
 @unittest.skip('')
 class Test_Server(unittest.TestCase):
 
@@ -50,7 +71,7 @@ class Test_Server(unittest.TestCase):
         delay = self.delay
         server = self._server
 
-        client1 = TestClient()
+        client1 = Client()
         delay()
         self.assertTrue(client1.isConnected())
         self.assertEqual(server.client_count(), (0, 1))
@@ -61,12 +82,12 @@ class Test_Server(unittest.TestCase):
         self.assertEqual(server.client_count(), (0, 0))
 
         #
-        client2 = TestClient()
+        client2 = Client()
         delay()
         self.assertTrue(client2.isConnected())
         self.assertEqual(server.client_count(), (0, 1))
 
-        client3 = TestClient()
+        client3 = Client()
         delay()
         self.assertTrue(client3.isConnected())
         self.assertEqual(server.client_count(), (0, 2))
@@ -96,14 +117,14 @@ class Test_Server(unittest.TestCase):
         c0_room = 'c0_room'
 
         d0 = Delegate()
-        c0 = TestClient(delegate=d0)
+        c0 = Client()
         delay()
         self.assertEqual(server.client_count(), (0, 1))
 
         c0.setClientName(c0_name)
         c0.joinRoom(c0_room)
         delay()
-        c0.networkConsumer()
+        networkConsumer(c0, self._delegate)
         expected = (c0_name, c0_room)
         self.assertEqual(server.client_count(), (1, 0))
         self.assertEqual(len(d0.name_room), 1)
@@ -120,19 +141,19 @@ class Test_Server(unittest.TestCase):
         c1_room = c0_room
 
         d0 = Delegate()
-        c0 = TestClient(delegate=d0)
+        c0 = Client()
         c0.joinRoom(c0_room)
         c0.setClientName(c0_name)
 
         d1 = Delegate()
-        c1 = TestClient(delegate=d1)
+        c1 = Client()
         c1.joinRoom(c1_room)
         c1.setClientName(c1_name)
 
         delay()
 
-        c0.networkConsumer()
-        c1.networkConsumer()
+        networkConsumer(c0, self._delegate)
+        networkConsumer(c1, self._delegate)
         expected = [(c0_name, c0_room), (c1_name, c1_room)]
         self.assertEqual(server.client_count(), (2, 0))
         self.assertEqual(len(d0.name_room), 2)
@@ -151,20 +172,20 @@ class Test_Server(unittest.TestCase):
         c1_room = c0_room
 
         d0 = Delegate()
-        c0 = TestClient(delegate=d0)
+        c0 = Client()
         c0.joinRoom(c0_room)
         c0.setClientName(c0_name)
 
         d1 = Delegate()
-        c1 = TestClient(delegate=d1)
+        c1 = Client()
         c1.joinRoom(c1_room)
         c1.setClientName(c1_name)
 
         c1.leaveRoom(c1_room)
 
         delay()
-        c0.networkConsumer()
-        c1.networkConsumer()
+        networkConsumer(c0, self._delegate)
+        networkConsumer(c1, self._delegate)
         expected = [(c0_name, c0_room)]
         self.assertEqual(server.client_count(), (1, 1))
         self.assertEqual(len(d0.name_room), 1)

@@ -24,7 +24,7 @@ MODULE_PATH = Path(__file__).parent
 
 def cleanup():
     shareData = operators.shareData
-    if None != shareData.current_statistics and shareData.auto_save_statistics:
+    if shareData.current_statistics is not None and shareData.auto_save_statistics:
         stats.save_statistics(shareData.current_statistics, shareData.statistics_directory)
     try:
         if shareData.localServerProcess:
@@ -70,12 +70,6 @@ def register():
 
 
 def unregister():
-    operators.disconnect()
-
-    if shareData:
-        if shareData.client and bpy.app.timers.is_registered(shareData.client.networkConsumer):
-            bpy.app.timers.unregister(shareData.client.networkConsumer)
-
     operators.unregister()
     ui.unregister()
     data.unregister()

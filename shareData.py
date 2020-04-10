@@ -39,7 +39,7 @@ class ShareData:
     def __init__(self):
         self.runId = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         self.sessionId = 0  # For logging and debug
-        self.client: "clientBlender.ClientBlender" = None
+        self.client = None
 
         # as received fom LIST_ALL_CLIENTS
         self.client_ids: List[Mapping[str, str]] = None
@@ -124,7 +124,7 @@ class ShareData:
         self.pendingParenting = set()
 
     def leaveCurrentRoom(self):
-        if self.client:
+        if self.client is not None:
             self.client.leaveRoom(shareData.currentRoom)
         self.clearRoomData()
 

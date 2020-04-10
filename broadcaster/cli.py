@@ -1,9 +1,5 @@
-import time
-import queue
 import argparse
 import logging
-import time
-import threading
 
 import client
 import common
@@ -22,51 +18,53 @@ class ServerError(RuntimeError):
 class CliClient(client.Client):
     def __init__(self, args):
         super().__init__(args.host, args.port)
+        self.connect()
         self.formatter = common.CommandFormatter()
-        self.terminate = False
-        consumer_thread = threading.Thread(None, self.consume)
-        consumer_thread.start()
 
     def listRooms(self):
         command = common.Command(common.MessageType.LIST_ROOMS)
-        self.post_command(command)
+        self.addAndProcessCommand(command, common.MessageType.LIST_ROOMS)
 
     def deleteRoom(self, name):
         command = common.Command(common.MessageType.DELETE_ROOM, name.encode())
-        self.post_command(command)
+        self.addAndProcessCommand(command)
 
     def clearRoom(self, name):
         command = common.Command(common.MessageType.CLEAR_ROOM, name.encode())
-        self.post_command(command)
+        self.addAndProcessCommand(command)
 
     def listRoomClients(self, name):
         command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, name.encode())
-        self.post_command(command)
+        self.addAndProcessCommand(command, common.MessageType.LIST_ROOM_CLIENTS)
 
     def listClients(self):
         command = common.Command(common.MessageType.LIST_CLIENTS)
-        self.post_command(command)
+        self.addAndProcessCommand(command, common.MessageType.LIST_CLIENTS)
 
     def listAllClients(self):
         command = common.Command(common.MessageType.LIST_ALL_CLIENTS)
-        self.post_command(command)
+        self.addAndProcessCommand(command, common.MessageType.LIST_ALL_CLIENTS)
 
-    def post_command(self, command: common.Command):
+    def addAndProcessCommand(self, command: common.Command, expected_response_type: common.MessageType = None):
         self.addCommand(command)
 
-    def consume(self):
-        # consume pending replies
-        while not self.terminate:
-            received, _ = super().consume_one()
-            if received is None:
-                time.sleep(0.1)
-            else:
+        received = None
+        while received is None or (expected_response_type is not None and received.type != expected_response_type):
+            self.fetchCommands()
+            received = self.getNextReceivedCommand()
+
+            if received is not None:
                 if received.type == common.MessageType.CONNECTION_LOST:
                     self.disconnect()
+                    return
+                if received.type == common.MessageType.SEND_ERROR:
+                    logger.error(common.decodeString(received.data, 0)[0])
+                    return
+                else:
+                    logger.info("Ignoring command %s", received.type)
 
-                print(self.formatter.format(received))
-                # a fake prompt
-                print('> ')
+        if expected_response_type is not None:
+            print(self.formatter.format(received))
 
 
 def process_room_command(args):
@@ -75,14 +73,12 @@ def process_room_command(args):
     try:
         if args.command == 'list':
             client = CliClient(args)
-            client.connect()
             client.listRooms()
 
         elif args.command == 'delete':
             count = len(args.name)
             if count:
                 client = CliClient(args)
-                client.connect()
                 for name in args.name:
                     client.deleteRoom(name)
             else:
@@ -92,7 +88,6 @@ def process_room_command(args):
             count = len(args.name)
             if count:
                 client = CliClient(args)
-                client.connect()
                 for name in args.name:
                     client.clearRoom(name)
             else:
@@ -102,7 +97,6 @@ def process_room_command(args):
             count = len(args.name)
             if count:
                 client = CliClient(args)
-                client.connect()
                 for name in args.name:
                     client.listRoomClients(name)
             else:
@@ -120,7 +114,6 @@ def process_client_command(args):
     try:
         if args.command == 'list':
             client = CliClient(args)
-            client.connect()
             client.listClients()
     except ServerError as e:
         logger.error(e, exc_info=True)
@@ -143,7 +136,7 @@ commands = [
 
     "listroomclients <roomname>",
 
-    "help"
+    "help",
     "exit"  # this loop
 ]
 
@@ -157,7 +150,6 @@ def help():
 
 def interactive_loop(args):
     client = CliClient(args)
-    client.connect()
     done = False
     while not done:
         try:
@@ -187,7 +179,6 @@ def interactive_loop(args):
                 else:
                     print(f"Error : already connected. Use disconnect first")
             elif command == "exit":
-                client.terminate = True
                 done = True
             elif command == "help":
                 help()
@@ -247,7 +238,7 @@ def parse_cli_args():
 
     # Client commands are relative to a client independently of any room
     client_parser = sub_parsers.add_parser('client', help='Clients related commands')
-    client_parser.add_argument('command', help='', choices=('list', 'disconnect'))
+    client_parser.add_argument('command', help='', choices=('list'))
     client_parser.set_defaults(func=process_client_command)
 
     return parser.parse_args(), parser
