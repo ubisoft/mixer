@@ -1,3 +1,36 @@
+# Developer environment
+
+We recommand Visual Studio Code, with Python and Blender VSCode extensions.
+
+After cloning the repository, create a Virtual Environment in the code directory:
+
+```bash
+python -m venv .venv
+```
+
+Use python 3.7 to match Blender's python version.
+
+If you have a python file open in VSCode, it should automatically detect this new venv and ask to to activate it, answer yes. Note that VSCode never detect your python unless you open a Python file. When your python is detected, you should see it in your status bar.
+
+In case you need to activate it manually, on Windows the commands are:
+
+With Git bash:
+```bash
+source .venv/Scripts/activate
+```
+
+With cmd.exe:
+```bash
+.venv/Scripts/activate.bat
+```
+
+Open a new terminal in VSCode and ensure the virtual env is activated ("(.venv)" should appear on the prompt line) and install pip packages in it:
+```bash
+pip install -r requirements.txt
+```
+
+
+
 # Unit tests
 
 ## Fonctionnement en bref
