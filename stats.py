@@ -91,7 +91,7 @@ def compute_final_statistics(stats_dict):
         if root:
             d["global_percent_time"] = 100 * d["time"] / root["time"] if root["time"] > 0 else 0
         if "children" in d:
-            for child, child_dict in d["children"].items():
+            for _child, child_dict in d["children"].items():
                 recursive_compute(child_dict, d, root)
 
     for _, d in new_dict["children"].items():

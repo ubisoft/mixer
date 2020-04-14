@@ -512,7 +512,7 @@ def decodeBaseMesh(client, obj, data, index):
     position_count, index = common.decodeInt(data, index)
     logger.debug("Reading %d vertices", position_count)
 
-    for pos_idx in range(position_count):
+    for _pos_idx in range(position_count):
         co, index = common.decodeVector3(data, index)
         bm.verts.new(co)
 
@@ -539,7 +539,7 @@ def decodeBaseMesh(client, obj, data, index):
     faceCount, index = common.decodeInt(data, index)
     logger.debug("Reading %d faces", faceCount)
 
-    for fIdx in range(faceCount):
+    for _fIdx in range(faceCount):
         materialIdx, index = common.decodeInt(data, index)
         smooth, index = common.decodeBool(data, index)
         vertCount, index = common.decodeInt(data, index)
@@ -565,7 +565,7 @@ def decodeBaseMesh(client, obj, data, index):
     if shape_keys_count > 0:
         logger.debug("Loading %d shape keys", shape_keys_count)
         shapes_keys_list = []
-        for i in range(shape_keys_count):
+        for _i in range(shape_keys_count):
             shape_key_name, index = common.decodeString(data, index)
             shapes_keys_list.append(obj.shape_key_add(name=shape_key_name))
         for i in range(shape_keys_count):
@@ -589,12 +589,12 @@ def decodeBaseMesh(client, obj, data, index):
     # Vertex Groups
     vg_count, index = common.decodeInt(data, index)
     obj.vertex_groups.clear()
-    for i in range(vg_count):
+    for _i in range(vg_count):
         vg_name, index = common.decodeString(data, index)
         vertex_group = obj.vertex_groups.new(name=vg_name)
         vertex_group.lock_weight, index = common.decodeBool(data, index)
         vg_size, index = common.decodeInt(data, index)
-        for elmt_idx in range(vg_size):
+        for _elmt_idx in range(vg_size):
             vert_idx, index = common.decodeInt(data, index)
             weight, index = common.decodeFloat(data, index)
             vertex_group.add([vert_idx], weight, "REPLACE")
@@ -607,7 +607,7 @@ def decodeBaseMesh(client, obj, data, index):
 
     if has_custom_normal:
         normals = []
-        for loop in obj.data.loops:
+        for _loop in obj.data.loops:
             normal, index = common.decodeVector3(data, index)
             normals.append(normal)
         obj.data.normals_split_custom_set(normals)
