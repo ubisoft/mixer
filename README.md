@@ -67,7 +67,7 @@ You need to have the virtual env activated for these commands to work.
 
 ## CI/CD
 
-The CI/CD script `.gitlab-ci.yml` has a codequality stage that run 
+The CI/CD script `.gitlab-ci.yml` has a codequality stage that run flake8 on the codebase. Go to the pipeline pages of the project to check if your commits meet the quality check.
 
 # Unit tests
 

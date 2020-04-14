@@ -911,7 +911,7 @@ class ClientBlender(Client):
             p.add(len(points) - len(p))
         if len(points) < len(p):
             maxIndex = len(points) - 1
-            for i in range(maxIndex, len(p)):
+            for _i in range(maxIndex, len(p)):
                 p.pop(maxIndex)
 
         for i in range(len(p)):
