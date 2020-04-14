@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List, Mapping, Set
 from collections import namedtuple
+from uuid import uuid4
 import bpy
 
 ObjectVisibility = namedtuple('ObjectVisibility', [
@@ -28,11 +29,14 @@ class CollectionInfo:
 
 
 class SceneInfo:
-    def __init__(self,
-                 children: List[str],
-                 objects: List[str] = None):
-        self.children = children
-        self.objects = objects or []
+    def __init__(self, scene: bpy.types.Scene):
+        masterCollection = scene.collection
+        self.children = [x.name_full for x in masterCollection.children]
+        self.objects = [x.name_full for x in masterCollection.objects]
+        self.viewlayers = {x.name for x in scene.view_layers}
+        if not scene.uuid:
+            scene.uuid = str(uuid4())
+        self.uuid = scene.uuid
 
 
 class ShareData:
@@ -64,8 +68,9 @@ class ShareData:
         self.objectsRemoved: Set(str) = set()
         self.collectionsAdded: Set(str) = set()
         self.collectionsRemoved: Set(str) = set()
-        self.scenesAdded: Set(str) = set()
-        self.scenesRemoved: Set(str) = set()
+        self.scenesAdded: List[str] = []
+        self.scenesRemoved: List[str] = []
+        self.scenesRenamed: List[str, str] = []
 
         # key : collection name
         self.objectsAddedToCollection: Mapping(str, str) = {}
@@ -228,6 +233,7 @@ class ShareData:
         """
         self.scenesAdded.clear()
         self.scenesRemoved.clear()
+        self.scenesRenamed.clear()
 
         self.collectionsAdded.clear()
         self.collectionsRemoved.clear()
@@ -248,14 +254,8 @@ class ShareData:
         self.clearChangedFrameRelatedLists()
 
     def updateScenesInfo(self):
-        self.scenesInfo = {}
-
-        for scene in self.blenderScenes.values():
-            masterCollection = scene.collection
-            collections = [x.name_full for x in masterCollection.children]
-            objects = [x.name_full for x in masterCollection.objects]
-            sInfo = SceneInfo(collections, objects)
-            self.scenesInfo[scene.name_full] = sInfo
+        self.scenesInfo = {scene.name_full: SceneInfo(scene)
+                           for scene in self.blenderScenes.values()}
 
     def updateCollectionsInfo(self):
         self.collectionsInfo = {}

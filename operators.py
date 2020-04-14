@@ -3,9 +3,9 @@ import os
 import socket
 import subprocess
 import time
-
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, Any
+from uuid import uuid4
 
 import bpy
 from bpy.app.handlers import persistent
@@ -145,16 +145,36 @@ def getParentCollections(collectionName):
     return parents
 
 
+def find_renamed(new_items: Mapping[Any, Any], old_items: Mapping[Any, Any]):
+    """
+
+    """
+    new_uuids = {uuid for uuid in new_items.keys()}
+    old_uuids = {uuid for uuid in old_items.keys()}
+    renamed_uuids = {uuid for uuid in new_uuids & old_uuids if old_items[uuid] != new_items[uuid]}
+    added_items = [new_items[uuid] for uuid in new_uuids - old_uuids - renamed_uuids]
+    removed_items = [old_items[uuid] for uuid in old_uuids - new_uuids - renamed_uuids]
+    renamed_items = [(old_items[uuid], new_items[uuid]) for uuid in renamed_uuids]
+    return added_items, removed_items, renamed_items
+
+
 def updateScenesState():
     """
     Must be called before updateCollectionsState so that non empty collections added to master
     collection are processed
     """
-    newNames = shareData.blenderScenes.keys()
-    oldNames = shareData.scenesInfo.keys()
 
-    shareData.scenesAdded |= newNames - oldNames
-    shareData.scenesRemoved |= oldNames - newNames
+    for scene in shareData.blenderScenes.values():
+        if not scene.uuid:
+            scene.uuid = str(uuid4())
+
+    new_scenes = {scene.uuid: name for name, scene in shareData.blenderScenes.items()}
+    old_scenes = {scene.uuid: name for name, scene in shareData.scenesInfo.items()}
+    shareData.scenesAdded, shareData.scenesRemoved, shareData.scenesRenamed = find_renamed(new_scenes, old_scenes)
+
+    for old_name, new_name in shareData.scenesRenamed:
+        shareData.scenesInfo[new_name] = shareData.scenesInfo[old_name]
+        del shareData.scenesInfo[old_name]
 
     # walk the old scenes
     for sceneName, sceneInfo in shareData.scenesInfo.items():
@@ -345,6 +365,9 @@ def addScenes():
     for scene in shareData.scenesAdded:
         scene_lib.sendScene(shareData.client, scene)
         changed = True
+    for old_name, new_name in shareData.scenesRenamed:
+        scene_lib.sendSceneRenamed(shareData.client, old_name, new_name)
+        changed = True
     return changed
 
 
@@ -477,7 +500,7 @@ def reparentObjects():
 
 def createVRtistObjects():
     """
-    VRtist will filter the received messages and handle only the objects that belong to the 
+    VRtist will filter the received messages and handle only the objects that belong to the
     same scene as the one initially synchronized
     """
     changed = False

@@ -1154,6 +1154,8 @@ class ClientBlender(Client):
                         scene_api.buildScene(command.data)
                     elif command.type == common.MessageType.SCENE_REMOVED:
                         scene_api.buildSceneRemoved(command.data)
+                    elif command.type == common.MessageType.SCENE_RENAMED:
+                        scene_api.buildSceneRenamed(command.data)
 
                     elif command.type == common.MessageType.OBJECT_VISIBILITY:
                         object_api.buildObjectVisibility(command.data)

@@ -13,6 +13,18 @@ def sendScene(client: 'ClientBlender', scene_name: str):
         common.MessageType.SCENE, buffer, 0))
 
 
+def delete_scene(scene):
+    # https://devtalk.blender.org/t/new-timers-have-no-context-object-why-is-that-so-cant-override-it/6802
+    def window():
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == 'VIEW_3D':
+                    return window
+
+    ctx = {'window': window(), 'scene': scene}
+    bpy.ops.scene.delete(ctx)
+
+
 def buildScene(data):
     scene_name, _ = common.decodeString(data, 0)
     logger.debug("buildScene %s", scene_name)
@@ -28,15 +40,7 @@ def buildScene(data):
         shareData.blenderScenes[scene_name] = scene
 
     if to_remove is not None:
-        # This one is so fucking tricky that it deserve an explanation:
-        # Due to bug mentionned here https://developer.blender.org/T71422, deleting a scene with D.scenes.remove() in a function called from a timer
-        # gives a hard crash.
-        # This is due to context.window being None.
-        # To overcome this issue, we call an operator with a custom context that define window, screen and scene.
-        window = bpy.context.window_manager.windows[0]
-        ctx = {'window': window, 'screen': window.screen, 'scene': to_remove}
-        # todo: replace with an operator from our addon that calls D.scenes.remove() , it is safer to have full control
-        bpy.ops.scene.delete(ctx)
+        delete_scene(to_remove)
 
 
 def sendSceneRemoved(client: 'ClientBlender', scene_name: str):
@@ -50,12 +54,24 @@ def buildSceneRemoved(data):
     scene_name, _ = common.decodeString(data, 0)
     logger.debug("buildSceneRemoved %s", scene_name)
     scene = shareData.blenderScenes.get(scene_name)
-    del shareData.blenderScenes[scene_name]
+    delete_scene(scene)
+    shareData.blenderScenesDirty = True
 
-    # see https://developer.blender.org/T71422
-    window = bpy.context.window_manager.windows[0]
-    ctx = {'window': window, 'screen': window.screen, 'scene': scene}
-    bpy.ops.scene.delete(ctx)
+
+def sendSceneRenamed(client: 'ClientBlender', old_name: str, new_name: str):
+    logger.debug("sendSceneRenamed %s to %s", old_name, new_name)
+    buffer = common.encodeString(old_name) + common.encodeString(new_name)
+    client.addCommand(common.Command(
+        common.MessageType.SCENE_RENAMED, buffer, 0))
+
+
+def buildSceneRenamed(data):
+    old_name, index = common.decodeString(data, 0)
+    new_name, _ = common.decodeString(data, index)
+    logger.debug("buildSceneRenamed %s to %s", old_name, new_name)
+    scene = shareData.blenderScenes.get(old_name)
+    scene.name = new_name
+    shareData.blenderScenesDirty = True
 
 
 def sendAddCollectionToScene(client: 'ClientBlender', scene_name: str, collection_name: str):
