@@ -33,6 +33,8 @@ We recommand Visual Studio Code, with Python and Blender VSCode extensions.
 
 If you have a python file open in VSCode, it should automatically detect the virtual env, activate it when prompted. Note that VSCode never detect your python unless you open a Python file. When your python is detected, you should see it in your status bar and any new terminal open should have the virtual env activated ("(.venv)" should appear on the prompt line).
 
+### settings.json
+
 Add or replace the following configuration to the project VSCode settings file `.vscode/settings.json`:
 
 ```json
@@ -63,6 +65,60 @@ If you have Gitlab extension setup, you may want to add the following setting:
     [...]
     "gitlab.instanceUrl": "https://gitlab-ncsa.ubisoft.org/",
     [...]
+}
+```
+
+### launch.json
+
+To be able to debug the broadcaster from VSCode, you need to run it with a launch configuration. Here is an example of `.vscode/launch.json` that allows to run the broadcaster or the CLI in interactive mode, as well as some other examples you can take inspiration from.
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run DCC Broadcaster",
+      "type": "python",
+      "request": "launch",
+      "module": "dccsync.broadcaster.dccBroadcaster",
+      "args": [
+        "--log-level=DEBUG",
+        "--log-file=${workspaceFolder}/.vscode/logs/dccBroadcaster.log"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run cli.py (interactive session)",
+      "type": "python",
+      "request": "launch",
+      "module": "dccsync.broadcaster.cli",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run cli.py room list",
+      "type": "python",
+      "request": "launch",
+      "module": "dccsync.broadcaster.cli",
+      "args": [
+        "room",
+        "list"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: Remote Attach",
+      "type": "python",
+      "request": "attach",
+      "port": 5688,
+      "host": "localhost",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "."
+        }
+      ]
+    }
+  ]
 }
 ```
 

@@ -13,7 +13,7 @@ zip:
   stage: build
   script: exit 0
   artifacts:
-    name: "${CI_PROJECT_NAME}_${CI_COMMIT_REF_NAME}"
+    name: "${CI_PROJECT_NAME}_${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}"
     paths:
       - dccsync
     expire_in: 1 week
