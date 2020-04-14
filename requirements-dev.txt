@@ -6,8 +6,10 @@ entrypoints==0.3
 fake-bpy-module-2.82==20200218
 flake8==3.7.9
 flake8-black==0.1.1
+flake8-polyfill==1.0.2
 mccabe==0.6.1
 pathspec==0.8.0
+pep8-naming==0.10.0
 pycodestyle==2.5.0
 pyflakes==2.1.1
 regex==2020.4.4
