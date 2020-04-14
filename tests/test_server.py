@@ -15,45 +15,44 @@ class Delegate:
         self.clients = None
         self.name_room = None
 
-    def buildListRooms(self, data):
+    def build_list_rooms(self, data):
         return None
 
-    def buildListRoomClients(self, clients):
-        logging.info('xxx %s', clients)
+    def build_list_room_clients(self, clients):
+        logging.info("xxx %s", clients)
         self.clients = clients
         if clients is None:
             self.name_room = None
         else:
-            self.name_room = [(c['name'], c['room']) for c in clients]
+            self.name_room = [(c["name"], c["room"]) for c in clients]
         return None
 
     def on_connection_lost(self):
         return None
 
 
-def networkConsumer(client, delegate):
-    client.fetchCommands()
+def network_consumer(client, delegate):
+    client.fetch_commands()
 
     while True:
-        command = client.getNextReceivedCommand()
+        command = client.get_next_received_command()
         if command is None:
             return
 
         if command.type == common.MessageType.LIST_ROOMS:
-            delegate.buildListRooms(command.data)
+            delegate.build_list_rooms(command.data)
         elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
-            clients, _ = common.decodeJson(command.data, 0)
-            delegate.buildListRoomClients(clients)
+            clients, _ = common.decode_json(command.data, 0)
+            delegate.build_list_room_clients(clients)
         elif command.type == common.MessageType.LIST_ALL_CLIENTS:
-            clients, _ = common.decodeJson(command.data, 0)
-            delegate.buildListAllClients(clients)
+            clients, _ = common.decode_json(command.data, 0)
+            delegate.build_list_all_clients(clients)
         elif command.type == common.MessageType.CONNECTION_LOST:
             delegate.on_connection_lost()
 
 
-@unittest.skip('')
-class Test_Server(unittest.TestCase):
-
+@unittest.skip("")
+class TestServer(unittest.TestCase):
     def setUp(self):
         self._delegate = Delegate()
         self._server = Server()
@@ -73,58 +72,58 @@ class Test_Server(unittest.TestCase):
 
         client1 = Client()
         delay()
-        self.assertTrue(client1.isConnected())
+        self.assertTrue(client1.is_connected())
         self.assertEqual(server.client_count(), (0, 1))
 
         client1.disconnect()
         delay()
-        self.assertFalse(client1.isConnected())
+        self.assertFalse(client1.is_connected())
         self.assertEqual(server.client_count(), (0, 0))
 
         #
         client2 = Client()
         delay()
-        self.assertTrue(client2.isConnected())
+        self.assertTrue(client2.is_connected())
         self.assertEqual(server.client_count(), (0, 1))
 
         client3 = Client()
         delay()
-        self.assertTrue(client3.isConnected())
+        self.assertTrue(client3.is_connected())
         self.assertEqual(server.client_count(), (0, 2))
 
         client2.disconnect()
         delay()
-        self.assertFalse(client2.isConnected())
-        self.assertTrue(client3.isConnected())
+        self.assertFalse(client2.is_connected())
+        self.assertTrue(client3.is_connected())
         self.assertEqual(server.client_count(), (0, 1))
 
         client2.disconnect()
         delay()
-        self.assertFalse(client2.isConnected())
-        self.assertTrue(client3.isConnected())
+        self.assertFalse(client2.is_connected())
+        self.assertTrue(client3.is_connected())
         self.assertEqual(server.client_count(), (0, 1))
 
         client3.disconnect()
         delay()
-        self.assertFalse(client3.isConnected())
+        self.assertFalse(client3.is_connected())
         self.assertEqual(server.client_count(), (0, 0))
 
     def test_join_one_room_one_client(self):
         delay = self.delay
         server = self._server
 
-        c0_name = 'c0_name'
-        c0_room = 'c0_room'
+        c0_name = "c0_name"
+        c0_room = "c0_room"
 
         d0 = Delegate()
         c0 = Client()
         delay()
         self.assertEqual(server.client_count(), (0, 1))
 
-        c0.setClientName(c0_name)
-        c0.joinRoom(c0_room)
+        c0.set_client_name(c0_name)
+        c0.join_room(c0_room)
         delay()
-        networkConsumer(c0, self._delegate)
+        network_consumer(c0, self._delegate)
         expected = (c0_name, c0_room)
         self.assertEqual(server.client_count(), (1, 0))
         self.assertEqual(len(d0.name_room), 1)
@@ -134,26 +133,26 @@ class Test_Server(unittest.TestCase):
         delay = self.delay
         server = self._server
 
-        c0_name = 'c0_name'
-        c0_room = 'c0_room'
+        c0_name = "c0_name"
+        c0_room = "c0_room"
 
-        c1_name = 'c1_name'
+        c1_name = "c1_name"
         c1_room = c0_room
 
         d0 = Delegate()
         c0 = Client()
-        c0.joinRoom(c0_room)
-        c0.setClientName(c0_name)
+        c0.join_room(c0_room)
+        c0.set_client_name(c0_name)
 
         d1 = Delegate()
         c1 = Client()
-        c1.joinRoom(c1_room)
-        c1.setClientName(c1_name)
+        c1.join_room(c1_room)
+        c1.set_client_name(c1_name)
 
         delay()
 
-        networkConsumer(c0, self._delegate)
-        networkConsumer(c1, self._delegate)
+        network_consumer(c0, self._delegate)
+        network_consumer(c1, self._delegate)
         expected = [(c0_name, c0_room), (c1_name, c1_room)]
         self.assertEqual(server.client_count(), (2, 0))
         self.assertEqual(len(d0.name_room), 2)
@@ -165,27 +164,27 @@ class Test_Server(unittest.TestCase):
         delay = self.delay
         server = self._server
 
-        c0_name = 'c0_name'
-        c0_room = 'c0_room'
+        c0_name = "c0_name"
+        c0_room = "c0_room"
 
-        c1_name = 'c1_name'
+        c1_name = "c1_name"
         c1_room = c0_room
 
         d0 = Delegate()
         c0 = Client()
-        c0.joinRoom(c0_room)
-        c0.setClientName(c0_name)
+        c0.join_room(c0_room)
+        c0.set_client_name(c0_name)
 
         d1 = Delegate()
         c1 = Client()
-        c1.joinRoom(c1_room)
-        c1.setClientName(c1_name)
+        c1.join_room(c1_room)
+        c1.set_client_name(c1_name)
 
-        c1.leaveRoom(c1_room)
+        c1.leave_room(c1_room)
 
         delay()
-        networkConsumer(c0, self._delegate)
-        networkConsumer(c1, self._delegate)
+        network_consumer(c0, self._delegate)
+        network_consumer(c1, self._delegate)
         expected = [(c0_name, c0_room)]
         self.assertEqual(server.client_count(), (1, 1))
         self.assertEqual(len(d0.name_room), 1)
@@ -193,5 +192,5 @@ class Test_Server(unittest.TestCase):
         self.assertListEqual(d0.name_room, d1.name_room)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

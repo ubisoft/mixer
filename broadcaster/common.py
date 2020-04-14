@@ -98,238 +98,242 @@ class SensorFitMode(IntEnum):
 
 
 class ClientDisconnectedException(Exception):
-    '''When a client is disconnected and we try to read from it.'''
+    """When a client is disconnected and we try to read from it."""
 
 
-def intToBytes(value, size=8):
-    return value.to_bytes(size, byteorder='little')
+def int_to_bytes(value, size=8):
+    return value.to_bytes(size, byteorder="little")
 
 
-def bytesToInt(value):
-    return int.from_bytes(value, 'little')
+def bytes_to_int(value):
+    return int.from_bytes(value, "little")
 
 
-def intToMessageType(value):
+def int_to_message_type(value):
     return MessageType(value)
 
 
-def encodeBool(value):
+def encode_bool(value):
     if value:
-        return intToBytes(1, 4)
+        return int_to_bytes(1, 4)
     else:
-        return intToBytes(0, 4)
+        return int_to_bytes(0, 4)
 
 
-def decodeBool(data, index):
-    value = bytesToInt(data[index:index+4])
+def decode_bool(data, index):
+    value = bytes_to_int(data[index : index + 4])
     if value == 1:
-        return True, index+4
+        return True, index + 4
     else:
-        return False, index+4
+        return False, index + 4
 
 
-def encodeString(value):
-    encodedValue = value.encode()
-    return intToBytes(len(encodedValue), 4) + encodedValue
+def encode_string(value):
+    encoded_value = value.encode()
+    return int_to_bytes(len(encoded_value), 4) + encoded_value
 
 
-def decodeString(data, index):
-    stringLength = bytesToInt(data[index:index+4])
-    start = index+4
-    end = start+stringLength
+def decode_string(data, index):
+    string_length = bytes_to_int(data[index : index + 4])
+    start = index + 4
+    end = start + string_length
     value = data[start:end].decode()
     return value, end
 
 
-def encodeJson(value: dict):
-    return encodeString(json.dumps(value))
+def encode_json(value: dict):
+    return encode_string(json.dumps(value))
 
 
-def decodeJson(data, index):
-    value, end = decodeString(data, index)
+def decode_json(data, index):
+    value, end = decode_string(data, index)
     return json.loads(value), end
 
 
-def encodeFloat(value):
-    return struct.pack('f', value)
+def encode_float(value):
+    return struct.pack("f", value)
 
 
-def decodeFloat(data, index):
-    return struct.unpack('f', data[index:index+4])[0], index+4
+def decode_float(data, index):
+    return struct.unpack("f", data[index : index + 4])[0], index + 4
 
 
-def encodeInt(value):
-    return struct.pack('i', value)
+def encode_int(value):
+    return struct.pack("i", value)
 
 
-def decodeInt(data, index):
-    return struct.unpack('i', data[index:index+4])[0], index+4
+def decode_int(data, index):
+    return struct.unpack("i", data[index : index + 4])[0], index + 4
 
 
-def encodeVector2(value):
-    return struct.pack('2f', *(value.x, value.y))
+def encode_vector2(value):
+    return struct.pack("2f", *(value.x, value.y))
 
 
-def decodeVector2(data, index):
-    return struct.unpack('2f', data[index:index+2*4]), index+2*4
+def decode_vector2(data, index):
+    return struct.unpack("2f", data[index : index + 2 * 4]), index + 2 * 4
 
 
-def encodeVector3(value):
-    return struct.pack('3f', *(value.x, value.y, value.z))
+def encode_vector3(value):
+    return struct.pack("3f", *(value.x, value.y, value.z))
 
 
-def decodeVector3(data, index):
-    return struct.unpack('3f', data[index:index+3*4]), index+3*4
+def decode_vector3(data, index):
+    return struct.unpack("3f", data[index : index + 3 * 4]), index + 3 * 4
 
 
-def encodeVector4(value):
-    return struct.pack('4f', *(value[0], value[1], value[2], value[3]))
+def encode_vector4(value):
+    return struct.pack("4f", *(value[0], value[1], value[2], value[3]))
 
 
-def decodeVector4(data, index):
-    return struct.unpack('4f', data[index:index+4*4]), index+4*4
+def decode_vector4(data, index):
+    return struct.unpack("4f", data[index : index + 4 * 4]), index + 4 * 4
 
 
-def encodeMatrix(value):
-    return encodeVector4(value.col[0]) + encodeVector4(value.col[1]) + encodeVector4(value.col[2]) + \
-        encodeVector4(value.col[3])
+def encode_matrix(value):
+    return (
+        encode_vector4(value.col[0])
+        + encode_vector4(value.col[1])
+        + encode_vector4(value.col[2])
+        + encode_vector4(value.col[3])
+    )
 
 
-def decodeMatrix(data, index):
-    c0, index = decodeVector4(data, index)
-    c1, index = decodeVector4(data, index)
-    c2, index = decodeVector4(data, index)
-    c3, index = decodeVector4(data, index)
+def decode_matrix(data, index):
+    c0, index = decode_vector4(data, index)
+    c1, index = decode_vector4(data, index)
+    c2, index = decode_vector4(data, index)
+    c3, index = decode_vector4(data, index)
     return (c0, c1, c2, c3), index
 
 
-def encodeColor(value):
+def encode_color(value):
     if len(value) == 3:
-        return struct.pack('4f', *(value[0], value[1], value[2], 1.0))
+        return struct.pack("4f", *(value[0], value[1], value[2], 1.0))
     else:
-        return struct.pack('4f', *(value[0], value[1], value[2], value[3]))
+        return struct.pack("4f", *(value[0], value[1], value[2], value[3]))
 
 
-def decodeColor(data, index):
-    return struct.unpack('4f', data[index:index+4*4]), index+4*4
+def decode_color(data, index):
+    return struct.unpack("4f", data[index : index + 4 * 4]), index + 4 * 4
 
 
-def encodeQuaternion(value):
-    return struct.pack('4f', *(value.w, value.x, value.y, value.z))
+def encode_quaternion(value):
+    return struct.pack("4f", *(value.w, value.x, value.y, value.z))
 
 
-def decodeQuaternion(data, index):
-    return struct.unpack('4f', data[index:index+4*4]), index+4*4
+def decode_quaternion(data, index):
+    return struct.unpack("4f", data[index : index + 4 * 4]), index + 4 * 4
 
 
-def encodeStringArray(values):
-    buffer = encodeInt(len(values))
+def encode_string_array(values):
+    buffer = encode_int(len(values))
     for item in values:
-        buffer += encodeString(item)
+        buffer += encode_string(item)
     return buffer
 
 
-def decodeStringArray(data, index):
-    count = bytesToInt(data[index:index+4])
+def decode_string_array(data, index):
+    count = bytes_to_int(data[index : index + 4])
     index = index + 4
     values = []
     for _ in range(count):
-        string, index = decodeString(data, index)
+        string, index = decode_string(data, index)
         values.append(string)
     return values, index
 
 
-def decodeArray(data, index, schema, inc):
-    count = bytesToInt(data[index:index+4])
-    start = index+4
+def decode_array(data, index, schema, inc):
+    count = bytes_to_int(data[index : index + 4])
+    start = index + 4
     end = start
     values = []
     for _ in range(count):
-        end = start+inc
+        end = start + inc
         values.append(struct.unpack(schema, data[start:end]))
         start = end
     return values, end
 
 
-def decodeFloatArray(data, index):
-    return decodeArray(data, index, 'f', 4)
+def decode_float_array(data, index):
+    return decode_array(data, index, "f", 4)
 
 
-def decodeIntArray(data, index):
-    count = bytesToInt(data[index:index+4])
-    start = index+4
+def decode_int_array(data, index):
+    count = bytes_to_int(data[index : index + 4])
+    start = index + 4
     values = []
     for _ in range(count):
-        end = start+4
-        values.extend(struct.unpack('I', data[start:end]))
+        end = start + 4
+        values.extend(struct.unpack("I", data[start:end]))
         start = end
     return values, end
 
 
-def decodeInt2Array(data, index):
-    return decodeArray(data, index, '2I', 2*4)
+def decode_int2_array(data, index):
+    return decode_array(data, index, "2I", 2 * 4)
 
 
-def decodeInt3Array(data, index):
-    return decodeArray(data, index, '3I', 3*4)
+def decode_int3_array(data, index):
+    return decode_array(data, index, "3I", 3 * 4)
 
 
-def decodeVector3Array(data, index):
-    return decodeArray(data, index, '3f', 3*4)
+def decode_vector3_array(data, index):
+    return decode_array(data, index, "3f", 3 * 4)
 
 
-def decodeVector2Array(data, index):
-    return decodeArray(data, index, '2f', 2*4)
+def decode_vector2_array(data, index):
+    return decode_array(data, index, "2f", 2 * 4)
 
 
 class Command:
     _id = 100
 
-    def __init__(self, commandType: MessageType, data=b'', commandId=0):
-        self.data = data or b''
-        self.type = commandType
-        self.id = commandId
-        if commandId == 0:
+    def __init__(self, command_type: MessageType, data=b"", command_id=0):
+        self.data = data or b""
+        self.type = command_type
+        self.id = command_id
+        if command_id == 0:
             self.id = Command._id
             Command._id += 1
 
 
 class CommandFormatter:
     def format_clients(self, clients):
-        s = ''
+        s = ""
         for c in clients:
-            s += f'   - {c["ip"]}:{c["port"]} name = \"{c["name"]}\" room = \"{c["room"]}\"\n'
+            s += f'   - {c["ip"]}:{c["port"]} name = "{c["name"]}" room = "{c["room"]}"\n'
         return s
 
     def format(self, command: Command):
 
-        s = f'={command.type.name}: '
+        s = f"={command.type.name}: "
 
         if command.type == MessageType.LIST_ROOMS:
-            rooms, _ = decodeStringArray(command.data, 0)
-            s += 'LIST_ROOMS: '
+            rooms, _ = decode_string_array(command.data, 0)
+            s += "LIST_ROOMS: "
             if len(rooms) == 0:
-                s += '  No rooms'
+                s += "  No rooms"
             else:
-                s += f' {len(rooms)} room(s) : {rooms}'
+                s += f" {len(rooms)} room(s) : {rooms}"
         elif command.type == MessageType.LIST_ROOM_CLIENTS:
-            clients, _ = decodeJson(command.data, 0)
+            clients, _ = decode_json(command.data, 0)
             if len(clients) == 0:
-                s += f'  No clients in room'
+                s += f"  No clients in room"
             else:
-                s += f'  {len(clients)} client(s) in room :\n'
+                s += f"  {len(clients)} client(s) in room :\n"
                 s += self.format_clients(clients)
         elif command.type == MessageType.LIST_CLIENTS or command.type == MessageType.LIST_ALL_CLIENTS:
-            clients, _ = decodeJson(command.data, 0)
+            clients, _ = decode_json(command.data, 0)
             if len(clients) == 0:
-                s += '  No clients\n'
+                s += "  No clients\n"
             else:
-                s += f'  {len(clients)} client(s):\n'
+                s += f"  {len(clients)} client(s):\n"
                 s += self.format_clients(clients)
         elif command.type == MessageType.CONNECTION_LOST:
-            s += 'CONNECTION_LOST:\n'
+            s += "CONNECTION_LOST:\n"
         elif command.type == MessageType.SEND_ERROR:
-            s += f'ERROR: {decodeString(command.data, 0)[0]}\n'
+            s += f"ERROR: {decode_string(command.data, 0)[0]}\n"
         else:
             pass
 
@@ -337,7 +341,7 @@ class CommandFormatter:
 
 
 def recv(socket: socket.socket, size: int):
-    result = b''
+    result = b""
     while size != 0:
         r, _, _ = select.select([socket], [], [], 0.1)
         if len(r) > 0:
@@ -355,9 +359,9 @@ def recv(socket: socket.socket, size: int):
     return result
 
 
-def readMessage(socket: socket.socket) -> Command:
+def read_message(socket: socket.socket) -> Command:
     if not socket:
-        logger.warning("readMessage called with no socket")
+        logger.warning("read_message called with no socket")
         return None
 
     r, _, _ = select.select([socket], [], [], 0.0001)
@@ -368,13 +372,13 @@ def readMessage(socket: socket.socket) -> Command:
         prefix_size = 14
         msg = recv(socket, prefix_size)
 
-        frameSize = bytesToInt(msg[:8])
-        commandId = bytesToInt(msg[8:12])
-        messageType = bytesToInt(msg[12:])
+        frame_size = bytes_to_int(msg[:8])
+        command_id = bytes_to_int(msg[8:12])
+        message_type = bytes_to_int(msg[12:])
 
-        msg = recv(socket, frameSize)
+        msg = recv(socket, frame_size)
 
-        return Command(intToMessageType(messageType), msg, commandId)
+        return Command(int_to_message_type(message_type), msg, command_id)
 
     except ClientDisconnectedException:
         raise
@@ -383,16 +387,16 @@ def readMessage(socket: socket.socket) -> Command:
         raise
 
 
-def writeMessage(sock: socket.socket, command: Command):
+def write_message(sock: socket.socket, command: Command):
     if not sock:
-        logger.warning("writeMessage called with no socket")
+        logger.warning("write_message called with no socket")
         return
 
-    size = intToBytes(len(command.data), 8)
-    commandId = intToBytes(command.id, 4)
-    mtype = intToBytes(command.type.value, 2)
+    size = int_to_bytes(len(command.data), 8)
+    command_id = int_to_bytes(command.id, 4)
+    mtype = int_to_bytes(command.type.value, 2)
 
-    buffer = size + commandId + mtype + command.data
+    buffer = size + command_id + mtype + command.data
 
     try:
         _, w, _ = select.select([], [sock], [])

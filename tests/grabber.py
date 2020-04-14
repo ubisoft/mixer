@@ -1,26 +1,23 @@
-import sys  # nopep8
-from pathlib import Path  # nopep8
-sys.path.append(str(Path(__package__).parent))  # nopep8
+import sys  # noqa
+from pathlib import Path  # noqa
+
+sys.path.append(str(Path(__package__).parent))  # noqa
 
 from broadcaster.common import MessageType
 from broadcaster.common import Command
-from broadcaster.common import readMessage
 from broadcaster.common import ClientDisconnectedException
 from broadcaster.client import Client
 from typing import Mapping, List
-import threading
 import time
 
 
-class CommandStream():
+class CommandStream:
     """
     Command stream split by command type
     """
 
     def __init__(self):
-        self.data: Mapping[int, List[Command]] = {
-            m: [] for m in MessageType if m > MessageType.COMMAND
-        }
+        self.data: Mapping[int, List[Command]] = {m: [] for m in MessageType if m > MessageType.COMMAND}
 
     def sort(self):
         # For each command type, the comand ordering is not significant for deciding the test success
@@ -29,7 +26,7 @@ class CommandStream():
             commands.sort()
 
 
-class Grabber():
+class Grabber:
     """
     Grab the command stream from a server for the purpose of unit testing. Ignores protocol messages (JOIN, ...)
     and messagae order
@@ -41,15 +38,15 @@ class Grabber():
     def grab(self, host, port, room_name: str):
         client = Client(host, port)
         client.connect()
-        command = Command(MessageType.JOIN_ROOM, room_name.encode('utf8'))
-        client.addCommand(command)
+        command = Command(MessageType.JOIN_ROOM, room_name.encode("utf8"))
+        client.add_command(command)
 
         attempts_max = 20
         attempts = 0
         try:
             while attempts < attempts_max:
-                client.fetchCommands()
-                command = client.getNextReceivedCommand()
+                client.fetch_commands()
+                command = client.get_next_received_command()
                 if command is None:
                     attempts += 1
                     time.sleep(0.01)

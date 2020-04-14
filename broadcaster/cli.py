@@ -21,44 +21,44 @@ class CliClient(client.Client):
         self.connect()
         self.formatter = common.CommandFormatter()
 
-    def listRooms(self):
+    def list_rooms(self):
         command = common.Command(common.MessageType.LIST_ROOMS)
-        self.addAndProcessCommand(command, common.MessageType.LIST_ROOMS)
+        self.add_and_process_command(command, common.MessageType.LIST_ROOMS)
 
-    def deleteRoom(self, name):
+    def delete_room(self, name):
         command = common.Command(common.MessageType.DELETE_ROOM, name.encode())
-        self.addAndProcessCommand(command)
+        self.add_and_process_command(command)
 
-    def clearRoom(self, name):
+    def clear_room(self, name):
         command = common.Command(common.MessageType.CLEAR_ROOM, name.encode())
-        self.addAndProcessCommand(command)
+        self.add_and_process_command(command)
 
-    def listRoomClients(self, name):
+    def list_room_clients(self, name):
         command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, name.encode())
-        self.addAndProcessCommand(command, common.MessageType.LIST_ROOM_CLIENTS)
+        self.add_and_process_command(command, common.MessageType.LIST_ROOM_CLIENTS)
 
-    def listClients(self):
+    def list_clients(self):
         command = common.Command(common.MessageType.LIST_CLIENTS)
-        self.addAndProcessCommand(command, common.MessageType.LIST_CLIENTS)
+        self.add_and_process_command(command, common.MessageType.LIST_CLIENTS)
 
-    def listAllClients(self):
+    def list_all_clients(self):
         command = common.Command(common.MessageType.LIST_ALL_CLIENTS)
-        self.addAndProcessCommand(command, common.MessageType.LIST_ALL_CLIENTS)
+        self.add_and_process_command(command, common.MessageType.LIST_ALL_CLIENTS)
 
-    def addAndProcessCommand(self, command: common.Command, expected_response_type: common.MessageType = None):
-        self.addCommand(command)
+    def add_and_process_command(self, command: common.Command, expected_response_type: common.MessageType = None):
+        self.add_command(command)
 
         received = None
         while received is None or (expected_response_type is not None and received.type != expected_response_type):
-            self.fetchCommands()
-            received = self.getNextReceivedCommand()
+            self.fetch_commands()
+            received = self.get_next_received_command()
 
             if received is not None:
                 if received.type == common.MessageType.CONNECTION_LOST:
                     self.disconnect()
                     return
                 if received.type == common.MessageType.SEND_ERROR:
-                    logger.error(common.decodeString(received.data, 0)[0])
+                    logger.error(common.decode_string(received.data, 0)[0])
                     return
                 else:
                     logger.info("Ignoring command %s", received.type)
@@ -71,36 +71,36 @@ def process_room_command(args):
     client = None
 
     try:
-        if args.command == 'list':
+        if args.command == "list":
             client = CliClient(args)
-            client.listRooms()
+            client.list_rooms()
 
-        elif args.command == 'delete':
+        elif args.command == "delete":
             count = len(args.name)
             if count:
                 client = CliClient(args)
                 for name in args.name:
-                    client.deleteRoom(name)
+                    client.delete_room(name)
             else:
-                print('Expected one or more room names')
+                print("Expected one or more room names")
 
-        elif args.command == 'clear':
+        elif args.command == "clear":
             count = len(args.name)
             if count:
                 client = CliClient(args)
                 for name in args.name:
-                    client.clearRoom(name)
+                    client.clear_room(name)
             else:
-                print('Expected one or more room names')
+                print("Expected one or more room names")
 
-        elif args.command == 'clients':
+        elif args.command == "clients":
             count = len(args.name)
             if count:
                 client = CliClient(args)
                 for name in args.name:
-                    client.listRoomClients(name)
+                    client.list_room_clients(name)
             else:
-                print('Expected one or more room names')
+                print("Expected one or more room names")
     except ServerError as e:
         logger.error(e, exc_info=True)
     finally:
@@ -112,9 +112,9 @@ def process_client_command(args):
     client = None
 
     try:
-        if args.command == 'list':
+        if args.command == "list":
             client = CliClient(args)
-            client.listClients()
+            client.list_clients()
     except ServerError as e:
         logger.error(e, exc_info=True)
     finally:
@@ -125,19 +125,15 @@ def process_client_command(args):
 commands = [
     "connect",
     "disconnect",
-
     "listrooms",
     "join <roomname>",
     "leave <roomname>",
-
     "listjoinedclients",
     "listallclients",
     "setclientname <clientname>",
-
     "listroomclients <roomname>",
-
     "help",
-    "exit"  # this loop
+    "exit",  # this loop
 ]
 
 
@@ -174,7 +170,7 @@ def interactive_loop(args):
             if input_command != command:
                 print(command, command_args)
             if command == "connect":
-                if client is None or not client.isConnected():
+                if client is None or not client.is_connected():
                     client = CliClient(args)
                 else:
                     print(f"Error : already connected. Use disconnect first")
@@ -183,62 +179,66 @@ def interactive_loop(args):
             elif command == "help":
                 help()
             else:
-                if client is None or not client.isConnected():
+                if client is None or not client.is_connected():
                     raise RuntimeError('Not connected, use "connect" first')
                 if command == "listrooms":
-                    client.listRooms()
+                    client.list_rooms()
                 elif command == "listroomclients":
-                    client.listRoomClients(command_args[0])
+                    client.list_room_clients(command_args[0])
                 elif command == "listjoinedclients":
-                    client.listClients()
+                    client.list_clients()
                 elif command == "listallclients":
-                    client.listAllClients()
+                    client.list_all_clients()
                 elif command == "join":
-                    client.joinRoom(command_args[0])
+                    client.join_room(command_args[0])
                 elif command == "leave":
-                    client.leaveRoom(command_args[0])
+                    client.leave_room(command_args[0])
                 elif command == "setclientname":
-                    client.setClientName(command_args[0])
+                    client.set_client_name(command_args[0])
                 elif command == "disconnect":
                     client.disconnect()
                     client = None
                 else:
                     pass
         except Exception as e:
-            logger.error(f'Exception: {e}', exc_info=True)
+            logger.error(f"Exception: {e}", exc_info=True)
 
 
 def main():
     args, args_parser = parse_cli_args()
     cli_utils.init_logging(args)
 
-    if hasattr(args, 'func'):
+    if hasattr(args, "func"):
         args.func(args)
     else:
         interactive_loop(args)
 
 
 def parse_cli_args():
-    parser = argparse.ArgumentParser(prog='cli', description='Command Line Interface for DCC Sync server')
+    parser = argparse.ArgumentParser(prog="cli", description="Command Line Interface for DCC Sync server")
     cli_utils.add_logging_cli_args(parser)
 
     sub_parsers = parser.add_subparsers()
 
-    parser.add_argument('--host', help='Host name', default=common.DEFAULT_HOST)
-    parser.add_argument('--port', help='Port', default=common.DEFAULT_PORT)
-    parser.add_argument('--timeout', help='Timeout for server response', default=TIMEOUT)
+    parser.add_argument("--host", help="Host name", default=common.DEFAULT_HOST)
+    parser.add_argument("--port", help="Port", default=common.DEFAULT_PORT)
+    parser.add_argument("--timeout", help="Timeout for server response", default=TIMEOUT)
 
     # Room commands are relative to... a room!
-    room_parser = sub_parsers.add_parser('room', help='Rooms related commands')
-    room_parser.add_argument('command', help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.', choices=(
-        'list', 'delete', 'clear', 'clients'))
+    room_parser = sub_parsers.add_parser("room", help="Rooms related commands")
     room_parser.add_argument(
-        'name', help='Room name. You can specify multiple room names separated by spaces.', nargs='*')
+        "command",
+        help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.',
+        choices=("list", "delete", "clear", "clients"),
+    )
+    room_parser.add_argument(
+        "name", help="Room name. You can specify multiple room names separated by spaces.", nargs="*"
+    )
     room_parser.set_defaults(func=process_room_command)
 
     # Client commands are relative to a client independently of any room
-    client_parser = sub_parsers.add_parser('client', help='Clients related commands')
-    client_parser.add_argument('command', help='', choices=('list'))
+    client_parser = sub_parsers.add_parser("client", help="Clients related commands")
+    client_parser.add_argument("command", help="", choices=("list"))
     client_parser.set_defaults(func=process_client_command)
 
     return parser.parse_args(), parser
