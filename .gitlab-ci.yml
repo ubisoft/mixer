@@ -12,6 +12,7 @@ flake8:
 zip:
   image: ubuntu
   script:
+    - apt-get install zip
     - zip -r dccsync.zip dccsync
   stage: build
   artifacts:
