@@ -1,5 +1,6 @@
 stages:
   - codequality
+  - build
 
 flake8:
   image: python:3
@@ -7,3 +8,11 @@ flake8:
   script:
     - pip install flake8 flake8-black pep8-naming flake8-bugbear
     - flake8 -v
+
+archive:
+  script: zip -r dccsync.zip dccsync
+  stage: build
+  artifacts:
+    paths:
+      - dccsync.zip
+    expire_in: 1 week
