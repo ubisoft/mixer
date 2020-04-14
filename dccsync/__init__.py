@@ -8,8 +8,10 @@ bl_info = {
     "description": "Collaborative 3D edition accross DCCs",
     "version": (0, 1, 0),
     "blender": (2, 82, 0),
-    "location": "France",
-    "warning": "Experimental, can break your scenes",
+    "location": "",
+    "warning": "Experimental addon, can break your scenes",
+    "wiki_url": "",
+    "tracker_url": "",
     "category": "Collaboration",
 }
 
