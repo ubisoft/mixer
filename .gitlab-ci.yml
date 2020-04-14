@@ -5,6 +5,6 @@ flake8:
   image: python:3
   stage: codequality
   script:
-    - pip install flake8 flake8-black pep8-naming
+    - pip install flake8 flake8-black pep8-naming --proxy http://proxy:3128
     - flake8 -v
   allow_failure: true
