@@ -9,8 +9,11 @@ flake8:
     - pip install flake8 flake8-black pep8-naming flake8-bugbear
     - flake8 -v
 
-archive:
-  script: zip -r dccsync.zip dccsync
+zip:
+  image: archlinux/base
+  script:
+    - pacman -S zip
+    - zip -r dccsync.zip dccsync
   stage: build
   artifacts:
     paths:
