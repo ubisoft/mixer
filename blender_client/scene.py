@@ -52,7 +52,7 @@ def send_scene_removed(client: Client, scene_name: str):
 def build_scene_removed(data):
     scene_name, _ = common.decode_string(data, 0)
     logger.debug("build_scene_removed %s", scene_name)
-    scene = share_data.blenderScenes.get(scene_name)
+    scene = share_data.blender_scenes.get(scene_name)
     delete_scene(scene)
     share_data.blender_scenes_dirty = True
 
@@ -60,7 +60,7 @@ def build_scene_removed(data):
 def send_scene_renamed(client: Client, old_name: str, new_name: str):
     logger.debug("send_scene_renamed %s to %s", old_name, new_name)
     buffer = common.encode_string(old_name) + common.encode_string(new_name)
-    client.addCommand(common.Command(common.MessageType.SCENE_RENAMED, buffer, 0))
+    client.add_command(common.Command(common.MessageType.SCENE_RENAMED, buffer, 0))
 
 
 def build_scene_renamed(data):

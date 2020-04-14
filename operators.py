@@ -80,10 +80,10 @@ def update_transform(obj):
 def join_room(room_name: str):
     logger.info("join_room")
 
-    assert share_data.currentRoom is None
+    assert share_data.current_room is None
     user = get_dcc_sync_props().user
     share_data.session_id += 1
-    share_data.currentRoom = room_name
+    share_data.current_room = room_name
     share_data.client.join_room(room_name)
     share_data.client.set_client_name(user)
     share_data.client.send_set_current_scene(bpy.context.scene.name_full)
@@ -105,7 +105,7 @@ def join_room(room_name: str):
 def leave_current_room():
     logger.info("leave_current_room")
 
-    if share_data.currentRoom:
+    if share_data.current_room:
         share_data.leave_current_room()
         set_handlers(False)
 
@@ -120,7 +120,7 @@ def leave_current_room():
 
 def is_joined():
     connected = share_data.client is not None and share_data.client.is_connected()
-    return connected and share_data.currentRoom
+    return connected and share_data.current_room
 
 
 @persistent
@@ -279,27 +279,27 @@ def update_frame_changed_related_objects_state(old_objects: dict, new_objects: d
         if not new_obj:
             continue
         if new_obj.matrix_local != matrix:
-            share_data.objectsTransformed.add(obj_name)
+            share_data.objects_transformed.add(obj_name)
 
 
 @stats_timer(share_data)
 def update_object_state(old_objects: dict, new_objects: dict):
     stats_timer = share_data.current_stats_timer
 
-    with stats_timer.child("checkObjectsAddedAndRemoved"):
+    with stats_timer.child("checkobjects_addedAndRemoved"):
         objects = set(new_objects.keys())
-        share_data.objectsAdded = objects - old_objects.keys()
-        share_data.objectsRemoved = old_objects.keys() - objects
+        share_data.objects_added = objects - old_objects.keys()
+        share_data.objects_removed = old_objects.keys() - objects
 
     share_data.old_objects = new_objects
 
-    if len(share_data.objectsAdded) == 1 and len(share_data.objectsRemoved) == 1:
-        share_data.objects_renamed[list(share_data.objectsRemoved)[0]] = list(share_data.objectsAdded)[0]
-        share_data.objectsAdded.clear()
-        share_data.objectsRemoved.clear()
+    if len(share_data.objects_added) == 1 and len(share_data.objects_removed) == 1:
+        share_data.objects_renamed[list(share_data.objects_removed)[0]] = list(share_data.objects_added)[0]
+        share_data.objects_added.clear()
+        share_data.objects_removed.clear()
         return
 
-    for obj_name in share_data.objectsRemoved:
+    for obj_name in share_data.objects_removed:
         if obj_name in share_data.old_objects:
             del share_data.old_objects[obj_name]
 
@@ -398,7 +398,7 @@ def remove_collections():
 
 def add_objects():
     changed = False
-    for obj_name in share_data.objectsAdded:
+    for obj_name in share_data.objects_added:
         obj = share_data.blender_objects.get(obj_name)
         if obj:
             update_params(obj)
@@ -462,7 +462,7 @@ def update_collections_parameters():
 
 def delete_scene_objects():
     changed = False
-    for obj_name in share_data.objectsRemoved:
+    for obj_name in share_data.objects_removed:
         share_data.client.send_deleted_object(obj_name)
         changed = True
     return changed
@@ -489,7 +489,7 @@ def update_objects_visibility():
 
 def update_objects_transforms():
     changed = False
-    for obj_name in share_data.objectsTransformed:
+    for obj_name in share_data.objects_transformed:
         if obj_name in share_data.blender_objects:
             update_transform(share_data.blender_objects[obj_name])
             changed = True
@@ -512,7 +512,7 @@ def create_vrtist_objects():
     same scene as the one initially synchronized
     """
     changed = False
-    for obj_name in share_data.objectsAdded:
+    for obj_name in share_data.objects_added:
         if obj_name in bpy.context.scene.objects:
             obj = bpy.context.scene.objects[obj_name]
             scene_lib.send_add_object_to_vrtist(share_data.client, bpy.context.scene.name_full, obj.name_full)
@@ -941,7 +941,7 @@ def disconnect():
         share_data.client = None
 
     share_data.client_ids = None
-    share_data.currentRoom = None
+    share_data.current_room = None
 
     ui.update_ui_lists()
     ui.redraw()
@@ -1002,10 +1002,10 @@ class CreateRoomOperator(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         props = get_dcc_sync_props()
-        return is_client_connected() and not share_data.currentRoom and bool(props.room)
+        return is_client_connected() and not share_data.current_room and bool(props.room)
 
     def execute(self, context):
-        assert share_data.currentRoom is None
+        assert share_data.current_room is None
         if not is_client_connected():
             return {"CANCELLED"}
 
@@ -1027,9 +1027,9 @@ class JoinRoomOperator(bpy.types.Operator):
         return is_client_connected() and room_index < len(get_dcc_sync_props().rooms)
 
     def execute(self, context):
-        assert not share_data.currentRoom
+        assert not share_data.current_room
         share_data.set_dirty()
-        share_data.currentRoom = None
+        share_data.current_room = None
 
         share_data.isLocal = False
         props = get_dcc_sync_props()
@@ -1048,7 +1048,7 @@ class LeaveRoomOperator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return is_client_connected() and share_data.currentRoom is not None
+        return is_client_connected() and share_data.current_room is not None
 
     def execute(self, context):
         leave_current_room()
@@ -1141,7 +1141,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
 
     def execute(self, context):
         dcc_sync_props = get_dcc_sync_props()
-        if not share_data.currentRoom:
+        if not share_data.current_room:
             if not connect():
                 return {"CANCELLED"}
 
@@ -1154,7 +1154,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
         args = [
             dcc_sync_props.VRtist,
             "--room",
-            share_data.currentRoom,
+            share_data.current_room,
             "--hostname",
             hostname,
             "--port",

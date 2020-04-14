@@ -55,10 +55,10 @@ class ShareData:
 
     def clear_room_data(self):
         # equivalent to handlers set
-        self.currentRoom: str = None
+        self.current_room: str = None
 
-        self.objectsAdded: Set(str) = set()
-        self.objectsRemoved: Set(str) = set()
+        self.objects_added: Set(str) = set()
+        self.objects_removed: Set(str) = set()
         self.collections_added: Set(str) = set()
         self.collections_removed: Set(str) = set()
         self.scenes_added: List[str] = []
@@ -86,7 +86,7 @@ class ShareData:
         self.objects_reparented = set()
         self.objects_parents = {}
         self.objects_renamed = {}
-        self.objectsTransformed = set()
+        self.objects_transformed = set()
         self.objects_transforms = {}
         self.objects_visibility_changed: Set[str] = set()
         self.objects_visibility: Mapping[str, ObjectVisibility] = {}
@@ -94,13 +94,10 @@ class ShareData:
         self.old_objects: Mapping[str, bpy.types.Object] = {}
 
         # {object_path: [collection_name]}
-        self.restore_toCollections: Mapping[str, List[str]] = {}
-
-        # {object_path: [collection_name]}
-        self.restore_toCollections: Mapping[str, List[str]] = {}
+        self.restore_to_collections: Mapping[str, List[str]] = {}
 
         self._blender_objects = {}
-        self.blender_objectsDirty = True
+        self.blender_objects_dirty = True
 
         self._blender_materials = {}
         self.blender_materials_dirty = True
@@ -112,22 +109,22 @@ class ShareData:
         self.blender_grease_pencils_dirty = True
 
         self._blender_cameras = {}
-        self.blender_camerasDirty = True
+        self.blender_cameras_dirty = True
 
         self._blender_lights = {}
-        self.blender_lightsDirty = True
+        self.blender_lights_dirty = True
         self._blender_collections: Mapping[str, bpy.types.Collection] = {}
         self.blender_collections_dirty = True
 
-        self.pendingParenting = set()
+        self.pending_parenting = set()
 
     def leave_current_room(self):
         if self.client is not None:
-            self.client.leave_room(share_data.currentRoom)
+            self.client.leave_room(share_data.current_room)
         self.clear_room_data()
 
         self._blender_scenes: Mapping[str, bpy.types.Scene] = {}
-        self.blender_scenesDirty = True
+        self.blender_scenes_dirty = True
 
     def clear_before_state(self):
         # These objects contain the "before" state when entering the update_post handler
@@ -137,14 +134,14 @@ class ShareData:
         self.scenes_info = {}
 
     def set_dirty(self):
-        self.blender_objectsDirty = True
+        self.blender_objects_dirty = True
         self.blender_materials_dirty = True
         self.blender_meshes_dirty = True
         self.blender_grease_pencils_dirty = True
-        self.blender_camerasDirty = True
-        self.blender_lightsDirty = True
+        self.blender_cameras_dirty = True
+        self.blender_lights_dirty = True
         self.blender_collections_dirty = True
-        self.blender_scenesDirty = True
+        self.blender_scenes_dirty = True
 
     def get_blender_property(self, property, property_dirty, elems):
         if not property_dirty:
@@ -155,10 +152,10 @@ class ShareData:
 
     @property
     def blender_objects(self):
-        if not self.blender_objectsDirty:
+        if not self.blender_objects_dirty:
             return self._blender_objects
         self._blender_objects = {x.name_full: x for x in bpy.data.objects}
-        self.blender_objectsDirty = False
+        self.blender_objects_dirty = False
         return self._blender_objects
 
     @property
@@ -187,18 +184,18 @@ class ShareData:
 
     @property
     def blender_cameras(self):
-        if not self.blender_camerasDirty:
+        if not self.blender_cameras_dirty:
             return self._blender_cameras
         self._blender_cameras = {x.name_full: x for x in bpy.data.cameras}
-        self.blender_camerasDirty = False
+        self.blender_cameras_dirty = False
         return self._blender_cameras
 
     @property
     def blender_lights(self):
-        if not self.blender_lightsDirty:
+        if not self.blender_lights_dirty:
             return self._blender_lights
         self._blender_lights = {x.name_full: x for x in bpy.data.lights}
-        self.blender_lightsDirty = False
+        self.blender_lights_dirty = False
         return self._blender_lights
 
     @property
@@ -211,14 +208,14 @@ class ShareData:
 
     @property
     def blender_scenes(self):
-        if not self.blender_scenesDirty:
+        if not self.blender_scenes_dirty:
             return self._blender_scenes
         self._blender_scenes = {x.name_full: x for x in bpy.data.scenes}
-        self.blender_scenesDirty = False
+        self.blender_scenes_dirty = False
         return self._blender_scenes
 
     def clear_changed_frame_related_lists(self):
-        self.objectsTransformed.clear()
+        self.objects_transformed.clear()
 
     def clear_lists(self):
         """
