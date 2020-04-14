@@ -22,14 +22,14 @@ class UserItem(bpy.types.PropertyGroup):
 
 
 def stats_file_path_suffix():
-    return datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 
 log_level_enum_items = [
-    ('ERROR', 'Error', '', logging.ERROR),
-    ('WARNING', 'Warning', '', logging.WARNING),
-    ('INFO', 'Info', '', logging.INFO),
-    ('DEBUG', 'Debug', '', logging.DEBUG)
+    ("ERROR", "Error", "", logging.ERROR),
+    ("WARNING", "Warning", "", logging.WARNING),
+    ("INFO", "Info", "", logging.INFO),
+    ("DEBUG", "Debug", "", logging.DEBUG),
 ]
 
 
@@ -50,8 +50,10 @@ def get_logs_directory():
             if os.path.exists(base_shared_path):
                 return os.path.join(os.fspath(base_shared_path), username)
             logger.error(
-                f"DCCSYNC_USER_LOGS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location.")
+                f"DCCSYNC_USER_LOGS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location."
+            )
         return os.path.join(os.fspath(tempfile.gettempdir()), "dcc_sync")
+
     dir = _get_logs_directory()
     if not os.path.exists(dir):
         os.makedirs(dir)
@@ -63,7 +65,6 @@ def get_log_file():
 
 
 class DCCSyncProperties(bpy.types.PropertyGroup):
-
     def on_room_selection_changed(self, context):
         ui.update_user_list()
 
@@ -73,21 +74,16 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
             client.setClientName(self.user)
 
     # Allows to change behavior according to environment: production or development
-    env: bpy.props.StringProperty(
-        name="Env", default=os.environ.get("DCCSYNC_ENV", "production"))
+    env: bpy.props.StringProperty(name="Env", default=os.environ.get("DCCSYNC_ENV", "production"))
 
-    host: bpy.props.StringProperty(
-        name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
+    host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
     port: bpy.props.IntProperty(name="Port", default=common.DEFAULT_PORT)
-    room: bpy.props.StringProperty(
-        name="Room", default=os.environ.get("VRTIST_ROOM", os.getlogin()))
+    room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", os.getlogin()))
     rooms: bpy.props.CollectionProperty(name="Rooms", type=RoomItem)
-    room_index: bpy.props.IntProperty(
-        update=on_room_selection_changed)  # index in the list of rooms
+    room_index: bpy.props.IntProperty(update=on_room_selection_changed)  # index in the list of rooms
 
     # User name as displayed in peers user list
-    user: bpy.props.StringProperty(
-        name="User", default=os.getlogin(), update=on_user_changed)
+    user: bpy.props.StringProperty(name="User", default=os.getlogin(), update=on_user_changed)
 
     # user list of the selected or connected room, according to status
     users: bpy.props.CollectionProperty(name="Users", type=UserItem)
@@ -99,10 +95,12 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
 
     showServerConsole: bpy.props.BoolProperty(default=False)
 
-    VRtist: bpy.props.StringProperty(name="VRtist", default=os.environ.get(
-        "VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe"))
-    statistics_directory: bpy.props.StringProperty(name="Stats Directory", default=os.environ.get(
-        "DCCSYNC_STATS_DIR", get_stats_directory()))
+    VRtist: bpy.props.StringProperty(
+        name="VRtist", default=os.environ.get("VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe")
+    )
+    statistics_directory: bpy.props.StringProperty(
+        name="Stats Directory", default=os.environ.get("DCCSYNC_STATS_DIR", get_stats_directory())
+    )
     auto_save_statistics: bpy.props.BoolProperty(default=True)
 
     # Developer option to avoid sending scene content to server at the first connexion
@@ -113,11 +111,13 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
     send_base_meshes: bpy.props.BoolProperty(default=True)
     send_baked_meshes: bpy.props.BoolProperty(default=True)
 
-    log_level: bpy.props.EnumProperty(name="Log Level",
-                                      description="Logging level to use",
-                                      items=log_level_enum_items,
-                                      set=set_log_level,
-                                      get=get_log_level)
+    log_level: bpy.props.EnumProperty(
+        name="Log Level",
+        description="Logging level to use",
+        items=log_level_enum_items,
+        set=set_log_level,
+        get=get_log_level,
+    )
 
 
 def get_dcc_sync_props() -> DCCSyncProperties:
@@ -134,8 +134,7 @@ classes = (
 def register():
     for _ in classes:
         bpy.utils.register_class(_)
-    bpy.types.WindowManager.dcc_sync = bpy.props.PointerProperty(
-        type=DCCSyncProperties)
+    bpy.types.WindowManager.dcc_sync = bpy.props.PointerProperty(type=DCCSyncProperties)
 
 
 def unregister():

@@ -15,7 +15,7 @@ bl_info = {
     "blender": (2, 80, 0),
     "location": "",
     "warning": "",
-    "category": "Generic"
+    "category": "Generic",
 }
 
 logger = logging.getLogger(__name__)
@@ -52,8 +52,7 @@ class Formatter(logging.Formatter):
 def register():
     if len(logger.handlers) == 0:
         logger.setLevel(logging.WARNING)
-        formatter = Formatter(
-            '{asctime} - {name:<36} - {levelname:<8} - {message:<80}', style='{')
+        formatter = Formatter("{asctime} - {name:<36} - {levelname:<8} - {message:<80}", style="{")
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         logger.addHandler(handler)

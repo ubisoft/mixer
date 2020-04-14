@@ -33,7 +33,7 @@ class TransformStruct:
 
 def updateParams(obj):
     # send collection instances
-    if obj.instance_type == 'COLLECTION':
+    if obj.instance_type == "COLLECTION":
         collection_lib.sendCollectionInstance(shareData.client, obj)
         return
 
@@ -44,23 +44,32 @@ def updateParams(obj):
     if obj.data:
         typename = obj.data.bl_rna.name
 
-    if typename != 'Camera' and typename != 'Mesh' and typename != 'Curve'and typename != 'Text Curve' and typename != 'Sun Light' and typename != 'Point Light' and typename != 'Spot Light' and typename != 'Grease Pencil':
+    if (
+        typename != "Camera"
+        and typename != "Mesh"
+        and typename != "Curve"
+        and typename != "Text Curve"
+        and typename != "Sun Light"
+        and typename != "Point Light"
+        and typename != "Spot Light"
+        and typename != "Grease Pencil"
+    ):
         return
 
-    if typename == 'Camera':
+    if typename == "Camera":
         shareData.client.sendCamera(obj)
 
-    if typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light':
+    if typename == "Sun Light" or typename == "Point Light" or typename == "Spot Light":
         shareData.client.sendLight(obj)
 
-    if typename == 'Grease Pencil':
+    if typename == "Grease Pencil":
         for material in obj.data.materials:
             shareData.client.sendMaterial(material)
         shareData.client.sendGreasePencilMesh(obj)
         shareData.client.sendGreasePencilConnection(obj)
 
-    if typename == 'Mesh' or typename == 'Curve' or typename == 'Text Curve':
-        if obj.mode == 'OBJECT':
+    if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
+        if obj.mode == "OBJECT":
             shareData.client.sendMesh(obj)
 
 
@@ -85,7 +94,7 @@ def join_room(room_name: str):
         "statsfile": get_stats_filename(shareData.runId, shareData.sessionId),
         "user": user,
         "room": room_name,
-        "children": {}
+        "children": {},
     }
     shareData.auto_save_statistics = get_dcc_sync_props().auto_save_statistics
     shareData.statistics_directory = get_dcc_sync_props().statistics_directory
@@ -103,8 +112,7 @@ def leave_current_room():
     shareData.clearBeforeState()
 
     if shareData.current_statistics is not None and shareData.auto_save_statistics:
-        save_statistics(shareData.current_statistics,
-                        shareData.statistics_directory)
+        save_statistics(shareData.current_statistics, shareData.statistics_directory)
     shareData.current_statistics = None
     shareData.auto_save_statistics = False
     shareData.statistics_directory = None
@@ -266,8 +274,7 @@ def updateObjectsState(oldObjects: dict, newObjects: dict):
     shareData.oldObjects = newObjects
 
     if len(shareData.objectsAdded) == 1 and len(shareData.objectsRemoved) == 1:
-        shareData.objectsRenamed[list(shareData.objectsRemoved)[
-            0]] = list(shareData.objectsAdded)[0]
+        shareData.objectsRenamed[list(shareData.objectsRemoved)[0]] = list(shareData.objectsAdded)[0]
         shareData.objectsAdded.clear()
         shareData.objectsRemoved.clear()
         return
@@ -297,7 +304,9 @@ def updateObjectsState(oldObjects: dict, newObjects: dict):
 
 
 def isInObjectMode():
-    return not hasattr(bpy.context, "active_object") or (not bpy.context.active_object or bpy.context.active_object.mode == 'OBJECT')
+    return not hasattr(bpy.context, "active_object") or (
+        not bpy.context.active_object or bpy.context.active_object.mode == "OBJECT"
+    )
 
 
 def removeObjectsFromScenes():
@@ -403,8 +412,7 @@ def addObjectsToCollections():
     changed = False
     for collectionName, objectNames in shareData.objectsAddedToCollection.items():
         for objectName in objectNames:
-            collection_lib.sendAddObjectToCollection(shareData.client,
-                                                     collectionName, objectName)
+            collection_lib.sendAddObjectToCollection(shareData.client, collectionName, objectName)
             changed = True
     return changed
 
@@ -501,18 +509,27 @@ def updateObjectsData():
         obj = update.id.original
         typename = obj.bl_rna.name
 
-        if typename == 'Object':
-            if hasattr(obj, 'data'):
+        if typename == "Object":
+            if hasattr(obj, "data"):
                 if obj.data in dataContainer:
                     dataContainer[obj.data].append(obj)
                 else:
                     dataContainer[obj.data] = [obj]
             transforms.add(obj)
 
-        if typename == 'Camera' or typename == 'Mesh' or typename == 'Curve' or typename == 'Text Curve' or typename == 'Sun Light' or typename == 'Point Light' or typename == 'Spot Light' or typename == 'Grease Pencil':
+        if (
+            typename == "Camera"
+            or typename == "Mesh"
+            or typename == "Curve"
+            or typename == "Text Curve"
+            or typename == "Sun Light"
+            or typename == "Point Light"
+            or typename == "Spot Light"
+            or typename == "Grease Pencil"
+        ):
             data.add(obj)
 
-        if typename == 'Material':
+        if typename == "Material":
             shareData.client.sendMaterial(obj)
 
     # Send transforms
@@ -556,8 +573,7 @@ def sendFrameChanged(scene):
             shareData.clearChangedFrameRelatedLists()
 
         with timer.child("updateFrameChangedRelatedObjectsState"):
-            updateFrameChangedRelatedObjectsState(
-                shareData.oldObjects, shareData.blenderObjects)
+            updateFrameChangedRelatedObjectsState(shareData.oldObjects, shareData.blenderObjects)
 
         with timer.child("checkForChangeAndSendUpdates"):
             updateObjectsTransforms()
@@ -593,8 +609,7 @@ def sendSceneDataToServer(scene, dummy):
         logger.info("sendSceneDataToServer canceled (not isInObjectMode)")
         return
 
-    updateObjectsState(shareData.oldObjects,
-                       shareData.blenderObjects)
+    updateObjectsState(shareData.oldObjects, shareData.blenderObjects)
 
     with timer.child("updateScenesState"):
         updateScenesState()
@@ -643,10 +658,8 @@ def onUndoRedoPre(scene):
 
 def remapObjectsInfo():
     # update objects references
-    addedObjects = set(shareData.blenderObjects.keys()) - \
-        set(shareData.oldObjects.keys())
-    removedObjects = set(shareData.oldObjects.keys()) - \
-        set(shareData.blenderObjects.keys())
+    addedObjects = set(shareData.blenderObjects.keys()) - set(shareData.oldObjects.keys())
+    removedObjects = set(shareData.oldObjects.keys()) - set(shareData.blenderObjects.keys())
     # we are only able to manage one object rename
     if len(addedObjects) == 1 and len(removedObjects) == 1:
         oldName = list(removedObjects)[0]
@@ -681,8 +694,7 @@ def onUndoRedoPost(scene, dummy):
     if not isInObjectMode():
         return
 
-    oldObjectsName = dict(
-        [(k, None) for k in shareData.oldObjects.keys()])  # value not needed
+    oldObjectsName = dict([(k, None) for k in shareData.oldObjects.keys()])  # value not needed
     remapObjectsInfo()
     for k, v in shareData.oldObjects.items():
         if k in oldObjectsName:
@@ -781,7 +793,7 @@ def clear_scene_content():
 
     if len(bpy.data.scenes) == 1:
         scene = bpy.data.scenes[0]
-        scene.name = '__last_scene_to_be_removed__'
+        scene.name = "__last_scene_to_be_removed__"
 
     set_handlers(True)
 
@@ -810,8 +822,7 @@ def send_scene_content():
 
     sendSceneDataToServer(None, None)
 
-    shareData.client.sendFrameStartEnd(
-        bpy.context.scene.frame_start, bpy.context.scene.frame_end)
+    shareData.client.sendFrameStartEnd(bpy.context.scene.frame_start, bpy.context.scene.frame_end)
     shareData.client.sendFrame(bpy.context.scene.frame_current)
 
     shareData.client.sendGroupEnd()
@@ -822,8 +833,7 @@ def set_handlers(connect: bool):
         if connect:
             shareData.depsgraph = bpy.context.evaluated_depsgraph_get()
             bpy.app.handlers.frame_change_post.append(sendFrameChanged)
-            bpy.app.handlers.depsgraph_update_post.append(
-                sendSceneDataToServer)
+            bpy.app.handlers.depsgraph_update_post.append(sendSceneDataToServer)
             bpy.app.handlers.undo_pre.append(onUndoRedoPre)
             bpy.app.handlers.redo_pre.append(onUndoRedoPre)
             bpy.app.handlers.undo_post.append(onUndoRedoPost)
@@ -832,8 +842,7 @@ def set_handlers(connect: bool):
         else:
             bpy.app.handlers.load_post.remove(onLoad)
             bpy.app.handlers.frame_change_post.remove(sendFrameChanged)
-            bpy.app.handlers.depsgraph_update_post.remove(
-                sendSceneDataToServer)
+            bpy.app.handlers.depsgraph_update_post.remove(sendSceneDataToServer)
             bpy.app.handlers.undo_pre.remove(onUndoRedoPre)
             bpy.app.handlers.redo_pre.remove(onUndoRedoPre)
             bpy.app.handlers.undo_post.remove(onUndoRedoPost)
@@ -854,15 +863,14 @@ def wait_for_server(host, port):
 
 def start_local_server():
     dir_path = Path(__file__).parent
-    serverPath = dir_path / 'broadcaster' / 'dccBroadcaster.py'
+    serverPath = dir_path / "broadcaster" / "dccBroadcaster.py"
 
     if get_dcc_sync_props().showServerConsole:
-        args = {'creationflags': subprocess.CREATE_NEW_CONSOLE}
+        args = {"creationflags": subprocess.CREATE_NEW_CONSOLE}
     else:
         args = {}
 
-    shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(
-        serverPath)], shell=False, **args)
+    shareData.localServerProcess = subprocess.Popen([bpy.app.binary_path_python, str(serverPath)], shell=False, **args)
 
 
 def is_localhost(host):
@@ -950,9 +958,9 @@ def create_main_client(host: str, port: int):
         return False
 
     shareData.client = client
-    shareData.client.addCallback('SendContent', send_scene_content)
-    shareData.client.addCallback('ClearContent', clear_scene_content)
-    shareData.client.addCallback('Disconnect', on_disconnect_from_server)
+    shareData.client.addCallback("SendContent", send_scene_content)
+    shareData.client.addCallback("ClearContent", clear_scene_content)
+    shareData.client.addCallback("Disconnect", on_disconnect_from_server)
     if not bpy.app.timers.is_registered(networkConsumerTimer):
         bpy.app.timers.register(networkConsumerTimer)
 
@@ -961,9 +969,10 @@ def create_main_client(host: str, port: int):
 
 class CreateRoomOperator(bpy.types.Operator):
     """Create a new room on DCC Sync server"""
+
     bl_idname = "dcc_sync.create_room"
     bl_label = "DCCSync Create Room"
-    bl_options = {'REGISTER'}
+    bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
@@ -973,18 +982,19 @@ class CreateRoomOperator(bpy.types.Operator):
     def execute(self, context):
         assert shareData.currentRoom is None
         if not isClientConnected():
-            return {'CANCELLED'}
+            return {"CANCELLED"}
 
         props = get_dcc_sync_props()
         join_room(props.room)
-        return {'FINISHED'}
+        return {"FINISHED"}
 
 
 class JoinRoomOperator(bpy.types.Operator):
     """Join a room"""
+
     bl_idname = "dcc_sync.join_room"
     bl_label = "DCCSync Join Room"
-    bl_options = {'REGISTER'}
+    bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
@@ -1001,14 +1011,15 @@ class JoinRoomOperator(bpy.types.Operator):
         roomIndex = props.room_index
         room = props.rooms[roomIndex].name
         join_room(room)
-        return {'FINISHED'}
+        return {"FINISHED"}
 
 
 class LeaveRoomOperator(bpy.types.Operator):
     """Reave the current room"""
+
     bl_idname = "dcc_sync.leave_room"
     bl_label = "DCCSync Leave Room"
-    bl_options = {'REGISTER'}
+    bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
@@ -1017,14 +1028,15 @@ class LeaveRoomOperator(bpy.types.Operator):
     def execute(self, context):
         leave_current_room()
         ui.update_ui_lists()
-        return {'FINISHED'}
+        return {"FINISHED"}
 
 
 class ConnectOperator(bpy.types.Operator):
     """Connect to the DCCSync server"""
+
     bl_idname = "dcc_sync.connect"
     bl_label = "Connect to server"
-    bl_options = {'REGISTER'}
+    bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
@@ -1033,29 +1045,28 @@ class ConnectOperator(bpy.types.Operator):
     def execute(self, context):
         props = get_dcc_sync_props()
         try:
-            self.report(
-                {'INFO'}, f'Connecting to "{props.host}:{props.port}" ...')
+            self.report({"INFO"}, f'Connecting to "{props.host}:{props.port}" ...')
             if not connect():
-                self.report({'ERROR'}, "unknown error")
-                return {'CANCELLED'}
+                self.report({"ERROR"}, "unknown error")
+                return {"CANCELLED"}
 
-            self.report(
-                {'INFO'}, f'Connected to "{props.host}:{props.port}" ...')
+            self.report({"INFO"}, f'Connected to "{props.host}:{props.port}" ...')
         except socket.gaierror:
             msg = f'Cannot connect to "{props.host}": invalid host name or address'
-            self.report({'ERROR'}, msg)
+            self.report({"ERROR"}, msg)
         except Exception as e:
-            self.report({'ERROR'}, repr(e))
-            return {'CANCELLED'}
+            self.report({"ERROR"}, repr(e))
+            return {"CANCELLED"}
 
-        return {'FINISHED'}
+        return {"FINISHED"}
 
 
 class DisconnectOperator(bpy.types.Operator):
     """Disconnect from the DccSync server"""
+
     bl_idname = "dcc_sync.disconnect"
     bl_label = "Disconnect from server"
-    bl_options = {'REGISTER'}
+    bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
@@ -1063,19 +1074,20 @@ class DisconnectOperator(bpy.types.Operator):
 
     def execute(self, context):
         disconnect()
-        self.report({'INFO'}, f'Disconnected ...')
-        return {'FINISHED'}
+        self.report({"INFO"}, f"Disconnected ...")
+        return {"FINISHED"}
 
 
 class SendSelectionOperator(bpy.types.Operator):
     """Send current selection to DCC Sync server"""
+
     bl_idname = "dcc_sync.send_selection"
     bl_label = "DCCSync Send selection"
-    bl_options = {'REGISTER'}
+    bl_options = {"REGISTER"}
 
     def execute(self, context):
         if shareData.client is None:
-            return {'CANCELLED'}
+            return {"CANCELLED"}
 
         selectedObjects = bpy.context.selected_objects
         for obj in selectedObjects:
@@ -1083,19 +1095,20 @@ class SendSelectionOperator(bpy.types.Operator):
                 for slot in obj.material_slots[:]:
                     shareData.client.sendMaterial(slot.material)
             except Exception:
-                logger.error('materials not found')
+                logger.error("materials not found")
 
             updateParams(obj)
             updateTransform(obj)
 
-        return {'FINISHED'}
+        return {"FINISHED"}
 
 
 class LaunchVRtistOperator(bpy.types.Operator):
     """Launch a VRtist instance"""
+
     bl_idname = "vrtist.launch"
     bl_label = "Launch VRtist"
-    bl_options = {'REGISTER'}
+    bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
@@ -1105,7 +1118,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
         dcc_sync_props = get_dcc_sync_props()
         if not shareData.currentRoom:
             if not connect():
-                return {'CANCELLED'}
+                return {"CANCELLED"}
 
             props = get_dcc_sync_props()
             join_room(props.room)
@@ -1113,35 +1126,42 @@ class LaunchVRtistOperator(bpy.types.Operator):
         hostname = "localhost"
         if not shareData.isLocal:
             hostname = dcc_sync_props.host
-        args = [dcc_sync_props.VRtist, "--room", shareData.currentRoom,
-                "--hostname", hostname, "--port", str(dcc_sync_props.port)]
-        subprocess.Popen(args, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT, shell=False)
-        return {'FINISHED'}
+        args = [
+            dcc_sync_props.VRtist,
+            "--room",
+            shareData.currentRoom,
+            "--hostname",
+            hostname,
+            "--port",
+            str(dcc_sync_props.port),
+        ]
+        subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+        return {"FINISHED"}
 
 
 class WriteStatisticsOperator(bpy.types.Operator):
     """Write dccsync statistics in a file"""
+
     bl_idname = "dcc_sync.write_statistics"
     bl_label = "DCCSync Write Statistics"
-    bl_options = {'REGISTER'}
+    bl_options = {"REGISTER"}
 
     def execute(self, context):
         if shareData.current_statistics is not None:
-            save_statistics(shareData.current_statistics,
-                            get_dcc_sync_props().statistics_directory)
-        return {'FINISHED'}
+            save_statistics(shareData.current_statistics, get_dcc_sync_props().statistics_directory)
+        return {"FINISHED"}
 
 
 class OpenStatsDirOperator(bpy.types.Operator):
     """Write dccsync stats directory in explorer"""
+
     bl_idname = "dcc_sync.open_stats_dir"
     bl_label = "DCCSync Open Stats Directory"
-    bl_options = {'REGISTER'}
+    bl_options = {"REGISTER"}
 
     def execute(self, context):
         os.startfile(get_dcc_sync_props().statistics_directory)
-        return {'FINISHED'}
+        return {"FINISHED"}
 
 
 classes = (

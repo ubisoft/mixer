@@ -9,10 +9,9 @@ def init_logging(args):
     """
     log_numeric_level = getattr(logging, args.log_level.upper(), None)
     if not isinstance(log_numeric_level, int):
-        raise ValueError(f'Invalid log level: {args.log_level}')
+        raise ValueError(f"Invalid log level: {args.log_level}")
 
-    formatter = logging.Formatter(
-        fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d]')
+    formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d]")
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
@@ -28,12 +27,12 @@ def init_logging(args):
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-        logger.info(f'Logging to file {args.log_file}')
+        logger.info(f"Logging to file {args.log_file}")
 
 
 def add_logging_cli_args(parser: argparse.ArgumentParser):
     """
     Set CLI arguments for logger configuration.
     """
-    parser.add_argument('--log-level', default='WARNING', help='Level of log to use by default.')
-    parser.add_argument('--log-file', help='Path to log file.')
+    parser.add_argument("--log-level", default="WARNING", help="Level of log to use by default.")
+    parser.add_argument("--log-file", help="Path to log file.")

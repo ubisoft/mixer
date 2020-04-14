@@ -103,7 +103,7 @@ def encode_bmesh_layer(layer_collection, element_seq, extract_layer_tuple_func):
             buffer.extend(extract_layer_tuple_func(elt, layer))
             count += 1
 
-    binary_buffer = struct.pack('1I', len(layer_collection))
+    binary_buffer = struct.pack("1I", len(layer_collection))
     if len(layer_collection) > 0:
         binary_buffer += struct.pack(extract_layer_tuple_func.struct * count, *buffer)
     return binary_buffer
@@ -130,7 +130,7 @@ def encodeBakedMesh(obj):
     stats_timer.checkpoint("eval_depsgraph")
 
     # Triangulate mesh (before calculating normals)
-    mesh = obj.data if obj.type == 'MESH' else obj.to_mesh()
+    mesh = obj.data if obj.type == "MESH" else obj.to_mesh()
     if mesh == None:
         # This happens for empty curves
         return bytes()
@@ -177,47 +177,44 @@ def encodeBakedMesh(obj):
             materialIndices.append(currentMaterialIndex)
         currentfaceIndex = currentfaceIndex + 1
 
-    if obj.type != 'MESH':
+    if obj.type != "MESH":
         obj.to_mesh_clear()
 
     stats_timer.checkpoint("make_buffers")
 
     # Vericex count + binary vertices buffer
     size = len(vertices) // 3
-    binaryVerticesBuffer = common.intToBytes(
-        size, 4) + struct.pack(f'{len(vertices)}f', *vertices)
+    binaryVerticesBuffer = common.intToBytes(size, 4) + struct.pack(f"{len(vertices)}f", *vertices)
 
     stats_timer.checkpoint("write_verts")
 
     # Normals count + binary normals buffer
     size = len(normals) // 3
-    binaryNormalsBuffer = common.intToBytes(
-        size, 4) + struct.pack(f'{len(normals)}f', *normals)
+    binaryNormalsBuffer = common.intToBytes(size, 4) + struct.pack(f"{len(normals)}f", *normals)
 
     stats_timer.checkpoint("write_normals")
 
     # UVs count + binary uvs buffer
     size = len(uvs) // 2
-    binaryUVsBuffer = common.intToBytes(
-        size, 4) + struct.pack(f'{len(uvs)}f', *uvs)
+    binaryUVsBuffer = common.intToBytes(size, 4) + struct.pack(f"{len(uvs)}f", *uvs)
 
     stats_timer.checkpoint("write_uvs")
 
     # material indices + binary material indices buffer
     size = len(materialIndices) // 2
-    binaryMaterialIndicesBuffer = common.intToBytes(
-        size, 4) + struct.pack(f'{len(materialIndices)}I', *materialIndices)
+    binaryMaterialIndicesBuffer = common.intToBytes(size, 4) + struct.pack(f"{len(materialIndices)}I", *materialIndices)
 
     stats_timer.checkpoint("write_material_indices")
 
     # triangle indices count + binary triangle indices buffer
     size = len(indices) // 3
-    binaryIndicesBuffer = common.intToBytes(
-        size, 4) + struct.pack(f'{len(indices)}I', *indices)
+    binaryIndicesBuffer = common.intToBytes(size, 4) + struct.pack(f"{len(indices)}I", *indices)
 
     stats_timer.checkpoint("write_tri_idx_buff")
 
-    return binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer
+    return (
+        binaryVerticesBuffer + binaryNormalsBuffer + binaryUVsBuffer + binaryMaterialIndicesBuffer + binaryIndicesBuffer
+    )
 
 
 @stats_timer(shareData)
@@ -326,7 +323,7 @@ def encodeBaseMesh(obj):
 
     # Temporary for curves and other objects that support to_mesh()
     # #todo Implement correct base encoding for these objects
-    mesh_data = obj.data if obj.type == 'MESH' else obj.to_mesh()
+    mesh_data = obj.data if obj.type == "MESH" else obj.to_mesh()
     if mesh_data == None:
         # This happens for empty curves
         # This is temporary, when curves will be fully implemented we will encode something
@@ -355,8 +352,9 @@ def encodeBaseMesh(obj):
         shape_keys_buffer = []
         fmt_str = ""
         for key_block in mesh_data.shape_keys.key_blocks:
-            shape_keys_buffer.extend((key_block.mute, key_block.value, key_block.slider_min,
-                                      key_block.slider_max, len(key_block.data)))
+            shape_keys_buffer.extend(
+                (key_block.mute, key_block.value, key_block.slider_min, key_block.slider_max, len(key_block.data))
+            )
             fmt_str += f"1I1f1f1f1I{(3 * len(key_block.data))}f"
             for i in range(len(key_block.data)):
                 shape_keys_buffer.extend(key_block.data[i].co)
@@ -404,7 +402,7 @@ def encodeBaseMesh(obj):
         binary_buffer += common.encodeString(vertex_colors.name)
         binary_buffer += common.encodeBool(vertex_colors.active_render)
 
-    if obj.type != 'MESH':
+    if obj.type != "MESH":
         obj.to_mesh_clear()
 
     return binary_buffer
@@ -526,7 +524,7 @@ def decodeBaseMesh(client, obj, data, index):
     edgeCount, index = common.decodeInt(data, index)
     logger.debug("Reading %d edges", edgeCount)
 
-    edgesData = struct.unpack(f'{edgeCount * 4}I', data[index:index + edgeCount * 4 * 4])
+    edgesData = struct.unpack(f"{edgeCount * 4}I", data[index : index + edgeCount * 4 * 4])
     index += edgeCount * 4 * 4
 
     for edgeIdx in range(edgeCount):
@@ -546,7 +544,7 @@ def decodeBaseMesh(client, obj, data, index):
         materialIdx, index = common.decodeInt(data, index)
         smooth, index = common.decodeBool(data, index)
         vertCount, index = common.decodeInt(data, index)
-        faceVertices = struct.unpack(f'{vertCount}I', data[index:index + vertCount * 4])
+        faceVertices = struct.unpack(f"{vertCount}I", data[index : index + vertCount * 4])
         index += vertCount * 4
         verts = [bm.verts[i] for i in faceVertices]
         face = bm.faces.new(verts)
@@ -585,7 +583,7 @@ def decodeBaseMesh(client, obj, data, index):
             shape_key.slider_max, index = common.decodeFloat(data, index)
             shape_key_data_size, index = common.decodeInt(data, index)
             for i in range(shape_key_data_size):
-                shape_key.data[i].co = Vector(struct.unpack('3f', data[index:index + 3 * 4]))
+                shape_key.data[i].co = Vector(struct.unpack("3f", data[index : index + 3 * 4]))
                 index += 3 * 4
         obj.data.shape_keys.use_relative, index = common.decodeBool(data, index)
 
@@ -600,7 +598,7 @@ def decodeBaseMesh(client, obj, data, index):
         for elmt_idx in range(vg_size):
             vert_idx, index = common.decodeInt(data, index)
             weight, index = common.decodeFloat(data, index)
-            vertex_group.add([vert_idx], weight, 'REPLACE')
+            vertex_group.add([vert_idx], weight, "REPLACE")
 
     # Normals
     obj.data.use_auto_smooth, index = common.decodeBool(data, index)
@@ -633,7 +631,7 @@ def decodeBaseMesh(client, obj, data, index):
 
 @stats_timer(shareData)
 def decodeMesh(client, obj, data, index):
-    assert(obj.data)
+    assert obj.data
 
     # Clear materials before building faces because it erase material idx of faces
     obj.data.materials.clear()

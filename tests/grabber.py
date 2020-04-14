@@ -1,5 +1,6 @@
 import sys  # nopep8
 from pathlib import Path  # nopep8
+
 sys.path.append(str(Path(__package__).parent))  # nopep8
 
 from broadcaster.common import MessageType
@@ -12,15 +13,13 @@ import threading
 import time
 
 
-class CommandStream():
+class CommandStream:
     """
     Command stream split by command type
     """
 
     def __init__(self):
-        self.data: Mapping[int, List[Command]] = {
-            m: [] for m in MessageType if m > MessageType.COMMAND
-        }
+        self.data: Mapping[int, List[Command]] = {m: [] for m in MessageType if m > MessageType.COMMAND}
 
     def sort(self):
         # For each command type, the comand ordering is not significant for deciding the test success
@@ -29,7 +28,7 @@ class CommandStream():
             commands.sort()
 
 
-class Grabber():
+class Grabber:
     """
     Grab the command stream from a server for the purpose of unit testing. Ignores protocol messages (JOIN, ...)
     and messagae order
@@ -41,7 +40,7 @@ class Grabber():
     def grab(self, host, port, room_name: str):
         client = Client(host, port)
         client.connect()
-        command = Command(MessageType.JOIN_ROOM, room_name.encode('utf8'))
+        command = Command(MessageType.JOIN_ROOM, room_name.encode("utf8"))
         client.addCommand(command)
 
         attempts_max = 20

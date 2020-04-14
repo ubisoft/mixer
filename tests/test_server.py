@@ -19,12 +19,12 @@ class Delegate:
         return None
 
     def buildListRoomClients(self, clients):
-        logging.info('xxx %s', clients)
+        logging.info("xxx %s", clients)
         self.clients = clients
         if clients is None:
             self.name_room = None
         else:
-            self.name_room = [(c['name'], c['room']) for c in clients]
+            self.name_room = [(c["name"], c["room"]) for c in clients]
         return None
 
     def on_connection_lost(self):
@@ -51,9 +51,8 @@ def networkConsumer(client, delegate):
             delegate.on_connection_lost()
 
 
-@unittest.skip('')
+@unittest.skip("")
 class Test_Server(unittest.TestCase):
-
     def setUp(self):
         self._delegate = Delegate()
         self._server = Server()
@@ -113,8 +112,8 @@ class Test_Server(unittest.TestCase):
         delay = self.delay
         server = self._server
 
-        c0_name = 'c0_name'
-        c0_room = 'c0_room'
+        c0_name = "c0_name"
+        c0_room = "c0_room"
 
         d0 = Delegate()
         c0 = Client()
@@ -134,10 +133,10 @@ class Test_Server(unittest.TestCase):
         delay = self.delay
         server = self._server
 
-        c0_name = 'c0_name'
-        c0_room = 'c0_room'
+        c0_name = "c0_name"
+        c0_room = "c0_room"
 
-        c1_name = 'c1_name'
+        c1_name = "c1_name"
         c1_room = c0_room
 
         d0 = Delegate()
@@ -165,10 +164,10 @@ class Test_Server(unittest.TestCase):
         delay = self.delay
         server = self._server
 
-        c0_name = 'c0_name'
-        c0_room = 'c0_room'
+        c0_name = "c0_name"
+        c0_room = "c0_room"
 
-        c1_name = 'c1_name'
+        c1_name = "c1_name"
         c1_room = c0_room
 
         d0 = Delegate()
@@ -193,5 +192,5 @@ class Test_Server(unittest.TestCase):
         self.assertListEqual(d0.name_room, d1.name_room)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

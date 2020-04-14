@@ -3,12 +3,7 @@ from typing import List, Mapping, Set
 from collections import namedtuple
 import bpy
 
-ObjectVisibility = namedtuple('ObjectVisibility', [
-    'hide_viewport',
-    'hide_select',
-    'hide_render',
-    'visible_get'
-])
+ObjectVisibility = namedtuple("ObjectVisibility", ["hide_viewport", "hide_select", "hide_render", "visible_get"])
 
 
 def objectVisibility(o: bpy.types.Object):
@@ -16,10 +11,9 @@ def objectVisibility(o: bpy.types.Object):
 
 
 class CollectionInfo:
-    def __init__(self, hide_viewport: bool, instance_offset,
-                 children: List[str],
-                 parent: List[str],
-                 objects: List[str] = None):
+    def __init__(
+        self, hide_viewport: bool, instance_offset, children: List[str], parent: List[str], objects: List[str] = None
+    ):
         self.hide_viewport = hide_viewport
         self.instance_offset = instance_offset
         self.children = children
@@ -28,16 +22,14 @@ class CollectionInfo:
 
 
 class SceneInfo:
-    def __init__(self,
-                 children: List[str],
-                 objects: List[str] = None):
+    def __init__(self, children: List[str], objects: List[str] = None):
         self.children = children
         self.objects = objects or []
 
 
 class ShareData:
     def __init__(self):
-        self.runId = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        self.runId = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.sessionId = 0  # For logging and debug
         self.client = None
 
@@ -263,12 +255,20 @@ class ShareData:
         # All non master collections
         for collection in self.blenderCollections.values():
             if not self.collectionsInfo.get(collection.name_full):
-                cInfo = CollectionInfo(collection.hide_viewport, collection.instance_offset,
-                                       [x.name_full for x in collection.children], None)
+                cInfo = CollectionInfo(
+                    collection.hide_viewport,
+                    collection.instance_offset,
+                    [x.name_full for x in collection.children],
+                    None,
+                )
                 self.collectionsInfo[collection.name_full] = cInfo
             for child in collection.children:
-                cInfo = CollectionInfo(child.hide_viewport, child.instance_offset,
-                                       [x.name_full for x in child.children], collection.name_full)
+                cInfo = CollectionInfo(
+                    child.hide_viewport,
+                    child.instance_offset,
+                    [x.name_full for x in child.children],
+                    collection.name_full,
+                )
                 self.collectionsInfo[child.name_full] = cInfo
 
         # Store non master collections objects
@@ -286,11 +286,10 @@ class ShareData:
         self.updateScenesInfo()
         self.updateCollectionsInfo()
         self.updateObjectsInfo()
-        self.objectsVisibility = {x.name_full: objectVisibility(x)
-                                  for x in self.blenderObjects.values()}
-        self.objectsParents = {x.name_full: x.parent.name_full
-                               if x.parent is not None else ""
-                               for x in self.blenderObjects.values()}
+        self.objectsVisibility = {x.name_full: objectVisibility(x) for x in self.blenderObjects.values()}
+        self.objectsParents = {
+            x.name_full: x.parent.name_full if x.parent is not None else "" for x in self.blenderObjects.values()
+        }
 
 
 shareData = ShareData()

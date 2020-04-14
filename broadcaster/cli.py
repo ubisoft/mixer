@@ -71,36 +71,36 @@ def process_room_command(args):
     client = None
 
     try:
-        if args.command == 'list':
+        if args.command == "list":
             client = CliClient(args)
             client.listRooms()
 
-        elif args.command == 'delete':
+        elif args.command == "delete":
             count = len(args.name)
             if count:
                 client = CliClient(args)
                 for name in args.name:
                     client.deleteRoom(name)
             else:
-                print('Expected one or more room names')
+                print("Expected one or more room names")
 
-        elif args.command == 'clear':
+        elif args.command == "clear":
             count = len(args.name)
             if count:
                 client = CliClient(args)
                 for name in args.name:
                     client.clearRoom(name)
             else:
-                print('Expected one or more room names')
+                print("Expected one or more room names")
 
-        elif args.command == 'clients':
+        elif args.command == "clients":
             count = len(args.name)
             if count:
                 client = CliClient(args)
                 for name in args.name:
                     client.listRoomClients(name)
             else:
-                print('Expected one or more room names')
+                print("Expected one or more room names")
     except ServerError as e:
         logger.error(e, exc_info=True)
     finally:
@@ -112,7 +112,7 @@ def process_client_command(args):
     client = None
 
     try:
-        if args.command == 'list':
+        if args.command == "list":
             client = CliClient(args)
             client.listClients()
     except ServerError as e:
@@ -125,19 +125,15 @@ def process_client_command(args):
 commands = [
     "connect",
     "disconnect",
-
     "listrooms",
     "join <roomname>",
     "leave <roomname>",
-
     "listjoinedclients",
     "listallclients",
     "setclientname <clientname>",
-
     "listroomclients <roomname>",
-
     "help",
-    "exit"  # this loop
+    "exit",  # this loop
 ]
 
 
@@ -205,40 +201,44 @@ def interactive_loop(args):
                 else:
                     pass
         except Exception as e:
-            logger.error(f'Exception: {e}', exc_info=True)
+            logger.error(f"Exception: {e}", exc_info=True)
 
 
 def main():
     args, args_parser = parse_cli_args()
     cli_utils.init_logging(args)
 
-    if hasattr(args, 'func'):
+    if hasattr(args, "func"):
         args.func(args)
     else:
         interactive_loop(args)
 
 
 def parse_cli_args():
-    parser = argparse.ArgumentParser(prog='cli', description='Command Line Interface for DCC Sync server')
+    parser = argparse.ArgumentParser(prog="cli", description="Command Line Interface for DCC Sync server")
     cli_utils.add_logging_cli_args(parser)
 
     sub_parsers = parser.add_subparsers()
 
-    parser.add_argument('--host', help='Host name', default=common.DEFAULT_HOST)
-    parser.add_argument('--port', help='Port', default=common.DEFAULT_PORT)
-    parser.add_argument('--timeout', help='Timeout for server response', default=TIMEOUT)
+    parser.add_argument("--host", help="Host name", default=common.DEFAULT_HOST)
+    parser.add_argument("--port", help="Port", default=common.DEFAULT_PORT)
+    parser.add_argument("--timeout", help="Timeout for server response", default=TIMEOUT)
 
     # Room commands are relative to... a room!
-    room_parser = sub_parsers.add_parser('room', help='Rooms related commands')
-    room_parser.add_argument('command', help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.', choices=(
-        'list', 'delete', 'clear', 'clients'))
+    room_parser = sub_parsers.add_parser("room", help="Rooms related commands")
     room_parser.add_argument(
-        'name', help='Room name. You can specify multiple room names separated by spaces.', nargs='*')
+        "command",
+        help='Commands. Use "list" to list all the rooms of the server. Use "delete" to delete one or more rooms. Use "clear" to clear the commands stack of rooms. Use "clients" to list the clients connected to rooms.',
+        choices=("list", "delete", "clear", "clients"),
+    )
+    room_parser.add_argument(
+        "name", help="Room name. You can specify multiple room names separated by spaces.", nargs="*"
+    )
     room_parser.set_defaults(func=process_room_command)
 
     # Client commands are relative to a client independently of any room
-    client_parser = sub_parsers.add_parser('client', help='Clients related commands')
-    client_parser.add_argument('command', help='', choices=('list'))
+    client_parser = sub_parsers.add_parser("client", help="Clients related commands")
+    client_parser.add_argument("command", help="", choices=("list"))
     client_parser.set_defaults(func=process_client_command)
 
     return parser.parse_args(), parser

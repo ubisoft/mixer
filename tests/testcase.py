@@ -14,6 +14,7 @@ from grabber import CommandStream
 from process import BlenderServer
 
 import sys  # nopep8
+
 sys.path.append(str(Path(__package__).parent))  # nopep8
 from broadcaster.common import MessageType
 
@@ -39,7 +40,7 @@ class Blender:
         self._blender.connect()
         self.connect_and_join_dccsync()
 
-    def connect_and_join_dccsync(self, room_name='dccsync_unittest'):
+    def connect_and_join_dccsync(self, room_name="dccsync_unittest"):
         if self._log_level is not None:
             self._blender.send_function(dccsync_lib.set_log_level, self._log_level)
         self._blender.send_function(dccsync_lib.connect)
@@ -65,7 +66,6 @@ class Blender:
 
 
 class BlenderTestCase(unittest.TestCase):
-
     def __init__(self, *args, **kwargs):
         self._sender_wait_for_debugger = False
         self._receiver_wait_for_debugger = False
@@ -85,18 +85,26 @@ class BlenderTestCase(unittest.TestCase):
         for k in a.keys():
             message_type = str(MessageType(k))
             message_count = len(a[k])
-            self.assertEquals(message_count, len(b[k]), f'len mismatch for {message_type}')
+            self.assertEquals(message_count, len(b[k]), f"len mismatch for {message_type}")
             if message_count != 0:
-                logger.info(f'Message count for {message_type:16} : {message_count}')
+                logger.info(f"Message count for {message_type:16} : {message_count}")
             if k not in ignore:
                 expected_count = self.expected_counts.get(k)
                 if expected_count is not None:
-                    self.assertEqual(expected_count, message_count,
-                                     f'Unexpected message count for message {message_type}. Expected {expected_count}: found {message_count}')
-                self.assertEquals(a[k], b[k], f'content mismatch for {message_type}')
+                    self.assertEqual(
+                        expected_count,
+                        message_count,
+                        f"Unexpected message count for message {message_type}. Expected {expected_count}: found {message_count}",
+                    )
+                self.assertEquals(a[k], b[k], f"content mismatch for {message_type}")
 
-    def setUp(self, sender_blendfile=None, receiver_blendfile=None,
-              sender_wait_for_debugger=False, receiver_wait_for_debugger=False):
+    def setUp(
+        self,
+        sender_blendfile=None,
+        receiver_blendfile=None,
+        sender_wait_for_debugger=False,
+        receiver_wait_for_debugger=False,
+    ):
         """
         if a blendfile if not specified, blender will start with its default file.
         Not recommended) as it is machine dependent
@@ -127,18 +135,18 @@ class BlenderTestCase(unittest.TestCase):
         self._receiver.disconnect_dccsync()
         # time.sleep(1)
 
-        host = '127.0.0.1'
+        host = "127.0.0.1"
         port = 12800
-        self._sender.connect_and_join_dccsync('dccsync_grab_sender')
+        self._sender.connect_and_join_dccsync("dccsync_grab_sender")
         time.sleep(1)
         sender_grabber = Grabber()
-        sender_grabber.grab(host, port, 'dccsync_grab_sender')
+        sender_grabber.grab(host, port, "dccsync_grab_sender")
         self._sender.disconnect_dccsync()
 
-        self._receiver.connect_and_join_dccsync('dccsync_grab_receiver')
+        self._receiver.connect_and_join_dccsync("dccsync_grab_receiver")
         time.sleep(1)
         receiver_grabber = Grabber()
-        receiver_grabber.grab(host, port, 'dccsync_grab_receiver')
+        receiver_grabber.grab(host, port, "dccsync_grab_receiver")
         self._receiver.disconnect_dccsync()
 
         # TODO_ timing error : sometimes succeeds
@@ -169,7 +177,7 @@ class BlenderTestCase(unittest.TestCase):
             if rc is not None:
                 self._receiver.kill()
                 if rc != 0:
-                    self.fail(f'sender return code {rc} ({hex(rc)})')
+                    self.fail(f"sender return code {rc} ({hex(rc)})")
                 else:
                     return
 
@@ -177,7 +185,7 @@ class BlenderTestCase(unittest.TestCase):
             if rc is not None:
                 self._sender.kill()
                 if rc != 0:
-                    self.fail(f'receiver return code {rc} ({hex(rc)})')
+                    self.fail(f"receiver return code {rc} ({hex(rc)})")
                 else:
                     return
 
@@ -190,8 +198,8 @@ class BlenderTestCase(unittest.TestCase):
 
         """
         with Path(tempfile.mkdtemp()) as tmp_dir:
-            sender_file = tmp_dir / 'sender'
-            receiver_file = tmp_dir / 'receiver'
+            sender_file = tmp_dir / "sender"
+            receiver_file = tmp_dir / "receiver"
             self._sender.send_function(blender_lib.save, str(sender_file))
             self._receiver.send_function(blender_lib.save, str(receiver_file))
             self._sender.quit()
@@ -200,7 +208,7 @@ class BlenderTestCase(unittest.TestCase):
             self.assertFilesIdentical(sender_file, receiver_file)
 
     def assertFileExists(self, path):
-        self.assertTrue(Path(path).is_file(), f'File does not exist or is not a file : {path}')
+        self.assertTrue(Path(path).is_file(), f"File does not exist or is not a file : {path}")
 
     def assertFilesIdentical(self, *files):
         """
@@ -215,19 +223,19 @@ class BlenderTestCase(unittest.TestCase):
 
         attrs = [(path, path.stat().st_size) for path in files]
         p0, s0 = attrs[0]
-        for (p,  s) in attrs:
-            self.assertEqual(s0, s, f'File size differ for {p0} ({s0}) and {p} ({s})')
+        for (p, s) in attrs:
+            self.assertEqual(s0, s, f"File size differ for {p0} ({s0}) and {p} ({s})")
 
         hashes = []
         for path in paths:
             hash = hashlib.md5()
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 hash.update(f.read())
             hashes.append((path, hash))
 
         p0, h0 = hashes[0]
-        for (p,  h) in attrs:
-            self.assertEqual(h0, h, f'Hashes differ for {p0} ({h0.hex()}) and {p} ({h.hex()})')
+        for (p, h) in attrs:
+            self.assertEqual(h0, h, f"Hashes differ for {p0} ({h0.hex()}) and {p} ({h.hex()})")
 
     def connect(self):
         self._sender.connect_and_join_dccsync()

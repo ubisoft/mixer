@@ -6,15 +6,16 @@ import bpy
 logger = logging.getLogger(__name__)
 
 
-def sendObjectVisibility(client: 'ClientBlender', object_: bpy.types.Object):
+def sendObjectVisibility(client: "ClientBlender", object_: bpy.types.Object):
     logger.debug("sendObjectVisibility %s", object_.name_full)
-    buffer = common.encodeString(object_.name_full) + \
-        common.encodeBool(object_.hide_viewport) + \
-        common.encodeBool(object_.hide_select) + \
-        common.encodeBool(object_.hide_render) + \
-        common.encodeBool(object_.hide_get())
-    client.addCommand(common.Command(
-        common.MessageType.OBJECT_VISIBILITY, buffer, 0))
+    buffer = (
+        common.encodeString(object_.name_full)
+        + common.encodeBool(object_.hide_viewport)
+        + common.encodeBool(object_.hide_select)
+        + common.encodeBool(object_.hide_render)
+        + common.encodeBool(object_.hide_get())
+    )
+    client.addCommand(common.Command(common.MessageType.OBJECT_VISIBILITY, buffer, 0))
 
 
 def buildObjectVisibility(data):

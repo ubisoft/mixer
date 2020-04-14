@@ -23,8 +23,7 @@ logger = logging.getLogger(__name__)
 
 class ClientBlender(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
-        super(ClientBlender, self).__init__(
-            host, port)
+        super(ClientBlender, self).__init__(host, port)
 
         self.textures = set()
         self.callbacks = {}
@@ -54,12 +53,12 @@ class ClientBlender(Client):
         return collection
 
     def getOrCreatePath(self, path, data=None) -> bpy.types.Object:
-        index = path.rfind('/')
+        index = path.rfind("/")
         if index != -1:
             shareData.pendingParenting.add(path)  # Parenting is resolved after consumption of all messages
 
         # Create or get object
-        elem = path[index + 1:]
+        elem = path[index + 1 :]
         ob = shareData.blenderObjects.get(elem)
         if not ob:
             ob = bpy.data.objects.new(elem, data)
@@ -80,7 +79,7 @@ class ClientBlender(Client):
     def buildCamera(self, data):
         cameraPath, start = common.decodeString(data, 0)
 
-        cameraName = cameraPath.split('/')[-1]
+        cameraName = cameraPath.split("/")[-1]
         camera = self.getOrCreateCamera(cameraName)
 
         camera.lens, start = common.decodeFloat(data, start)
@@ -92,11 +91,11 @@ class ClientBlender(Client):
         camera.sensor_height, start = common.decodeFloat(data, start)
 
         if sensorFit == 0:
-            camera.sensor_fit = 'AUTO'
+            camera.sensor_fit = "AUTO"
         elif sensorFit == 1:
-            camera.sensor_fit = 'VERTICAL'
+            camera.sensor_fit = "VERTICAL"
         else:
-            camera.sensor_fit = 'HORIZONTAL'
+            camera.sensor_fit = "HORIZONTAL"
 
         self.getOrCreateObjectData(cameraPath, camera)
 
@@ -111,15 +110,15 @@ class ClientBlender(Client):
     def buildLight(self, data):
         lightPath, start = common.decodeString(data, 0)
         lightType, start = common.decodeInt(data, start)
-        blighttype = 'POINT'
+        blighttype = "POINT"
         if lightType == common.LightType.SUN.value:
-            blighttype = 'SUN'
+            blighttype = "SUN"
         elif lightType == common.LightType.POINT.value:
-            blighttype = 'POINT'
+            blighttype = "POINT"
         else:
-            blighttype = 'SPOT'
+            blighttype = "SPOT"
 
-        lightName = lightPath.split('/')[-1]
+        lightName = lightPath.split("/")[-1]
         light = self.getOrCreateLight(lightName, blighttype)
 
         shadow, start = common.decodeInt(data, start)
@@ -198,15 +197,14 @@ class ClientBlender(Client):
     def buildTexture(self, principled, material, channel, isColor, data, index):
         fileName, index = common.decodeString(data, index)
         if len(fileName) > 0:
-            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
+            texImage = material.node_tree.nodes.new("ShaderNodeTexImage")
             try:
                 texImage.image = bpy.data.images.load(fileName)
                 if not isColor:
-                    texImage.image.colorspace_settings.name = 'Non-Color'
+                    texImage.image.colorspace_settings.name = "Non-Color"
             except Exception as e:
                 logger.error(e)
-            material.node_tree.links.new(
-                principled.inputs[channel], texImage.outputs['Color'])
+            material.node_tree.links.new(principled.inputs[channel], texImage.outputs["Color"])
         return index
 
     def buildMaterial(self, data):
@@ -222,7 +220,7 @@ class ClientBlender(Client):
         principled = None
         if nodes:
             for n in nodes:
-                if n.type == 'BSDF_PRINCIPLED':
+                if n.type == "BSDF_PRINCIPLED":
                     principled = n
                     break
 
@@ -235,66 +233,58 @@ class ClientBlender(Client):
         # Transmission ( 1 - opacity)
         transmission, index = common.decodeFloat(data, index)
         transmission = 1 - transmission
-        principled.inputs['Transmission'].default_value = transmission
+        principled.inputs["Transmission"].default_value = transmission
         fileName, index = common.decodeString(data, index)
         if len(fileName) > 0:
-            invert = material.node_tree.nodes.new('ShaderNodeInvert')
-            material.node_tree.links.new(
-                principled.inputs['Transmission'], invert.outputs['Color'])
-            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
+            invert = material.node_tree.nodes.new("ShaderNodeInvert")
+            material.node_tree.links.new(principled.inputs["Transmission"], invert.outputs["Color"])
+            texImage = material.node_tree.nodes.new("ShaderNodeTexImage")
             try:
                 texImage.image = bpy.data.images.load(fileName)
-                texImage.image.colorspace_settings.name = 'Non-Color'
+                texImage.image.colorspace_settings.name = "Non-Color"
             except Exception as e:
                 logger.error("could not load file %s (%s)", fileName, e)
-            material.node_tree.links.new(
-                invert.inputs['Color'], texImage.outputs['Color'])
+            material.node_tree.links.new(invert.inputs["Color"], texImage.outputs["Color"])
 
         # Base Color
         baseColor, index = common.decodeColor(data, index)
         material.diffuse_color = (baseColor[0], baseColor[1], baseColor[2], 1)
-        principled.inputs['Base Color'].default_value = material.diffuse_color
-        index = self.buildTexture(
-            principled, material, 'Base Color', True, data, index)
+        principled.inputs["Base Color"].default_value = material.diffuse_color
+        index = self.buildTexture(principled, material, "Base Color", True, data, index)
 
         # Metallic
         material.metallic, index = common.decodeFloat(data, index)
-        principled.inputs['Metallic'].default_value = material.metallic
-        index = self.buildTexture(
-            principled, material, 'Metallic', False, data, index)
+        principled.inputs["Metallic"].default_value = material.metallic
+        index = self.buildTexture(principled, material, "Metallic", False, data, index)
 
         # Roughness
         material.roughness, index = common.decodeFloat(data, index)
-        principled.inputs['Roughness'].default_value = material.roughness
-        index = self.buildTexture(
-            principled, material, 'Roughness', False, data, index)
+        principled.inputs["Roughness"].default_value = material.roughness
+        index = self.buildTexture(principled, material, "Roughness", False, data, index)
 
         # Normal
         fileName, index = common.decodeString(data, index)
         if len(fileName) > 0:
-            normalMap = material.node_tree.nodes.new('ShaderNodeNormalMap')
-            material.node_tree.links.new(
-                principled.inputs['Normal'], normalMap.outputs['Normal'])
-            texImage = material.node_tree.nodes.new('ShaderNodeTexImage')
+            normalMap = material.node_tree.nodes.new("ShaderNodeNormalMap")
+            material.node_tree.links.new(principled.inputs["Normal"], normalMap.outputs["Normal"])
+            texImage = material.node_tree.nodes.new("ShaderNodeTexImage")
             try:
                 texImage.image = bpy.data.images.load(fileName)
-                texImage.image.colorspace_settings.name = 'Non-Color'
+                texImage.image.colorspace_settings.name = "Non-Color"
             except Exception as e:
                 logger.error("could not load file %s (%s)", fileName, e)
-            material.node_tree.links.new(
-                normalMap.inputs['Color'], texImage.outputs['Color'])
+            material.node_tree.links.new(normalMap.inputs["Color"], texImage.outputs["Color"])
 
         # Emission
         emission, index = common.decodeColor(data, index)
-        principled.inputs['Emission'].default_value = emission
-        index = self.buildTexture(
-            principled, material, 'Emission', False, data, index)
+        principled.inputs["Emission"].default_value = emission
+        index = self.buildTexture(principled, material, "Emission", False, data, index)
 
     def buildRename(self, data):
         oldPath, index = common.decodeString(data, 0)
         newPath, index = common.decodeString(data, index)
-        oldName = oldPath.split('/')[-1]
-        newName = newPath.split('/')[-1]
+        oldName = oldPath.split("/")[-1]
+        newName = newPath.split("/")[-1]
         shareData.blenderObjects.get(oldName).name = newName
 
     def buildDuplicate(self, data):
@@ -320,7 +310,7 @@ class ClientBlender(Client):
         path, _ = common.decodeString(data, 0)
 
         try:
-            obj = shareData.blenderObjects[path.split('/')[-1]]
+            obj = shareData.blenderObjects[path.split("/")[-1]]
         except KeyError:
             # Object doesn't exist anymore
             return
@@ -356,19 +346,23 @@ class ClientBlender(Client):
             collection.objects.link(obj)
         del shareData.restoreToCollections[obj.name_full]
         if len(path) > 0:
-            parentName = path.split('/')[-1]
+            parentName = path.split("/")[-1]
             obj.parent = shareData.blenderObjects.get(parentName, None)
 
     def getTransformBuffer(self, obj):
         path = self.getObjectPath(obj)
         visible = not obj.hide_viewport
-        return common.encodeString(path) + common.encodeMatrix(obj.matrix_parent_inverse) + \
-            common.encodeMatrix(obj.matrix_basis) + common.encodeMatrix(obj.matrix_local) + common.encodeBool(visible)
+        return (
+            common.encodeString(path)
+            + common.encodeMatrix(obj.matrix_parent_inverse)
+            + common.encodeMatrix(obj.matrix_basis)
+            + common.encodeMatrix(obj.matrix_local)
+            + common.encodeBool(visible)
+        )
 
     def sendTransform(self, obj):
         transformBuffer = self.getTransformBuffer(obj)
-        self.addCommand(common.Command(
-            common.MessageType.TRANSFORM, transformBuffer, 0))
+        self.addCommand(common.Command(common.MessageType.TRANSFORM, transformBuffer, 0))
 
     def buildTextureFile(self, data):
         path, index = common.decodeString(data, 0)
@@ -376,7 +370,7 @@ class ClientBlender(Client):
             size, index = common.decodeInt(data, index)
             try:
                 f = open(path, "wb")
-                f.write(data[index:index+size])
+                f.write(data[index : index + size])
                 f.close()
                 self.textures.add(path)
             except Exception as e:
@@ -397,15 +391,14 @@ class ClientBlender(Client):
     def sendTextureData(self, path, data):
         nameBuffer = common.encodeString(path)
         self.textures.add(path)
-        self.addCommand(common.Command(common.MessageType.TEXTURE,
-                                       nameBuffer + common.encodeInt(len(data)) + data, 0))
+        self.addCommand(common.Command(common.MessageType.TEXTURE, nameBuffer + common.encodeInt(len(data)) + data, 0))
 
     def getTexture(self, inputs):
         if not inputs:
             return None
         if len(inputs.links) == 1:
             connectedNode = inputs.links[0].from_node
-            if type(connectedNode).__name__ == 'ShaderNodeTexImage':
+            if type(connectedNode).__name__ == "ShaderNodeTexImage":
                 image = connectedNode.image
                 pack = image.packed_file
                 path = bpy.path.abspath(image.filepath)
@@ -428,10 +421,10 @@ class ClientBlender(Client):
             # Get a principled node
             if nodes:
                 for n in nodes:
-                    if n.type == 'BSDF_PRINCIPLED':
+                    if n.type == "BSDF_PRINCIPLED":
                         principled = n
                         break
-                    if n.type == 'BSDF_DIFFUSE':
+                    if n.type == "BSDF_DIFFUSE":
                         diffuse = n
             # principled = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
         if principled is None and diffuse is None:
@@ -445,8 +438,7 @@ class ClientBlender(Client):
             buffer += common.encodeFloat(metallic) + common.encodeString("")
             buffer += common.encodeFloat(roughness) + common.encodeString("")
             buffer += common.encodeString("")
-            buffer += common.encodeColor(emissionColor) + \
-                common.encodeString("")
+            buffer += common.encodeColor(emissionColor) + common.encodeString("")
             return buffer
         elif diffuse:
             opacity = 1.0
@@ -460,7 +452,7 @@ class ClientBlender(Client):
             # Or principled.inputs[0]
             baseColor = (1.0, 1.0, 1.0)
             baseColorTexture = None
-            baseColorInput = diffuse.inputs.get('Color')
+            baseColorInput = diffuse.inputs.get("Color")
             # Get its default value (not the value from a possible link)
             if baseColorInput:
                 baseColor = baseColorInput.default_value
@@ -468,14 +460,14 @@ class ClientBlender(Client):
 
             roughness = 1.0
             roughnessTexture = None
-            roughnessInput = diffuse.inputs.get('Roughness')
+            roughnessInput = diffuse.inputs.get("Roughness")
             if roughnessInput:
                 roughnessTexture = self.getTexture(roughnessInput)
                 if len(roughnessInput.links) == 0:
                     roughness = roughnessInput.default_value
 
             normalTexture = None
-            normalInput = diffuse.inputs.get('Normal')
+            normalInput = diffuse.inputs.get("Normal")
             if normalInput:
                 if len(normalInput.links) == 1:
                     normalMap = normalInput.links[0].from_node
@@ -486,7 +478,7 @@ class ClientBlender(Client):
         else:
             opacity = 1.0
             opacityTexture = None
-            opacityInput = principled.inputs.get('Transmission')
+            opacityInput = principled.inputs.get("Transmission")
             if opacityInput:
                 if len(opacityInput.links) == 1:
                     invert = opacityInput.links[0].from_node
@@ -500,7 +492,7 @@ class ClientBlender(Client):
             # Or principled.inputs[0]
             baseColor = (1.0, 1.0, 1.0)
             baseColorTexture = None
-            baseColorInput = principled.inputs.get('Base Color')
+            baseColorInput = principled.inputs.get("Base Color")
             # Get its default value (not the value from a possible link)
             if baseColorInput:
                 baseColor = baseColorInput.default_value
@@ -508,7 +500,7 @@ class ClientBlender(Client):
 
             metallic = 0.0
             metallicTexture = None
-            metallicInput = principled.inputs.get('Metallic')
+            metallicInput = principled.inputs.get("Metallic")
             if metallicInput:
                 metallicTexture = self.getTexture(metallicInput)
                 if len(metallicInput.links) == 0:
@@ -516,14 +508,14 @@ class ClientBlender(Client):
 
             roughness = 1.0
             roughnessTexture = None
-            roughnessInput = principled.inputs.get('Roughness')
+            roughnessInput = principled.inputs.get("Roughness")
             if roughnessInput:
                 roughnessTexture = self.getTexture(roughnessInput)
                 if len(roughnessInput.links) == 0:
                     roughness = roughnessInput.default_value
 
             normalTexture = None
-            normalInput = principled.inputs.get('Normal')
+            normalInput = principled.inputs.get("Normal")
             if normalInput:
                 if len(normalInput.links) == 1:
                     normalMap = normalInput.links[0].from_node
@@ -533,7 +525,7 @@ class ClientBlender(Client):
 
             emission = (0.0, 0.0, 0.0)
             emissionTexture = None
-            emissionInput = principled.inputs.get('Emission')
+            emissionInput = principled.inputs.get("Emission")
             if emissionInput:
                 # Get its default value (not the value from a possible link)
                 emission = emissionInput.default_value
@@ -602,8 +594,7 @@ class ClientBlender(Client):
         if material.grease_pencil:
             self.sendGreasePencilMaterial(material)
         else:
-            self.addCommand(common.Command(
-                common.MessageType.MATERIAL, self.getMaterialBuffer(material), 0))
+            self.addCommand(common.Command(common.MessageType.MATERIAL, self.getMaterialBuffer(material), 0))
 
     def getMeshName(self, mesh):
         return mesh.name_full
@@ -616,21 +607,19 @@ class ClientBlender(Client):
 
         binary_buffer = common.encodeString(path) + common.encodeString(meshName)
 
-        binary_buffer += mesh_api.encodeMesh(obj, data.get_dcc_sync_props().send_base_meshes,
-                                             data.get_dcc_sync_props().send_baked_meshes)
+        binary_buffer += mesh_api.encodeMesh(
+            obj, data.get_dcc_sync_props().send_base_meshes, data.get_dcc_sync_props().send_baked_meshes
+        )
 
         # For now include material slots in the same message, but maybe it should be a separated message
         # like Transform
-        material_link_dict = {
-            'OBJECT': 0,
-            'DATA': 1
-        }
+        material_link_dict = {"OBJECT": 0, "DATA": 1}
         material_links = [material_link_dict[slot.link] for slot in obj.material_slots]
-        assert(len(material_links) == len(obj.data.materials))
-        binary_buffer += struct.pack(f'{len(material_links)}I', *material_links)
+        assert len(material_links) == len(obj.data.materials)
+        binary_buffer += struct.pack(f"{len(material_links)}I", *material_links)
 
         for slot in obj.material_slots:
-            if slot.link == 'DATA':
+            if slot.link == "DATA":
                 binary_buffer += common.encodeString("")
             else:
                 binary_buffer += common.encodeString(slot.material.name if slot.material is not None else "")
@@ -645,31 +634,27 @@ class ClientBlender(Client):
         meshName, index = common.decodeString(commandData, index)
 
         obj = self.getOrCreateObjectData(path, self.getOrCreateMesh(meshName))
-        if obj.mode == 'EDIT':
+        if obj.mode == "EDIT":
             logger.error("Received a mesh for object %s while begin in EDIT mode, ignoring.", path)
             return
 
         index = mesh_api.decodeMesh(self, obj, commandData, index)
 
         material_slot_count = len(obj.data.materials)
-        material_link_dict = [
-            'OBJECT',
-            'DATA'
-        ]
-        material_links = struct.unpack(f'{material_slot_count}I', commandData[index: index + 4 * material_slot_count])
+        material_link_dict = ["OBJECT", "DATA"]
+        material_links = struct.unpack(f"{material_slot_count}I", commandData[index : index + 4 * material_slot_count])
         for link, slot in zip(material_links, obj.material_slots):
             slot.link = material_link_dict[link]
         index += 4 * material_slot_count
 
         for slot in obj.material_slots:
             material_name, index = common.decodeString(commandData, index)
-            if slot.link == 'OBJECT' and material_name != "":
+            if slot.link == "OBJECT" and material_name != "":
                 slot.material = self.getOrCreateMaterial(material_name)
 
     def sendSetCurrentScene(self, name):
         buffer = common.encodeString(name)
-        self.addCommand(common.Command(
-            common.MessageType.SET_SCENE, buffer, 0))
+        self.addCommand(common.Command(common.MessageType.SET_SCENE, buffer, 0))
 
     def sendAnimationBuffer(self, objName, animationData, channelName, channelIndex=-1):
         if not animationData:
@@ -684,27 +669,24 @@ class ClientBlender(Client):
                     keys = []
                     for keyframe in fcurve.keyframe_points:
                         keys.extend(keyframe.co)
-                    buffer = common.encodeString(objName) + common.encodeString(channelName) + common.encodeInt(
-                        channelIndex) + common.intToBytes(keyCount, 4) + struct.pack(f'{len(keys)}f', *keys)
-                    self.addCommand(common.Command(
-                        common.MessageType.CAMERA_ANIMATION, buffer, 0))
+                    buffer = (
+                        common.encodeString(objName)
+                        + common.encodeString(channelName)
+                        + common.encodeInt(channelIndex)
+                        + common.intToBytes(keyCount, 4)
+                        + struct.pack(f"{len(keys)}f", *keys)
+                    )
+                    self.addCommand(common.Command(common.MessageType.CAMERA_ANIMATION, buffer, 0))
                     return
 
     def sendCameraAnimations(self, obj):
-        self.sendAnimationBuffer(
-            obj.name_full, obj.animation_data, 'location', 0)
-        self.sendAnimationBuffer(
-            obj.name_full, obj.animation_data, 'location', 1)
-        self.sendAnimationBuffer(
-            obj.name_full, obj.animation_data, 'location', 2)
-        self.sendAnimationBuffer(
-            obj.name_full, obj.animation_data, 'rotation', 0)
-        self.sendAnimationBuffer(
-            obj.name_full, obj.animation_data, 'rotation', 1)
-        self.sendAnimationBuffer(
-            obj.name_full, obj.animation_data, 'rotation', 2)
-        self.sendAnimationBuffer(
-            obj.name_full, obj.data.animation_data, 'lens')
+        self.sendAnimationBuffer(obj.name_full, obj.animation_data, "location", 0)
+        self.sendAnimationBuffer(obj.name_full, obj.animation_data, "location", 1)
+        self.sendAnimationBuffer(obj.name_full, obj.animation_data, "location", 2)
+        self.sendAnimationBuffer(obj.name_full, obj.animation_data, "rotation", 0)
+        self.sendAnimationBuffer(obj.name_full, obj.animation_data, "rotation", 1)
+        self.sendAnimationBuffer(obj.name_full, obj.animation_data, "rotation", 2)
+        self.sendAnimationBuffer(obj.name_full, obj.data.animation_data, "lens")
 
     def getCameraBuffer(self, obj):
         cam = obj.data
@@ -714,47 +696,48 @@ class ClientBlender(Client):
         aperture = cam.dof.aperture_fstop
         sensorFitName = cam.sensor_fit
         sensorFit = common.SensorFitMode.AUTO
-        if sensorFitName == 'AUTO':
+        if sensorFitName == "AUTO":
             sensorFit = common.SensorFitMode.AUTO
-        elif sensorFitName == 'HORIZONTAL':
+        elif sensorFitName == "HORIZONTAL":
             sensorFit = common.SensorFitMode.HORIZONTAL
-        elif sensorFitName == 'VERTICAL':
+        elif sensorFitName == "VERTICAL":
             sensorFit = common.SensorFitMode.VERTICAL
         sensorWidth = cam.sensor_width
         sensorHeight = cam.sensor_height
 
         path = self.getObjectPath(obj)
-        return common.encodeString(path) + \
-            common.encodeFloat(focal) + \
-            common.encodeFloat(frontClipPlane) + \
-            common.encodeFloat(farClipPlane) + \
-            common.encodeFloat(aperture) + \
-            common.encodeInt(sensorFit.value) + \
-            common.encodeFloat(sensorWidth) + \
-            common.encodeFloat(sensorHeight)
+        return (
+            common.encodeString(path)
+            + common.encodeFloat(focal)
+            + common.encodeFloat(frontClipPlane)
+            + common.encodeFloat(farClipPlane)
+            + common.encodeFloat(aperture)
+            + common.encodeInt(sensorFit.value)
+            + common.encodeFloat(sensorWidth)
+            + common.encodeFloat(sensorHeight)
+        )
 
     def sendCamera(self, obj):
         cameraBuffer = self.getCameraBuffer(obj)
         if cameraBuffer:
-            self.addCommand(common.Command(
-                common.MessageType.CAMERA, cameraBuffer, 0))
+            self.addCommand(common.Command(common.MessageType.CAMERA, cameraBuffer, 0))
         self.sendCameraAnimations(obj)
 
     def getLightBuffer(self, obj):
         light = obj.data
         lightTypeName = light.type
         lightType = common.LightType.SUN
-        if lightTypeName == 'POINT':
+        if lightTypeName == "POINT":
             lightType = common.LightType.POINT
-        elif lightTypeName == 'SPOT':
+        elif lightTypeName == "SPOT":
             lightType = common.LightType.SPOT
-        elif lightTypeName == 'SUN':
+        elif lightTypeName == "SUN":
             lightType = common.LightType.SUN
         else:
             return None
         color = light.color
         power = light.energy
-        if bpy.context.scene.render.engine == 'CYCLES':
+        if bpy.context.scene.render.engine == "CYCLES":
             shadow = light.cycles.cast_shadow
         else:
             shadow = light.use_shadow
@@ -765,19 +748,20 @@ class ClientBlender(Client):
             spotSize = light.spot_size
             spotBlend = light.spot_blend
 
-        return common.encodeString(self.getObjectPath(obj)) + \
-            common.encodeInt(lightType.value) + \
-            common.encodeInt(shadow) + \
-            common.encodeColor(color) + \
-            common.encodeFloat(power) + \
-            common.encodeFloat(spotSize) + \
-            common.encodeFloat(spotBlend)
+        return (
+            common.encodeString(self.getObjectPath(obj))
+            + common.encodeInt(lightType.value)
+            + common.encodeInt(shadow)
+            + common.encodeColor(color)
+            + common.encodeFloat(power)
+            + common.encodeFloat(spotSize)
+            + common.encodeFloat(spotBlend)
+        )
 
     def sendLight(self, obj):
         lightBuffer = self.getLightBuffer(obj)
         if lightBuffer:
-            self.addCommand(common.Command(
-                common.MessageType.LIGHT, lightBuffer, 0))
+            self.addCommand(common.Command(common.MessageType.LIGHT, lightBuffer, 0))
 
     def sendDeletedObject(self, objName):
         self.sendDelete(objName)
@@ -789,13 +773,16 @@ class ClientBlender(Client):
     def getRenameBuffer(self, oldName, newName):
         encodedOldName = oldName.encode()
         encodedNewName = newName.encode()
-        buffer = common.intToBytes(len(encodedOldName), 4) + encodedOldName + \
-            common.intToBytes(len(encodedNewName), 4) + encodedNewName
+        buffer = (
+            common.intToBytes(len(encodedOldName), 4)
+            + encodedOldName
+            + common.intToBytes(len(encodedNewName), 4)
+            + encodedNewName
+        )
         return buffer
 
     def sendRename(self, oldName, newName):
-        self.addCommand(common.Command(common.MessageType.RENAME,
-                                       self.getRenameBuffer(oldName, newName), 0))
+        self.addCommand(common.Command(common.MessageType.RENAME, self.getRenameBuffer(oldName, newName), 0))
 
     # -----------------------------------------------------------------------------------------------------------
     #
@@ -814,8 +801,7 @@ class ClientBlender(Client):
             points.append(point.pressure)
             points.append(point.strength)
 
-        binaryPointsBuffer = common.intToBytes(
-            len(stroke.points), 4) + struct.pack(f'{len(points)}f', *points)
+        binaryPointsBuffer = common.intToBytes(len(stroke.points), 4) + struct.pack(f"{len(points)}f", *points)
         buffer += binaryPointsBuffer
         return buffer
 
@@ -839,17 +825,21 @@ class ClientBlender(Client):
         buffer = common.encodeString(GP.name_full)
 
         for modifier in obj.grease_pencil_modifiers:
-            if modifier.type != 'GP_TIME':
+            if modifier.type != "GP_TIME":
                 continue
             offset = modifier.offset
             scale = modifier.frame_scale
             customRange = modifier.use_custom_frame_range
             frameStart = modifier.frame_start
             frameEnd = modifier.frame_end
-            buffer += common.encodeInt(offset) + common.encodeFloat(scale) + common.encodeBool(
-                customRange) + common.encodeInt(frameStart) + common.encodeInt(frameEnd)
-            self.addCommand(common.Command(
-                common.MessageType.GREASE_PENCIL_TIME_OFFSET, buffer, 0))
+            buffer += (
+                common.encodeInt(offset)
+                + common.encodeFloat(scale)
+                + common.encodeBool(customRange)
+                + common.encodeInt(frameStart)
+                + common.encodeInt(frameEnd)
+            )
+            self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_TIME_OFFSET, buffer, 0))
             break
 
     def sendGreasePencilMesh(self, obj):
@@ -868,8 +858,7 @@ class ClientBlender(Client):
         for name, layer in GP.layers.items():
             buffer += self.sendGreasePencilLayer(layer, name)
 
-        self.addCommand(common.Command(
-            common.MessageType.GREASE_PENCIL_MESH, buffer, 0))
+        self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_MESH, buffer, 0))
 
         self.sendGreasePencilTimeOffset(obj)
 
@@ -892,14 +881,12 @@ class ClientBlender(Client):
         GPMaterialBuffer += common.encodeBool(fillEnable)
         GPMaterialBuffer += common.encodeString(fillStyle)
         GPMaterialBuffer += common.encodeColor(fillColor)
-        self.addCommand(common.Command(
-            common.MessageType.GREASE_PENCIL_MATERIAL, GPMaterialBuffer, 0))
+        self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_MATERIAL, GPMaterialBuffer, 0))
 
     def sendGreasePencilConnection(self, obj):
         buffer = common.encodeString(self.getObjectPath(obj))
         buffer += common.encodeString(obj.data.name_full)
-        self.addCommand(common.Command(
-            common.MessageType.GREASE_PENCIL_CONNECTION, buffer, 0))
+        self.addCommand(common.Command(common.MessageType.GREASE_PENCIL_CONNECTION, buffer, 0))
 
     def buildGreasePencilConnection(self, data):
         path, start = common.decodeString(data, 0)
@@ -910,7 +897,7 @@ class ClientBlender(Client):
     def decodeGreasePencilStroke(self, greasePencilFrame, strokeIndex, data, index):
         materialIndex, index = common.decodeInt(data, index)
         lineWidth, index = common.decodeInt(data, index)
-        points, index = common.decodeArray(data, index, '5f', 5*4)
+        points, index = common.decodeArray(data, index, "5f", 5 * 4)
 
         if strokeIndex >= len(greasePencilFrame.strokes):
             stroke = greasePencilFrame.strokes.new()
@@ -930,7 +917,7 @@ class ClientBlender(Client):
 
         for i in range(len(p)):
             point = points[i]
-            p[i].co = ((point[0], point[1], point[2]))
+            p[i].co = (point[0], point[1], point[2])
             p[i].pressure = point[3]
             p[i].strength = point[4]
         return index
@@ -946,8 +933,7 @@ class ClientBlender(Client):
             frame = greasePencilLayer.frames.new(greasePencilFrame)
         strokeCount, index = common.decodeInt(data, index)
         for strokeIndex in range(strokeCount):
-            index = self.decodeGreasePencilStroke(
-                frame, strokeIndex, data, index)
+            index = self.decodeGreasePencilStroke(frame, strokeIndex, data, index)
         return index
 
     def decodeGreasePencilLayer(self, greasePencil, data, index):
@@ -1013,39 +999,38 @@ class ClientBlender(Client):
         return buffer
 
     def sendDelete(self, objName):
-        self.addCommand(common.Command(
-            common.MessageType.DELETE, self.getDeleteBuffer(objName), 0))
+        self.addCommand(common.Command(common.MessageType.DELETE, self.getDeleteBuffer(objName), 0))
 
     def sendListRooms(self):
         self.addCommand(common.Command(common.MessageType.LIST_ROOMS))
 
     def on_connection_lost(self):
-        if 'Disconnect' in self.callbacks:
-            self.callbacks['Disconnect']()
+        if "Disconnect" in self.callbacks:
+            self.callbacks["Disconnect"]()
 
     def buildListAllClients(self, client_ids):
         shareData.client_ids = client_ids
         ui.update_ui_lists()
 
     def sendSceneContent(self):
-        if 'SendContent' in self.callbacks:
-            self.callbacks['SendContent']()
+        if "SendContent" in self.callbacks:
+            self.callbacks["SendContent"]()
 
     def sendFrame(self, frame):
-        self.addCommand(common.Command(
-            common.MessageType.FRAME, common.encodeInt(frame), 0))
+        self.addCommand(common.Command(common.MessageType.FRAME, common.encodeInt(frame), 0))
 
     def sendFrameStartEnd(self, start, end):
-        self.addCommand(common.Command(common.MessageType.FRAME_START_END,
-                                       common.encodeInt(start) + common.encodeInt(end), 0))
+        self.addCommand(
+            common.Command(common.MessageType.FRAME_START_END, common.encodeInt(start) + common.encodeInt(end), 0)
+        )
 
     def clearContent(self):
-        if 'ClearContent' in self.callbacks:
-            self.callbacks['ClearContent']()
+        if "ClearContent" in self.callbacks:
+            self.callbacks["ClearContent"]()
 
     @stats_timer(shareData)
     def networkConsumer(self):
-        assert(self.isConnected())
+        assert self.isConnected()
 
         group_count = 0
 
@@ -1130,7 +1115,7 @@ class ClientBlender(Client):
                         collection_api.buildCollectionRemoved(command.data)
 
                     elif command.type == common.MessageType.INSTANCE_COLLECTION:
-                        collection_api. buildCollectionInstance(command.data)
+                        collection_api.buildCollectionInstance(command.data)
 
                     elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
                         collection_api.buildCollectionToCollection(command.data)
@@ -1170,7 +1155,7 @@ class ClientBlender(Client):
         if len(shareData.pendingParenting) > 0:
             remainingParentings = set()
             for path in shareData.pendingParenting:
-                pathElem = path.split('/')
+                pathElem = path.split("/")
                 ob = None
                 parent = None
                 for elem in pathElem:

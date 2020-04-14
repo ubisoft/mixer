@@ -11,9 +11,9 @@ import functools
 logger = logging.getLogger(__name__)
 
 
-class StatsTimer():
+class StatsTimer:
     def __init__(self, share_data, key, log=None):
-        assert(share_data.current_statistics)
+        assert share_data.current_statistics
 
         if log == None:
             if share_data.current_stats_timer == None:
@@ -32,11 +32,7 @@ class StatsTimer():
         if not "children" in parent_stats_dict:
             parent_stats_dict["children"] = {}
         if not key in parent_stats_dict["children"]:
-            parent_stats_dict["children"][key] = {
-                "time": 0,
-                "max_time": 0,
-                "hit_count": 0
-            }
+            parent_stats_dict["children"][key] = {"time": 0, "max_time": 0, "hit_count": 0}
         self.key = key
         self.stats_dict = parent_stats_dict["children"][key]
         self.log = log
@@ -77,7 +73,8 @@ def get_stats_directory():
         if os.path.exists(base_shared_path):
             return os.path.join(os.fspath(base_shared_path), username)
         logger.error(
-            f"DCCSYNC_USER_STATS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location.")
+            f"DCCSYNC_USER_STATS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location."
+        )
     return os.path.join(os.fspath(tempfile.gettempdir()), "dcc_sync")
 
 
@@ -119,5 +116,7 @@ def stats_timer(shareData, log=None):
 
             with StatsTimer(shareData, func.__name__, log):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return innerDecorator

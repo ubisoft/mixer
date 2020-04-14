@@ -12,7 +12,7 @@ import common
 
 sys.path.append(os.getcwd())
 
-BINDING_HOST = ''
+BINDING_HOST = ""
 SHUTDOWN = False
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
@@ -21,11 +21,11 @@ logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__
 class Connection:
     """ Represent a connection with a client """
 
-    def __init__(self, server: 'Server', socket: socket.socket, address):
+    def __init__(self, server: "Server", socket: socket.socket, address):
         self.socket = socket
         self.address = address
         self.clientname: str = None
-        self.room: 'Room' = None
+        self.room: "Room" = None
         # TODO use a Queue and drop the mutex ?
         self.commands = []  # Pending commands to send to the client
         self._server = server
@@ -101,8 +101,9 @@ class Connection:
                     ids = common.encodeJson(room.client_ids())
                     command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, ids)
                 else:
-                    command = common.Command(common.MessageType.SEND_ERROR,
-                                             common.encodeString(f'No room named {room_name}.'))
+                    command = common.Command(
+                        common.MessageType.SEND_ERROR, common.encodeString(f"No room named {room_name}.")
+                    )
             if command:
                 self.commands.append(command)
 
@@ -141,10 +142,12 @@ class Connection:
             self._server.leave_room(self, room_name)
 
     def client_id(self) -> Mapping[str, str]:
-        return {'ip': self.address[0],
-                'port': self.address[1],
-                'name': self.clientname,
-                'room': self.room.name if self.room is not None else None}
+        return {
+            "ip": self.address[0],
+            "port": self.address[1],
+            "name": self.clientname,
+            "room": self.room.name if self.room is not None else None,
+        }
 
     def setClientName(self, name):
         self.clientname = name
@@ -202,8 +205,12 @@ class Connection:
                     if self.room is not None:
                         self.room.addCommand(command, self)
                     else:
-                        logger.warning("%s:%s - %s received but no room was joined",
-                                       self.address[0], self.address[1], command.type.value)
+                        logger.warning(
+                            "%s:%s - %s received but no room was joined",
+                            self.address[0],
+                            self.address[1],
+                            command.type.value,
+                        )
 
             try:
                 if len(self.commands) > 0:
@@ -232,7 +239,7 @@ class Connection:
             self.socket.close()
         except Exception:
             pass
-        logger.info("%s closed",  self.address)
+        logger.info("%s closed", self.address)
 
 
 class Room:
@@ -243,11 +250,11 @@ class Room:
     - dispatch added commands to already clients already in the room
     """
 
-    def __init__(self, server: 'Server', roomName: str):
+    def __init__(self, server: "Server", roomName: str):
         self.name = roomName
-        self._connections: List['Connection'] = []
+        self._connections: List["Connection"] = []
         self.commands = []
-        self._server: 'Server' = server
+        self._server: "Server" = server
 
     def client_count(self):
         return len(self._connections)
@@ -291,9 +298,9 @@ class Room:
         connection.room = None
         if len(self._connections) == 0:
             self._server.delete_room(self.name)
-            logger.info("No more clients in room \"%s\". Room deleted", self.name)
+            logger.info('No more clients in room "%s". Room deleted', self.name)
         else:
-            logger.info(f'Connections left : {len(self._connections)}.')
+            logger.info(f"Connections left : {len(self._connections)}.")
             self.broadcast_user_list()
 
     def send_client_ids(self, client_ids):
@@ -354,7 +361,7 @@ class Server:
                 raise ValueError(f"add_room: room with name {room_name} already exists")
             room = Room(self, room_name)
             self._rooms[room_name] = room
-            logger.info(f'Room {room_name} added')
+            logger.info(f"Room {room_name} added")
             self.broadcast_user_list()
             return room
 
@@ -362,7 +369,7 @@ class Server:
         with common.mutex:
             if room_name in self._rooms:
                 del self._rooms[room_name]
-                logger.info(f'Room {room_name} deleted')
+                logger.info(f"Room {room_name} deleted")
             self.broadcast_user_list()
 
     def join_room(self, connection: Connection, room_name: str):
@@ -465,10 +472,10 @@ def main():
 
 
 def parse_cli_args():
-    parser = argparse.ArgumentParser(description='Start broadcasting server for DCC Sync')
+    parser = argparse.ArgumentParser(description="Start broadcasting server for DCC Sync")
     cli_utils.add_logging_cli_args(parser)
     return parser.parse_args(), parser
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
