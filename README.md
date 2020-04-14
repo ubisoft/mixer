@@ -29,7 +29,26 @@ Open a new terminal in VSCode and ensure the virtual env is activated ("(.venv)"
 pip install -r requirements-dev.txt
 ```
 
+Then add the following configuration to the project VSCode settings file `.vscode/settings.json`:
 
+```
+{
+    [...]
+    "python.pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "python.formatting.provider": "black",
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./tests",
+        "-p",
+        "test_*.py"
+    ],
+    "python.testing.unittestEnabled": true,
+    "python.linting.flake8Enabled": true,
+    "python.linting.enabled": true,
+    [...]
+}
+```
 
 # Unit tests
 
