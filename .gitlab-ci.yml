@@ -1,0 +1,10 @@
+stages:
+  - codequality
+
+flake8:
+  image: python:3
+  stage: codequality
+  script:
+    - pip install flake8 flake8-black
+    - flake8 -v
+  allow_failure: true
