@@ -12,7 +12,7 @@ flake8:
 zip:
   image: archlinux/base
   script:
-    - pacman -Sy zip
+    - pacman -Sy zip --noconfirm
     - zip -r dccsync.zip dccsync
   stage: build
   artifacts:
