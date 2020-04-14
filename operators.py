@@ -485,7 +485,7 @@ def reparentObjects():
 
 def createVRtistObjects():
     """
-    VRtist will filter the received messages and handle only the objects that belong to the 
+    VRtist will filter the received messages and handle only the objects that belong to the
     same scene as the one initially synchronized
     """
     changed = False

@@ -4,7 +4,6 @@ import json
 import logging
 import copy
 import tempfile
-from datetime import datetime
 from pathlib import Path
 import functools
 
@@ -15,8 +14,8 @@ class StatsTimer:
     def __init__(self, share_data, key, log=None):
         assert share_data.current_statistics
 
-        if log == None:
-            if share_data.current_stats_timer == None:
+        if log is None:
+            if share_data.current_stats_timer is None:
                 log = False
             else:
                 log = share_data.current_stats_timer.log
@@ -29,9 +28,9 @@ class StatsTimer:
 
         if log:
             logger.debug(key)
-        if not "children" in parent_stats_dict:
+        if "children" not in parent_stats_dict:
             parent_stats_dict["children"] = {}
-        if not key in parent_stats_dict["children"]:
+        if key not in parent_stats_dict["children"]:
             parent_stats_dict["children"][key] = {"time": 0, "max_time": 0, "hit_count": 0}
         self.key = key
         self.stats_dict = parent_stats_dict["children"][key]

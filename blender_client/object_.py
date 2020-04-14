@@ -1,4 +1,5 @@
 from ..broadcaster import common
+from ..broadcaster.client import Client
 from ..shareData import shareData
 import logging
 import bpy
@@ -6,7 +7,7 @@ import bpy
 logger = logging.getLogger(__name__)
 
 
-def sendObjectVisibility(client: "ClientBlender", object_: bpy.types.Object):
+def sendObjectVisibility(client: Client, object_: bpy.types.Object):
     logger.debug("sendObjectVisibility %s", object_.name_full)
     buffer = (
         common.encodeString(object_.name_full)

@@ -1,4 +1,3 @@
-import functools
 import hashlib
 import logging
 from pathlib import Path
@@ -13,14 +12,13 @@ from grabber import Grabber
 from grabber import CommandStream
 from process import BlenderServer
 
-import sys  # nopep8
+import sys  # noqa
 
-sys.path.append(str(Path(__package__).parent))  # nopep8
+sys.path.append(str(Path(__package__).parent))  # noqa
 from broadcaster.common import MessageType
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)
 
 
 class Blender:
@@ -200,8 +198,8 @@ class BlenderTestCase(unittest.TestCase):
         with Path(tempfile.mkdtemp()) as tmp_dir:
             sender_file = tmp_dir / "sender"
             receiver_file = tmp_dir / "receiver"
-            self._sender.send_function(blender_lib.save, str(sender_file))
-            self._receiver.send_function(blender_lib.save, str(receiver_file))
+            self._sender.send_function(bl.save, str(sender_file))
+            self._receiver.send_function(bl.save, str(receiver_file))
             self._sender.quit()
             self._receiver.quit()
             self.assertUserSuccess()

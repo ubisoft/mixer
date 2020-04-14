@@ -1,7 +1,6 @@
 import unittest
 import testcase
 from pathlib import Path
-import blender_lib as bl
 import logging
 
 
@@ -117,13 +116,12 @@ class test_collection_default_doc(testcase.BlenderTestCase):
     @unittest.skip("Timing problem")
     def test_create_instance_in_collection_before_join(self):
         """
-        This test causes an exception in the second connection in the receiver sharedData.current_statistics 
+        This test causes an exception in the second connection in the receiver sharedData.current_statistics
         is not initialized.
         """
 
         # if collection instances are create before join we need to ensure that
         # the collection is received before the instance
-        import time
 
         self._sender.disconnect_dccsync()
         self._receiver.disconnect_dccsync()

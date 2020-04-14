@@ -17,7 +17,6 @@ from .stats import stats_timer
 
 _STILL_ACTIVE = 259
 
-
 logger = logging.getLogger(__name__)
 
 

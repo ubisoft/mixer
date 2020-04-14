@@ -1,6 +1,6 @@
 import bpy
 from . import operators
-from .data import get_dcc_sync_props, DCCSyncProperties
+from .data import get_dcc_sync_props
 from .shareData import shareData
 
 import logging

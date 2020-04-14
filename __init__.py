@@ -3,7 +3,6 @@ from . import operators
 from . import data
 from . import stats
 from .shareData import shareData
-import bpy
 import atexit
 import logging
 from pathlib import Path
@@ -23,7 +22,6 @@ MODULE_PATH = Path(__file__).parent
 
 
 def cleanup():
-    shareData = operators.shareData
     if shareData.current_statistics is not None and shareData.auto_save_statistics:
         stats.save_statistics(shareData.current_statistics, shareData.statistics_directory)
     try:

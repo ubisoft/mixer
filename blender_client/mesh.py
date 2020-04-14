@@ -131,7 +131,7 @@ def encodeBakedMesh(obj):
 
     # Triangulate mesh (before calculating normals)
     mesh = obj.data if obj.type == "MESH" else obj.to_mesh()
-    if mesh == None:
+    if mesh is None:
         # This happens for empty curves
         return bytes()
 
@@ -319,12 +319,11 @@ def encodeBaseMeshGeometry(mesh_data):
 
 @stats_timer(shareData)
 def encodeBaseMesh(obj):
-    stats_timer = shareData.current_stats_timer
 
     # Temporary for curves and other objects that support to_mesh()
     # #todo Implement correct base encoding for these objects
     mesh_data = obj.data if obj.type == "MESH" else obj.to_mesh()
-    if mesh_data == None:
+    if mesh_data is None:
         # This happens for empty curves
         # This is temporary, when curves will be fully implemented we will encode something
         return bytes()
@@ -333,7 +332,7 @@ def encodeBaseMesh(obj):
 
     # Shape keys
     # source https://blender.stackexchange.com/questions/111661/creating-shape-keys-using-python
-    if mesh_data.shape_keys == None:
+    if mesh_data.shape_keys is None:
         binary_buffer += common.encodeInt(0)  # Indicate 0 key blocks
     else:
         logger.debug("Writing %d shape keys", len(mesh_data.shape_keys.key_blocks))
@@ -429,7 +428,7 @@ def encodeMesh(obj, encode_base_mesh, encode_baked_mesh):
     # Materials
     materials = []
     for material in obj.data.materials:
-        materials.append(material.name_full if material != None else "")
+        materials.append(material.name_full if material is not None else "")
     binary_buffer += common.encodeStringArray(materials)
 
     return binary_buffer
@@ -488,7 +487,7 @@ def decodeBakedMesh(obj, data, index):
                 face.loops[0][uv_layer].uv = uvs[i1]
                 face.loops[1][uv_layer].uv = uvs[i2]
                 face.loops[2][uv_layer].uv = uvs[i3]
-        except:
+        except Exception:
             pass
 
     me = obj.data
@@ -515,7 +514,7 @@ def decodeBaseMesh(client, obj, data, index):
 
     for pos_idx in range(position_count):
         co, index = common.decodeVector3(data, index)
-        vert = bm.verts.new(co)
+        bm.verts.new(co)
 
     bm.verts.ensure_lookup_table()
 

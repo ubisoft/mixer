@@ -1,13 +1,12 @@
-import sys  # nopep8
-from pathlib import Path  # nopep8
+import sys  # noqa
+from pathlib import Path  # noqa
 
-sys.path.append(str(Path(__package__).parent))  # nopep8
+sys.path.append(str(Path(__package__).parent))  # noqa
 from broadcaster.common import MessageType
 
 import unittest
 import testcase
 from pathlib import Path
-import blender_lib as bl
 
 
 class SceneTestCase(testcase.BlenderTestCase):

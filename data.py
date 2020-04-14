@@ -2,6 +2,7 @@ import os
 import logging
 import tempfile
 from datetime import datetime
+from pathlib import Path
 
 import bpy
 

@@ -1,4 +1,5 @@
 from ..broadcaster import common
+from ..broadcaster.client import Client
 from ..shareData import shareData
 import logging
 import bpy
@@ -6,7 +7,7 @@ import bpy
 logger = logging.getLogger(__name__)
 
 
-def sendCollection(client: "ClientBlender", collection: bpy.types.Collection):
+def sendCollection(client: Client, collection: bpy.types.Collection):
     logger.debug("sendCollection %s", collection.name_full)
     collectionInstanceOffset = collection.instance_offset
     buffer = (
@@ -32,7 +33,7 @@ def buildCollection(data):
     collection.instance_offset = offset
 
 
-def sendCollectionRemoved(client: "ClientBlender", collectionName):
+def sendCollectionRemoved(client: Client, collectionName):
     logger.debug("sendCollectionRemoved %s", collectionName)
     buffer = common.encodeString(collectionName)
     client.addCommand(common.Command(common.MessageType.COLLECTION_REMOVED, buffer, 0))
@@ -46,7 +47,7 @@ def buildCollectionRemoved(data):
     bpy.data.collections.remove(collection)
 
 
-def sendAddCollectionToCollection(client: "ClientBlender", parentCollectionName, collectionName):
+def sendAddCollectionToCollection(client: Client, parentCollectionName, collectionName):
     logger.debug("sendAddCollectionToCollection %s <- %s", parentCollectionName, collectionName)
 
     buffer = common.encodeString(parentCollectionName) + common.encodeString(collectionName)
@@ -63,7 +64,7 @@ def buildCollectionToCollection(data):
     parent.children.link(child)
 
 
-def sendRemoveCollectionFromCollection(client: "ClientBlender", parentCollectionName, collectionName):
+def sendRemoveCollectionFromCollection(client: Client, parentCollectionName, collectionName):
     logger.debug("sendRemoveCollectionFromCollection %s <- %s", parentCollectionName, collectionName)
 
     buffer = common.encodeString(parentCollectionName) + common.encodeString(collectionName)
@@ -80,7 +81,7 @@ def buildRemoveCollectionFromCollection(data):
     parent.children.unlink(child)
 
 
-def sendAddObjectToCollection(client: "ClientBlender", collectionName, objName):
+def sendAddObjectToCollection(client: Client, collectionName, objName):
     logger.debug("sendAddObjectToCollection %s <- %s", collectionName, objName)
     buffer = common.encodeString(collectionName) + common.encodeString(objName)
     client.addCommand(common.Command(common.MessageType.ADD_OBJECT_TO_COLLECTION, buffer, 0))
@@ -100,7 +101,7 @@ def buildAddObjectToCollection(data):
         collection.objects.link(object_)
 
 
-def sendRemoveObjectFromCollection(client: "ClientBlender", collectionName, objName):
+def sendRemoveObjectFromCollection(client: Client, collectionName, objName):
     logger.debug("sendRemoveObjectFromCollection %s <- %s", collectionName, objName)
     buffer = common.encodeString(collectionName) + common.encodeString(objName)
     client.addCommand(common.Command(common.MessageType.REMOVE_OBJECT_FROM_COLLECTION, buffer, 0))
@@ -116,7 +117,7 @@ def buildRemoveObjectFromCollection(data):
     collection.objects.unlink(object_)
 
 
-def sendCollectionInstance(client: "ClientBlender", obj):
+def sendCollectionInstance(client: Client, obj):
     if not obj.instance_collection:
         return
     instanceName = obj.name_full
