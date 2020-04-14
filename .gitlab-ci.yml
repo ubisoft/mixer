@@ -10,9 +10,9 @@ flake8:
     - flake8 -v
 
 zip:
-  image: ubuntu
+  image: archlinux/base
   script:
-    - sudo -E apt-get install zip
+    - pacman -Sy zip
     - zip -r dccsync.zip dccsync
   stage: build
   artifacts:
