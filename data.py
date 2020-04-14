@@ -7,7 +7,7 @@ from pathlib import Path
 import bpy
 
 from .broadcaster import common
-from .shareData import shareData
+from .share_data import share_data
 from .stats import get_stats_directory
 from . import ui
 
@@ -62,7 +62,7 @@ def get_logs_directory():
 
 
 def get_log_file():
-    return os.path.join(get_logs_directory(), f"dccsync_logs_{shareData.runId}.log")
+    return os.path.join(get_logs_directory(), f"dccsync_logs_{share_data.runId}.log")
 
 
 class DCCSyncProperties(bpy.types.PropertyGroup):
@@ -70,9 +70,9 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
         ui.update_user_list()
 
     def on_user_changed(self, context):
-        client = shareData.client
-        if client and client.isConnected():
-            client.setClientName(self.user)
+        client = share_data.client
+        if client and client.is_connected():
+            client.set_client_name(self.user)
 
     # Allows to change behavior according to environment: production or development
     env: bpy.props.StringProperty(name="Env", default=os.environ.get("DCCSYNC_ENV", "production"))
@@ -92,9 +92,9 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
 
     advanced: bpy.props.BoolProperty(default=False)
     developer_options: bpy.props.BoolProperty(default=False)
-    remoteServerIsUp: bpy.props.BoolProperty(default=False)
+    remote_server_is_up: bpy.props.BoolProperty(default=False)
 
-    showServerConsole: bpy.props.BoolProperty(default=False)
+    show_server_console: bpy.props.BoolProperty(default=False)
 
     VRtist: bpy.props.StringProperty(
         name="VRtist", default=os.environ.get("VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe")

@@ -39,14 +39,14 @@ class Grabber:
         client = Client(host, port)
         client.connect()
         command = Command(MessageType.JOIN_ROOM, room_name.encode("utf8"))
-        client.addCommand(command)
+        client.add_command(command)
 
         attempts_max = 20
         attempts = 0
         try:
             while attempts < attempts_max:
-                client.fetchCommands()
-                command = client.getNextReceivedCommand()
+                client.fetch_commands()
+                command = client.get_next_received_command()
                 if command is None:
                     attempts += 1
                     time.sleep(0.01)

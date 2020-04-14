@@ -2,7 +2,7 @@ from . import ui
 from . import operators
 from . import data
 from . import stats
-from .shareData import shareData
+from .share_data import share_data
 import atexit
 import logging
 from pathlib import Path
@@ -22,11 +22,11 @@ MODULE_PATH = Path(__file__).parent
 
 
 def cleanup():
-    if shareData.current_statistics is not None and shareData.auto_save_statistics:
-        stats.save_statistics(shareData.current_statistics, shareData.statistics_directory)
+    if share_data.current_statistics is not None and share_data.auto_save_statistics:
+        stats.save_statistics(share_data.current_statistics, share_data.statistics_directory)
     try:
-        if shareData.localServerProcess:
-            shareData.localServerProcess.kill()
+        if share_data.localServerProcess:
+            share_data.localServerProcess.kill()
     except Exception:
         pass
 

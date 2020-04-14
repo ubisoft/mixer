@@ -106,16 +106,16 @@ def save_statistics(stats_dict, stats_directory):
         json.dump(compute_final_statistics(stats_dict), f, indent=2)
 
 
-def stats_timer(shareData, log=None):
-    def innerDecorator(func):
+def stats_timer(share_data, log=None):
+    def inner_decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            if shareData.current_statistics is None:
+            if share_data.current_statistics is None:
                 return func(*args, **kwargs)
 
-            with StatsTimer(shareData, func.__name__, log):
+            with StatsTimer(share_data, func.__name__, log):
                 return func(*args, **kwargs)
 
         return wrapper
 
-    return innerDecorator
+    return inner_decorator

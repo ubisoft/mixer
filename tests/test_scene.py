@@ -13,7 +13,7 @@ class SceneTestCase(testcase.BlenderTestCase):
     pass
 
 
-class test_scene_empty_doc(SceneTestCase):
+class TestSceneEmptyDoc(SceneTestCase):
     def setUp(self):
         folder = Path(__file__).parent
         sender_blendfile = folder / "empty.blend"

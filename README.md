@@ -196,7 +196,7 @@ link changement de transform possible en script mais pas en UI
 les lights ont des parametres différents en fonciton du render engine:
 exemple : light.cycles.cast_shadow vs light.use_shadow
 
-mat.node_tree.links.new(bsdf.inputs['Base Color'], texImage.outputs['Color']) je l'aurais fait dans l'autre sens...
+mat.node_tree.links.new(bsdf.inputs['Base Color'], tex_image.outputs['Color']) je l'aurais fait dans l'autre sens...
 
 set parametre sur une multi selection marche à moitié
 

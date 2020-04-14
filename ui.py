@@ -1,7 +1,7 @@
 import bpy
 from . import operators
 from .data import get_dcc_sync_props
-from .shareData import shareData
+from .share_data import share_data
 
 import logging
 
@@ -31,12 +31,12 @@ def update_ui_lists():
 def update_user_list(do_redraw=True):
     props = get_dcc_sync_props()
     props.users.clear()
-    if shareData.client_ids is None:
+    if share_data.client_ids is None:
         redraw_if(do_redraw)
         return
 
-    if shareData.currentRoom:
-        room_name = shareData.currentRoom
+    if share_data.currentRoom:
+        room_name = share_data.currentRoom
     else:
         idx = props.room_index
         if idx >= len(props.rooms):
@@ -44,7 +44,7 @@ def update_user_list(do_redraw=True):
             return
         room_name = props.rooms[idx].name
 
-    client_ids = [c for c in shareData.client_ids if c["room"] == room_name]
+    client_ids = [c for c in share_data.client_ids if c["room"] == room_name]
 
     for client in client_ids:
         item = props.users.add()
@@ -59,11 +59,11 @@ def update_user_list(do_redraw=True):
 def update_room_list(do_redraw=True):
     props = get_dcc_sync_props()
     props.rooms.clear()
-    if shareData.client_ids is None:
+    if share_data.client_ids is None:
         redraw_if(do_redraw)
         return
 
-    rooms = {id["room"] for id in shareData.client_ids if id["room"]}
+    rooms = {id["room"] for id in share_data.client_ids if id["room"]}
     for room in rooms:
         item = props.rooms.add()
         item.name = room
@@ -71,13 +71,13 @@ def update_room_list(do_redraw=True):
     redraw_if(do_redraw)
 
 
-class ROOM_UL_ItemRenderer(bpy.types.UIList):
+class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.row()
         split.label(text=item.name)  # avoids renaming the item by accident
 
 
-class USERS_UL_ItemRenderer(bpy.types.UIList):
+class USERS_UL_ItemRenderer(bpy.types.UIList):  # noqa
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.row()
         split.label(text=item.name)  # avoids renaming the item by accident
@@ -109,7 +109,7 @@ class SettingsPanel(bpy.types.Panel):
 
         row = layout.column()
 
-        if not operators.shareData.currentRoom:
+        if not operators.share_data.currentRoom:
 
             # Room list
             row = layout.row()
@@ -118,7 +118,7 @@ class SettingsPanel(bpy.types.Panel):
             # Join room
             col = row.column()
 
-            connected = operators.shareData.client is not None and operators.shareData.client.isConnected()
+            connected = operators.share_data.client is not None and operators.share_data.client.is_connected()
             if not connected:
                 col.operator(operators.ConnectOperator.bl_idname, text="Connect")
             else:
@@ -152,11 +152,11 @@ class SettingsPanel(bpy.types.Panel):
                 col.prop(dcc_sync_props, "host", text="Host")
                 col.prop(dcc_sync_props, "port", text="Port")
                 col.prop(dcc_sync_props, "VRtist", text="VRtist Path")
-                col.prop(dcc_sync_props, "showServerConsole", text="Show server console")
+                col.prop(dcc_sync_props, "show_server_console", text="Show server console")
 
         else:
             col = row.column()
-            col.operator(operators.LeaveRoomOperator.bl_idname, text=f"Leave Room : {operators.shareData.currentRoom}")
+            col.operator(operators.LeaveRoomOperator.bl_idname, text=f"Leave Room : {operators.share_data.currentRoom}")
             col.label(text="Room Users: ")
             col.template_list(
                 "USERS_UL_ItemRenderer", "", dcc_sync_props, "users", dcc_sync_props, "user_index", rows=4

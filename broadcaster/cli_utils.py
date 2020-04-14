@@ -21,9 +21,9 @@ def init_logging(args):
     logger.setLevel(log_numeric_level)
 
     if args.log_file:
-        maxBytes = 1024 * 1000 * 512  # 512 MB
-        backupCount = 1024 * 1000  # 1B backup files
-        handler = logging.handlers.RotatingFileHandler(args.log_file, maxBytes=maxBytes, backupCount=backupCount)
+        max_bytes = 1024 * 1000 * 512  # 512 MB
+        backup_count = 1024 * 1000  # 1B backup files
+        handler = logging.handlers.RotatingFileHandler(args.log_file, max_bytes=max_bytes, backup_count=backup_count)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 

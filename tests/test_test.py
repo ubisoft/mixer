@@ -4,7 +4,7 @@ import blender_lib as bl
 from pathlib import Path
 
 
-class Test_test(testcase.BlenderTestCase):
+class TestTest(testcase.BlenderTestCase):
     def setUp(self):
         # Everything will apply to the whole testcase
 
@@ -18,7 +18,7 @@ class Test_test(testcase.BlenderTestCase):
 
     @unittest.skip("")
     def test_just_start(self):
-        self.assertUserSuccess()
+        self.assert_user_success()
 
     @unittest.skip("")
     def test_selftest(self):
@@ -27,7 +27,7 @@ class Test_test(testcase.BlenderTestCase):
 
         # automatic file chek fails sonce the add mesh command is not transmitted at once
 
-        self.assertMatches()
+        self.assert_matches()
 
 
 if __name__ == "__main__":
