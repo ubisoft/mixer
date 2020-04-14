@@ -1,5 +1,5 @@
 import unittest
-import testcase
+import tests.testcase as testcase
 from pathlib import Path
 import logging
 

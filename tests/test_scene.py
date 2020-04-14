@@ -1,12 +1,9 @@
-import sys  # noqa
-from pathlib import Path  # noqa
+from pathlib import Path
 
-sys.path.append(str(Path(__package__).parent))  # noqa
 from broadcaster.common import MessageType
 
 import unittest
-import testcase
-from pathlib import Path
+import tests.testcase as testcase
 
 
 class SceneTestCase(testcase.BlenderTestCase):

@@ -863,7 +863,6 @@ def wait_for_server(host, port):
 
 def start_local_server():
     dir_path = Path(__file__).parent
-    server_path = dir_path / "broadcaster" / "dccBroadcaster.py"
 
     if get_dcc_sync_props().show_server_console:
         args = {"creationflags": subprocess.CREATE_NEW_CONSOLE}
@@ -871,7 +870,7 @@ def start_local_server():
         args = {}
 
     share_data.localServerProcess = subprocess.Popen(
-        [bpy.app.binary_path_python, str(server_path)], shell=False, **args
+        [bpy.app.binary_path_python, "-m", "broadcaster.dccBroadcaster"], cwd=dir_path, shell=False, **args
     )
 
 

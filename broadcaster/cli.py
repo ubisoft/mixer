@@ -1,9 +1,9 @@
 import argparse
 import logging
 
-import client
-import common
-import cli_utils
+import broadcaster.client as client
+import broadcaster.common as common
+import broadcaster.cli_utils as cli_utils
 
 TIMEOUT = 10  # in seconds
 
