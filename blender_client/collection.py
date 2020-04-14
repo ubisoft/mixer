@@ -1,146 +1,138 @@
 from ..broadcaster import common
-from ..shareData import shareData
+from ..broadcaster.client import Client
+from ..share_data import share_data
 import logging
 import bpy
 
 logger = logging.getLogger(__name__)
 
 
-def sendCollection(client: 'ClientBlender', collection: bpy.types.Collection):
-    logger.debug("sendCollection %s", collection.name_full)
-    collectionInstanceOffset = collection.instance_offset
-    buffer = common.encodeString(collection.name_full) + common.encodeBool(not collection.hide_viewport) + \
-        common.encodeVector3(collectionInstanceOffset)
-    client.addCommand(common.Command(
-        common.MessageType.COLLECTION, buffer, 0))
+def send_collection(client: Client, collection: bpy.types.Collection):
+    logger.debug("send_collection %s", collection.name_full)
+    collection_instance_offset = collection.instance_offset
+    buffer = (
+        common.encode_string(collection.name_full)
+        + common.encode_bool(not collection.hide_viewport)
+        + common.encode_vector3(collection_instance_offset)
+    )
+    client.add_command(common.Command(common.MessageType.COLLECTION, buffer, 0))
 
 
-def buildCollection(data):
-    name_full, index = common.decodeString(data, 0)
-    visible, index = common.decodeBool(data, index)
+def build_collection(data):
+    name_full, index = common.decode_string(data, 0)
+    visible, index = common.decode_bool(data, index)
     hide_viewport = not visible
-    offset, _ = common.decodeVector3(data, index)
+    offset, _ = common.decode_vector3(data, index)
 
-    logger.debug("buildCollection %s", name_full)
-    collection = shareData.blenderCollections.get(name_full)
+    logger.debug("build_collection %s", name_full)
+    collection = share_data.blender_collections.get(name_full)
     if collection is None:
         collection = bpy.data.collections.new(name_full)
-        shareData.blenderCollections[name_full] = collection
+        share_data.blender_collections[name_full] = collection
     collection.hide_viewport = hide_viewport
     collection.instance_offset = offset
 
 
-def sendCollectionRemoved(client: 'ClientBlender', collectionName):
-    logger.debug("sendCollectionRemoved %s", collectionName)
-    buffer = common.encodeString(collectionName)
-    client.addCommand(common.Command(
-        common.MessageType.COLLECTION_REMOVED, buffer, 0))
+def send_collection_removed(client: Client, collection_name):
+    logger.debug("send_collection_removed %s", collection_name)
+    buffer = common.encode_string(collection_name)
+    client.add_command(common.Command(common.MessageType.COLLECTION_REMOVED, buffer, 0))
 
 
-def buildCollectionRemoved(data):
-    name_full, index = common.decodeString(data, 0)
-    logger.debug("buildCollectionRemove %s", name_full)
-    collection = shareData.blenderCollections[name_full]
-    del shareData.blenderCollections[name_full]
+def build_collection_removed(data):
+    name_full, index = common.decode_string(data, 0)
+    logger.debug("build_collectionRemove %s", name_full)
+    collection = share_data.blender_collections[name_full]
+    del share_data.blender_collections[name_full]
     bpy.data.collections.remove(collection)
 
 
-def sendAddCollectionToCollection(client: 'ClientBlender', parentCollectionName, collectionName):
-    logger.debug("sendAddCollectionToCollection %s <- %s", parentCollectionName, collectionName)
+def send_add_collection_to_collection(client: Client, parent_collection_name, collection_name):
+    logger.debug("send_add_collection_to_collection %s <- %s", parent_collection_name, collection_name)
 
-    buffer = common.encodeString(
-        parentCollectionName) + common.encodeString(collectionName)
-    client.addCommand(common.Command(
-        common.MessageType.ADD_COLLECTION_TO_COLLECTION, buffer, 0))
+    buffer = common.encode_string(parent_collection_name) + common.encode_string(collection_name)
+    client.add_command(common.Command(common.MessageType.ADD_COLLECTION_TO_COLLECTION, buffer, 0))
 
 
-def buildCollectionToCollection(data):
-    parent_name, index = common.decodeString(data, 0)
-    child_name, _ = common.decodeString(data, index)
-    logger.debug("buildCollectionToCollection %s <- %s", parent_name, child_name)
+def build_collection_to_collection(data):
+    parent_name, index = common.decode_string(data, 0)
+    child_name, _ = common.decode_string(data, index)
+    logger.debug("build_collection_to_collection %s <- %s", parent_name, child_name)
 
-    parent = shareData.blenderCollections[parent_name]
-    child = shareData.blenderCollections[child_name]
+    parent = share_data.blender_collections[parent_name]
+    child = share_data.blender_collections[child_name]
     parent.children.link(child)
 
 
-def sendRemoveCollectionFromCollection(client: 'ClientBlender', parentCollectionName, collectionName):
-    logger.debug("sendRemoveCollectionFromCollection %s <- %s", parentCollectionName, collectionName)
+def send_remove_collection_from_collection(client: Client, parent_collection_name, collection_name):
+    logger.debug("send_remove_collection_from_collection %s <- %s", parent_collection_name, collection_name)
 
-    buffer = common.encodeString(
-        parentCollectionName) + common.encodeString(collectionName)
-    client.addCommand(common.Command(
-        common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION, buffer, 0))
+    buffer = common.encode_string(parent_collection_name) + common.encode_string(collection_name)
+    client.add_command(common.Command(common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION, buffer, 0))
 
 
-def buildRemoveCollectionFromCollection(data):
-    parent_name, index = common.decodeString(data, 0)
-    child_name, _ = common.decodeString(data, index)
-    logger.debug("buildRemoveCollectionFromCollection %s <- %s", parent_name, child_name)
+def build_remove_collection_from_collection(data):
+    parent_name, index = common.decode_string(data, 0)
+    child_name, _ = common.decode_string(data, index)
+    logger.debug("build_remove_collection_from_collection %s <- %s", parent_name, child_name)
 
-    parent = shareData.blenderCollections[parent_name]
-    child = shareData.blenderCollections[child_name]
+    parent = share_data.blender_collections[parent_name]
+    child = share_data.blender_collections[child_name]
     parent.children.unlink(child)
 
 
-def sendAddObjectToCollection(client: 'ClientBlender', collectionName, objName):
-    logger.debug("sendAddObjectToCollection %s <- %s", collectionName, objName)
-    buffer = common.encodeString(
-        collectionName) + common.encodeString(objName)
-    client.addCommand(common.Command(
-        common.MessageType.ADD_OBJECT_TO_COLLECTION, buffer, 0))
+def send_add_object_to_collection(client: Client, collection_name, obj_name):
+    logger.debug("send_add_object_to_collection %s <- %s", collection_name, obj_name)
+    buffer = common.encode_string(collection_name) + common.encode_string(obj_name)
+    client.add_command(common.Command(common.MessageType.ADD_OBJECT_TO_COLLECTION, buffer, 0))
 
 
-def buildAddObjectToCollection(data):
-    collection_name, index = common.decodeString(data, 0)
-    object_name, _ = common.decodeString(data, index)
-    logger.debug("buildAddObjectToCollection %s <- %s", collection_name, object_name)
+def build_add_object_to_collection(data):
+    collection_name, index = common.decode_string(data, 0)
+    object_name, _ = common.decode_string(data, index)
+    logger.debug("build_add_object_to_collection %s <- %s", collection_name, object_name)
 
-    collection = shareData.blenderCollections[collection_name]
+    collection = share_data.blender_collections[collection_name]
 
     # We may have received an object creation message before this collection link message
     # and object creation will have created and linked the collecetion if needed
     if collection.objects.get(object_name) is None:
-        object_ = shareData.blenderObjects[object_name]
+        object_ = share_data.blender_objects[object_name]
         collection.objects.link(object_)
 
 
-def sendRemoveObjectFromCollection(client: 'ClientBlender', collectionName, objName):
-    logger.debug("sendRemoveObjectFromCollection %s <- %s", collectionName, objName)
-    buffer = common.encodeString(
-        collectionName) + common.encodeString(objName)
-    client.addCommand(common.Command(
-        common.MessageType.REMOVE_OBJECT_FROM_COLLECTION, buffer, 0))
+def send_remove_object_from_collection(client: Client, collection_name, obj_name):
+    logger.debug("send_remove_object_from_collection %s <- %s", collection_name, obj_name)
+    buffer = common.encode_string(collection_name) + common.encode_string(obj_name)
+    client.add_command(common.Command(common.MessageType.REMOVE_OBJECT_FROM_COLLECTION, buffer, 0))
 
 
-def buildRemoveObjectFromCollection(data):
-    collection_name, index = common.decodeString(data, 0)
-    object_name, _ = common.decodeString(data, index)
-    logger.debug("buildRemoveObjectFromCollection %s <- %s", collection_name, object_name)
+def build_remove_object_from_collection(data):
+    collection_name, index = common.decode_string(data, 0)
+    object_name, _ = common.decode_string(data, index)
+    logger.debug("build_remove_object_from_collection %s <- %s", collection_name, object_name)
 
-    collection = shareData.blenderCollections[collection_name]
-    object_ = shareData.blenderObjects[object_name]
+    collection = share_data.blender_collections[collection_name]
+    object_ = share_data.blender_objects[object_name]
     collection.objects.unlink(object_)
 
 
-def sendCollectionInstance(client: 'ClientBlender', obj):
+def send_collection_instance(client: Client, obj):
     if not obj.instance_collection:
         return
-    instanceName = obj.name_full
-    instantiatedCollection = obj.instance_collection.name_full
-    buffer = common.encodeString(
-        instanceName) + common.encodeString(instantiatedCollection)
-    client.addCommand(common.Command(
-        common.MessageType.INSTANCE_COLLECTION, buffer, 0))
+    instance_name = obj.name_full
+    instanciated_collection = obj.instance_collection.name_full
+    buffer = common.encode_string(instance_name) + common.encode_string(instanciated_collection)
+    client.add_command(common.Command(common.MessageType.INSTANCE_COLLECTION, buffer, 0))
 
 
-def buildCollectionInstance(data):
-    instance_name, index = common.decodeString(data, 0)
-    instantiated_name, _ = common.decodeString(data, index)
-    instantiated = shareData.blenderCollections[instantiated_name]
+def build_collection_instance(data):
+    instance_name, index = common.decode_string(data, 0)
+    instantiated_name, _ = common.decode_string(data, index)
+    instantiated = share_data.blender_collections[instantiated_name]
 
     instance = bpy.data.objects.new(name=instance_name, object_data=None)
     instance.instance_collection = instantiated
-    instance.instance_type = 'COLLECTION'
+    instance.instance_type = "COLLECTION"
 
-    shareData.blenderObjects[instance_name] = instance
+    share_data.blender_objects[instance_name] = instance
