@@ -5,6 +5,7 @@ click==7.1.1
 entrypoints==0.3
 fake-bpy-module-2.82==20200218
 flake8==3.7.9
+flake8-black==0.1.1
 mccabe==0.6.1
 pathspec==0.8.0
 pycodestyle==2.5.0

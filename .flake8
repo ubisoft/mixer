@@ -1,0 +1,9 @@
+[flake8]
+max-line-length = 120
+extend-ignore = E203 # Incompatible with black
+
+exclude =
+  .git
+  .history
+  .venv
+  .vscode
