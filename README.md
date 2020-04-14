@@ -1,6 +1,6 @@
 # Developer environment
 
-We recommand Visual Studio Code, with Python and Blender VSCode extensions.
+## Python Virtual Environment
 
 After cloning the repository, create a Virtual Environment in the code directory:
 
@@ -10,9 +10,7 @@ python -m venv .venv
 
 Use python 3.7 to match Blender's python version.
 
-If you have a python file open in VSCode, it should automatically detect this new venv and ask to to activate it, answer yes. Note that VSCode never detect your python unless you open a Python file. When your python is detected, you should see it in your status bar.
-
-In case you need to activate it manually, on Windows the commands are:
+Activate the virtual env, on Windows the commands are:
 
 With Git bash:
 ```bash
@@ -24,16 +22,23 @@ With cmd.exe:
 .venv/Scripts/activate.bat
 ```
 
-Open a new terminal in VSCode and ensure the virtual env is activated ("(.venv)" should appear on the prompt line) and install developer pip packages in it:
+Then install development packages with pip:
 ```bash
 pip install -r requirements-dev.txt
 ```
 
-Then add the following configuration to the project VSCode settings file `.vscode/settings.json`:
+## Visual Studio Code
+
+We recommand Visual Studio Code, with Python and Blender VSCode extensions.
+
+If you have a python file open in VSCode, it should automatically detect the virtual env, activate it when prompted. Note that VSCode never detect your python unless you open a Python file. When your python is detected, you should see it in your status bar and any new terminal open should have the virtual env activated ("(.venv)" should appear on the prompt line).
+
+Add or replace the following configuration to the project VSCode settings file `.vscode/settings.json`:
 
 ```
 {
     [...]
+    "editor.formatOnSave": true,
     "python.pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe",
     "python.formatting.provider": "black",
     "python.testing.unittestArgs": [
@@ -49,6 +54,20 @@ Then add the following configuration to the project VSCode settings file `.vscod
     [...]
 }
 ```
+
+## Running code quality tools manually
+
+With the above setup, all the code you type should be formatted on save and you should have flake8 warning messages.
+
+If you want to format manually the codebase, run `black .` in the terminal.
+
+If you want to check flake warnings, run `flake8` in the terminal. Note that the flake8 plugins `flake8-black` and `pep8-naming` are installed in the virtual env so you will be notified if black would reformat a file and if you violate PEP8 naming conventions.
+
+You need to have the virtual env activated for these commands to work.
+
+## CI/CD
+
+The CI/CD script `.gitlab-ci.yml` has a codequality stage that run 
 
 # Unit tests
 
