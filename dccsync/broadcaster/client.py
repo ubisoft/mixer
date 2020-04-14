@@ -2,10 +2,7 @@ import queue
 import socket
 import logging
 
-try:
-    from . import common
-except ImportError:
-    import broadcaster.common as common
+import dccsync.broadcaster.common as common
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
 

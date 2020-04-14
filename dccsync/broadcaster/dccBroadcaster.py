@@ -5,8 +5,8 @@ import select
 import threading
 from typing import Tuple, List, Mapping, Union, ValuesView
 
-import broadcaster.cli_utils as cli_utils
-import broadcaster.common as common
+import dccsync.broadcaster.cli_utils as cli_utils
+import dccsync.broadcaster.common as common
 
 BINDING_HOST = ""
 SHUTDOWN = False

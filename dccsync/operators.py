@@ -10,15 +10,15 @@ from typing import Mapping
 import bpy
 from bpy.app.handlers import persistent
 
-from .share_data import share_data, object_visibility
-from .blender_client import scene as scene_lib
-from .blender_client import collection as collection_lib
-from .blender_client import object_ as object_lib
+from dccsync.share_data import share_data, object_visibility
+from dccsync.blender_client import scene as scene_lib
+from dccsync.blender_client import collection as collection_lib
+from dccsync.blender_client import object_ as object_lib
 
-from . import clientBlender
-from . import ui
-from .data import get_dcc_sync_props
-from .stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
+from dccsync import clientBlender
+from dccsync import ui
+from dccsync.data import get_dcc_sync_props
+from dccsync.stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
 
 logger = logging.getLogger(__name__)
 

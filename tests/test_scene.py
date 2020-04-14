@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from broadcaster.common import MessageType
+from dccsync.broadcaster.common import MessageType
 
 import unittest
 import tests.testcase as testcase

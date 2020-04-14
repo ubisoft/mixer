@@ -4,16 +4,16 @@ import os
 
 import bpy
 from mathutils import Matrix, Quaternion
-from . import ui
-from . import data
-from .share_data import share_data
-from .broadcaster import common
-from .broadcaster.client import Client
-from .blender_client import collection as collection_api
-from .blender_client import mesh as mesh_api
-from .blender_client import object_ as object_api
-from .blender_client import scene as scene_api
-from .stats import stats_timer
+from dccsync import ui
+from dccsync import data
+from dccsync.share_data import share_data
+from dccsync.broadcaster import common
+from dccsync.broadcaster.client import Client
+from dccsync.blender_client import collection as collection_api
+from dccsync.blender_client import mesh as mesh_api
+from dccsync.blender_client import object_ as object_api
+from dccsync.blender_client import scene as scene_api
+from dccsync.stats import stats_timer
 
 _STILL_ACTIVE = 259
 

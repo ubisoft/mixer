@@ -1,9 +1,9 @@
 import argparse
 import logging
 
-import broadcaster.client as client
-import broadcaster.common as common
-import broadcaster.cli_utils as cli_utils
+import dccsync.broadcaster.client as client
+import dccsync.broadcaster.common as common
+import dccsync.broadcaster.cli_utils as cli_utils
 
 TIMEOUT = 10  # in seconds
 

@@ -1,8 +1,9 @@
-from ..broadcaster import common
-from ..broadcaster.client import Client
-from ..share_data import share_data
 import logging
 import bpy
+
+from dccsync.broadcaster import common
+from dccsync.broadcaster.client import Client
+from dccsync.share_data import share_data
 
 logger = logging.getLogger(__name__)
 

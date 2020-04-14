@@ -35,7 +35,7 @@ If you have a python file open in VSCode, it should automatically detect the vir
 
 Add or replace the following configuration to the project VSCode settings file `.vscode/settings.json`:
 
-```
+```json
 {
     [...]
     "editor.formatOnSave": true,
@@ -51,6 +51,17 @@ Add or replace the following configuration to the project VSCode settings file `
     "python.testing.unittestEnabled": true,
     "python.linting.flake8Enabled": true,
     "python.linting.enabled": true,
+    "blender.addon.loadDirectory": "./dccsync",
+    [...]
+}
+```
+
+If you have Gitlab extension setup, you may want to add the following setting:
+
+```json
+{
+    [...]
+    "gitlab.instanceUrl": "https://gitlab-ncsa.ubisoft.org/",
     [...]
 }
 ```

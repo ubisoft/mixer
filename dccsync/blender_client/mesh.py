@@ -1,13 +1,13 @@
-from ..broadcaster import common
-from ..stats import stats_timer
-from ..share_data import share_data
-
 import logging
 import struct
 
 import bpy
 import bmesh
 from mathutils import Vector
+
+from dccsync.broadcaster import common
+from dccsync.stats import stats_timer
+from dccsync.share_data import share_data
 
 logger = logging.getLogger(__name__)
 
