@@ -23,7 +23,7 @@ def init_logging(args):
     if args.log_file:
         max_bytes = 1024 * 1000 * 512  # 512 MB
         backup_count = 1024 * 1000  # 1B backup files
-        handler = logging.handlers.RotatingFileHandler(args.log_file, max_bytes=max_bytes, backup_count=backup_count)
+        handler = logging.handlers.RotatingFileHandler(args.log_file, maxBytes=max_bytes, backupCount=backup_count)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
