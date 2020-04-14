@@ -10,12 +10,9 @@ flake8:
     - flake8 -v
 
 zip:
-  image: archlinux/base
-  script:
-    - pacman -Sy zip --noconfirm
-    - zip -r dccsync.zip dccsync
   stage: build
   artifacts:
+    name: "${CI_PROJECT_NAME}_${CI_COMMIT_REF_NAME}"
     paths:
-      - dccsync.zip
+      - dccsync
     expire_in: 1 week
