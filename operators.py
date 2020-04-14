@@ -153,16 +153,18 @@ def get_parent_collections(collection_name):
     return parents
 
 
-def find_renamed(new_items: Mapping[Any, Any], old_items: Mapping[Any, Any]):
+def find_renamed(items_before: Mapping[Any, Any], items_after: Mapping[Any, Any]):
     """
+    Split before/after mappings into added/removed/renamed
 
+    Rename detection is based on the mapping keys (e.g. uuids)
     """
-    new_uuids = {uuid for uuid in new_items.keys()}
-    old_uuids = {uuid for uuid in old_items.keys()}
-    renamed_uuids = {uuid for uuid in new_uuids & old_uuids if old_items[uuid] != new_items[uuid]}
-    added_items = [new_items[uuid] for uuid in new_uuids - old_uuids - renamed_uuids]
-    removed_items = [old_items[uuid] for uuid in old_uuids - new_uuids - renamed_uuids]
-    renamed_items = [(old_items[uuid], new_items[uuid]) for uuid in renamed_uuids]
+    uuids_before = {uuid for uuid in items_before.keys()}
+    uuids_after = {uuid for uuid in items_after.keys()}
+    renamed_uuids = {uuid for uuid in uuids_after & uuids_before if items_before[uuid] != items_after[uuid]}
+    added_items = [items_after[uuid] for uuid in uuids_after - uuids_before - renamed_uuids]
+    removed_items = [items_before[uuid] for uuid in uuids_before - uuids_after - renamed_uuids]
+    renamed_items = [(items_before[uuid], items_after[uuid]) for uuid in renamed_uuids]
     return added_items, removed_items, renamed_items
 
 
@@ -176,9 +178,11 @@ def update_scenes_state():
         if not scene.uuid:
             scene.uuid = str(uuid4())
 
-    new_scenes = {scene.uuid: name for name, scene in share_data.blender_scenes.items()}
-    old_scenes = {scene.uuid: name for name, scene in share_data.scenes_info.items()}
-    share_data.scenes_added, share_data.scenes_removed, share_data.scenes_renamed = find_renamed(new_scenes, old_scenes)
+    scenes_after = {scene.uuid: name for name, scene in share_data.blender_scenes.items()}
+    scenes_before = {scene.uuid: name for name, scene in share_data.scenes_info.items()}
+    share_data.scenes_added, share_data.scenes_removed, share_data.scenes_renamed = find_renamed(
+        scenes_before, scenes_after
+    )
 
     for old_name, new_name in share_data.scenes_renamed:
         share_data.scenes_info[new_name] = share_data.scenes_info[old_name]

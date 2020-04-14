@@ -1,6 +1,7 @@
 import unittest
-import testcase
-import blender_lib as bl
+import tests.testcase as testcase
+import tests.blender_lib as bl
+
 from pathlib import Path
 
 

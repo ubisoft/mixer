@@ -14,6 +14,9 @@ def send_scene(client: Client, scene_name: str):
 
 
 def delete_scene(scene):
+    # Due to bug mentionned here https://developer.blender.org/T71422, deleting a scene with D.scenes.remove()
+    # in a function called from a timer gives a hard crash. This is due to context.window being None.
+    # To overcome this issue, we call an operator with a custom context that define window.
     # https://devtalk.blender.org/t/new-timers-have-no-context-object-why-is-that-so-cant-override-it/6802
     def window():
         for window in bpy.context.window_manager.windows:
