@@ -810,7 +810,7 @@ def clear_scene_content():
 
     # Cannot remove the last scene at this point, treat it differently
     for scene in bpy.data.scenes[:-1]:
-        bpy.data.scenes.remove(scene)
+        scene_lib.delete_scene(scene)
 
     share_data.clear_before_state()
 
