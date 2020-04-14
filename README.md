@@ -24,9 +24,9 @@ With cmd.exe:
 .venv/Scripts/activate.bat
 ```
 
-Open a new terminal in VSCode and ensure the virtual env is activated ("(.venv)" should appear on the prompt line) and install pip packages in it:
+Open a new terminal in VSCode and ensure the virtual env is activated ("(.venv)" should appear on the prompt line) and install developer pip packages in it:
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 
