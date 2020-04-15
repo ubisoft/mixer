@@ -1,16 +1,12 @@
 import logging
 import argparse
-import os
 import socket
 import select
-import sys
 import threading
 from typing import Tuple, List, Mapping, Union, ValuesView
 
-import cli_utils
-import common
-
-sys.path.append(os.getcwd())
+import dccsync.broadcaster.cli_utils as cli_utils
+import dccsync.broadcaster.common as common
 
 BINDING_HOST = ""
 SHUTDOWN = False

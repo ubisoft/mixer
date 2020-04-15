@@ -6,10 +6,10 @@ from pathlib import Path
 
 import bpy
 
-from .broadcaster import common
-from .share_data import share_data
-from .stats import get_stats_directory
-from . import ui
+from dccsync.broadcaster import common
+from dccsync.share_data import share_data
+from dccsync.stats import get_stats_directory
+from dccsync import ui
 
 logger = logging.getLogger(__name__)
 

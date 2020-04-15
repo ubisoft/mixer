@@ -1,10 +1,11 @@
 import unittest
 import threading
 import time
-from broadcaster.dccBroadcaster import Server
-from broadcaster.client import Client
-import broadcaster.common as common
 import logging
+
+from dccsync.broadcaster.dccBroadcaster import Server
+from dccsync.broadcaster.client import Client
+import dccsync.broadcaster.common as common
 
 
 class Delegate:

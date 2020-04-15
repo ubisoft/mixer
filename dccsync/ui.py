@@ -1,7 +1,7 @@
 import bpy
-from . import operators
-from .data import get_dcc_sync_props
-from .share_data import share_data
+from dccsync import operators
+from dccsync.data import get_dcc_sync_props
+from dccsync.share_data import share_data
 
 import logging
 

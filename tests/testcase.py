@@ -5,17 +5,15 @@ import tempfile
 import time
 from typing import List
 import unittest
+import sys
 
-import blender_lib as bl
-import dccsync_lib
-from grabber import Grabber
-from grabber import CommandStream
-from process import BlenderServer
+import tests.blender_lib as bl
+import tests.dccsync_lib as dccsync_lib
+from tests.grabber import Grabber
+from tests.grabber import CommandStream
+from tests.process import BlenderServer
 
-import sys  # noqa
-
-sys.path.append(str(Path(__package__).parent))  # noqa
-from broadcaster.common import MessageType
+from dccsync.broadcaster.common import MessageType
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)

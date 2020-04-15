@@ -4,7 +4,7 @@ from typing import List, Callable
 import inspect
 import socket
 import time
-import blender_lib
+import tests.blender_lib as blender_lib
 import os
 import logging
 
