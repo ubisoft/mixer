@@ -54,7 +54,7 @@ class ClientBlender(Client):
     def get_or_create_path(self, path, data=None) -> bpy.types.Object:
         index = path.rfind("/")
         if index != -1:
-            share_data.pendingParenting.add(path)  # Parenting is resolved after consumption of all messages
+            share_data.pending_parenting.add(path)  # Parenting is resolved after consumption of all messages
 
         # Create or get object
         elem = path[index + 1 :]
@@ -320,8 +320,8 @@ class ClientBlender(Client):
         path, _ = common.decode_string(data, 0)
         obj = self.get_or_create_path(path)
 
-        share_data.restore_toCollections[obj.name_full] = []
-        restore_to = share_data.restore_toCollections[obj.name_full]
+        share_data.restore_to_collections[obj.name_full] = []
+        restore_to = share_data.restore_to_collections[obj.name_full]
         for collection in obj.users_collection:
             restore_to.append(collection.name_full)
             collection.objects.unlink(obj)
@@ -339,11 +339,11 @@ class ClientBlender(Client):
         trash_collection = self.get_or_create_collection("__Trash__")
         trash_collection.hide_viewport = True
         trash_collection.objects.unlink(obj)
-        restore_to = share_data.restore_toCollections[obj.name_full]
+        restore_to = share_data.restore_to_collections[obj.name_full]
         for collection_name in restore_to:
             collection = self.get_or_create_collection(collection_name)
             collection.objects.link(obj)
-        del share_data.restore_toCollections[obj.name_full]
+        del share_data.restore_to_collections[obj.name_full]
         if len(path) > 0:
             parent_name = path.split("/")[-1]
             obj.parent = share_data.blender_objects.get(parent_name, None)
@@ -1140,6 +1140,8 @@ class ClientBlender(Client):
                         scene_api.build_scene(command.data)
                     elif command.type == common.MessageType.SCENE_REMOVED:
                         scene_api.build_scene_removed(command.data)
+                    elif command.type == common.MessageType.SCENE_RENAMED:
+                        scene_api.build_scene_renamed(command.data)
 
                     elif command.type == common.MessageType.OBJECT_VISIBILITY:
                         object_api.build_object_visibility(command.data)
@@ -1153,9 +1155,9 @@ class ClientBlender(Client):
         if not set_dirty:
             share_data.update_current_data()
 
-        if len(share_data.pendingParenting) > 0:
+        if len(share_data.pending_parenting) > 0:
             remaining_parentings = set()
-            for path in share_data.pendingParenting:
+            for path in share_data.pending_parenting:
                 path_elem = path.split("/")
                 ob = None
                 parent = None
@@ -1167,4 +1169,4 @@ class ClientBlender(Client):
                     if ob.parent != parent:  # do it only if needed, otherwise it resets matrix_parent_inverse
                         ob.parent = parent
                     parent = ob
-            share_data.pendingParenting = remaining_parentings
+            share_data.pending_parenting = remaining_parentings

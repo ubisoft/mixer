@@ -3,9 +3,9 @@ import os
 import socket
 import subprocess
 import time
-
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, Any
+from uuid import uuid4
 
 import bpy
 from bpy.app.handlers import persistent
@@ -80,10 +80,10 @@ def update_transform(obj):
 def join_room(room_name: str):
     logger.info("join_room")
 
-    assert share_data.currentRoom is None
+    assert share_data.current_room is None
     user = get_dcc_sync_props().user
     share_data.session_id += 1
-    share_data.currentRoom = room_name
+    share_data.current_room = room_name
     share_data.client.join_room(room_name)
     share_data.client.set_client_name(user)
     share_data.client.send_set_current_scene(bpy.context.scene.name_full)
@@ -105,7 +105,7 @@ def join_room(room_name: str):
 def leave_current_room():
     logger.info("leave_current_room")
 
-    if share_data.currentRoom:
+    if share_data.current_room:
         share_data.leave_current_room()
         set_handlers(False)
 
@@ -120,7 +120,7 @@ def leave_current_room():
 
 def is_joined():
     connected = share_data.client is not None and share_data.client.is_connected()
-    return connected and share_data.currentRoom
+    return connected and share_data.current_room
 
 
 @persistent
@@ -153,16 +153,40 @@ def get_parent_collections(collection_name):
     return parents
 
 
+def find_renamed(items_before: Mapping[Any, Any], items_after: Mapping[Any, Any]):
+    """
+    Split before/after mappings into added/removed/renamed
+
+    Rename detection is based on the mapping keys (e.g. uuids)
+    """
+    uuids_before = {uuid for uuid in items_before.keys()}
+    uuids_after = {uuid for uuid in items_after.keys()}
+    renamed_uuids = {uuid for uuid in uuids_after & uuids_before if items_before[uuid] != items_after[uuid]}
+    added_items = [items_after[uuid] for uuid in uuids_after - uuids_before - renamed_uuids]
+    removed_items = [items_before[uuid] for uuid in uuids_before - uuids_after - renamed_uuids]
+    renamed_items = [(items_before[uuid], items_after[uuid]) for uuid in renamed_uuids]
+    return added_items, removed_items, renamed_items
+
+
 def update_scenes_state():
     """
     Must be called before update_collections_state so that non empty collections added to master
     collection are processed
     """
-    new_names = share_data.blender_scenes.keys()
-    old_names = share_data.scenes_info.keys()
 
-    share_data.scenes_added |= new_names - old_names
-    share_data.scenes_removed |= old_names - new_names
+    for scene in share_data.blender_scenes.values():
+        if not scene.dccsync_uuid:
+            scene.dccsync_uuid = str(uuid4())
+
+    scenes_after = {scene.dccsync_uuid: name for name, scene in share_data.blender_scenes.items()}
+    scenes_before = {scene.dccsync_uuid: name for name, scene in share_data.scenes_info.items()}
+    share_data.scenes_added, share_data.scenes_removed, share_data.scenes_renamed = find_renamed(
+        scenes_before, scenes_after
+    )
+
+    for old_name, new_name in share_data.scenes_renamed:
+        share_data.scenes_info[new_name] = share_data.scenes_info[old_name]
+        del share_data.scenes_info[old_name]
 
     # walk the old scenes
     for scene_name, scene_info in share_data.scenes_info.items():
@@ -259,27 +283,27 @@ def update_frame_changed_related_objects_state(old_objects: dict, new_objects: d
         if not new_obj:
             continue
         if new_obj.matrix_local != matrix:
-            share_data.objectsTransformed.add(obj_name)
+            share_data.objects_transformed.add(obj_name)
 
 
 @stats_timer(share_data)
 def update_object_state(old_objects: dict, new_objects: dict):
     stats_timer = share_data.current_stats_timer
 
-    with stats_timer.child("checkObjectsAddedAndRemoved"):
+    with stats_timer.child("checkobjects_addedAndRemoved"):
         objects = set(new_objects.keys())
-        share_data.objectsAdded = objects - old_objects.keys()
-        share_data.objectsRemoved = old_objects.keys() - objects
+        share_data.objects_added = objects - old_objects.keys()
+        share_data.objects_removed = old_objects.keys() - objects
 
     share_data.old_objects = new_objects
 
-    if len(share_data.objectsAdded) == 1 and len(share_data.objectsRemoved) == 1:
-        share_data.objects_renamed[list(share_data.objectsRemoved)[0]] = list(share_data.objectsAdded)[0]
-        share_data.objectsAdded.clear()
-        share_data.objectsRemoved.clear()
+    if len(share_data.objects_added) == 1 and len(share_data.objects_removed) == 1:
+        share_data.objects_renamed[list(share_data.objects_removed)[0]] = list(share_data.objects_added)[0]
+        share_data.objects_added.clear()
+        share_data.objects_removed.clear()
         return
 
-    for obj_name in share_data.objectsRemoved:
+    for obj_name in share_data.objects_removed:
         if obj_name in share_data.old_objects:
             del share_data.old_objects[obj_name]
 
@@ -354,6 +378,9 @@ def add_scenes():
     for scene in share_data.scenes_added:
         scene_lib.send_scene(share_data.client, scene)
         changed = True
+    for old_name, new_name in share_data.scenes_renamed:
+        scene_lib.send_scene_renamed(share_data.client, old_name, new_name)
+        changed = True
     return changed
 
 
@@ -375,7 +402,7 @@ def remove_collections():
 
 def add_objects():
     changed = False
-    for obj_name in share_data.objectsAdded:
+    for obj_name in share_data.objects_added:
         obj = share_data.blender_objects.get(obj_name)
         if obj:
             update_params(obj)
@@ -439,7 +466,7 @@ def update_collections_parameters():
 
 def delete_scene_objects():
     changed = False
-    for obj_name in share_data.objectsRemoved:
+    for obj_name in share_data.objects_removed:
         share_data.client.send_deleted_object(obj_name)
         changed = True
     return changed
@@ -466,7 +493,7 @@ def update_objects_visibility():
 
 def update_objects_transforms():
     changed = False
-    for obj_name in share_data.objectsTransformed:
+    for obj_name in share_data.objects_transformed:
         if obj_name in share_data.blender_objects:
             update_transform(share_data.blender_objects[obj_name])
             changed = True
@@ -489,7 +516,7 @@ def create_vrtist_objects():
     same scene as the one initially synchronized
     """
     changed = False
-    for obj_name in share_data.objectsAdded:
+    for obj_name in share_data.objects_added:
         if obj_name in bpy.context.scene.objects:
             obj = bpy.context.scene.objects[obj_name]
             scene_lib.send_add_object_to_vrtist(share_data.client, bpy.context.scene.name_full, obj.name_full)
@@ -787,7 +814,7 @@ def clear_scene_content():
 
     # Cannot remove the last scene at this point, treat it differently
     for scene in bpy.data.scenes[:-1]:
-        bpy.data.scenes.remove(scene)
+        scene_lib.delete_scene(scene)
 
     share_data.clear_before_state()
 
@@ -919,7 +946,7 @@ def disconnect():
         share_data.client = None
 
     share_data.client_ids = None
-    share_data.currentRoom = None
+    share_data.current_room = None
 
     ui.update_ui_lists()
     ui.redraw()
@@ -980,10 +1007,10 @@ class CreateRoomOperator(bpy.types.Operator):
     @classmethod
     def poll(cls, context):
         props = get_dcc_sync_props()
-        return is_client_connected() and not share_data.currentRoom and bool(props.room)
+        return is_client_connected() and not share_data.current_room and bool(props.room)
 
     def execute(self, context):
-        assert share_data.currentRoom is None
+        assert share_data.current_room is None
         if not is_client_connected():
             return {"CANCELLED"}
 
@@ -1005,9 +1032,9 @@ class JoinRoomOperator(bpy.types.Operator):
         return is_client_connected() and room_index < len(get_dcc_sync_props().rooms)
 
     def execute(self, context):
-        assert not share_data.currentRoom
+        assert not share_data.current_room
         share_data.set_dirty()
-        share_data.currentRoom = None
+        share_data.current_room = None
 
         share_data.isLocal = False
         props = get_dcc_sync_props()
@@ -1026,7 +1053,7 @@ class LeaveRoomOperator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return is_client_connected() and share_data.currentRoom is not None
+        return is_client_connected() and share_data.current_room is not None
 
     def execute(self, context):
         leave_current_room()
@@ -1119,7 +1146,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
 
     def execute(self, context):
         dcc_sync_props = get_dcc_sync_props()
-        if not share_data.currentRoom:
+        if not share_data.current_room:
             if not connect():
                 return {"CANCELLED"}
 
@@ -1132,7 +1159,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
         args = [
             dcc_sync_props.VRtist,
             "--room",
-            share_data.currentRoom,
+            share_data.current_room,
             "--hostname",
             hostname,
             "--port",

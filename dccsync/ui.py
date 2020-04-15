@@ -35,8 +35,8 @@ def update_user_list(do_redraw=True):
         redraw_if(do_redraw)
         return
 
-    if share_data.currentRoom:
-        room_name = share_data.currentRoom
+    if share_data.current_room:
+        room_name = share_data.current_room
     else:
         idx = props.room_index
         if idx >= len(props.rooms):
@@ -109,7 +109,7 @@ class SettingsPanel(bpy.types.Panel):
 
         row = layout.column()
 
-        if not operators.share_data.currentRoom:
+        if not operators.share_data.current_room:
 
             # Room list
             row = layout.row()
@@ -156,7 +156,9 @@ class SettingsPanel(bpy.types.Panel):
 
         else:
             col = row.column()
-            col.operator(operators.LeaveRoomOperator.bl_idname, text=f"Leave Room : {operators.share_data.currentRoom}")
+            col.operator(
+                operators.LeaveRoomOperator.bl_idname, text=f"Leave Room : {operators.share_data.current_room}"
+            )
             col.label(text="Room Users: ")
             col.template_list(
                 "USERS_UL_ItemRenderer", "", dcc_sync_props, "users", dcc_sync_props, "user_index", rows=4

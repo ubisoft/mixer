@@ -78,6 +78,8 @@ class MessageType(IntEnum):
     GROUP_BEGIN = 132
     GROUP_END = 133
 
+    SCENE_RENAMED = 134
+
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
     MESH = 202

@@ -135,6 +135,7 @@ classes = (
 def register():
     for _ in classes:
         bpy.utils.register_class(_)
+    bpy.types.Scene.dccsync_uuid = bpy.props.StringProperty(default="")
     bpy.types.WindowManager.dcc_sync = bpy.props.PointerProperty(type=DCCSyncProperties)
 
 
