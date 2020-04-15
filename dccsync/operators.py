@@ -10,15 +10,15 @@ from typing import Mapping
 import bpy
 from bpy.app.handlers import persistent
 
-from .share_data import share_data, object_visibility
-from .blender_client import scene as scene_lib
-from .blender_client import collection as collection_lib
-from .blender_client import object_ as object_lib
+from dccsync.share_data import share_data, object_visibility
+from dccsync.blender_client import scene as scene_lib
+from dccsync.blender_client import collection as collection_lib
+from dccsync.blender_client import object_ as object_lib
 
-from . import clientBlender
-from . import ui
-from .data import get_dcc_sync_props
-from .stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
+from dccsync import clientBlender
+from dccsync import ui
+from dccsync.data import get_dcc_sync_props
+from dccsync.stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
 
 logger = logging.getLogger(__name__)
 
@@ -862,8 +862,9 @@ def wait_for_server(host, port):
 
 
 def start_local_server():
-    dir_path = Path(__file__).parent
-    server_path = dir_path / "broadcaster" / "dccBroadcaster.py"
+    import dccsync
+
+    dir_path = Path(dccsync.__file__).parent.parent  # broadcaster is submodule of dccsync
 
     if get_dcc_sync_props().show_server_console:
         args = {"creationflags": subprocess.CREATE_NEW_CONSOLE}
@@ -871,7 +872,7 @@ def start_local_server():
         args = {}
 
     share_data.localServerProcess = subprocess.Popen(
-        [bpy.app.binary_path_python, str(server_path)], shell=False, **args
+        [bpy.app.binary_path_python, "-m", "dccsync.broadcaster.dccBroadcaster"], cwd=dir_path, shell=False, **args
     )
 
 

@@ -1,12 +1,7 @@
-import sys  # noqa
-from pathlib import Path  # noqa
-
-sys.path.append(str(Path(__package__).parent))  # noqa
-
-from broadcaster.common import MessageType
-from broadcaster.common import Command
-from broadcaster.common import ClientDisconnectedException
-from broadcaster.client import Client
+from dccsync.broadcaster.common import MessageType
+from dccsync.broadcaster.common import Command
+from dccsync.broadcaster.common import ClientDisconnectedException
+from dccsync.broadcaster.client import Client
 from typing import Mapping, List
 import time
 
