@@ -5,6 +5,7 @@
 - Support more object visibility atributes (#54)
 - Collections linked to multiple collections (#44)
 - Undo failures for collection rename and other cases (#45)
+- Fix scene rename (#43)
 
 # 0.1.0alpha (2020-04-03)
 

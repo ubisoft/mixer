@@ -175,11 +175,11 @@ def update_scenes_state():
     """
 
     for scene in share_data.blender_scenes.values():
-        if not scene.uuid:
-            scene.uuid = str(uuid4())
+        if not scene.dccsync_uuid:
+            scene.dccsync_uuid = str(uuid4())
 
-    scenes_after = {scene.uuid: name for name, scene in share_data.blender_scenes.items()}
-    scenes_before = {scene.uuid: name for name, scene in share_data.scenes_info.items()}
+    scenes_after = {scene.dccsync_uuid: name for name, scene in share_data.blender_scenes.items()}
+    scenes_before = {scene.dccsync_uuid: name for name, scene in share_data.scenes_info.items()}
     share_data.scenes_added, share_data.scenes_removed, share_data.scenes_renamed = find_renamed(
         scenes_before, scenes_after
     )

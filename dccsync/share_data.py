@@ -27,9 +27,9 @@ class SceneInfo:
         master_collection = scene.collection
         self.children = [x.name_full for x in master_collection.children]
         self.objects = [x.name_full for x in master_collection.objects]
-        if not scene.uuid:
-            scene.uuid = str(uuid4())
-        self.uuid = scene.uuid
+        if not scene.dccsync_uuid:
+            scene.dccsync_uuid = str(uuid4())
+        self.dccsync_uuid = scene.dccsync_uuid
 
 
 class ShareData:
