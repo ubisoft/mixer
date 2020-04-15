@@ -19,7 +19,7 @@ source .venv/Scripts/activate
 
 With cmd.exe:
 ```bash
-.venv/Scripts/activate.bat
+.venv\Scripts\activate.bat
 ```
 
 Then install development packages with pip:
