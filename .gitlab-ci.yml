@@ -1,8 +1,11 @@
 stages:
   - codequality
+  - test
   - build
 
 flake8:
+  tags:
+    - linux
   image: python:3
   stage: codequality
   script:
@@ -10,6 +13,8 @@ flake8:
     - flake8 -v
 
 zip:
+  tags:
+    - linux
   stage: build
   script: exit 0
   artifacts:
@@ -17,3 +22,14 @@ zip:
     paths:
       - dccsync
     expire_in: 1 week
+
+# https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
+unittest:
+  stage: test
+  tags:
+    - blender
+  variables:
+    DCCSYNC_BLENDER_EXE_PATH: D:\gitlab_runner\blender-2.82a-windows64\blender.exe
+    DCCSYNC_BLENDER_EXE_DIR: D:\gitlab_runner\blender-2.82a-windows64
+  script:
+    - gitlab\run_unittest.bat

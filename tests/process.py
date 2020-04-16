@@ -116,6 +116,10 @@ class BlenderServer(Blender):
                 time.sleep(0.1)
                 attempts += 1
 
+    def close(self):
+        if self._sock is not None:
+            self._sock.close()
+
     def send_string(self, script: str):
         self._sock.send(script.encode("utf-8"))
 
