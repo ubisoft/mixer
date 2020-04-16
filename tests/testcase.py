@@ -15,7 +15,7 @@ from tests.process import BlenderServer
 
 from dccsync.broadcaster.common import MessageType
 
-logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +60,9 @@ class Blender:
     def quit(self):
         self._blender.send_function(bl.quit)
 
+    def close(self):
+        self._blender.close()
+
 
 class BlenderTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -74,14 +77,14 @@ class BlenderTestCase(unittest.TestCase):
 
     def assert_stream_equals(self, a_stream: CommandStream, b_stream: CommandStream, msg: str = None):
         a, b = a_stream.data, b_stream.data
-        self.assertEquals(a.keys(), b.keys())
+        self.assertEqual(a.keys(), b.keys())
 
         # TODO clarify why we need to ignore TRANSFORM (float comparison)
         ignore = [MessageType.TRANSFORM]
         for k in a.keys():
             message_type = str(MessageType(k))
             message_count = len(a[k])
-            self.assertEquals(message_count, len(b[k]), f"len mismatch for {message_type}")
+            self.assertEqual(message_count, len(b[k]), f"len mismatch for {message_type}")
             if message_count != 0:
                 logger.info(f"Message count for {message_type:16} : {message_count}")
             if k not in ignore:
@@ -92,7 +95,7 @@ class BlenderTestCase(unittest.TestCase):
                         message_count,
                         f"Unexpected message count for message {message_type}. Expected {expected_count}: found {message_count}",
                     )
-                self.assertEquals(a[k], b[k], f"content mismatch for {message_type}")
+                self.assertEqual(a[k], b[k], f"content mismatch for {message_type}")
 
     def setUp(
         self,
@@ -160,6 +163,8 @@ class BlenderTestCase(unittest.TestCase):
         self._receiver.quit()
         self._sender.wait()
         self._receiver.wait()
+        self._sender.close()
+        self._receiver.close()
         super().tearDown()
 
     def assert_user_success(self):
