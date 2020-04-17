@@ -53,7 +53,7 @@ Add or replace the following configuration to the project VSCode settings file `
     "python.testing.unittestEnabled": true,
     "python.linting.flake8Enabled": true,
     "python.linting.enabled": true,
-    "blender.addon.loadDirectory": "./dccsync",
+    "blender.addon.sourceDirectory": "./dccsync",
     [...]
 }
 ```
