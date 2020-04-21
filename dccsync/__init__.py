@@ -52,6 +52,7 @@ def register():
     from dccsync import ui
     from dccsync import operators
     from dccsync import data
+    from dccsync.blender_data import debug_addon
 
     if len(logger.handlers) == 0:
         logger.setLevel(logging.WARNING)
@@ -67,6 +68,7 @@ def register():
     operators.register()
     ui.register()
     data.register()
+    debug_addon.register()
 
     atexit.register(cleanup)
 
@@ -75,10 +77,12 @@ def unregister():
     from dccsync import ui
     from dccsync import operators
     from dccsync import data
+    from dccsync.blender_data import debug_addon
 
     operators.unregister()
     ui.unregister()
     data.unregister()
+    debug_addon.unregister()
 
     cleanup()
     atexit.unregister(cleanup)
