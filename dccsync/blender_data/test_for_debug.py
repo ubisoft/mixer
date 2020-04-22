@@ -1,6 +1,6 @@
 import unittest
 import bpy
-from dccsync.blender_data.proxy import ProxyFactory
+from dccsync.blender_data.proxy import ProxyFactory, BpyDataProxy
 
 
 class TestTruc(unittest.TestCase):
@@ -8,9 +8,14 @@ class TestTruc(unittest.TestCase):
         pass
 
     def test_one_scene(self):
-        # sp = SceneProxy()
-        # cp = ProxyFactory.make(bpy.types.Camera)
-        # cp.load(bpy.data.cameras["Camera"])
+        dp = BpyDataProxy().load()
+        wp = ProxyFactory.make(bpy.types.BlendDataWorlds)
+        wp.load(bpy.data.worlds)
+        sp = ProxyFactory.make(bpy.types.BlendDataScenes)
+        sp.load(bpy.data.scenes)
+
+        cp = ProxyFactory.make(bpy.types.Camera)
+        cp.load(bpy.data.cameras["Camera"])
 
         # cam = bpy.data.cameras["Camera"]
         # cp2 = ProxyFactory.make(cam.bl_rna)
