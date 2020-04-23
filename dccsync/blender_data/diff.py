@@ -1,53 +1,117 @@
 import bpy
-import mathutils
-from uuid import uuid4
-from typing import Mapping, Any
+import bpy.types as T  # noqa
+from typing import Mapping, List, Tuple, Any
+from .proxy import BpyBlendProxy, BpyIDProxy, BpyStructProxy, BpyPropCollectionProxy, ensure_uuid, Proxy
+
+Uuid = str
+Name = str
+
+ItemsAdded = Mapping[Name, T.bpy_prop_collection]
+ItemsRemoved = List[Name]
+ItemsRenamed = List[Tuple[Name, Name]]
+ItemsUpdated = Mapping[Name, "BpyIDDiff"]
 
 
-def find_renamed(items_before: Mapping[Any, Any], items_after: Mapping[Any, Any]):
+def find_renamed(
+    proxy_items: Mapping[Uuid, Name], blender_items: Mapping[Uuid, Tuple[Name, T.bpy_prop_collection]]
+) -> Tuple[ItemsAdded, ItemsRemoved, ItemsRenamed]:
     """
     Split before/after mappings into added/removed/renamed
 
     Rename detection is based on the mapping keys (e.g. uuids)
     """
-    uuids_before = {uuid for uuid in items_before.keys()}
-    uuids_after = {uuid for uuid in items_after.keys()}
-    renamed_uuids = {uuid for uuid in uuids_after & uuids_before if items_before[uuid] != items_after[uuid]}
-    added_items = [items_after[uuid] for uuid in uuids_after - uuids_before - renamed_uuids]
-    removed_items = [items_before[uuid] for uuid in uuids_before - uuids_after - renamed_uuids]
-    renamed_items = [(items_before[uuid], items_after[uuid]) for uuid in renamed_uuids]
+    proxy_uuids = set(proxy_items.keys())
+    blender_uuids = set(blender_items.keys())
+
+    renamed_uuids = {uuid for uuid in blender_uuids & proxy_uuids if proxy_items[uuid] != blender_items[uuid][0]}
+    added_uuids = blender_uuids - proxy_uuids - renamed_uuids
+    removed_uuids = proxy_uuids - blender_uuids - renamed_uuids
+
+    added_items = {blender_items[uuid][0]: blender_items[uuid][1] for uuid in added_uuids}
+    removed_items = [proxy_items[uuid] for uuid in removed_uuids]
+    renamed_items = [(proxy_items[uuid], blender_items[uuid][0]) for uuid in renamed_uuids]
+
     return added_items, removed_items, renamed_items
 
 
-def ensure_uuid(blender_collection):
-    for item in blender_collection:
-        if item.get("dccsync_uuid") is None:
-            item.dccsync_uuid = str(uuid4())
+class BpyDiff:
+    pass
 
 
-class StructDiff:
-    def diff(self, proxy_struct: "StructProxy", blender_struct):
-        pass
+class BpyStructDiff(BpyDiff):
+    deltas: {Name, Any} = {}
+
+    def diff(self, proxy: BpyStructProxy, bl_struct: T.bpy_struct):
+        self.deltas.clear()
+        # updated only, suppose the names are the same
+        # peoperties have already been filtered when loading the proxy, so use the
+        # proxy keys. This probably misses new properties loaded from a plugin
+        for attr_name, proxy_value in proxy._data.items():
+            bl_value = getattr(bl_struct, attr_name)
+            proxy_value = BpyStructProxy.read(attr_name)
+            if issubclass(proxy_value, Proxy):
+                # TODO find the Differ
+                pass
+            else:
+                # TODO optimize for arrays
+                if proxy_value != bl_value:
+                    self.deltas[attr_name] = (proxy_value, bl_value)
 
 
-class CollectionDiff:
-    items_added: Mapping[str, str] = None
-    items_removed: Mapping[str, str] = None
-    items_renamed: Mapping[str, str] = None
-
-    def __init__(self):
-        pass
-
-    def diff(self, proxy_collection, blender_collection: bpy.types.bpy_prop_collection):
-        items_after = {item.dccsync_uuid: name for name, item in blender_collection.items()}
-        items_before = {scene.dccsync_uuid: name for name, scene in proxy_collection.items()}
-        self.items_added, self.items_removed, self.items_renamed = find_renamed(items_before, items_after)
+class BpyIDDiff(BpyStructDiff):
+    def diff(self, proxy: BpyIDProxy, bl_id: T.ID):
+        # if is a struct otherwise(collection, array, ...)
+        super().diff(proxy, bl_id)
 
 
-def diff_data(proxy_data, blender_data):
-    attrs = dir(blender_data)
-    # Comparable attributes otherwise recurse
-    changed_attrs = []
-    for attr in attrs:
-        if not proxy_data.hasattr(attr) or proxy_data.get(attr) != blender_data.get(attr):
-            changed_attrs.append(attr)
+class BpyPropCollectionDiff(BpyDiff):
+    """
+    Diff for a bpy_prop_collection. May not work as is for bpy_prop_collection not in bpy.data
+    """
+
+    items_added: ItemsAdded = {}
+    items_removed: ItemsRemoved = []
+    items_renamed: ItemsRenamed = []
+    items_updated: ItemsUpdated = {}
+
+    def diff(self, proxy: BpyPropCollectionProxy, bl_collection: T.bpy_prop_collection):
+        self.items_added.clear()
+        self.items_removed.clear()
+        self.items_renamed.clear()
+        self.items_updated.clear()
+        blender_items = {}
+        for name, item in bl_collection.items():
+            ensure_uuid(item)
+            blender_items[item.dccsync_uuid] = (name, bl_collection)
+        proxy_items = {item.dccsync_uuid: name for name, item in proxy.items()}
+        self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
+
+        # TODO diff, filter by depsgraph update (add depsgraph parameter ?)
+        return
+        for name in proxy.iter_all():
+            deltas = BpyIDDiff()
+            deltas.diff(proxy._data[name], getattr(bpy.data, name))
+            if not deltas.empty:
+                self.deltas[name] = deltas
+
+    def empty(self):
+        return not (self.items_updated or self.items_added or self.items_removed or self.items_renamed)
+
+
+class BpyBlendDiff(BpyDiff):
+    """
+    Diff for the whole blen document, currently bpy.data
+    """
+
+    deltas: Mapping[Name, BpyPropCollectionDiff] = {}
+
+    def diff(self, proxy: BpyBlendProxy):
+        self.deltas.clear()
+        for name in proxy.iter_all():
+            delta = BpyPropCollectionDiff()
+            delta.diff(proxy._data[name], getattr(bpy.data, name))
+            if not delta.empty():
+                self.deltas[name] = delta
+
+    def empty(self):
+        return not self.deltas
