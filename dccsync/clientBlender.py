@@ -579,6 +579,39 @@ class ClientBlender(Client):
         except Exception as e:
             logger.error(e)
 
+    def build_add_keyframe(self, data):
+        index = 0
+        name, index = common.decode_string(data, index)
+        if name not in share_data.blender_objects:
+            return
+        ob = share_data.blender_objects[name]
+        channel, index = common.decode_string(data, index)
+        channel_index, index = common.decode_int(data, index)
+        value, index = common.decode_float(data, index)
+
+        if not hasattr(ob, channel):
+            ob = ob.data
+
+        attr = getattr(ob, channel)
+        if channel_index != -1:
+            attr[channel_index] = value
+        else:
+            attr = value
+        setattr(ob, channel, attr)
+        ob.keyframe_insert(channel, index=channel_index)
+
+    def build_remove_keyframe(self):
+        index = 0
+        name, index = common.decode_string(data, index)
+        if name not in share_data.blender_objects:
+            return
+        ob = share_data.blender_objects[name]
+        channel, index = common.decode_string(data, index)
+        channel_index, index = common.decode_int(data, index)
+        if not hasattr(ob, channel):
+            ob = ob.data
+        ob.keyframe_delete(channel, index=channel_index)
+
     def send_group_begin(self):
         # The integer sent is for future use: the server might fill it with the group size once all messages
         # have been received, and give the opportunity to future clients to know how many messages they need to process
@@ -1017,6 +1050,11 @@ class ClientBlender(Client):
         if "SendContent" in self.callbacks:
             self.callbacks["SendContent"]()
 
+    def build_frame(self, command):
+        start = 0
+        frame, start = common.decode_int(data, start)
+        bpy.context.scene.frame_current = frame
+
     def send_frame(self, frame):
         self.add_command(common.Command(common.MessageType.FRAME, common.encode_int(frame), 0))
 
@@ -1024,6 +1062,27 @@ class ClientBlender(Client):
         self.add_command(
             common.Command(common.MessageType.FRAME_START_END, common.encode_int(start) + common.encode_int(end), 0)
         )
+
+    def override_context(self):
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                if area.type == "VIEW_3D":
+                    override = bpy.context.copy()
+                    override["window"] = window
+                    override["screen"] = window.screen
+                    override["area"] = window.screen.areas[0]
+                    return override
+        return None
+
+    def build_play(self, command):
+        ctx = self.override_context()
+        if ctx:
+            bpy.ops.screen.animation_play(ctx)
+
+    def build_pause(self, command):
+        ctx = self.override_context()
+        if ctx:
+            bpy.ops.screen.animation_cancel(ctx)
 
     def clear_content(self):
         if "ClearContent" in self.callbacks:
@@ -1145,6 +1204,17 @@ class ClientBlender(Client):
 
                     elif command.type == common.MessageType.OBJECT_VISIBILITY:
                         object_api.build_object_visibility(command.data)
+
+                    elif command.type == common.MessageType.FRAME:
+                        self.build_frame(command.data)
+                    elif command.type == common.MessageType.PLAY:
+                        self.build_play(command.data)
+                    elif command.type == common.MessageType.PAUSE:
+                        self.build_pause(command.data)
+                    elif command.type == common.MessageType.ADD_KEYFRAME:
+                        self.build_add_keyframe(command.data)
+                    elif command.type == common.MessageType.REMOVE_KEYFRAME:
+                        self.build_remove_keyframe(command.data)
 
                     self.receivedCommands.task_done()
                     self.blockSignals = False

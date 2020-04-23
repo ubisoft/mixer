@@ -80,11 +80,16 @@ class MessageType(IntEnum):
 
     SCENE_RENAMED = 134
 
+    ADD_KEYFRAME = 135
+    REMOVE_KEYFRAME = 136
+
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
     MESH = 202
     MATERIAL = 203
     FRAME = 204
+    PLAY = 205
+    PAUSE = 206
 
 
 class LightType(IntEnum):
