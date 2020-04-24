@@ -965,10 +965,10 @@ def on_frame_update():
     send_frame_changed(bpy.context.scene)
 
 
-def on_data_update(objectName):
-    if objectName not in share_data.blender_objects:
+def on_data_update(object_name):
+    if object_name not in share_data.blender_objects:
         return
-    ob = share_data.blender_objects[objectName]
+    ob = share_data.blender_objects[object_name]
     update_params(ob)
 
 

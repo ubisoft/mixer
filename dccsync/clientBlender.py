@@ -1096,14 +1096,14 @@ class ClientBlender(Client):
         if "ClearContent" in self.callbacks:
             self.callbacks["ClearContent"]()
 
-    def refresh_data(self, objectName):
+    def refresh_data(self, object_name):
         if "DataUpdate" in self.callbacks:
-            self.callbacks["DataUpdate"](objectName)
+            self.callbacks["DataUpdate"](object_name)
 
-    def force_send_data(self, objectName):
+    def force_send_data(self, object_name):
         previous_value = share_data.client.receivedCommandsProcessed
         share_data.client.receivedCommandsProcessed = False
-        self.refresh_data(objectName)
+        self.refresh_data(object_name)
         share_data.client.receivedCommandsProcessed = previous_value
 
     def refresh_current_frame(self):
@@ -1242,11 +1242,11 @@ class ClientBlender(Client):
                     elif command.type == common.MessageType.PAUSE:
                         self.build_pause(command.data)
                     elif command.type == common.MessageType.ADD_KEYFRAME:
-                        objectName = self.build_add_keyframe(command.data)
-                        self.force_send_data(objectName)
+                        object_name = self.build_add_keyframe(command.data)
+                        self.force_send_data(object_name)
                     elif command.type == common.MessageType.REMOVE_KEYFRAME:
-                        objectName = self.build_remove_keyframe(command.data)
-                        self.force_send_data(objectName)
+                        object_name = self.build_remove_keyframe(command.data)
+                        self.force_send_data(object_name)
 
                     self.receivedCommands.task_done()
                     self.blockSignals = False
