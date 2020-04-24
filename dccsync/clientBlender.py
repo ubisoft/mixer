@@ -592,13 +592,12 @@ class ClientBlender(Client):
         if not hasattr(ob, channel):
             ob = ob.data
 
-        # ignore value
-        # attr = getattr(ob, channel)
-        # if channel_index != -1:
-        #    attr[channel_index] = value
-        # else:
-        #    attr = value
-        # setattr(ob, channel, attr)
+        attr = getattr(ob, channel)
+        if channel_index != -1:
+           attr[channel_index] = value
+        else:
+           attr = value
+        setattr(ob, channel, attr)
         ob.keyframe_insert(channel, index=channel_index)
         return name
 
