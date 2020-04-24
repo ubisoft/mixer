@@ -580,7 +580,7 @@ def send_frame_changed(scene):
         logger.info("send_frame_changed cancelled (no client instance)")
         return
 
-    # We can arrive here because of scene deletion (bpy.ops.scene.delete({'scene': to_remove}) that append during build_scene)
+    # We can arrive here because of scene deletion (bpy.ops.scene.delete({'scene': to_remove}) that happens during build_scene)
     # so we need to prevent processing self events
     if share_data.client.receivedCommandsProcessed:
         if not share_data.client.blockSignals:
@@ -961,6 +961,17 @@ def is_client_connected():
     return share_data.client is not None and share_data.client.is_connected()
 
 
+def on_frame_update():
+    send_frame_changed(bpy.context.scene)
+
+
+def on_data_update(objectName):
+    if objectName not in share_data.blender_objects:
+        return
+    ob = share_data.blender_objects[objectName]
+    update_params(ob)
+
+
 def network_consumer_timer():
     if not share_data.client.is_connected():
         error_msg = "Timer still registered but client disconnected."
@@ -991,6 +1002,8 @@ def create_main_client(host: str, port: int):
     share_data.client.add_callback("SendContent", send_scene_content)
     share_data.client.add_callback("ClearContent", clear_scene_content)
     share_data.client.add_callback("Disconnect", on_disconnect_from_server)
+    share_data.client.add_callback("DataUpdate", on_data_update)
+    share_data.client.add_callback("FrameUpdate", on_frame_update)
     if not bpy.app.timers.is_registered(network_consumer_timer):
         bpy.app.timers.register(network_consumer_timer)
 

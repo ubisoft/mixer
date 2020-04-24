@@ -583,7 +583,7 @@ class ClientBlender(Client):
         index = 0
         name, index = common.decode_string(data, index)
         if name not in share_data.blender_objects:
-            return
+            return name
         ob = share_data.blender_objects[name]
         channel, index = common.decode_string(data, index)
         channel_index, index = common.decode_int(data, index)
@@ -592,25 +592,28 @@ class ClientBlender(Client):
         if not hasattr(ob, channel):
             ob = ob.data
 
-        attr = getattr(ob, channel)
-        if channel_index != -1:
-            attr[channel_index] = value
-        else:
-            attr = value
-        setattr(ob, channel, attr)
+        # ignore value
+        # attr = getattr(ob, channel)
+        # if channel_index != -1:
+        #    attr[channel_index] = value
+        # else:
+        #    attr = value
+        # setattr(ob, channel, attr)
         ob.keyframe_insert(channel, index=channel_index)
+        return name
 
-    def build_remove_keyframe(self):
+    def build_remove_keyframe(self, data):
         index = 0
         name, index = common.decode_string(data, index)
         if name not in share_data.blender_objects:
-            return
+            return name
         ob = share_data.blender_objects[name]
         channel, index = common.decode_string(data, index)
         channel_index, index = common.decode_int(data, index)
         if not hasattr(ob, channel):
             ob = ob.data
         ob.keyframe_delete(channel, index=channel_index)
+        return name
 
     def send_group_begin(self):
         # The integer sent is for future use: the server might fill it with the group size once all messages
@@ -700,15 +703,18 @@ class ClientBlender(Client):
             if fcurve.data_path == channel_name:
                 if channel_index == -1 or fcurve.array_index == channel_index:
                     key_count = len(fcurve.keyframe_points)
-                    keys = []
+                    times = []
+                    values = []
                     for keyframe in fcurve.keyframe_points:
-                        keys.extend(keyframe.co)
+                        times.append(int(keyframe.co[0]))
+                        values.append(keyframe.co[1])
                     buffer = (
                         common.encode_string(obj_name)
                         + common.encode_string(channel_name)
                         + common.encode_int(channel_index)
                         + common.int_to_bytes(key_count, 4)
-                        + struct.pack(f"{len(keys)}f", *keys)
+                        + struct.pack(f"{len(times)}i", *times)
+                        + struct.pack(f"{len(values)}f", *values)
                     )
                     self.add_command(common.Command(common.MessageType.CAMERA_ANIMATION, buffer, 0))
                     return
@@ -717,9 +723,9 @@ class ClientBlender(Client):
         self.send_animation_buffer(obj.name_full, obj.animation_data, "location", 0)
         self.send_animation_buffer(obj.name_full, obj.animation_data, "location", 1)
         self.send_animation_buffer(obj.name_full, obj.animation_data, "location", 2)
-        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation", 0)
-        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation", 1)
-        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation", 2)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 0)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 1)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
         self.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
 
     def get_camera_buffer(self, obj):
@@ -1050,7 +1056,7 @@ class ClientBlender(Client):
         if "SendContent" in self.callbacks:
             self.callbacks["SendContent"]()
 
-    def build_frame(self, command):
+    def build_frame(self, data):
         start = 0
         frame, start = common.decode_int(data, start)
         bpy.context.scene.frame_current = frame
@@ -1077,16 +1083,38 @@ class ClientBlender(Client):
     def build_play(self, command):
         ctx = self.override_context()
         if ctx:
-            bpy.ops.screen.animation_play(ctx)
+            if not ctx["screen"].is_animation_playing:
+                bpy.ops.screen.animation_play(ctx)
 
     def build_pause(self, command):
         ctx = self.override_context()
         if ctx:
-            bpy.ops.screen.animation_cancel(ctx)
+            if ctx["screen"].is_animation_playing:
+                bpy.ops.screen.animation_play(ctx)
 
     def clear_content(self):
         if "ClearContent" in self.callbacks:
             self.callbacks["ClearContent"]()
+
+    def refresh_data(self, objectName):
+        if "DataUpdate" in self.callbacks:
+            self.callbacks["DataUpdate"](objectName)
+
+    def force_send_data(self, objectName):
+        previous_value = share_data.client.receivedCommandsProcessed
+        share_data.client.receivedCommandsProcessed = False
+        self.refresh_data(objectName)
+        share_data.client.receivedCommandsProcessed = previous_value
+
+    def refresh_current_frame(self):
+        if "FrameUpdate" in self.callbacks:
+            self.callbacks["FrameUpdate"]()
+
+    def force_refresh_current_frame(self):
+        previous_value = share_data.client.receivedCommandsProcessed
+        share_data.client.receivedCommandsProcessed = False
+        self.refresh_current_frame()
+        share_data.client.receivedCommandsProcessed = previous_value
 
     @stats_timer(share_data)
     def network_consumer(self):
@@ -1207,14 +1235,18 @@ class ClientBlender(Client):
 
                     elif command.type == common.MessageType.FRAME:
                         self.build_frame(command.data)
+                        self.force_refresh_current_frame()
+
                     elif command.type == common.MessageType.PLAY:
                         self.build_play(command.data)
                     elif command.type == common.MessageType.PAUSE:
                         self.build_pause(command.data)
                     elif command.type == common.MessageType.ADD_KEYFRAME:
-                        self.build_add_keyframe(command.data)
+                        objectName = self.build_add_keyframe(command.data)
+                        self.force_send_data(objectName)
                     elif command.type == common.MessageType.REMOVE_KEYFRAME:
-                        self.build_remove_keyframe(command.data)
+                        objectName = self.build_remove_keyframe(command.data)
+                        self.force_send_data(objectName)
 
                     self.receivedCommands.task_done()
                     self.blockSignals = False
