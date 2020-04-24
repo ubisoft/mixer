@@ -615,6 +615,11 @@ class ClientBlender(Client):
         ob.keyframe_delete(channel, index=channel_index)
         return name
 
+    def build_query_object_data(self, data):
+        index = 0
+        name, index = common.decode_string(data, index)
+        self.query_object_data(name)
+
     def send_group_begin(self):
         # The integer sent is for future use: the server might fill it with the group size once all messages
         # have been received, and give the opportunity to future clients to know how many messages they need to process
@@ -1096,24 +1101,18 @@ class ClientBlender(Client):
         if "ClearContent" in self.callbacks:
             self.callbacks["ClearContent"]()
 
-    def refresh_data(self, object_name):
-        if "DataUpdate" in self.callbacks:
-            self.callbacks["DataUpdate"](object_name)
-
-    def force_send_data(self, object_name):
+    def query_object_data(self, object_name):
         previous_value = share_data.client.receivedCommandsProcessed
         share_data.client.receivedCommandsProcessed = False
-        self.refresh_data(object_name)
+        if "QueryObjectData" in self.callbacks:
+            self.callbacks["QueryObjectData"](object_name)
         share_data.client.receivedCommandsProcessed = previous_value
 
-    def refresh_current_frame(self):
-        if "FrameUpdate" in self.callbacks:
-            self.callbacks["FrameUpdate"]()
-
-    def force_refresh_current_frame(self):
+    def query_current_frame(self):
         previous_value = share_data.client.receivedCommandsProcessed
         share_data.client.receivedCommandsProcessed = False
-        self.refresh_current_frame()
+        if "QueryCurrentFrame" in self.callbacks:
+            self.callbacks["QueryCurrentFrame"]()
         share_data.client.receivedCommandsProcessed = previous_value
 
     @stats_timer(share_data)
@@ -1235,18 +1234,19 @@ class ClientBlender(Client):
 
                     elif command.type == common.MessageType.FRAME:
                         self.build_frame(command.data)
-                        self.force_refresh_current_frame()
+                    elif command.type == common.MessageType.QUERY_CURRENT_FRAME:
+                        self.query_current_frame()
 
                     elif command.type == common.MessageType.PLAY:
                         self.build_play(command.data)
                     elif command.type == common.MessageType.PAUSE:
                         self.build_pause(command.data)
                     elif command.type == common.MessageType.ADD_KEYFRAME:
-                        object_name = self.build_add_keyframe(command.data)
-                        self.force_send_data(object_name)
+                        self.build_add_keyframe(command.data)
                     elif command.type == common.MessageType.REMOVE_KEYFRAME:
-                        object_name = self.build_remove_keyframe(command.data)
-                        self.force_send_data(object_name)
+                        self.build_remove_keyframe(command.data)
+                    elif command.type == common.MessageType.QUERY_OBJECT_DATA:
+                        self.build_query_object_data(command.data)
 
                     self.receivedCommands.task_done()
                     self.blockSignals = False

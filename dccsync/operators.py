@@ -965,7 +965,7 @@ def on_frame_update():
     send_frame_changed(bpy.context.scene)
 
 
-def on_data_update(object_name):
+def on_query_object_data(object_name):
     if object_name not in share_data.blender_objects:
         return
     ob = share_data.blender_objects[object_name]
@@ -1002,8 +1002,8 @@ def create_main_client(host: str, port: int):
     share_data.client.add_callback("SendContent", send_scene_content)
     share_data.client.add_callback("ClearContent", clear_scene_content)
     share_data.client.add_callback("Disconnect", on_disconnect_from_server)
-    share_data.client.add_callback("DataUpdate", on_data_update)
-    share_data.client.add_callback("FrameUpdate", on_frame_update)
+    share_data.client.add_callback("QueryObjectData", on_query_object_data)
+    share_data.client.add_callback("QueryCurrentFrame", on_frame_update)
     if not bpy.app.timers.is_registered(network_consumer_timer):
         bpy.app.timers.register(network_consumer_timer)
 
