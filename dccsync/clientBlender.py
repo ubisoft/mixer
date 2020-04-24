@@ -594,9 +594,9 @@ class ClientBlender(Client):
 
         attr = getattr(ob, channel)
         if channel_index != -1:
-           attr[channel_index] = value
+            attr[channel_index] = value
         else:
-           attr = value
+            attr = value
         setattr(ob, channel, attr)
         ob.keyframe_insert(channel, index=channel_index)
         return name
