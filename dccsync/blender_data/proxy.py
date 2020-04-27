@@ -24,6 +24,17 @@ def is_a(class_: type, base: type) -> bool:
     return base == T.bpy_struct
 
 
+def is_data_collection_type(attr):
+    has_rna = hasattr(attr, "bl_rna")
+    if not has_rna:
+        return False
+    # Find if collection element type derives from ID.  Do now know how to get the element type
+    # from the collection attribute, so list types that contain "links" into a blenddata collection.
+    # TODO and others
+    data_types = {T.BlendDataObjects.bl_rna, T.SceneObjects.bl_rna, T.LayerObjects.bl_rna}
+    return attr.bl_rna in data_types
+
+
 class Proxy:
     _vector_types = {mathutils.Vector, mathutils.Color, mathutils.Quaternion, mathutils.Euler}
     _builtin_types = {float, int, bool, str}
@@ -83,7 +94,8 @@ class PropertyGroupProxy:
     _placeholder: str = None
 
     def load(self, attr):
-        self._placeholder = attr.bl_rna.name
+        self._placeholder = f"Placeholder for {attr.bl_rna.name}"
+        return self
 
 
 class BpyStructProxy(Proxy):
@@ -138,32 +150,28 @@ class BpyStructProxy(Proxy):
         if attr_type == T.bpy_prop_array:
             return BpyPropArrayProxy().load(attr)
         if attr_type == T.bpy_prop_collection:
-
-            def is_data_collection_type(attr_type):
-                # TODO and others
-                return attr_type in {T.BlendDataObjects}
-
-            if is_data_collection_type(attr_type):
-                return BpyPropDataCollectionProxy().load(attr)
+            if is_data_collection_type(attr):
+                return BpyPropDataCollectionProxy().load_as_IDref(attr)
             else:
                 return BpyPropStructCollectionProxy().load(attr)
+
         bl_rna = getattr(attr_type, "bl_rna", None)
         if bl_rna is None:
-            logger.info("Skip %s", attr)
+            logger.warning("Skip attribute %s", attr)
             return None
 
         if is_a(attr_type, T.ID):
-            # warning : identity is false !
             # if it is an ID, do not crate a proxy but link through its data collection
             # an IDRef whe the bpy contain IDdef
-            return IDRefProxy(attr_type).load(attr)
+            return BpyIDRefProxy(attr_type).load(attr)
+
         if is_a(attr_type, T.PropertyGroup):
             return PropertyGroupProxy().load(attr)
 
-        proxy = ProxyFactory.make(attr_type)
-        if proxy:
-            return proxy.load(attr)
-        return attr
+        if is_a(attr_type, T.bpy_struct):
+            return BpyStructProxy(attr_type.bl_rna).load(attr)
+
+        raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
 
     def get(self, bl_instance, attr_name):
 
@@ -213,7 +221,7 @@ class BpyIDProxy(BpyStructProxy):
         pass
 
 
-class IDRefProxy(Proxy):
+class BpyIDRefProxy(Proxy):
     """
     A reference to an item of bpy_prop_collection in bpy.data member
     """
@@ -317,19 +325,21 @@ class BpyPropDataCollectionProxy(Proxy):
     def items(self):
         return self._data.items()
 
-    def load(self, bl_collection: bpy.types.bpy_prop_collection):
+    def load_as_ID(self, bl_collection: bpy.types.bpy_prop_collection):
         """
-        in bl_collection : a bpy.types.bpy_prop_collection
+        Load bl_collection elements as plain IDs, with all element properties. Use this lo load from bpy.data
         """
-        # TODO check parameter type
-        # TODO : beware
-        # some are handled by data (real collection)
-        # others are not (view_layers, master collections)
-        # TODO check that it contains a struct, for instance a MeshVertex
         for name, item in bl_collection.items():
-            ## ensure_uuid(item)
+            ensure_uuid(item)
             self._data[name] = BpyIDProxy(item).load(item)
+        return self
 
+    def load_as_IDref(self, bl_collection: bpy.types.bpy_prop_collection):
+        """
+        Load bl_collection elements as referenced into bpy.data
+        """
+        for name, item in bl_collection.items():
+            self._data[name] = BpyIDRefProxy(item).load(item)
         return self
 
     def update(self, diff):
@@ -415,7 +425,7 @@ class BpyBlendProxy(Proxy):
         for name in self.iter_all():
             collection = getattr(bpy.data, name)
             # the diff may be easier if all the collectiona are always present
-            self._data[name] = BpyPropDataCollectionProxy().load(collection)
+            self._data[name] = BpyPropDataCollectionProxy().load_as_ID(collection)
         return self
 
     def update(self, diff):
@@ -423,33 +433,3 @@ class BpyBlendProxy(Proxy):
             deltas = diff.deltas.get(name)
             if deltas is not None:
                 self._data[name].update(diff.deltas[name])
-
-
-class ProxyFactory:
-    # TODO split blenddata collections and others
-    collections = [bpy.types.BlendDataObjects, bpy.types.BlendDataScenes]
-    # root_types = [type, T.bpy_struct_meta_idprop, T.RNAMetaPropGroup]
-    root_types = [type, T.bpy_struct_meta_idprop]
-
-    @classmethod
-    def make(cls, class_or_instance) -> Proxy:
-        param_type = type(class_or_instance)
-        if param_type not in cls.root_types:
-            class_ = param_type
-        else:
-            class_ = class_or_instance
-
-        if class_ is bpy.types.bpy_prop_array:
-            return BpyPropArrayProxy()
-
-        if getattr(class_, "bl_rna", None) is None:
-            breakpoint
-
-        # Do not handle  ID heren, we need to explicitely distinguish ID defs (in blenddata collections) and
-        # their references. For instance scene.camera is a reference (an IDRef) to a bpy.data.camaras[] element
-        # (an IDRef)
-        if is_a(class_, T.bpy_struct):
-            return BpyStructProxy(class_.bl_rna)
-
-        raise ValueError(f"ProxyFactory.make() Unhandled class '{class_}'")
-        return None

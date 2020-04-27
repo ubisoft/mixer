@@ -1,3 +1,11 @@
+# TODO
+
+- PropertyGroup contents
+- text beyond Scene
+- unsupported type set() ??
+  - Unsupported attribute type <class 'set'> without bl_rna for attribute {'INCREMENT'}
+- collections (master, classic, viewlayer)
+
 # Data
 
 - properties

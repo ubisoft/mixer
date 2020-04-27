@@ -1,54 +1,32 @@
 import unittest
 import bpy
 from bpy import data as D  # noqa
-from dccsync.blender_data.proxy import BpyBlendProxy
+from dccsync.blender_data.proxy import BpyBlendProxy, BpyIDProxy, BpyIDRefProxy
 from dccsync.blender_data.diff import BpyBlendDiff
 
 
-class TestBpyData(unittest.TestCase):
+class TestLoadProxy(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=".local\\test_data.blend")
 
-    def test_new_scene(self):
+    def test_scene(self):
         proxy = BpyBlendProxy()
         proxy.load()
+        scene = proxy._data["scenes"]._data["Scene"]._data
+        self.assertEqual(50, len(scene))
+        objects = scene["objects"]._data
+        self.assertEqual(4, len(objects))
+        for o in objects.values():
+            self.assertEqual(type(o), BpyIDRefProxy)
 
-        D.scenes.new("plop1")
-        D.scenes.new("plop2")
-        #  do something
-        deltas = BpyBlendDiff()
-        deltas.diff(proxy)
-        d = deltas.deltas["scenes"]
-        self.assertEquals(2, len(d.items_added))
-        self.assertEquals(d.items_added["plop1"], D.scenes)
-        self.assertEquals(d.items_added["plop2"], D.scenes)
-        self.assertFalse(d.items_removed)
-        self.assertFalse(d.items_renamed)
-        self.assertFalse(d.items_updated)
-        proxy.update(deltas)
-        return
-        # crashes
-        D.scenes.remove(D.scenes["plop2"])
-        deltas.diff(proxy)
-        # check
-        proxy.update(deltas)
-        self.assertFalse(d.items_added)
-        self.assertEquals(1, len(d.items_removed))
-        self.assertEquals(d.items_removed["plop2"], D.scenes)
-        self.assertFalse(d.items_renamed)
-        self.assertFalse(d.items_updated)
-
-        proxy.update(deltas)
-        deltas.diff(proxy)
-        self.assertTrue(deltas.empty)
-
-    @unittest.skip("")
-    def test_two_scenes(self):
-        self.assertEquals(2, len(bpy.data.scenes))
+        frame_properties = [name for name in scene.keys() if name.startswith("frame_")]
+        self.assertEqual(9, len(frame_properties))
+        eevee = scene["eevee"]._data
+        self.assertEqual(59, len(eevee))
 
 
 def main():
-    suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestBpyData)
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestLoadProxy)
     runner = unittest.TextTestRunner()
     runner.run(suite)
 
