@@ -1,7 +1,15 @@
 import bpy
 import bpy.types as T  # noqa
 from typing import Mapping, List, Tuple, Any
-from .proxy import BpyBlendProxy, BpyIDProxy, BpyStructProxy, BpyPropCollectionProxy, ensure_uuid, Proxy
+from .proxy import (
+    BpyBlendProxy,
+    BpyIDProxy,
+    BpyStructProxy,
+    BpyPropStructCollectionProxy,
+    BpyPropDataCollectionProxy,
+    ensure_uuid,
+    Proxy,
+)
 
 Uuid = str
 Name = str
@@ -74,7 +82,7 @@ class BpyPropCollectionDiff(BpyDiff):
     items_renamed: ItemsRenamed = []
     items_updated: ItemsUpdated = {}
 
-    def diff(self, proxy: BpyPropCollectionProxy, bl_collection: T.bpy_prop_collection):
+    def diff(self, proxy: BpyPropDataCollectionProxy, bl_collection: T.bpy_prop_collection):
         self.items_added.clear()
         self.items_removed.clear()
         self.items_renamed.clear()
