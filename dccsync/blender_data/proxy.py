@@ -10,6 +10,48 @@ logger = logging.Logger("plop", logging.INFO)
 
 i = 0
 
+vector_types = {mathutils.Vector, mathutils.Color, mathutils.Quaternion, mathutils.Euler}
+builtin_types = {float, int, bool, str, set}
+
+# those found in bpy_data members
+data_types = {
+    "actions": T.Action,
+    "armatures": T.Armature,
+    "brushes": T.Brush,
+    "cache_files": T.CacheFile,
+    "cameras": T.Camera,
+    "collections": T.Collection,
+    "curves": T.Curve,
+    "fonts": T.VectorFont,
+    "grease_pencils": T.GreasePencil,
+    "images": T.Image,
+    "lattices": T.Lattice,
+    "libraries": T.Library,
+    "lightprobess": T.LightProbe,
+    "lights": T.Light,
+    "linestyles": T.FreestyleLineStyle,
+    "masks": T.Mask,
+    "materials": T.Material,
+    "meshes": T.Mesh,
+    "mataballs": T.MetaBall,
+    "moveclips": T.MovieClip,
+    "node_groups": T.NodeTree,
+    "objects": T.Object,
+    "paint_curves": T.PaintCurve,
+    "palettes": T.Palette,
+    "particles": T.ParticleSettings,
+    "scenes": T.Scene,
+    "screens": T.Screen,
+    "shape_keys": T.Key,
+    "sounds": T.Sound,
+    "speakers": T.Speaker,
+    "texts": T.Text,
+    "textures": T.Texture,
+    "window_managers": T.WindowManager,
+    "worlds": T.World,
+    "workspaces": T.WorkSpace,
+}
+
 
 def is_a(class_: type, base: type) -> bool:
     # None fot bpy_struct
@@ -35,11 +77,50 @@ def is_data_collection_type(attr):
     return attr.bl_rna in data_types
 
 
-class Proxy:
-    _vector_types = {mathutils.Vector, mathutils.Color, mathutils.Quaternion, mathutils.Euler}
-    _builtin_types = {float, int, bool, str}
+def read_attribute(attr):
+    """
+        Load a property into a python object of the appropriate type, be ti a Proxy or a native python object
+        """
 
-    # _blend_data_types = [t for t in bpy.data.bl_rna.properties.values() if t.bl_rna.identifier == "CollectionProperty"]
+    # TODO should we compare the type (e.g. bpy.types.bpy_prop_collection) or the rna ?
+    # TODO why do some types have an rna (T.ID) and not others (T.bpy_prop_collection)
+
+    attr_type = type(attr)
+    if attr_type in builtin_types:
+        return attr
+    if attr_type in vector_types:
+        return list(attr)
+    if attr_type is mathutils.Matrix:
+        return [list(col) for col in attr.col]
+    if attr_type == T.bpy_prop_array:
+        return BpyPropArrayProxy().load(attr)
+    if attr_type == T.bpy_prop_collection:
+        if is_data_collection_type(attr):
+            return BpyPropDataCollectionProxy().load_as_IDref(attr)
+        else:
+            return BpyPropStructCollectionProxy().load(attr)
+
+    bl_rna = getattr(attr_type, "bl_rna", None)
+    if bl_rna is None:
+        logger.warning("Skip attribute %s", attr)
+        return None
+
+    if is_a(attr_type, T.ID):
+        # if it is an ID, do not crate a proxy but link through its data collection
+        # an IDRef whe the bpy contain IDdef
+        return BpyIDRefProxy(attr_type).load(attr)
+
+    if is_a(attr_type, T.PropertyGroup):
+        return BpyPropertyGroupProxy(attr_type).load(attr)
+
+    if is_a(attr_type, T.bpy_struct):
+        return BpyStructProxy(attr_type.bl_rna).load(attr)
+
+    raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
+
+
+class Proxy:
+    pass
 
 
 class Iter:
@@ -90,15 +171,7 @@ class Properties:
 all_properties = Properties()
 
 
-class PropertyGroupProxy:
-    _placeholder: str = None
-
-    def load(self, attr):
-        self._placeholder = f"Placeholder for {attr.bl_rna.name}"
-        return self
-
-
-class BpyStructProxy(Proxy):
+class StructLikeProxy(Proxy):
     """
     Holds a copy of a Blender bpy_struct
     """
@@ -107,7 +180,7 @@ class BpyStructProxy(Proxy):
     # TODO name or class based whitelists and blacklists. These lists could be customized for a given workflow step,
     # TODO attribute groups per UI panel ?
 
-    def __init__(self, bl_struct: bpy.types.bpy_struct, *args, **kwargs):
+    def __init__(self, bl_struct: Union[T.bpy_struct, T.PropertyGroup], *args, **kwargs):
 
         # We care for some non readonly properties. Collection object are tagged read_only byt can be updated with
 
@@ -132,53 +205,12 @@ class BpyStructProxy(Proxy):
         self._data = {}
         pass
 
-    def read(self, attr):
-        """
-        Load a property into a python object of the appropriate type, be ti a Proxy or a native python object
-        """
-
-        # TODO should we compare the type (e.g. bpy.types.bpy_prop_collection) or the rna ?
-        # TODO why do some types have an rna (T.ID) and not others (T.bpy_prop_collection)
-
-        attr_type = type(attr)
-        if attr_type in self._builtin_types:
-            return attr
-        if attr_type in self._vector_types:
-            return list(attr)
-        if attr_type is mathutils.Matrix:
-            return [list(col) for col in attr.col]
-        if attr_type == T.bpy_prop_array:
-            return BpyPropArrayProxy().load(attr)
-        if attr_type == T.bpy_prop_collection:
-            if is_data_collection_type(attr):
-                return BpyPropDataCollectionProxy().load_as_IDref(attr)
-            else:
-                return BpyPropStructCollectionProxy().load(attr)
-
-        bl_rna = getattr(attr_type, "bl_rna", None)
-        if bl_rna is None:
-            logger.warning("Skip attribute %s", attr)
-            return None
-
-        if is_a(attr_type, T.ID):
-            # if it is an ID, do not crate a proxy but link through its data collection
-            # an IDRef whe the bpy contain IDdef
-            return BpyIDRefProxy(attr_type).load(attr)
-
-        if is_a(attr_type, T.PropertyGroup):
-            return PropertyGroupProxy().load(attr)
-
-        if is_a(attr_type, T.bpy_struct):
-            return BpyStructProxy(attr_type.bl_rna).load(attr)
-
-        raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
-
     def get(self, bl_instance, attr_name):
 
         attr = getattr(bl_instance, attr_name)
         if attr is None:
             return None
-        return self.read(attr)
+        return read_attribute(attr)
 
     def load(self, bl_instance):
         """
@@ -194,6 +226,14 @@ class BpyStructProxy(Proxy):
 
     def update(self, diff_data: BpyStructDiff):
         pass
+
+
+class BpyPropertyGroupProxy(StructLikeProxy):
+    pass
+
+
+class BpyStructProxy(StructLikeProxy):
+    pass
 
 
 class BpyIDProxy(BpyStructProxy):
@@ -257,7 +297,7 @@ class BpyPropStructCollectionProxy(Proxy):
     """
 
     def __init__(self):
-        self._data: Mapping[str, BpyIDProxy] = {}
+        self._data: Mapping[Union[str, int], BpyIDProxy] = {}
 
     class _Iter(Iter):
         # TODO explai why an iterator
@@ -286,8 +326,9 @@ class BpyPropStructCollectionProxy(Proxy):
         # some are handled by data (real collection)
         # others are not (view_layers, master collections)
         # TODO check that it contains a struct, for instance a MeshVertex
-        for name, item in bl_collection.items():
-            self._data[name] = BpyStructProxy(item).load(item)
+        # when iterating over items(), the keys may be a name (str) or an index (int)
+        for key, item in bl_collection.items():
+            self._data[key] = BpyStructProxy(item).load(item)
 
         return self
 
@@ -367,43 +408,6 @@ class BpyPropArrayProxy(Proxy):
 class BpyBlendProxy(Proxy):
 
     # TODO how could we get this information programatically
-    types = {
-        "actions": T.Action,
-        "armatures": T.Armature,
-        "brushes": T.Brush,
-        "cache_files": T.CacheFile,
-        "cameras": T.Camera,
-        "collections": T.Collection,
-        "curves": T.Curve,
-        "fonts": T.VectorFont,
-        "grease_pencils": T.GreasePencil,
-        "images": T.Image,
-        "lattices": T.Lattice,
-        "libraries": T.Library,
-        "lightprobess": T.LightProbe,
-        "lights": T.Light,
-        "linestyles": T.FreestyleLineStyle,
-        "masks": T.Mask,
-        "materials": T.Material,
-        "meshes": T.Mesh,
-        "mataballs": T.MetaBall,
-        "moveclips": T.MovieClip,
-        "node_groups": T.NodeTree,
-        "objects": T.Object,
-        "paint_curves": T.PaintCurve,
-        "palettes": T.Palette,
-        "particles": T.ParticleSettings,
-        "scenes": T.Scene,
-        "screens": T.Screen,
-        "shape_keys": T.Key,
-        "sounds": T.Sound,
-        "speakers": T.Speaker,
-        "texts": T.Text,
-        "textures": T.Texture,
-        "window_managers": T.WindowManager,
-        "worlds": T.World,
-        "workspaces": T.WorkSpace,
-    }
 
     def __init__(self, *args, **kwargs):
         self._data: Mapping[str, BpyPropDataCollectionProxy] = {}
@@ -411,10 +415,13 @@ class BpyBlendProxy(Proxy):
     class _Iter(Iter):
         def gen(self):
             keep = ["scenes"]
+            keep = []
+            exclude = ["screens", "window_managers", "workspaces"]
             for name, type_ in bpy.data.bl_rna.properties.items():
+                if name in exclude:
+                    continue
                 if name not in keep:
                     pass
-                    continue
                 if type_.bl_rna is bpy.types.CollectionProperty.bl_rna:
                     yield name
 

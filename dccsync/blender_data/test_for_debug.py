@@ -1,7 +1,7 @@
 import unittest
 import bpy
 from bpy import data as D  # noqa
-from dccsync.blender_data.proxy import BpyBlendProxy, BpyIDProxy, BpyIDRefProxy
+from dccsync.blender_data.proxy import BpyBlendProxy, BpyIDProxy, BpyIDRefProxy, BpyPropertyGroupProxy
 from dccsync.blender_data.diff import BpyBlendDiff
 
 
@@ -19,10 +19,18 @@ class TestLoadProxy(unittest.TestCase):
         for o in objects.values():
             self.assertEqual(type(o), BpyIDRefProxy)
 
+        # builtin attributes (floats)
         frame_properties = [name for name in scene.keys() if name.startswith("frame_")]
         self.assertEqual(9, len(frame_properties))
+
+        # bpy_struct
         eevee = scene["eevee"]._data
         self.assertEqual(59, len(eevee))
+
+        # PropertiesGroup
+        cycles_proxy = scene["view_layers"]._data["View Layer"]._data["cycles"]
+        self.assertTrue(isinstance(cycles_proxy, BpyPropertyGroupProxy))
+        self.assertEqual(31, len(cycles_proxy._data))
 
 
 def main():

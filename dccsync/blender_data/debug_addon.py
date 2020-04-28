@@ -1,5 +1,5 @@
 import bpy
-from .proxy import BpyBlendProxy
+from .proxy import BpyBlendProxy, data_types
 from .diff import BpyBlendDiff
 
 proxy = BpyBlendProxy()
@@ -79,7 +79,7 @@ classes = (DebugDataLoadOperator, DebugDataDiffOperator, DebugDataUpdateOperator
 
 
 def register():
-    for t in BpyBlendProxy.types.values():
+    for t in data_types.values():
         t.dccsync_uuid = bpy.props.StringProperty(default="")
     for _ in classes:
         bpy.utils.register_class(_)
