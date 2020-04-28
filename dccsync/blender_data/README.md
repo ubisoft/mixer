@@ -6,7 +6,9 @@
   - Unsupported attribute type <class 'set'> without bl_rna for attribute {'INCREMENT'}
 - collections (master, classic, viewlayer)
 
-D.screens['Animation'].areas[2].spaces[0].overlay.grid_scale_unit
+bpy.data.scenes['Scene'].view_layers['View Layer'].cycles.bl_rna.properties['aovs']
+
+D.screens['Animation'].areas[2].spaces[0].overlay.grid_scale_unit crashes Blender
 
 # Data
 
@@ -49,3 +51,4 @@ D.screens['Animation'].areas[2].spaces[0].overlay.grid_scale_unit
 ## Doc
 
 https://developer.blender.org/source/blender-file/
+https://blender.stackexchange.com/questions/55423/how-to-get-the-class-type-of-a-blender-collection-property

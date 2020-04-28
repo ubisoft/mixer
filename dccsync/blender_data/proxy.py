@@ -77,10 +77,53 @@ def is_data_collection_type(attr):
     return attr.bl_rna in data_types
 
 
-def read_attribute(attr):
+def read_attribute(attr: any, attr_property: any):
     """
         Load a property into a python object of the appropriate type, be ti a Proxy or a native python object
-        """
+    """
+    #
+    # WARNING, this is a bit confusing
+    #
+    # In all cases the Blender type of an attribute named attr_name can be obtained from
+    # the bl_rna.properties['attr_name'] of its *parent*, but is is not straightforward
+    # (see gravity and Vector example below).
+    #
+    #   D = bpy.data
+    #   s = D.scenes['Scene']
+    #   type(gravity)
+    #       <class 'Vector'>
+    #   s.bl_rna_properties['gravity']
+    #       <bpy_struct, FloatProperty("gravity")>
+    #   s.bl_rna.properties['gravity'].is_array
+    #       True
+    #   s.bl_rna.properties['gravity'].array_length
+    #       3
+    #   s.bl_rna.properties['gravity'].array_dimensions
+    #       <bpy_int[3], FloatProperty.array_dimensions>
+    #
+    # So in this case type(gravity) is easier
+    #
+    # In some cases, it can be obtained from the bl_rna of the attribute, but is does not always exist.
+    # For instance, bl_rna does not exist for some properties
+    # from plugins (e.g.cycles) :
+    #   cycles = bpy.data.scenes['Scene'].view_layers['View Layer'].cycles
+    #   aovs = cycles.aovs
+    #   type(aovs)
+    #       <class 'bpy_prop_collection_idprop'>                                # unusable
+    #   type(cycles.bl_rna.properties['aovs'])
+    #       <class 'bpy.types.CollectionProperty'>                              # unusable
+    #   cycles.bl_rna.properties['aovs']
+    #       <bpy_struct, CollectionProperty("aovs")>                            # useful information from the parent
+    #   cycles.bl_rna.properties['aovs'].fixed_type
+    #       <bpy_struct, Struct("CyclesAOVPass")>                               # The collection element type
+    #   type(cycles.bl_rna.properties['aovs'].fixed_type)
+    #       <class 'cycles.properties.CyclesAOVPass'>                           #
+    #   cycles.bl_rna.properties['aovs'].fixed_type.bl_rna.properties.items()
+    #       [ ('name', <bpy_struct, StringProperty("name")>),                   # yessss
+    #         ('type', <bpy_struct, EnumProperty("type")>)
+    #          ...
+    #       ]
+    # For some types the python binding will do the job, so try it first by testing type(attr).
 
     # TODO should we compare the type (e.g. bpy.types.bpy_prop_collection) or the rna ?
     # TODO why do some types have an rna (T.ID) and not others (T.bpy_prop_collection)
@@ -92,15 +135,25 @@ def read_attribute(attr):
         return list(attr)
     if attr_type is mathutils.Matrix:
         return [list(col) for col in attr.col]
+
+    # We have tested the types that are usefully reported by the python binding, now harder work.
+    # These were implemented first and may be better implemented with the bl_rna property of the parent struct
     if attr_type == T.bpy_prop_array:
         return BpyPropArrayProxy().load(attr)
+    
     if attr_type == T.bpy_prop_collection:
+        # TODO redo properly, not hardcoded
         if is_data_collection_type(attr):
             return BpyPropDataCollectionProxy().load_as_IDref(attr)
         else:
             return BpyPropStructCollectionProxy().load(attr)
 
-    bl_rna = getattr(attr_type, "bl_rna", None)
+    if isinstance(attr_property, T.CollectionProperty):
+        # applies to D.scenes['Scene'].view_layers['View Layer'].cycles.bl_rna.properties['aovs']
+        return BpyPropStructCollectionProxy().load(attr)
+
+    # We have handles "simple" cases
+    bl_rna = attr_property.bl_rna
     if bl_rna is None:
         logger.warning("Skip attribute %s", attr)
         return None
@@ -205,21 +258,21 @@ class StructLikeProxy(Proxy):
         self._data = {}
         pass
 
-    def get(self, bl_instance, attr_name):
+    def get(self, bl_instance: any, attr_name: str, attr_property: any):
 
         attr = getattr(bl_instance, attr_name)
         if attr is None:
             return None
-        return read_attribute(attr)
+        return read_attribute(attr, attr_property)
 
-    def load(self, bl_instance):
+    def load(self, bl_instance: any):
         """
         Load a Blender object into this proxy
         """
         self._data.clear()
-        for attr_name in self.bl_rna_attributes:
+        for attr_name, attr_property in self._bl_rna_properties.items():
             # TOTO some attributes not in
-            attr_value = self.get(bl_instance, attr_name)
+            attr_value = self.get(bl_instance, attr_name, attr_property)
             if attr_value is not None:
                 self._data[attr_name] = attr_value
         return self
