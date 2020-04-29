@@ -1,18 +1,30 @@
 from __future__ import annotations
+import logging
+import sys
+from typing import Iterable, Mapping, Union
+from uuid import uuid4
+
 import bpy
 import bpy.types as T  # noqa
 import mathutils
-from typing import Iterable, Mapping
-from uuid import uuid4
-import logging
 
-logger = logging.Logger("plop", logging.INFO)
+logger = logging.Logger("blender_data", logging.INFO)
+
+DEBUG = True
+
+if DEBUG:
+    # easier to find circular references
+    pass
+    # sys.setrecursionlimit(50)
 
 i = 0
+all_pointers: Mapping[int, any] = {}
+references = []
 
 vector_types = {mathutils.Vector, mathutils.Color, mathutils.Quaternion, mathutils.Euler}
 builtin_types = {float, int, bool, str, set}
 
+# TODO unused ?
 # those found in bpy_data members
 data_types = {
     "actions": T.Action,
@@ -53,6 +65,25 @@ data_types = {
 }
 
 
+def debug_check_stack_overflow(func, *args, **kwargs):
+    """
+    Use as a function decorator to detect probable stack overflow in case of circular references
+
+    Beware : inspect performance is very poor. 
+    sys.setrecursionlimit cannot be used because it will possibly break the Blender VScode
+    plugin and StackOverflowException is not caught by VScode "Raised exceptions" breakpoint.
+    """
+
+    def wrapper(*args, **kwargs):
+        import inspect
+
+        if len(inspect.stack(0)) > 50:
+            raise RuntimeError("Possible stackoverflow")
+        func(*args, **kwargs)
+
+    return wrapper
+
+
 def is_a(class_: type, base: type) -> bool:
     # None fot bpy_struct
     base_rna = getattr(base, "bl_rna", None)
@@ -77,53 +108,11 @@ def is_data_collection_type(attr):
     return attr.bl_rna in data_types
 
 
+# @debug_check_stack_overflow
 def read_attribute(attr: any, attr_property: any):
     """
         Load a property into a python object of the appropriate type, be ti a Proxy or a native python object
     """
-    #
-    # WARNING, this is a bit confusing
-    #
-    # In all cases the Blender type of an attribute named attr_name can be obtained from
-    # the bl_rna.properties['attr_name'] of its *parent*, but is is not straightforward
-    # (see gravity and Vector example below).
-    #
-    #   D = bpy.data
-    #   s = D.scenes['Scene']
-    #   type(gravity)
-    #       <class 'Vector'>
-    #   s.bl_rna_properties['gravity']
-    #       <bpy_struct, FloatProperty("gravity")>
-    #   s.bl_rna.properties['gravity'].is_array
-    #       True
-    #   s.bl_rna.properties['gravity'].array_length
-    #       3
-    #   s.bl_rna.properties['gravity'].array_dimensions
-    #       <bpy_int[3], FloatProperty.array_dimensions>
-    #
-    # So in this case type(gravity) is easier
-    #
-    # In some cases, it can be obtained from the bl_rna of the attribute, but is does not always exist.
-    # For instance, bl_rna does not exist for some properties
-    # from plugins (e.g.cycles) :
-    #   cycles = bpy.data.scenes['Scene'].view_layers['View Layer'].cycles
-    #   aovs = cycles.aovs
-    #   type(aovs)
-    #       <class 'bpy_prop_collection_idprop'>                                # unusable
-    #   type(cycles.bl_rna.properties['aovs'])
-    #       <class 'bpy.types.CollectionProperty'>                              # unusable
-    #   cycles.bl_rna.properties['aovs']
-    #       <bpy_struct, CollectionProperty("aovs")>                            # useful information from the parent
-    #   cycles.bl_rna.properties['aovs'].fixed_type
-    #       <bpy_struct, Struct("CyclesAOVPass")>                               # The collection element type
-    #   type(cycles.bl_rna.properties['aovs'].fixed_type)
-    #       <class 'cycles.properties.CyclesAOVPass'>                           #
-    #   cycles.bl_rna.properties['aovs'].fixed_type.bl_rna.properties.items()
-    #       [ ('name', <bpy_struct, StringProperty("name")>),                   # yessss
-    #         ('type', <bpy_struct, EnumProperty("type")>)
-    #          ...
-    #       ]
-    # For some types the python binding will do the job, so try it first by testing type(attr).
 
     # TODO should we compare the type (e.g. bpy.types.bpy_prop_collection) or the rna ?
     # TODO why do some types have an rna (T.ID) and not others (T.bpy_prop_collection)
@@ -140,7 +129,7 @@ def read_attribute(attr: any, attr_property: any):
     # These were implemented first and may be better implemented with the bl_rna property of the parent struct
     if attr_type == T.bpy_prop_array:
         return BpyPropArrayProxy().load(attr)
-    
+
     if attr_type == T.bpy_prop_collection:
         # TODO redo properly, not hardcoded
         if is_data_collection_type(attr):
@@ -149,25 +138,39 @@ def read_attribute(attr: any, attr_property: any):
             return BpyPropStructCollectionProxy().load(attr)
 
     if isinstance(attr_property, T.CollectionProperty):
-        # applies to D.scenes['Scene'].view_layers['View Layer'].cycles.bl_rna.properties['aovs']
         return BpyPropStructCollectionProxy().load(attr)
 
     # We have handles "simple" cases
     bl_rna = attr_property.bl_rna
     if bl_rna is None:
-        logger.warning("Skip attribute %s", attr)
+        logger.warning("Skipping attribute %s", attr)
         return None
 
     if is_a(attr_type, T.ID):
+        # Handling
         # if it is an ID, do not crate a proxy but link through its data collection
         # an IDRef whe the bpy contain IDdef
+        # TODO this is false for ShaderNodeTree contained in materials, that do not seem to be stored in BlendData
         return BpyIDRefProxy(attr_type).load(attr)
+
+    if DEBUG:
+        dbg_detect_duplicate_pointer = False
+        if dbg_detect_duplicate_pointer and isinstance(attr_property, T.PointerProperty):
+            # Debugging : figure out if two PointerProperty can point to the same objects, except for ID in blenddata
+            # Some are duplicate. In this case the default behavior would be to duplicate the object, maybe not appropriate
+            ptr = attr.as_pointer()
+            if ptr in all_pointers:
+                logging.warning(f"duplicate pointer {hex(ptr)} for {attr} from {all_pointers[ptr]}")
+            all_pointers[ptr] = attr
 
     if is_a(attr_type, T.PropertyGroup):
         return BpyPropertyGroupProxy(attr_type).load(attr)
 
     if is_a(attr_type, T.bpy_struct):
         return BpyStructProxy(attr_type.bl_rna).load(attr)
+
+    if isinstance(attr_property, T.PointerProperty):
+        assert references.pop() == attr.as_pointer()
 
     raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
 
@@ -177,6 +180,8 @@ class Proxy:
 
 
 class Iter:
+    # Attempt to iterate the same way during load and diff.
+    # currently not used
     def __init__(self):
         self._gen = self.gen()
 
@@ -192,7 +197,9 @@ ignores = {bpy.types.Scene: {"objects"}}
 
 class Properties:
     _props: Mapping[any, Iterable[str]] = {}
-    _skip_names = {
+
+    # Always excluded
+    _exclude_names = {
         "type_info",  # for Available (?) keyingset
         "depsgraph",  # found in Viewlayer
         "rna_type",
@@ -208,14 +215,34 @@ class Properties:
         "dccsync_uuid",
     }
 
-    def skip(self, bl_type, property_name: str) -> bool:
-        return property_name in self._skip_names
+    # Always excluded
+    _exclude_types = {
+        # A pointer in f-curve point to a recursive infinite structure
+        # T.PointerProperty
+        # TODO currently work only with plain attributes, not collections
+        # TODO Handle properly a circular reference between FCurve.group and ActionGroup.channels that must be handled
+        T.FCurve,
+        T.ShaderNodeTree,
+    }
+
+    def exclude(self, bl_type, property_name: str, property_type) -> bool:
+        name_excludes = property_name in self._exclude_names
+        if name_excludes:
+            return True
+        type_excludes = any([isinstance(property_type, t) for t in self._exclude_types])
+        # debug
+        for t in self._exclude_types:
+            if isinstance(property_type, t):
+                logging.warning(f"Excluded {t} from {bl_type}.{property_name}, points to {property_type.fixed_type}")
+        return type_excludes
 
     def properties(self, bl_type: any):
         props = self._props.get(bl_type)
         if props is None:
             props = {
-                name: property_ for name, property_ in bl_type.bl_rna.properties.items() if not self.skip(bl_type, name)
+                name: property_
+                for name, property_ in bl_type.bl_rna.properties.items()
+                if not self.exclude(bl_type, name, property_)
             }
             self._props[bl_type] = props
         return props
@@ -229,9 +256,9 @@ class StructLikeProxy(Proxy):
     Holds a copy of a Blender bpy_struct
     """
 
-    # TODO limit depth like in multiuser ?
+    # TODO limit depth like in multiuser. Anyhow, there are circular references in f-curves
     # TODO name or class based whitelists and blacklists. These lists could be customized for a given workflow step,
-    # TODO attribute groups per UI panel ?
+    # TODO filter on attribute groups per UI panel ?
 
     def __init__(self, bl_struct: Union[T.bpy_struct, T.PropertyGroup], *args, **kwargs):
 
@@ -260,6 +287,8 @@ class StructLikeProxy(Proxy):
 
     def get(self, bl_instance: any, attr_name: str, attr_property: any):
 
+        if attr_name == "cycles":
+            breakpoint
         attr = getattr(bl_instance, attr_name)
         if attr is None:
             return None
@@ -353,7 +382,7 @@ class BpyPropStructCollectionProxy(Proxy):
         self._data: Mapping[Union[str, int], BpyIDProxy] = {}
 
     class _Iter(Iter):
-        # TODO explai why an iterator
+        # TODO explain why an iterator
         # probalbly no
         def gen(self):
             keep = []
@@ -374,12 +403,14 @@ class BpyPropStructCollectionProxy(Proxy):
         """
         in bl_collection : a bpy.types.bpy_prop_collection
         """
-        # TODO check parameter type
-        # TODO : beware
-        # some are handled by data (real collection)
+        # TODO : some are handled by data (real collection)
         # others are not (view_layers, master collections)
+
         # TODO check that it contains a struct, for instance a MeshVertex
         # when iterating over items(), the keys may be a name (str) or an index (int)
+
+        # TODO also check for element type to skip
+
         for key, item in bl_collection.items():
             self._data[key] = BpyStructProxy(item).load(item)
 
@@ -459,8 +490,8 @@ class BpyPropArrayProxy(Proxy):
 
 
 class BpyBlendProxy(Proxy):
-
-    # TODO how could we get this information programatically
+    # TODO blenddata is a struct so use BpyStructProxy instead
+    # like BpyStructProxy(bpy.data).load(bpy.data)
 
     def __init__(self, *args, **kwargs):
         self._data: Mapping[str, BpyPropDataCollectionProxy] = {}
@@ -469,11 +500,21 @@ class BpyBlendProxy(Proxy):
         def gen(self):
             keep = ["scenes"]
             keep = []
-            exclude = ["screens", "window_managers", "workspaces"]
+            exclude = [
+                # "brushes" generates harmless warnings when EnumProperty properties are initialized with a value not in the enum
+                "brushes",
+                # TODO actions require to handle the circular reference between ActionGroup.channel and FCurve.group
+                "actions",
+                # we do not need those
+                "screens",
+                "window_managers",
+                "workspaces",
+            ]
             for name, type_ in bpy.data.bl_rna.properties.items():
                 if name in exclude:
                     continue
                 if name not in keep:
+                    # TODO properly filter
                     pass
                 if type_.bl_rna is bpy.types.CollectionProperty.bl_rna:
                     yield name
@@ -482,10 +523,15 @@ class BpyBlendProxy(Proxy):
         return self._Iter()
 
     def load(self):
+        global all_pointers
+        all_pointers.clear()
+
         for name in self.iter_all():
             collection = getattr(bpy.data, name)
             # the diff may be easier if all the collectiona are always present
             self._data[name] = BpyPropDataCollectionProxy().load_as_ID(collection)
+        all_pointers.clear()
+        assert len(references) == 0
         return self
 
     def update(self, diff):
