@@ -587,6 +587,7 @@ class ClientBlender(Client):
         ob = share_data.blender_objects[name]
         channel, index = common.decode_string(data, index)
         channel_index, index = common.decode_int(data, index)
+        frame, index = common.decode_int(data, index)
         value, index = common.decode_float(data, index)
 
         if not hasattr(ob, channel):
@@ -598,7 +599,7 @@ class ClientBlender(Client):
         else:
             attr = value
         setattr(ob, channel, attr)
-        ob.keyframe_insert(channel, index=channel_index)
+        ob.keyframe_insert(channel, frame=float(frame), index=channel_index)
         return name
 
     def build_remove_keyframe(self, data):
