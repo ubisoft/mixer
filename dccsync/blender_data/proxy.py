@@ -8,6 +8,7 @@ from enum import IntEnum
 import bpy
 import bpy.types as T  # noqa
 import mathutils
+from dccsync.blender_data.filter import Context
 
 logger = logging.Logger(__name__, logging.INFO)
 
@@ -508,57 +509,15 @@ class BpyPropDataCollectionProxy(Proxy):
             self._data[name].update(delta)
 
 
-class BpyPropArrayProxy(Proxy):
-    def load(self, bl_array: bpy.types.bpy_prop_array):
-        # TODO
-        logger.warning(f"Not implemented {bl_array}")
-        self._data = "array_tbd"
-        return self
-
-
 class BpyBlendProxy(Proxy):
-    # TODO blenddata is a struct so use BpyStructProxy instead
-    # like BpyStructProxy(bpy.data).load(bpy.data)
-
     def __init__(self, *args, **kwargs):
         self._data: Mapping[str, BpyPropDataCollectionProxy] = {}
 
-    class _Iter(Iter):
-        def gen(self):
-            keep = ["scenes"]
-            keep = []
-            exclude = [
-                # "brushes" generates harmless warnings when EnumProperty properties are initialized with a value not in the enum
-                "brushes",
-                # TODO actions require to handle the circular reference between ActionGroup.channel and FCurve.group
-                "actions",
-                # we do not need those
-                "screens",
-                "window_managers",
-                "workspaces",
-            ]
-            for name, type_ in bpy.data.bl_rna.properties.items():
-                if name in exclude:
-                    continue
-                if name not in keep:
-                    # TODO properly filter
-                    pass
-                if type_.bl_rna is bpy.types.CollectionProperty.bl_rna:
-                    yield name
-
-    def iter_all(self):
-        return self._Iter()
-
-    def load(self):
-        global all_pointers
-        all_pointers.clear()
-
-        for name in self.iter_all():
+    def load(self, context: Context):
+        for property_ in context.properties(T.BlendData.bl_rna):
+            name = property_.identifier
             collection = getattr(bpy.data, name)
-            # the diff may be easier if all the collectiona are always present
             self._data[name] = BpyPropDataCollectionProxy().load_as_ID(collection)
-        all_pointers.clear()
-        assert len(references) == 0
         return self
 
     def update(self, diff):

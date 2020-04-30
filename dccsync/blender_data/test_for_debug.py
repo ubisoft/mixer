@@ -15,6 +15,7 @@ from dccsync.blender_data.proxy import (
     load_as_what,
 )
 from dccsync.blender_data.diff import BpyBlendDiff
+from dccsync.blender_data.filter import default_context
 
 
 # @unittest.skip("")
@@ -22,7 +23,7 @@ class TestLoadProxy(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=".local\\test_data.blend")
         self.proxy = BpyBlendProxy()
-        self.proxy.load()
+        self.proxy.load(default_context)
 
     def check(self, item, expected_elements):
         self.assertSetEqual(set(item._data.keys()), set(expected_elements))
