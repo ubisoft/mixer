@@ -1,14 +1,15 @@
 from __future__ import annotations
 import logging
 import sys
-from typing import Iterable, Mapping, Union
+from typing import Iterable, Mapping, Union, Any
 from uuid import uuid4
-
+from functools import lru_cache
+from enum import IntEnum
 import bpy
 import bpy.types as T  # noqa
 import mathutils
 
-logger = logging.Logger("blender_data", logging.INFO)
+logger = logging.Logger(__name__, logging.INFO)
 
 DEBUG = True
 
@@ -22,7 +23,7 @@ all_pointers: Mapping[int, any] = {}
 references = []
 
 vector_types = {mathutils.Vector, mathutils.Color, mathutils.Quaternion, mathutils.Euler}
-builtin_types = {float, int, bool, str, set}
+builtin_types = {type(None), float, int, bool, str, set}
 
 # TODO unused ?
 # those found in bpy_data members
@@ -64,6 +65,8 @@ data_types = {
     "workspaces": T.WorkSpace,
 }
 
+blenddata_types = {t for t in data_types.values()}
+
 
 def debug_check_stack_overflow(func, *args, **kwargs):
     """
@@ -79,43 +82,83 @@ def debug_check_stack_overflow(func, *args, **kwargs):
 
         if len(inspect.stack(0)) > 50:
             raise RuntimeError("Possible stackoverflow")
-        func(*args, **kwargs)
+        return func(*args, **kwargs)
 
     return wrapper
 
 
-def is_a(class_: type, base: type) -> bool:
-    # None fot bpy_struct
-    base_rna = getattr(base, "bl_rna", None)
-    parent = class_.bl_rna.base
-    while parent is not None:
-        if parent == base_rna:
-            return True
-        parent = parent.base
-
-    # parent is none means derive from bpy_struct
-    return base == T.bpy_struct
+# an element of T.my_type.bl_rna.properties
+RNAProperty = Any
 
 
-def is_data_collection_type(attr):
-    has_rna = hasattr(attr, "bl_rna")
-    if not has_rna:
-        return False
-    # Find if collection element type derives from ID.  Do now know how to get the element type
-    # from the collection attribute, so list types that contain "links" into a blenddata collection.
-    # TODO and others
-    data_types = {T.BlendDataObjects.bl_rna, T.SceneObjects.bl_rna, T.LayerObjects.bl_rna}
-    return attr.bl_rna in data_types
+def is_pointer_to(rna_property: RNAProperty, base: type) -> bool:
+    return isinstance(rna_property, T.PointerProperty) and isinstance(rna_property.fixed_type, base)
+
+
+def is_or_points_to(rna_property: RNAProperty, base: type) -> bool:
+    return isinstance(rna_property, base) or is_pointer_to(rna_property, base)
+
+
+class LoadElementAs(IntEnum):
+    STRUCT = 0
+    ID_REF = 1
+    ID_DEF = 2
+
+
+def same_rna(a, b):
+    return a.bl_rna == b.bl_rna
+
+
+# @lru_cache(maxsize=None)
+def load_as_what(parent, attr_property):
+    """
+    Determine of we must load an attribute as a struct, a blenddata collection element (ID_DEF)
+    or a reference to a BlendData collection element (ID_REF)
+
+    All struct are loaded as struct
+    All IS are loaded ad D Ref (that is pointer into a blendata collection except
+    for specific case. For instance the scene master "collection" is not a D.collections item. 
+
+    Arguments
+    parent -- the type that contains the attribute names attr_name, for instance T.Scene
+    attr_property -- a bl_rna property of a sttribute, that can be a CollectionProperty or a "plain" attribute
+    """
+    # In these types, these members are T.ID that to not link to slots in bpy.data collections
+    # so we load them as ID and not as a reference to s also in an bpy.data collection
+    # Only include here types that derive from ID
+
+    # TODO use T.Material.bl_rna.properties['node_tree'] ...
+    force_as_ID_def = {
+        T.Material.bl_rna: ["node_tree"],
+        T.Scene.bl_rna: ["collection"],
+        T.LayerCollection.bl_rna: ["collection"],
+    }
+    if same_rna(attr_property, T.CollectionProperty) or same_rna(attr_property, T.PointerProperty):
+        element_property = attr_property.fixed_type
+    else:
+        element_property = attr_property
+
+    is_a_blenddata_ID = any([same_rna(element_property, t) for t in blenddata_types])
+    if not is_a_blenddata_ID:
+        return LoadElementAs.STRUCT
+
+    if attr_property.identifier in force_as_ID_def.get(parent.bl_rna, []):
+        return LoadElementAs.ID_DEF
+    else:
+        return LoadElementAs.ID_REF
 
 
 # @debug_check_stack_overflow
-def read_attribute(attr: any, attr_property: any):
+def read_attribute(attr: any, attr_property: any, parent_struct):
     """
-        Load a property into a python object of the appropriate type, be ti a Proxy or a native python object
+    Load a property into a python object of the appropriate type, be it a Proxy or a native python object
+
+
     """
 
-    # TODO should we compare the type (e.g. bpy.types.bpy_prop_collection) or the rna ?
-    # TODO why do some types have an rna (T.ID) and not others (T.bpy_prop_collection)
+    if attr_property.identifier == "objects":
+        breakpoint
+        pass
 
     attr_type = type(attr)
     if attr_type in builtin_types:
@@ -128,49 +171,45 @@ def read_attribute(attr: any, attr_property: any):
     # We have tested the types that are usefully reported by the python binding, now harder work.
     # These were implemented first and may be better implemented with the bl_rna property of the parent struct
     if attr_type == T.bpy_prop_array:
-        return BpyPropArrayProxy().load(attr)
+        return [e for e in attr]
 
+    if attr_property.identifier == "collection":
+        breakpoint
     if attr_type == T.bpy_prop_collection:
-        # TODO redo properly, not hardcoded
-        if is_data_collection_type(attr):
-            return BpyPropDataCollectionProxy().load_as_IDref(attr)
-        else:
+        load_as = load_as_what(parent_struct, attr_property)
+        if load_as == LoadElementAs.STRUCT:
             return BpyPropStructCollectionProxy().load(attr)
+        elif load_as == LoadElementAs.ID_REF:
+            return BpyPropDataCollectionProxy().load_as_IDref(attr)
+        elif load_as == LoadElementAs.ID_DEF:
+            return BpyPropDataCollectionProxy().load_as_ID(attr)
 
+    # TODO merge with previous case
     if isinstance(attr_property, T.CollectionProperty):
         return BpyPropStructCollectionProxy().load(attr)
 
-    # We have handles "simple" cases
     bl_rna = attr_property.bl_rna
     if bl_rna is None:
-        logger.warning("Skipping attribute %s", attr)
+        logger.warning("Unimplemented attribute %s", attr)
         return None
 
-    if is_a(attr_type, T.ID):
-        # Handling
-        # if it is an ID, do not crate a proxy but link through its data collection
-        # an IDRef whe the bpy contain IDdef
-        # TODO this is false for ShaderNodeTree contained in materials, that do not seem to be stored in BlendData
-        return BpyIDRefProxy(attr_type).load(attr)
-
-    if DEBUG:
-        dbg_detect_duplicate_pointer = False
-        if dbg_detect_duplicate_pointer and isinstance(attr_property, T.PointerProperty):
-            # Debugging : figure out if two PointerProperty can point to the same objects, except for ID in blenddata
-            # Some are duplicate. In this case the default behavior would be to duplicate the object, maybe not appropriate
-            ptr = attr.as_pointer()
-            if ptr in all_pointers:
-                logging.warning(f"duplicate pointer {hex(ptr)} for {attr} from {all_pointers[ptr]}")
-            all_pointers[ptr] = attr
-
-    if is_a(attr_type, T.PropertyGroup):
+    assert issubclass(attr_type, T.PropertyGroup) == issubclass(attr_type, T.PropertyGroup)
+    if issubclass(attr_type, T.PropertyGroup):
         return BpyPropertyGroupProxy(attr_type).load(attr)
 
-    if is_a(attr_type, T.bpy_struct):
+    load_as = load_as_what(parent_struct, attr_property)
+    if load_as == LoadElementAs.STRUCT:
         return BpyStructProxy(attr_type.bl_rna).load(attr)
+    elif load_as == LoadElementAs.ID_REF:
+        return BpyIDRefProxy(attr_type).load(attr)
+    elif load_as == LoadElementAs.ID_DEF:
+        return BpyIDProxy(attr_type).load(attr)
 
-    if isinstance(attr_property, T.PointerProperty):
-        assert references.pop() == attr.as_pointer()
+    # assert issubclass(attr_type, T.bpy_struct) == issubclass(attr_type, T.bpy_struct)
+    assert False, "unexpected code path"
+    # should be handled above
+    if issubclass(attr_type, T.bpy_struct):
+        return BpyStructProxy(attr_type.bl_rna).load(attr)
 
     raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
 
@@ -196,7 +235,7 @@ ignores = {bpy.types.Scene: {"objects"}}
 
 
 class Properties:
-    _props: Mapping[any, Iterable[str]] = {}
+    _props: Mapping[str, RNAProperty] = {}
 
     # Always excluded
     _exclude_names = {
@@ -218,31 +257,26 @@ class Properties:
     # Always excluded
     _exclude_types = {
         # A pointer in f-curve point to a recursive infinite structure
-        # T.PointerProperty
-        # TODO currently work only with plain attributes, not collections
         # TODO Handle properly a circular reference between FCurve.group and ActionGroup.channels that must be handled
         T.FCurve,
-        T.ShaderNodeTree,
+        # TODO a recursion in world nodetrree
+        T.NodeTree,
     }
 
-    def exclude(self, bl_type, property_name: str, property_type) -> bool:
+    def exclude(self, property_name: str, rna_property: RNAProperty) -> bool:
         name_excludes = property_name in self._exclude_names
         if name_excludes:
             return True
-        type_excludes = any([isinstance(property_type, t) for t in self._exclude_types])
-        # debug
-        for t in self._exclude_types:
-            if isinstance(property_type, t):
-                logging.warning(f"Excluded {t} from {bl_type}.{property_name}, points to {property_type.fixed_type}")
+        type_excludes = any([is_or_points_to(rna_property, t) for t in self._exclude_types])
         return type_excludes
 
     def properties(self, bl_type: any):
         props = self._props.get(bl_type)
         if props is None:
             props = {
-                name: property_
-                for name, property_ in bl_type.bl_rna.properties.items()
-                if not self.exclude(bl_type, name, property_)
+                name: rna_property
+                for name, rna_property in bl_type.bl_rna.properties.items()
+                if not self.exclude(name, rna_property)
             }
             self._props[bl_type] = props
         return props
@@ -260,7 +294,7 @@ class StructLikeProxy(Proxy):
     # TODO name or class based whitelists and blacklists. These lists could be customized for a given workflow step,
     # TODO filter on attribute groups per UI panel ?
 
-    def __init__(self, bl_struct: Union[T.bpy_struct, T.PropertyGroup], *args, **kwargs):
+    def __init__(self, bl_struct: T.bpy_struct, *args, **kwargs):
 
         # We care for some non readonly properties. Collection object are tagged read_only byt can be updated with
 
@@ -271,28 +305,30 @@ class StructLikeProxy(Proxy):
 
         # TODO is_readonly may be only interesting for "base types". FOr Collections it seems always set to true
         # meaning that the collection property slot cannot be updated although the object is mutable
-        #
+        # TODO we also care for some readonly properties that are in fact links to data collections
         # TODO make this "static"
         # TODO filter out bpy_func + others
+
+        # The property information are taken from the containing class, not from the attribute.
+        # So we get :
+        #   T.Scene.bl_rna.properties['collection']
+        #       <bpy_struct, PointerProperty("collection")>
+        #   T.Scene.bl_rna.properties['collection'].fixed_type
+        #       <bpy_struct, Struct("Collection")>
+        # But if we take the information in the attribute we get information for the derferenced
+        # data
+        #   D.scenes[0].collection.bl_rna
+        #       <bpy_struct, Struct("Collection")>
+        #
+        # We need the former to make a difference betwwen T.Scene.collection and T.Collection.children.
+        # the former is a pointer
         self._bl_rna_properties = all_properties.properties(bl_struct.bl_rna)
-
-        # TODO we also care for some readonly properties that are in fact links to data collections
-        # TODO can we have ID ad members ?
-        # These ara for the type and should be loaded once for all
-        self.bl_rna_attributes = self._bl_rna_properties.keys()
-
-        # pointers are the links to other datablocks (e.g. camera)
         self._data = {}
         pass
 
     def get(self, bl_instance: any, attr_name: str, attr_property: any):
-
-        if attr_name == "cycles":
-            breakpoint
         attr = getattr(bl_instance, attr_name)
-        if attr is None:
-            return None
-        return read_attribute(attr, attr_property)
+        return read_attribute(attr, attr_property, bl_instance)
 
     def load(self, bl_instance: any):
         """
@@ -300,7 +336,6 @@ class StructLikeProxy(Proxy):
         """
         self._data.clear()
         for attr_name, attr_property in self._bl_rna_properties.items():
-            # TOTO some attributes not in
             attr_value = self.get(bl_instance, attr_name, attr_property)
             if attr_value is not None:
                 self._data[attr_name] = attr_value
@@ -329,13 +364,6 @@ class BpyIDProxy(BpyStructProxy):
     def load(self, bl_instance):
         # TODO check that bl_instance class derives from ID
         super().load(bl_instance)
-        # TODO load the custom properties, probably attributes not in bl_rna_attributes.
-        # For instance cyles is a custom property of camera
-        # I will not be available is the plugin os not loaded
-
-        # TODO do we let this to normal attr sync for initial load ?
-
-        # https://blender.stackexchange.com/questions/55423/how-to-get-the-class-type-of-a-blender-collection-property
         self.dccsync_uuid = bl_instance.dccsync_uuid
         return self
 
@@ -359,7 +387,7 @@ class BpyIDRefProxy(Proxy):
         while class_bl_rna.base is not None and class_bl_rna.base != bpy.types.ID.bl_rna:
             class_bl_rna = class_bl_rna.base
 
-        # TODO for easier access could keep a red to the BpyBlendProxy
+        # TODO for easier access could keep a ref to the BpyBlendProxy
         # TODO maybe this information does not belong to _data and _data should be reserved to "fields"
         self._data = (
             class_bl_rna.identifier,  # blenddata collection
@@ -403,9 +431,6 @@ class BpyPropStructCollectionProxy(Proxy):
         """
         in bl_collection : a bpy.types.bpy_prop_collection
         """
-        # TODO : some are handled by data (real collection)
-        # others are not (view_layers, master collections)
-
         # TODO check that it contains a struct, for instance a MeshVertex
         # when iterating over items(), the keys may be a name (str) or an index (int)
 
@@ -486,7 +511,9 @@ class BpyPropDataCollectionProxy(Proxy):
 class BpyPropArrayProxy(Proxy):
     def load(self, bl_array: bpy.types.bpy_prop_array):
         # TODO
+        logger.warning(f"Not implemented {bl_array}")
         self._data = "array_tbd"
+        return self
 
 
 class BpyBlendProxy(Proxy):

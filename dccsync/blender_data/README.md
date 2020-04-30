@@ -57,6 +57,53 @@ Also consider :
 
 When `isinstance(attr_property.bl_rna, T.PointerProperty)` is `True`, then `type(attr)` is the _pointee_ type
 
+About collections
+
+    s = D.scenes['Scene']
+    # The master collection is a collection on its own, not in D.collections
+    s.collection
+      bpy.data.scenes['Scene_0'].collection
+    type(s.collection)
+      <class 'bpy_types.Collection'>
+    T.Scene.bl_rna.properties['collection']
+      <bpy_struct, PointerProperty("collection")>
+    T.Scene.bl_rna.properties['collection'].fixed_type
+      <bpy_struct, Struct("Collection")>
+
+    # A collection in D.collections
+    D.collections[0]
+      bpy.data.collections['Collection_0_0']
+    type(D.collections[0])
+      <class 'bpy_types.Collection'>
+    D.bl_rna.properties['collections']
+      <bpy_struct, CollectionProperty("collections")>
+    D.bl_rna.properties['collections'].fixed_type
+      <bpy_struct, Struct("Collection")>
+
+    D.collections[0].children
+      bpy.data.collections['Collection_0_0'].children
+    T.Collection.bl_rna.properties['children']
+      <bpy_struct, CollectionProperty("children")>
+    T.Collection.bl_rna.properties['children'].fixed_type
+      <bpy_struct, Struct("Collection")>
+
+    D.collections[0].children[0]
+      bpy.data.collections['Collection_0_0_0']
+    type(D.collections[0].children[0])
+      <class 'bpy_types.Collection'>
+
+Determine explicitely
+
+| Property                                       | Useful ? | Def or ref to Blenddata |
+| ---------------------------------------------- | :------: | :---------------------: |
+| `T.BlendData.bl_rna.properties['collections']` |    Y     |           Def           |
+| `T.Scene.bl_rna.properties['collection']`      |    Y     |          _Def_          |
+| `T.Scene.bl_rna.properties['objects']`         |    N     |           Ref           |
+| `T.Collection.bl_rna.properties['children']`   |    Y     |           Ref           |
+| `T.Collection.bl_rna.properties['objects']`    |    N     |           Ref           |
+
+Exclude all readonly except specified (pointer, collections) ?
+
 # TODO
 
 ## Prio 1
