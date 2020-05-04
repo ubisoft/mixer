@@ -140,7 +140,8 @@ Installation steps:
 1. Register a runner with `gitlab-runner-windows-amd64.exe register`. Use `blender` as token and `shell` as executor
 1. Install a portable Blender in the folder with a name used as the value of the variable `DCCSYNC_BLENDER_EXE_DIR` in `.gitlab-ci.yml`
 
-Then run an interactive executor `gitlab-runner-windows-amd64.exe run`.
+Then run an interactive executor as administrator : `gitlab-runner-windows-amd64.exe run`. It must run as administrator because the `TSCON` command requires administrator rights
+to disconnect a session from the remote desktop.
 As the runner executes jobs, it will display the jobs status : 
 ```
 D:\gitlab_runner>gitlab-runner-windows-amd64.exe run
