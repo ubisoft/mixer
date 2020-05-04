@@ -133,6 +133,14 @@ class TestCore(unittest.TestCase):
         self.assertFalse("node_tree" in proxy._data)
 
 
+
+def run_tests(test_name: str):
+    suite = unittest.defaultTestLoader.loadTestsFromName(test_name)
+    # suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestCore)
+    runner = unittest.TextTestRunner(verbosity=2)
+    runner.run(suite)
+
+
 def main():
     module = sys.modules[__name__]
     suite = unittest.defaultTestLoader.loadTestsFromModule(module)

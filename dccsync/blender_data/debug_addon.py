@@ -6,6 +6,10 @@ proxy = BpyBlendProxy()
 deltas = BpyBlendDiff()
 
 
+class DebugDataProperties(bpy.types.PropertyGroup):
+    test_names: bpy.props.StringProperty(name="TestNames", default="TestLoadProxy.test_blenddata")
+
+
 class DebugDataLoadOperator(bpy.types.Operator):
     """Execute blender_data tests for debugging"""
 
@@ -50,9 +54,13 @@ class DebugDataTestOperator(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     def execute(self, context):
-        from dccsync.blender_data.test_for_debug import main
+        from dccsync.blender_data.test_for_debug import run_tests
 
-        main()
+        test_names = "dccsync.blender_data.test_for_debug"
+        names = get_props().test_names
+        if names:
+            test_names = test_names + "." + names
+        run_tests(test_names)
         return {"FINISHED"}
 
 
@@ -73,19 +81,34 @@ class DebugDataPanel(bpy.types.Panel):
         row.operator(DebugDataDiffOperator.bl_idname, text="Diff")
         row.operator(DebugDataUpdateOperator.bl_idname, text="Update")
         row.operator(DebugDataTestOperator.bl_idname, text="Test")
+        row = layout.row()
+        row.prop(get_props(), "test_names", text="Test names")
 
 
-classes = (DebugDataLoadOperator, DebugDataDiffOperator, DebugDataUpdateOperator, DebugDataTestOperator, DebugDataPanel)
+classes = (
+    DebugDataLoadOperator,
+    DebugDataDiffOperator,
+    DebugDataUpdateOperator,
+    DebugDataTestOperator,
+    DebugDataPanel,
+    DebugDataProperties,
+)
+
+
+def get_props() -> DebugDataProperties:
+    return bpy.context.window_manager.debug_data_props
 
 
 def register():
     for t in data_types.values():
         t.dccsync_uuid = bpy.props.StringProperty(default="")
-    for _ in classes:
-        bpy.utils.register_class(_)
+
+    for class_ in classes:
+        bpy.utils.register_class(class_)
+    bpy.types.WindowManager.debug_data_props = bpy.props.PointerProperty(type=DebugDataProperties)
 
 
 def unregister():
 
-    for _ in classes:
-        bpy.utils.unregister_class(_)
+    for class_ in classes:
+        bpy.utils.unregister_class(class_)
