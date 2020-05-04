@@ -1,5 +1,7 @@
-import unittest
+import copy
 import sys
+import unittest
+
 import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
@@ -9,13 +11,21 @@ from dccsync.blender_data.proxy import (
     BpyIDProxy,
     BpyIDRefProxy,
     BpyPropertyGroupProxy,
-    is_pointer_to,
-    all_properties,
     LoadElementAs,
     load_as_what,
 )
+
+import dccsync.blender_data.types as types
 from dccsync.blender_data.diff import BpyBlendDiff
-from dccsync.blender_data.filter import default_context
+from dccsync.blender_data.filter import (
+    CollectionFilterOut,
+    Context,
+    FilterStack,
+    TypeFilterIn,
+    TypeFilterOut,
+    default_context,
+    default_filter,
+)
 
 
 # @unittest.skip("")
@@ -41,10 +51,24 @@ class TestLoadProxy(unittest.TestCase):
             self.proxy._data["collections"], {"Collection_0_0", "Collection_0_1", "Collection_0_0_0", "Collection_1_0"}
         )
 
+    def test_blenddata_filtered(self):
+        blend_data = self.proxy._data
+        scene = blend_data["scenes"]._data["Scene_0"]._data
+        self.assertTrue("eevee" in scene)
+
+        filter_stack = copy.copy(default_filter)
+        filter_stack.append({T.Scene: TypeFilterOut(T.SceneEEVEE)})
+        proxy = BpyBlendProxy()
+        proxy.load(Context(filter_stack))
+        blend_data_ = proxy._data
+        scene_ = blend_data_["scenes"]._data["Scene_0"]._data
+        self.assertFalse("eevee" in scene_)
+
     # @unittest.skip("")
     def test_scene(self):
         scene = self.proxy._data["scenes"]._data["Scene_0"]._data
-        self.assertEqual(49, len(scene))
+        # will vary slightly during tiune tuning of the default filter
+        self.assertEqual(50, len(scene))
 
         objects = scene["objects"]._data
         self.assertEqual(4, len(objects))
@@ -92,8 +116,6 @@ class TestCore(unittest.TestCase):
         bpy.ops.wm.open_mainfile(filepath=".local\\test_data.blend")
 
     def test_issubclass(self):
-        # More to understand than to actually test
-        all_properties._props.clear()
 
         # Warning T.bpy_struct is not T.Struct !!
         self.assertTrue(issubclass(T.ID, T.bpy_struct))
@@ -114,29 +136,101 @@ class TestCore(unittest.TestCase):
         # ... but ...
         self.assertIs(objects_rna_property.fixed_type.bl_rna, T.Object.bl_rna)
 
+        # better :
+        self.assertIs(T.Mesh.bl_rna.properties["vertices"].srna.bl_rna, T.MeshVertices.bl_rna)
+
     def test_load_as(self):
         self.assertEqual(LoadElementAs.STRUCT, load_as_what(T.Scene, T.Scene.bl_rna.properties["animation_data"]))
         self.assertEqual(LoadElementAs.ID_REF, load_as_what(T.Scene, T.Scene.bl_rna.properties["objects"]))
         self.assertEqual(LoadElementAs.ID_DEF, load_as_what(T.Scene, T.Scene.bl_rna.properties["collection"]))
 
     def test_pointer_class(self):
+        eevee = T.Scene.bl_rna.properties["eevee"]
+        self.assertTrue(types.is_pointer_to(eevee, T.SceneEEVEE))
+
         collection = T.Scene.bl_rna.properties["collection"]
-        self.assertTrue(is_pointer_to(collection, T.Collection))
+        self.assertTrue(types.is_pointer_to(collection, T.Collection))
         node_tree = T.World.bl_rna.properties["node_tree"]
-        self.assertTrue(is_pointer_to(node_tree, T.NodeTree))
-        self.assertFalse(is_pointer_to(node_tree, T.ShaderNodeTree))
+        self.assertTrue(types.is_pointer_to(node_tree, T.NodeTree))
+        self.assertFalse(types.is_pointer_to(node_tree, T.ShaderNodeTree))
 
     def test_skip_ShaderNodeTree(self):
         world = D.worlds["World"]
-        proxy = BpyStructProxy(world).load(world)
+        proxy = BpyStructProxy(world).load(world, default_context)
         self.assertTrue("color" in proxy._data)
-        self.assertFalse("node_tree" in proxy._data)
+        # self.assertFalse("node_tree" in proxy._data)
 
+
+def matches_type(p, t):
+    # sic ...
+    if p.bl_rna is T.CollectionProperty.bl_rna and p.srna and p.srna.bl_rna is t.bl_rna:
+        return True
+
+
+class TestPointerFilterOut(unittest.TestCase):
+    def test_exact_class(self):
+        filter_stack = FilterStack()
+        filter_set = {T.Scene: TypeFilterOut(T.SceneEEVEE)}
+        filter_stack.append(filter_set)
+        context = Context(filter_stack)
+        props = context.properties(T.Mesh)
+        self.assertFalse(any([matches_type(p, T.SceneEEVEE) for _, p in props]))
+
+
+class TestTypeFilterIn(unittest.TestCase):
+    def test_exact_class(self):
+        filter_stack = FilterStack()
+        filter_set = {T.BlendData: TypeFilterIn(T.CollectionProperty)}
+        filter_stack.append(filter_set)
+        context = Context(filter_stack)
+        props = list(context.properties(T.BlendData))
+        self.assertTrue(any([matches_type(p, T.BlendDataCameras) for _, p in props]))
+        self.assertFalse(any([matches_type(p, T.StringProperty) for _, p in props]))
+
+
+class TestCollectionFilterOut(unittest.TestCase):
+    def test_exact_class(self):
+        filter_stack = FilterStack()
+        filter_set = {T.Mesh: CollectionFilterOut(T.MeshVertices)}
+        filter_stack.append(filter_set)
+        context = Context(filter_stack)
+        props = context.properties(T.Mesh)
+        self.assertFalse(any([matches_type(p, T.MeshVertices) for _, p in props]))
+        self.assertTrue(any([matches_type(p, T.MeshLoops) for _, p in props]))
+
+    def test_base_class(self):
+        filter_stack = FilterStack()
+        # Exclude on ID, applies to derived classes
+        filter_set = {T.ID: CollectionFilterOut(T.MeshVertices)}
+        filter_stack.append(filter_set)
+        context = Context(filter_stack)
+        props = context.properties(T.Mesh)
+        self.assertFalse(any([matches_type(p, T.MeshVertices) for _, p in props]))
+        self.assertTrue(any([matches_type(p, T.MeshLoops) for _, p in props]))
+
+    def test_root_class(self):
+        filter_stack = FilterStack()
+        # Exclude on all classes
+        filter_set = {None: CollectionFilterOut(T.MeshVertices)}
+        filter_stack.append(filter_set)
+        context = Context(filter_stack)
+        props = context.properties(T.Mesh)
+        self.assertFalse(any([matches_type(p, T.MeshVertices) for _, p in props]))
+        self.assertTrue(any([matches_type(p, T.MeshLoops) for _, p in props]))
+
+    def test_unrelated_class(self):
+        filter_stack = FilterStack()
+        # Exclude on unrelated class : does nothing
+        filter_set = {T.Collection: CollectionFilterOut(T.MeshVertices)}
+        filter_stack.append(filter_set)
+        context = Context(filter_stack)
+        props = context.properties(T.Mesh)
+        self.assertTrue(any([matches_type(p, T.MeshVertices) for _, p in props]))
+        self.assertTrue(any([matches_type(p, T.MeshLoops) for _, p in props]))
 
 
 def run_tests(test_name: str):
     suite = unittest.defaultTestLoader.loadTestsFromName(test_name)
-    # suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestCore)
     runner = unittest.TextTestRunner(verbosity=2)
     runner.run(suite)
 
@@ -144,7 +238,6 @@ def run_tests(test_name: str):
 def main():
     module = sys.modules[__name__]
     suite = unittest.defaultTestLoader.loadTestsFromModule(module)
-    # suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestCore)
     runner = unittest.TextTestRunner(verbosity=2)
     runner.run(suite)
 

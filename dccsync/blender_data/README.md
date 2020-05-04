@@ -7,7 +7,7 @@ the `bl_rna.properties['attr_name']` of its \_parent*, but is is not straightfor
 
     D = bpy.data
     s = D.scenes['Scene']
-    type(gravity)
+    type(s.gravity)
         <class 'Vector'>
     s.bl_rna_properties['gravity']
         <bpy_struct, FloatProperty("gravity")>
@@ -18,7 +18,7 @@ the `bl_rna.properties['attr_name']` of its \_parent*, but is is not straightfor
     s.bl_rna.properties['gravity'].array_dimensions
         <bpy_int[3], FloatProperty.array_dimensions>
 
-So in this case `type(gravity)` is the easiest way to find out how to store this attribute.
+So in this case `type(s.gravity)` is the easiest way to find out how to store this attribute.
 
 In some cases, it can be obtained from the `bl_rna` of the attribute, but is does not always exist.
 For instance, `bl_rna` does not exist for some properties

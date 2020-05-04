@@ -1,59 +1,110 @@
-from typing import Mapping, Iterable, Any, List, Union
-from bpy import types as T
+from typing import Any, ItemsView, Iterable, List, Mapping, Union
+from bpy import types as T  # noqa
+
+from dccsync.blender_data.types import is_pointer_to
 
 
 class Filter:
-    pass
+    def is_active(self):
+        return True
 
 
-class IncludeTypeFilter(Filter):
-    def __init__(self, types: Iterable[Any]):
+# TODO FilterNameIn, FilterNameOut, FilterNameAdd
+# properties (included, excluded)
+
+
+class TypeFilter(Filter):
+    """
+    Filter on type or Pointer to type.
+
+    T.SceneEEVEE wil match D.scenes[0].eevee although the later is a T.PointerProperty
+    """
+
+    def __init__(self, types: Union[Any, Iterable[Any]]):
+        types = types if isinstance(types, Iterable) else [types]
         self._types: Iterable[Any] = [t.bl_rna for t in types]
 
+    def matches(self, bl_rna_property):
+        return bl_rna_property.bl_rna in self._types or any([is_pointer_to(bl_rna_property, t) for t in self._types])
+
+
+class TypeFilterIn(TypeFilter):
     def apply(self, properties):
-        return [p for p in properties if p.bl_rna in self._types]
+        return [p for p in properties if self.matches(p)]
 
 
-class ExcludeFuncFilter(Filter):
+class TypeFilterOut(TypeFilter):
+    def apply(self, properties):
+        return [p for p in properties if not self.matches(p)]
+
+
+class CollectionFilterOut(TypeFilter):
+    def apply(self, properties):
+        # srna looks like the type inside the collection
+        return [
+            p
+            for p in properties
+            if p.bl_rna is not T.CollectionProperty.bl_rna or p.srna and p.srna.bl_rna not in self._types
+        ]
+
+
+class FuncFilterOut(Filter):
     pass
 
 
-class ExcludeNameFilter(Filter):
-    def __init__(self, names: Iterable[str]):
+class NameFilter(Filter):
+    def __init__(self, names: Union[Any, Iterable[str]]):
+        names = names if isinstance(names, Iterable) else [names]
         self._names: Iterable[str] = names
 
+
+class NameFilterOut(NameFilter):
     def apply(self, properties):
         return [p for p in properties if p.identifier not in self._names]
 
 
-class IncludeNameFilter(Filter):
-    def __init__(self, names: Iterable[str]):
-        self._names: Iterable[str]
-
+class NameFilterIn(NameFilter):
     def apply(self, properties):
         return [p for p in properties if p.identifier in self._names]
 
 
+# true class with isactive()
+FilterSet = Mapping[Any, Iterable[Filter]]
+
+
+def bases(bl_rna):
+    b = bl_rna
+    while b is not None:
+        yield b
+        b = None if b.base is None else b.base.bl_rna
+    yield None
+
+
 class FilterStack:
     def __init__(self):
-        self._filters: Mapping[Any, List[Filter]] = {}
+        self._filter_stack: List[FilterSet] = []
 
     def get(self, bl_rna):
         pass
 
     def apply(self, bl_rna, properties):
-        filters = self._filters.get(bl_rna, [])
-        for filter_ in filters:
-            properties = filter_.apply(properties)
+        for class_ in bases(bl_rna):
+            bl_rna = None if class_ is None else class_.bl_rna
+            for filter_set in self._filter_stack:
+                filters = filter_set.get(bl_rna, [])
+                filters = filters if isinstance(filters, Iterable) else [filters]
+                for filter_ in filters:
+                    properties = filter_.apply(properties)
         return properties
 
-    def append(self, bl_rna, filters: Union[Filter, Iterable[Filter]]):
-        if not isinstance(filters, Iterable):
-            filters = [filters]
-        current_filters = self._filters.get(bl_rna, [])
-        if not current_filters:
-            self._filters[bl_rna] = current_filters
-        current_filters.extend(filters)
+    def append(self, filter_set: FilterSet):
+        self._filter_stack.append({None if k is None else k.bl_rna: v for k, v in filter_set.items()})
+
+
+BlRna = Any
+PropertyName = str
+Property = Any
+Properties = Mapping[PropertyName, Property]
 
 
 class Context:
@@ -61,16 +112,22 @@ class Context:
     # TODO check plugins and appearing disappearing attributes
 
     def __init__(self, filter_stack):
-        # bl_rna -> properties
-        self._properties: Mapping[Any, Iterable[Any]] = {}
+        self._properties: Mapping[BlRna, Properties] = {}
         self._filter_stack: FilterStack = filter_stack
 
-    def properties(self, bl_rna):
-        properties = self._properties.get(bl_rna)
-        if properties is None:
-            properties = self._filter_stack.apply(bl_rna, list(bl_rna.properties))
-            self._properties[bl_rna] = properties
-        return properties
+    def properties(self, bl_rna_property: T.Property = None, bpy_type=None) -> ItemsView:
+        if (bl_rna_property is None) == (bpy_type is None):
+            raise ValueError("Exactly one of bl_rna and bpy_type must be provided")
+        if bl_rna_property is not None:
+            bl_rna = bl_rna_property.bl_rna
+        elif bpy_type is not None:
+            bl_rna = bpy_type.bl_rna
+        bl_rna_properties = self._properties.get(bl_rna)
+        if bl_rna_properties is None:
+            filtered_properties = self._filter_stack.apply(bl_rna, list(bl_rna.properties))
+            bl_rna_properties = {p.identifier: p for p in filtered_properties}
+            self._properties[bl_rna] = bl_rna_properties
+        return bl_rna_properties.items()
 
 
 default_filter = FilterStack()
@@ -84,9 +141,36 @@ blenddata_exclude = [
     "window_managers",
     "workspaces",
 ]
+
+# TODO some of these will be included in future read_only exclusion
+_exclude_names = {
+    "type_info",  # for Available (?) keyingset
+    "depsgraph",  # found in Viewlayer
+    "rna_type",
+    "is_evaluated",
+    "original",
+    "users",
+    "use_fake_user",
+    "tag",
+    "is_library_indirect",
+    "library",
+    "override_library",
+    "preview",
+    "dccsync_uuid",
+}
+
+# TODO Collection_of
+
 default_filter.append(
-    T.BlendData.bl_rna, (ExcludeNameFilter(blenddata_exclude), IncludeTypeFilter([T.CollectionProperty]))
+    {
+        T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
+        # TODO this avoids the recursion path Node.socket , NodeSocker.Node
+        # can probably be included in the readonly filter
+        T.NodeSocket: [NameFilterOut("node")],
+        None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
+    }
 )
+
 default_context = Context(default_filter)
 # todebug
-# default_filter.append(T.BlendData.bl_rna, IncludeNameFilter("collections"))
+# default_filter.append(T.BlendData.bl_rna, NameFilterIn("collections"))
