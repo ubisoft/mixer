@@ -1,4 +1,4 @@
-from dccsync.blender_client.misc import get_or_create_object_data, get_or_create_path, get_object_path
+from dccsync.blender_client.misc import get_or_create_object_data, get_object_path
 from dccsync.broadcaster import common
 from dccsync.broadcaster.client import Client
 from dccsync.share_data import share_data
