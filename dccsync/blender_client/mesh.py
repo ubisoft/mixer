@@ -8,6 +8,7 @@ from mathutils import Vector
 from dccsync.broadcaster import common
 from dccsync.stats import stats_timer
 from dccsync.share_data import share_data
+from dccsync.blender_client import material as material_api
 
 logger = logging.getLogger(__name__)
 
@@ -654,7 +655,7 @@ def decode_mesh(client, obj, data, index):
     # Materials
     material_names, index = common.decode_string_array(data, index)
     for material_name in material_names:
-        material = client.get_or_create_material(material_name) if material_name != "" else None
+        material = material_api.get_or_create_material(material_name) if material_name != "" else None
         obj.data.materials.append(material)
 
     return index
