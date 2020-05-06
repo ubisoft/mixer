@@ -4,6 +4,7 @@ import os
 
 import bpy
 from mathutils import Matrix, Quaternion
+import dccsync
 from dccsync import ui
 from dccsync import data
 from dccsync.share_data import share_data
@@ -13,6 +14,8 @@ from dccsync.blender_client import collection as collection_api
 from dccsync.blender_client import mesh as mesh_api
 from dccsync.blender_client import object_ as object_api
 from dccsync.blender_client import scene as scene_api
+from dccsync.blender_client import light as light_api
+from dccsync.blender_client import camera as camera_api
 from dccsync.stats import stats_timer
 
 _STILL_ACTIVE = 259
@@ -34,12 +37,7 @@ class ClientBlender(Client):
 
     # returns the path of an object
     def get_object_path(self, obj):
-        path = obj.name_full
-        while obj.parent:
-            obj = obj.parent
-            if obj:
-                path = obj.name_full + "/" + path
-        return path
+        return dccsync.blender_client.misc.get_object_path(obj)
 
     # get first collection
     def get_or_create_collection(self, name: str):
@@ -52,88 +50,10 @@ class ClientBlender(Client):
         return collection
 
     def get_or_create_path(self, path, data=None) -> bpy.types.Object:
-        index = path.rfind("/")
-        if index != -1:
-            share_data.pending_parenting.add(path)  # Parenting is resolved after consumption of all messages
-
-        # Create or get object
-        elem = path[index + 1 :]
-        ob = share_data.blender_objects.get(elem)
-        if not ob:
-            ob = bpy.data.objects.new(elem, data)
-            share_data._blender_objects[ob.name_full] = ob
-        return ob
+        return dccsync.blender_client.misc.get_or_create_path(path, data)
 
     def get_or_create_object_data(self, path, data):
         return self.get_or_create_path(path, data)
-
-    def get_or_create_camera(self, camera_name):
-        camera = share_data.blender_cameras.get(camera_name)
-        if camera:
-            return camera
-        camera = bpy.data.cameras.new(camera_name)
-        share_data._blender_cameras[camera.name_full] = camera
-        return camera
-
-    def build_camera(self, data):
-        camera_path, start = common.decode_string(data, 0)
-
-        camera_name = camera_path.split("/")[-1]
-        camera = self.get_or_create_camera(camera_name)
-
-        camera.lens, start = common.decode_float(data, start)
-        camera.clip_start, start = common.decode_float(data, start)
-        camera.clip_end, start = common.decode_float(data, start)
-        camera.dof.aperture_fstop, start = common.decode_float(data, start)
-        sensor_fit, start = common.decode_int(data, start)
-        camera.sensor_width, start = common.decode_float(data, start)
-        camera.sensor_height, start = common.decode_float(data, start)
-
-        if sensor_fit == 0:
-            camera.sensor_fit = "AUTO"
-        elif sensor_fit == 1:
-            camera.sensor_fit = "VERTICAL"
-        else:
-            camera.sensor_fit = "HORIZONTAL"
-
-        self.get_or_create_object_data(camera_path, camera)
-
-    def get_or_create_light(self, light_name, light_type):
-        light = share_data.blender_lights.get(light_name)
-        if light:
-            return light
-        light = bpy.data.lights.new(light_name, type=light_type)
-        share_data._blender_lights[light.name_full] = light
-        return light
-
-    def build_light(self, data):
-        light_path, start = common.decode_string(data, 0)
-        light_type, start = common.decode_int(data, start)
-        blighttype = "POINT"
-        if light_type == common.LightType.SUN.value:
-            blighttype = "SUN"
-        elif light_type == common.LightType.POINT.value:
-            blighttype = "POINT"
-        else:
-            blighttype = "SPOT"
-
-        light_name = light_path.split("/")[-1]
-        light = self.get_or_create_light(light_name, blighttype)
-
-        shadow, start = common.decode_int(data, start)
-        if shadow != 0:
-            light.use_shadow = True
-        else:
-            light.use_shadow = False
-
-        color, start = common.decode_color(data, start)
-        light.color = (color[0], color[1], color[2])
-        light.energy, start = common.decode_float(data, start)
-        if light_type == common.LightType.SPOT.value:
-            light.spot_size, start = common.decode_float(data, start)
-            light.spot_blend, start = common.decode_float(data, start)
-
-        self.get_or_create_object_data(light_path, light)
 
     def get_or_create_mesh(self, mesh_name):
         me = share_data.blender_meshes.get(mesh_name)
@@ -733,81 +653,6 @@ class ClientBlender(Client):
         self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
         self.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
 
-    def get_camera_buffer(self, obj):
-        cam = obj.data
-        focal = cam.lens
-        front_clip_plane = cam.clip_start
-        far_clip_plane = cam.clip_end
-        aperture = cam.dof.aperture_fstop
-        sensor_fit_name = cam.sensor_fit
-        sensor_fit = common.SensorFitMode.AUTO
-        if sensor_fit_name == "AUTO":
-            sensor_fit = common.SensorFitMode.AUTO
-        elif sensor_fit_name == "HORIZONTAL":
-            sensor_fit = common.SensorFitMode.HORIZONTAL
-        elif sensor_fit_name == "VERTICAL":
-            sensor_fit = common.SensorFitMode.VERTICAL
-        sensor_width = cam.sensor_width
-        sensor_height = cam.sensor_height
-
-        path = self.get_object_path(obj)
-        return (
-            common.encode_string(path)
-            + common.encode_float(focal)
-            + common.encode_float(front_clip_plane)
-            + common.encode_float(far_clip_plane)
-            + common.encode_float(aperture)
-            + common.encode_int(sensor_fit.value)
-            + common.encode_float(sensor_width)
-            + common.encode_float(sensor_height)
-        )
-
-    def send_camera(self, obj):
-        camera_buffer = self.get_camera_buffer(obj)
-        if camera_buffer:
-            self.add_command(common.Command(common.MessageType.CAMERA, camera_buffer, 0))
-        self.send_camera_animations(obj)
-
-    def get_light_buffer(self, obj):
-        light = obj.data
-        light_type_name = light.type
-        light_type = common.LightType.SUN
-        if light_type_name == "POINT":
-            light_type = common.LightType.POINT
-        elif light_type_name == "SPOT":
-            light_type = common.LightType.SPOT
-        elif light_type_name == "SUN":
-            light_type = common.LightType.SUN
-        else:
-            return None
-        color = light.color
-        power = light.energy
-        if bpy.context.scene.render.engine == "CYCLES":
-            shadow = light.cycles.cast_shadow
-        else:
-            shadow = light.use_shadow
-
-        spot_blend = 10.0
-        spot_size = 0.0
-        if light_type == common.LightType.SPOT:
-            spot_size = light.spot_size
-            spot_blend = light.spot_blend
-
-        return (
-            common.encode_string(self.get_object_path(obj))
-            + common.encode_int(light_type.value)
-            + common.encode_int(shadow)
-            + common.encode_color(color)
-            + common.encode_float(power)
-            + common.encode_float(spot_size)
-            + common.encode_float(spot_blend)
-        )
-
-    def send_light(self, obj):
-        light_buffer = self.get_light_buffer(obj)
-        if light_buffer:
-            self.add_command(common.Command(common.MessageType.LIGHT, light_buffer, 0))
-
     def send_deleted_object(self, obj_name):
         self.send_delete(obj_name)
 
@@ -1182,9 +1027,9 @@ class ClientBlender(Client):
                     elif command.type == common.MessageType.DELETE:
                         self.build_delete(command.data)
                     elif command.type == common.MessageType.CAMERA:
-                        self.build_camera(command.data)
+                        camera_api.build_camera(command.data)
                     elif command.type == common.MessageType.LIGHT:
-                        self.build_light(command.data)
+                        light_api.build_light(command.data)
                     elif command.type == common.MessageType.RENAME:
                         self.build_rename(command.data)
                     elif command.type == common.MessageType.DUPLICATE:

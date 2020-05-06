@@ -14,7 +14,8 @@ from dccsync.share_data import share_data, object_visibility
 from dccsync.blender_client import scene as scene_lib
 from dccsync.blender_client import collection as collection_lib
 from dccsync.blender_client import object_ as object_lib
-
+from dccsync.blender_client.camera import send_camera
+from dccsync.blender_client.light import send_light
 from dccsync import clientBlender
 from dccsync import ui
 from dccsync.data import get_dcc_sync_props
@@ -57,10 +58,10 @@ def update_params(obj):
         return
 
     if typename == "Camera":
-        share_data.client.send_camera(obj)
+        send_camera(share_data.client, obj)
 
     if typename == "Sun Light" or typename == "Point Light" or typename == "Spot Light":
-        share_data.client.send_light(obj)
+        send_light(share_data.client, obj)
 
     if typename == "Grease Pencil":
         for material in obj.data.materials:
