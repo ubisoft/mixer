@@ -124,6 +124,44 @@ Ensuite:
 - démarrer l'exécution du test unitaire : Blender se bloque en attendant l'attachement
 - attacher le debugger : l'exécution continue jusqu'au breakpoint
 
+## CI/CD on unit tests
+
+For a first simple setup, we rely on an interactive gitlab runner setup. Issues related to service-based runners are described below.
+
+The scripts are located in a new `gitlab` folder
+
+### Interactive runner
+Documentation: 
+- Installation : https://docs.gitlab.com/runner/install/windows.html
+- Runner commands : https://docs.gitlab.com/runner/commands/
+
+Installation steps: 
+1. Install a gitlab runner on a desktop in `d:\gitlab_runner`
+1. Register a runner with `gitlab-runner-windows-amd64.exe register`. Use `blender` as token and `shell` as executor
+1. Install a portable Blender in the folder with a name used as the value of the variable `DCCSYNC_BLENDER_EXE_DIR` in `.gitlab-ci.yml`
+
+Then run an interactive executor as administrator : `gitlab-runner-windows-amd64.exe run`. It must run as administrator because the `TSCON` command requires administrator rights
+to disconnect a session from the remote desktop.
+As the runner executes jobs, it will display the jobs status : 
+```
+D:\gitlab_runner>gitlab-runner-windows-amd64.exe run
+Runtime platform                                    arch=amd64 os=windows pid=19628 revision=4c96e5ad version=12.9.0
+Starting multi-runner from D:\gitlab_runner\config.toml...  builds=0
+Configuration loaded                                builds=0
+listen_address not defined, metrics & debug endpoints disabled  builds=0
+[session_server].listen_address not defined, session endpoints disabled  builds=0
+Checking for jobs... received                       job=11132741 repo_url=https://gitlab-ncsa.ubisoft.org/motion-pictures/blender/dccsync.git runner=Q-sQ1rhN
+Job succeeded                                       duration=5m3.2796891s job=11132741 project=39094 runner=Q-sQ1rhN
+Checking for jobs... received                       job=11132866 repo_url=https://gitlab-ncsa.ubisoft.org/motion-pictures/blender/dccsync.git runner=Q-sQ1rhN
+WARNING: Job failed: exit status 1                  duration=5m8.5314355s job=11132866 project=39094 runner=Q-sQ1rhN
+WARNING: Failed to process runner                   builds=0 error=exit status 1 executor=shell runner=Q-sQ1rhN
+```
+
+### Runner as a Windows service
+Using a system service could be difficult because the user profile may not be easy to access and we also need the service to access to the desktop.
+
+Using a service that logons with a user account requires a user account that can logon as a service as described in https://docs.gitlab.com/runner/faq/README.html#the-service-did-not-start-due-to-a-logon-failure-error-when-starting-service.
+
 # Misc
 
 ## Guidelines
