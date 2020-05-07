@@ -135,7 +135,7 @@ class BlendData:
     Wrapper to bpy.data, with linear time access to collection items by name.
 
     These objects keep live reference to Blender blenddata collection, so they must not be used after the
-    file has been reloaded, hence the handler below. 
+    file has been reloaded, hence the handler below.
     """
 
     def __init__(self):
@@ -145,7 +145,7 @@ class BlendData:
     @functools.lru_cache(1)
     def instance(cls):
         """
-        Work around a situation where a BlendData object cannot be initialized during addon loading because an exception 
+        Work around a situation where a BlendData object cannot be initialized during addon loading because an exception
         is thrown like in
         https://blender.stackexchange.com/questions/8702/attributeerror-restrictdata-object-has-no-attribute-filepath
         but about bpy.data

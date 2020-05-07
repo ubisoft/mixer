@@ -1,7 +1,7 @@
 from enum import IntEnum
 from functools import lru_cache
 import logging
-from typing import Any, Mapping, Union
+from typing import Mapping, Union
 from uuid import uuid4
 
 import bpy
