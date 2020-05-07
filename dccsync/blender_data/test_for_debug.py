@@ -5,6 +5,8 @@ import unittest
 import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
+from dccsync.blender_data import types
+from dccsync.blender_data.blenddata import blenddata
 from dccsync.blender_data.proxy import (
     BpyBlendProxy,
     BpyStructProxy,
@@ -15,8 +17,6 @@ from dccsync.blender_data.proxy import (
     load_as_what,
 )
 
-import dccsync.blender_data.types as types
-from dccsync.blender_data.diff import BpyBlendDiff
 from dccsync.blender_data.filter import (
     CollectionFilterOut,
     Context,
@@ -130,13 +130,33 @@ class TestCore(unittest.TestCase):
         self.assertTrue(issubclass(T.ShaderNodeTree, T.ID))
         self.assertTrue(issubclass(T.ShaderNodeTree, T.bpy_struct))
 
+    def test_invariants(self):
+        s = D.scenes[0]
+
+        #
+        # same bl_rna in type and property
+        self.assertTrue(isinstance(s, T.Scene))
+        self.assertIs(T.Scene.bl_rna, s.bl_rna)
+
+        #
+        # Pointers
+        self.assertTrue(isinstance(s.eevee, T.SceneEEVEE))
+        self.assertFalse(isinstance(s.eevee, T.PointerProperty))
+        self.assertIsNot(T.Scene.bl_rna.properties["eevee"].bl_rna, s.eevee.bl_rna)
+        self.assertIs(T.Scene.bl_rna.properties["eevee"].bl_rna, T.PointerProperty.bl_rna)
+        self.assertIs(T.Scene.bl_rna.properties["eevee"].fixed_type.bl_rna, T.SceneEEVEE.bl_rna)
+        # readonly pointer with readwrite pointee :
+        self.assertTrue(T.Scene.bl_rna.properties["eevee"].is_readonly)
+        s.eevee.use_volumetric_shadows = not s.eevee.use_volumetric_shadows
+        # readwrite pointer :
+        self.assertFalse(T.Scene.bl_rna.properties["camera"].is_readonly)
+
+        #
+        # Collection element type
         # The type of a collection element : Scene.objects is a T.Object
         objects_rna_property = T.Scene.bl_rna.properties["objects"]
         self.assertNotEqual(objects_rna_property.fixed_type, T.Object)
-        # ... but ...
         self.assertIs(objects_rna_property.fixed_type.bl_rna, T.Object.bl_rna)
-
-        # better :
         self.assertIs(T.Mesh.bl_rna.properties["vertices"].srna.bl_rna, T.MeshVertices.bl_rna)
 
     def test_load_as(self):
@@ -154,7 +174,7 @@ class TestCore(unittest.TestCase):
         self.assertTrue(types.is_pointer_to(node_tree, T.NodeTree))
         self.assertFalse(types.is_pointer_to(node_tree, T.ShaderNodeTree))
 
-    def test_skip_ShaderNodeTree(self):
+    def test_skip_ShaderNodeTree(self):  # npqa N802
         world = D.worlds["World"]
         proxy = BpyStructProxy(world).load(world, default_context)
         self.assertTrue("color" in proxy._data)
@@ -227,6 +247,19 @@ class TestCollectionFilterOut(unittest.TestCase):
         props = context.properties(T.Mesh)
         self.assertTrue(any([matches_type(p, T.MeshVertices) for _, p in props]))
         self.assertTrue(any([matches_type(p, T.MeshLoops) for _, p in props]))
+
+
+class TestBlendData(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def test_one(self):
+        scenes = blenddata.collection("scenes").bpy_collection()
+        sounds = blenddata.collection("sounds").bpy_collection()
+        # identity is not true
+        self.assertEqual(scenes, D.scenes)
+        self.assertEqual(sounds, D.sounds)
+        self.assertIs(scenes["Scene_0"], D.scenes["Scene_0"])
 
 
 def run_tests(test_name: str):

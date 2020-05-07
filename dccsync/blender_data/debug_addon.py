@@ -1,49 +1,47 @@
 import bpy
-from .proxy import BpyBlendProxy, data_types
-from .diff import BpyBlendDiff
 
-proxy = BpyBlendProxy()
-deltas = BpyBlendDiff()
+
+data_types = {
+    "actions": bpy.types.Action,
+    "armatures": bpy.types.Armature,
+    "brushes": bpy.types.Brush,
+    "cache_files": bpy.types.CacheFile,
+    "cameras": bpy.types.Camera,
+    "collections": bpy.types.Collection,
+    "curves": bpy.types.Curve,
+    "fonts": bpy.types.VectorFont,
+    "grease_pencils": bpy.types.GreasePencil,
+    "images": bpy.types.Image,
+    "lattices": bpy.types.Lattice,
+    "libraries": bpy.types.Library,
+    "lightprobess": bpy.types.LightProbe,
+    "lights": bpy.types.Light,
+    "linestyles": bpy.types.FreestyleLineStyle,
+    "masks": bpy.types.Mask,
+    "materials": bpy.types.Material,
+    "meshes": bpy.types.Mesh,
+    "metaballs": bpy.types.MetaBall,
+    "moveclips": bpy.types.MovieClip,
+    "node_groups": bpy.types.NodeTree,
+    "objects": bpy.types.Object,
+    "paint_curves": bpy.types.PaintCurve,
+    "palettes": bpy.types.Palette,
+    "particles": bpy.types.ParticleSettings,
+    "scenes": bpy.types.Scene,
+    "screens": bpy.types.Screen,
+    "shape_keys": bpy.types.Key,
+    "sounds": bpy.types.Sound,
+    "speakers": bpy.types.Speaker,
+    "texts": bpy.types.Text,
+    "textures": bpy.types.Texture,
+    "window_managers": bpy.types.WindowManager,
+    "worlds": bpy.types.World,
+    "workspaces": bpy.types.WorkSpace,
+}
 
 
 class DebugDataProperties(bpy.types.PropertyGroup):
     test_names: bpy.props.StringProperty(name="TestNames", default="TestLoadProxy.test_blenddata")
-
-
-class DebugDataLoadOperator(bpy.types.Operator):
-    """Execute blender_data tests for debugging"""
-
-    bl_idname = "dcc_sync.data_load"
-    bl_label = "DCCSync test data"
-    bl_options = {"REGISTER"}
-
-    def execute(self, context):
-        proxy.load()
-        return {"FINISHED"}
-
-
-class DebugDataDiffOperator(bpy.types.Operator):
-    """Execute blender_data tests for debugging"""
-
-    bl_idname = "dcc_sync.data_diff"
-    bl_label = "DCCSync test data"
-    bl_options = {"REGISTER"}
-
-    def execute(self, context):
-        deltas.diff(proxy)
-        return {"FINISHED"}
-
-
-class DebugDataUpdateOperator(bpy.types.Operator):
-    """Execute blender_data tests for debugging"""
-
-    bl_idname = "dcc_sync.data_update"
-    bl_label = "DCCSync test data"
-    bl_options = {"REGISTER"}
-
-    def execute(self, context):
-        proxy.update(deltas)
-        return {"FINISHED"}
 
 
 class DebugDataTestOperator(bpy.types.Operator):
@@ -77,18 +75,12 @@ class DebugDataPanel(bpy.types.Panel):
         layout = self.layout
 
         row = layout.column()
-        row.operator(DebugDataLoadOperator.bl_idname, text="Load")
-        row.operator(DebugDataDiffOperator.bl_idname, text="Diff")
-        row.operator(DebugDataUpdateOperator.bl_idname, text="Update")
         row.operator(DebugDataTestOperator.bl_idname, text="Test")
         row = layout.row()
         row.prop(get_props(), "test_names", text="Test names")
 
 
 classes = (
-    DebugDataLoadOperator,
-    DebugDataDiffOperator,
-    DebugDataUpdateOperator,
     DebugDataTestOperator,
     DebugDataPanel,
     DebugDataProperties,

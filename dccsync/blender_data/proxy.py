@@ -1,13 +1,14 @@
-from __future__ import annotations
+from enum import IntEnum
+from functools import lru_cache
 import logging
 from typing import Any, Mapping, Union
 from uuid import uuid4
-from functools import lru_cache
-from enum import IntEnum
+
 import bpy
 import bpy.types as T  # noqa
 import mathutils
 from dccsync.blender_data.filter import Context
+from dccsync.blender_data.blenddata import blenddata
 
 logger = logging.Logger(__name__, logging.INFO)
 
@@ -17,45 +18,6 @@ builtin_types = {type(None), float, int, bool, str, set}
 
 # TODO unused ?
 # those found in bpy_data members
-data_types = {
-    "actions": T.Action,
-    "armatures": T.Armature,
-    "brushes": T.Brush,
-    "cache_files": T.CacheFile,
-    "cameras": T.Camera,
-    "collections": T.Collection,
-    "curves": T.Curve,
-    "fonts": T.VectorFont,
-    "grease_pencils": T.GreasePencil,
-    "images": T.Image,
-    "lattices": T.Lattice,
-    "libraries": T.Library,
-    "lightprobess": T.LightProbe,
-    "lights": T.Light,
-    "linestyles": T.FreestyleLineStyle,
-    "masks": T.Mask,
-    "materials": T.Material,
-    "meshes": T.Mesh,
-    "metaballs": T.MetaBall,
-    "moveclips": T.MovieClip,
-    "node_groups": T.NodeTree,
-    "objects": T.Object,
-    "paint_curves": T.PaintCurve,
-    "palettes": T.Palette,
-    "particles": T.ParticleSettings,
-    "scenes": T.Scene,
-    "screens": T.Screen,
-    "shape_keys": T.Key,
-    "sounds": T.Sound,
-    "speakers": T.Speaker,
-    "texts": T.Text,
-    "textures": T.Texture,
-    "window_managers": T.WindowManager,
-    "worlds": T.World,
-    "workspaces": T.WorkSpace,
-}
-
-blenddata_types = {t for t in data_types.values()}
 
 
 def debug_check_stack_overflow(func, *args, **kwargs):
@@ -117,7 +79,7 @@ def load_as_what(parent, attr_property):
     else:
         element_property = attr_property
 
-    is_a_blenddata_ID = any([same_rna(element_property, t) for t in blenddata_types])  # noqa N806
+    is_a_blenddata_ID = element_property.bl_rna in blenddata.types_rna  # noqa N806
     if not is_a_blenddata_ID:
         return LoadElementAs.STRUCT
 
@@ -239,9 +201,6 @@ class StructLikeProxy(Proxy):
                 self._data[name] = attr_value
         return self
 
-    def update(self, diff_data: BpyStructDiff):
-        pass
-
 
 class BpyPropertyGroupProxy(StructLikeProxy):
     pass
@@ -264,9 +223,6 @@ class BpyIDProxy(BpyStructProxy):
         super().load(bl_instance, context)
         self.dccsync_uuid = bl_instance.dccsync_uuid
         return self
-
-    def update(self, diff_data: BpyIDDiff):
-        pass
 
 
 class BpyIDRefProxy(Proxy):
@@ -321,12 +277,6 @@ class BpyPropStructCollectionProxy(Proxy):
             self._data[key] = BpyStructProxy(item).load(item, context)
 
         return self
-
-    def update(self, diff):
-        """
-        Update the proxy according to the diff
-        """
-        # TODO
 
 
 # TODO derive from BpyIDProxy
