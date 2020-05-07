@@ -325,7 +325,7 @@ class BpyBlendProxy(Proxy):
         self._data: Mapping[str, BpyPropDataCollectionProxy] = {}
 
     def load(self, context: Context):
-        for name, bl_rna_property in context.properties(bpy_type=T.BlendData):
+        for name, _ in context.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
             self._data[name] = BpyPropDataCollectionProxy().load_as_ID(collection, context)
         return self

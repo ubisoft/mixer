@@ -5,7 +5,6 @@ from .proxy import (
     BpyBlendProxy,
     BpyIDProxy,
     BpyStructProxy,
-    BpyPropStructCollectionProxy,
     BpyPropDataCollectionProxy,
     ensure_uuid,
     Proxy,

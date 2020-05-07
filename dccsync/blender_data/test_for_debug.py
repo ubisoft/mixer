@@ -174,7 +174,7 @@ class TestCore(unittest.TestCase):
         self.assertTrue(types.is_pointer_to(node_tree, T.NodeTree))
         self.assertFalse(types.is_pointer_to(node_tree, T.ShaderNodeTree))
 
-    def test_skip_ShaderNodeTree(self):  # npqa N802
+    def test_skip_ShaderNodeTree(self):  # noqa N802
         world = D.worlds["World"]
         proxy = BpyStructProxy(world).load(world, default_context)
         self.assertTrue("color" in proxy._data)
