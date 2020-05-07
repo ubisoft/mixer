@@ -6,7 +6,7 @@ import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
 from dccsync.blender_data import types
-from dccsync.blender_data.blenddata import blenddata
+from dccsync.blender_data.blenddata import BlendData
 from dccsync.blender_data.proxy import (
     BpyBlendProxy,
     BpyStructProxy,
@@ -251,9 +251,10 @@ class TestCollectionFilterOut(unittest.TestCase):
 
 class TestBlendData(unittest.TestCase):
     def setUp(self):
-        pass
+        bpy.ops.wm.open_mainfile(filepath=".local\\test_data.blend")
 
     def test_one(self):
+        blenddata = BlendData.instance()
         scenes = blenddata.collection("scenes").bpy_collection()
         sounds = blenddata.collection("sounds").bpy_collection()
         # identity is not true

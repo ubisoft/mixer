@@ -1,5 +1,5 @@
 import bpy
-
+import dccsync.blender_data.blenddata
 
 data_types = {
     "actions": bpy.types.Action,
@@ -98,9 +98,10 @@ def register():
     for class_ in classes:
         bpy.utils.register_class(class_)
     bpy.types.WindowManager.debug_data_props = bpy.props.PointerProperty(type=DebugDataProperties)
+    bpy.app.handlers.load_post.append(dccsync.blender_data.blenddata.on_load)
 
 
 def unregister():
-
     for class_ in classes:
         bpy.utils.unregister_class(class_)
+    bpy.app.handlers.load_post.remove(dccsync.blender_data.blenddata.on_load)

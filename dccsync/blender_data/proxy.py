@@ -8,16 +8,14 @@ import bpy
 import bpy.types as T  # noqa
 import mathutils
 from dccsync.blender_data.filter import Context
-from dccsync.blender_data.blenddata import blenddata
+from dccsync.blender_data.blenddata import BlendData
 
+blenddata = BlendData.instance()
 logger = logging.Logger(__name__, logging.INFO)
 
 
 vector_types = {mathutils.Vector, mathutils.Color, mathutils.Quaternion, mathutils.Euler}
 builtin_types = {type(None), float, int, bool, str, set}
-
-# TODO unused ?
-# those found in bpy_data members
 
 
 def debug_check_stack_overflow(func, *args, **kwargs):
