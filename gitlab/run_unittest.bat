@@ -7,4 +7,4 @@ tscon 5 /dest:console
 
 set PYTHON=%DCCSYNC_BLENDER_EXE_DIR%\2.82\python\bin\python.exe
 %DCCSYNC_BLENDER_EXE_PATH% --background --python gitlab\install_dccsync.py
-%PYTHON% -m unittest --verbose
+%PYTHON% -m unittest --verbose --start-directory tests
