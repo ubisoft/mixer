@@ -104,6 +104,33 @@ Determine explicitely
 
 Exclude all readonly except specified (pointer, collections) ?
 
+Custom properties : `oj.keys()` :
+https://stackoverflow.com/questions/21265676/how-do-i-read-out-custom-properties-in-blender-with-python
+
+# Use cases for (de)serialization
+
+simple strut, nested
+
+    'name': 'scn01'
+    'camera': // IDref
+    'gravity: [0,0,-10]
+    'eevee': // is a Ptr, include or reference ?
+    'view_layers' :
+    'eevee STRUCT' :
+    'view_layers COLL' :
+
+    sparse update
+      'scenes' : {
+        'scn00' : {
+          eevee: {
+            use_bloom=False
+          }
+          current_frame: 2
+        }
+      }
+
+par type ou categories de type ?
+
 # TODO
 
 ## Prio 1

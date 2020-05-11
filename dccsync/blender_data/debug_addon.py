@@ -39,9 +39,11 @@ data_types = {
     "workspaces": bpy.types.WorkSpace,
 }
 
+default_test = ""
+
 
 class DebugDataProperties(bpy.types.PropertyGroup):
-    test_names: bpy.props.StringProperty(name="TestNames", default="TestLoadProxy.test_blenddata")
+    test_names: bpy.props.StringProperty(name="TestNames", default=default_test)
 
 
 class DebugDataTestOperator(bpy.types.Operator):
@@ -52,9 +54,11 @@ class DebugDataTestOperator(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     def execute(self, context):
-        from dccsync.blender_data.test_for_debug import run_tests
+        # Cannot import at module level, since it requires access to bpy.data which is not
+        # accessible during module load
+        from dccsync.blender_data.tests.test_for_debug import run_tests
 
-        test_names = "dccsync.blender_data.test_for_debug"
+        test_names = "dccsync.blender_data.tests.test_for_debug"
         names = get_props().test_names
         if names:
             test_names = test_names + "." + names

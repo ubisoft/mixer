@@ -140,6 +140,7 @@ blenddata_exclude = [
     "screens",
     "window_managers",
     "workspaces",
+    # "grease_pencils",
 ]
 
 # TODO some of these will be included in future read_only exclusion
@@ -167,6 +168,10 @@ default_filter.append(
         # TODO this avoids the recursion path Node.socket , NodeSocker.Node
         # can probably be included in the readonly filter
         T.NodeSocket: [NameFilterOut("node")],
+        T.ActionGroup: [NameFilterOut("channels")],
+        T.Node: [NameFilterOut("internal_links")],
+        T.Image: [NameFilterOut("pixels")],
+        T.CompositorNodeRLayers: [NameFilterOut("scene")],
         None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
     }
 )
