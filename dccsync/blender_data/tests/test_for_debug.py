@@ -533,5 +533,14 @@ def main():
     runner.run(suite)
 
 
+def main_ci():
+    module = sys.modules[__name__]
+    suite = unittest.defaultTestLoader.loadTestsFromModule(module)
+    runner = unittest.TextTestRunner(verbosity=2)
+    result = runner.run(suite)
+    if not result.wasSuccessful():
+        raise AssertionError("Tests failed")
+
+
 if __name__ == "__main__":
-    unittest.main()
+    main_ci()
