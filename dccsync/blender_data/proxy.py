@@ -87,7 +87,7 @@ def load_as_what(parent, attr_property):
         return LoadElementAs.ID_REF
 
 
-# @debug_check_stack_overflow
+@debug_check_stack_overflow
 def read_attribute(attr: any, attr_property: any, parent_struct, context: Context):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object

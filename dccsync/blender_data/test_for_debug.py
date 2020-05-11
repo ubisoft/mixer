@@ -31,7 +31,7 @@ from dccsync.blender_data.filter import (
 # @unittest.skip("")
 class TestLoadProxy(unittest.TestCase):
     def setUp(self):
-        bpy.ops.wm.open_mainfile(filepath=".local\\test_data.blend")
+        # bpy.ops.wm.open_mainfile(filepath=".local\\test_data.blend")
         self.proxy = BpyBlendProxy()
         self.proxy.load(default_context)
 

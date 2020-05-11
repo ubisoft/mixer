@@ -155,6 +155,10 @@ class BlendData:
     def reset(self):
         self._bpy_collections = {name: getattr(bpy.data, name) for name in blenddata_names}
         self.types_rna = [bpy.data.bl_rna.properties[name].fixed_type.bl_rna for name in blenddata_names]
+        # Trick to add <bpy_struct, Struct("ID")> RNA to the list:
+        # Can also be obtained base .base of .fixed_type.bl_rna of any ID type in types_rna I guess...
+        # In fact a bl_rna is an ID type is its highest base is ID
+        self.types_rna.append(bpy.types.Object.bl_rna.properties["data"].fixed_type.bl_rna)
         self._collections = {name: BlendDataCollection(self._bpy_collections[name]) for name in blenddata_names}
 
     def __getattr__(self, attrname):
