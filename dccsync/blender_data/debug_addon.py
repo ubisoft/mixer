@@ -3,8 +3,8 @@ import logging
 import dccsync.blender_data.blenddata
 from dccsync.blender_data.blenddata import collection_name_to_type
 
-default_test = ""
 logger = logging.Logger(__name__, logging.INFO)
+default_test = "test_module.TestCase.test_name"
 
 
 class DebugDataProperties(bpy.types.PropertyGroup):
@@ -44,12 +44,14 @@ class DebugDataTestOperator(bpy.types.Operator):
     def execute(self, context):
         # Cannot import at module level, since it requires access to bpy.data which is not
         # accessible during module load
-        from dccsync.blender_data.tests.test_for_debug import run_tests
+        from dccsync.blender_data.tests.utils import run_tests
 
-        test_names = "dccsync.blender_data.tests.test_for_debug"
         names = get_props().test_names
         if names:
+            test_names = "dccsync.blender_data.tests"
             test_names = test_names + "." + names
+        else:
+            test_names = None
         run_tests(test_names)
         return {"FINISHED"}
 
@@ -70,7 +72,7 @@ class DebugDataPanel(bpy.types.Panel):
         row.operator(BuildProxyOperator.bl_idname, text="Build Proxy")
         row.operator(DebugDataTestOperator.bl_idname, text="Test")
         row = layout.row()
-        row.prop(get_props(), "test_names", text="Test names")
+        row.prop(get_props(), "test_names", text="Test")
 
 
 classes = (
