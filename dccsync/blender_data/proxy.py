@@ -8,7 +8,12 @@ import bpy
 import bpy.types as T  # noqa
 
 from dccsync.blender_data.filter import Context
-from dccsync.blender_data.blenddata import BlendData, rna_identifier_to_collection_name, bl_rna_to_type
+from dccsync.blender_data.blenddata import (
+    BlendData,
+    collection_name_to_type,
+    rna_identifier_to_collection_name,
+    bl_rna_to_type,
+)
 from dccsync.blender_data.types import is_builtin, is_vector, is_matrix
 
 blenddata = BlendData.instance()
@@ -45,8 +50,14 @@ class BlendDataVisitContext:
     serialized_addresses: Set[bpy.types.ID] = set()  # Already serialized addresses (struct or IDs), for debug
     property_stack: List[Tuple[str, any]] = []  # Stack of properties up to this point in the visit
 
-    def __init__(self):
-        pass
+    def __init__(self, context: Context):
+        # Iterate over IDs at the root level of blender file to serialize them as IDref deeper in the hierarchy
+        for name, _ in context.properties(bpy_type=T.BlendData):
+            if name in collection_name_to_type:
+                bl_collection = getattr(bpy.data, name)
+                for _id_name, item in bl_collection.items():
+                    ensure_uuid(item)
+                    self.root_ids.add(item)
 
     @contextmanager
     def enter(self, property_name, property_value):
@@ -81,7 +92,7 @@ def is_ID_subclass_rna(bl_rna):  # noqa
     return issubclass(bl_rna_to_type(bl_rna), bpy.types.ID)
 
 
-def load_as_what(parent, attr_property, attr: any, visit_context: BlendDataVisitContext):
+def load_as_what(attr_property: bpy.types.Property, attr: any, visit_context: BlendDataVisitContext):
     """
     Determine if we must load an attribute as a struct, a blenddata collection element (ID_DEF)
     or a reference to a BlendData collection element (ID_REF)
@@ -119,9 +130,7 @@ def load_as_what(parent, attr_property, attr: any, visit_context: BlendDataVisit
 
 
 # @debug_check_stack_overflow
-def read_attribute(
-    attr: any, attr_property: any, parent_struct, context: Context, visit_context: BlendDataVisitContext
-):
+def read_attribute(attr: any, attr_property: any, context: Context, visit_context: BlendDataVisitContext):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
 
@@ -144,7 +153,7 @@ def read_attribute(
 
         if attr_type == T.bpy_prop_collection:
             # need to know for each element if it is a ref or id
-            load_as = load_as_what(parent_struct, attr_property, attr, visit_context)
+            load_as = load_as_what(attr_property, attr, visit_context)
             if load_as == LoadElementAs.STRUCT:
                 return BpyPropStructCollectionProxy().load(attr, context, visit_context)
             elif load_as == LoadElementAs.ID_REF:
@@ -167,7 +176,7 @@ def read_attribute(
         if issubclass(attr_type, T.PropertyGroup):
             return BpyPropertyGroupProxy().load(attr, context, visit_context)
 
-        load_as = load_as_what(parent_struct, attr_property, attr, visit_context)
+        load_as = load_as_what(attr_property, attr, visit_context)
         if load_as == LoadElementAs.STRUCT:
             return BpyStructProxy().load(attr, context, visit_context)
         elif load_as == LoadElementAs.ID_REF:
@@ -248,7 +257,7 @@ class StructLikeProxy(Proxy):
         self._data.clear()
         for name, bl_rna_property in context.properties(bl_instance):
             attr = getattr(bl_instance, name)
-            attr_value = read_attribute(attr, bl_rna_property, bl_instance, context, visit_context)
+            attr_value = read_attribute(attr, bl_rna_property, context, visit_context)
             if attr_value is not None:
                 self._data[name] = attr_value
         return self
@@ -409,14 +418,7 @@ class BpyBlendProxy(Proxy):
         return {key: value for key, value in self._data.items() if len(value) > 0}
 
     def load(self, context: Context):
-        visit_context = BlendDataVisitContext()
-
-        # First iterate over IDs at the root level of blender file to identify them
-        for name, _ in context.properties(bpy_type=T.BlendData):
-            bl_collection = getattr(bpy.data, name)
-            for _id_name, item in bl_collection.items():
-                ensure_uuid(item)
-                visit_context.root_ids.add(item)
+        visit_context = BlendDataVisitContext(context)
 
         for name, _ in context.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)

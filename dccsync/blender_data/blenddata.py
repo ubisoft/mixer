@@ -10,7 +10,7 @@ def bl_rna_to_type(bl_rna):
 
 # Map root collection name to object type
 # e.g. "objects" -> bpy.types.Object, "lights" -> bpy.types.Light, ...
-data_types = {
+collection_name_to_type = {
     p.identifier: bl_rna_to_type(p.fixed_type)
     for p in T.BlendData.bl_rna.properties
     if p.bl_rna.identifier == "CollectionProperty"
@@ -18,7 +18,7 @@ data_types = {
 
 # Map object type name to root collection
 # e.g. "Object" -> "objects", "Light" -> "lights"
-rna_identifier_to_collection_name = {value.bl_rna.identifier: key for key, value in data_types.items()}
+rna_identifier_to_collection_name = {value.bl_rna.identifier: key for key, value in collection_name_to_type.items()}
 
 
 class BlendDataCollection:
@@ -94,8 +94,10 @@ class BlendData:
         return cls()
 
     def reset(self):
-        _bpy_collections = {name: getattr(bpy.data, name) for name in data_types.keys()}
-        self._collections = {name: BlendDataCollection(_bpy_collections[name]) for name in data_types.keys()}
+        _bpy_collections = {name: getattr(bpy.data, name) for name in collection_name_to_type.keys()}
+        self._collections = {
+            name: BlendDataCollection(_bpy_collections[name]) for name in collection_name_to_type.keys()
+        }
 
     def __getattr__(self, attrname):
         return self._collections[attrname].get()

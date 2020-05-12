@@ -17,6 +17,7 @@ from dccsync.blender_data.proxy import (
     BpyIDProxy,
     BpyIDRefProxy,
     BpyPropertyGroupProxy,
+    BlendDataVisitContext,
     LoadElementAs,
     load_as_what,
     write_attribute,
@@ -266,10 +267,24 @@ class TestCore(unittest.TestCase):
                 self.assertFalse(isinstance(prop.bl_rna, T.ID))
 
     def test_load_as(self):
-        self.assertEqual(LoadElementAs.STRUCT, load_as_what(T.Scene, T.Scene.bl_rna.properties["animation_data"]))
-        self.assertEqual(LoadElementAs.ID_REF, load_as_what(T.Scene, T.Scene.bl_rna.properties["objects"]))
-        self.assertEqual(LoadElementAs.ID_REF, load_as_what(T.Scene, T.Scene.bl_rna.properties["camera"]))
-        self.assertEqual(LoadElementAs.ID_DEF, load_as_what(T.Scene, T.Scene.bl_rna.properties["collection"]))
+        visit_context = BlendDataVisitContext(Context(FilterStack()))
+
+        self.assertEqual(
+            LoadElementAs.STRUCT,
+            load_as_what(T.Scene.bl_rna.properties["display"], bpy.data.scenes[0].display, visit_context),
+        )
+        self.assertEqual(
+            LoadElementAs.ID_REF,
+            load_as_what(T.Scene.bl_rna.properties["objects"], bpy.data.scenes[0].objects, visit_context),
+        )
+        self.assertEqual(
+            LoadElementAs.ID_REF,
+            load_as_what(T.Scene.bl_rna.properties["world"], bpy.data.scenes[0].world, visit_context),
+        )
+        self.assertEqual(
+            LoadElementAs.ID_DEF,
+            load_as_what(T.Scene.bl_rna.properties["collection"], bpy.data.scenes[0].collection, visit_context),
+        )
 
     def test_pointer_class(self):
         eevee = T.Scene.bl_rna.properties["eevee"]
