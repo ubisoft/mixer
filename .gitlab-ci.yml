@@ -1,13 +1,14 @@
+# a single stage allows test to run even if flake8 fails,
+# and makes it possible to get all the errors at once
 stages:
-  - codequality
-  - test
+  - qa_and_test
   - build
 
 flake8:
   tags:
     - linux
   image: python:3
-  stage: codequality
+  stage: qa_and_test
   script:
     - pip install flake8 flake8-black pep8-naming flake8-bugbear
     - flake8 -v
@@ -23,20 +24,9 @@ zip:
       - dccsync
     expire_in: 1 week
 
-# https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
-unittest:
-  stage: test
-  tags:
-    - blender
-  variables:
-    DCCSYNC_BLENDER_EXE_PATH: D:\gitlab_runner\blender-2.82a-windows64\blender.exe
-    DCCSYNC_BLENDER_EXE_DIR: D:\gitlab_runner\blender-2.82a-windows64
-  script:
-    - gitlab\run_unittest.bat
-
-# During early development, easier to keep track of failures with a separate step. Merge later in previous step
+# During early development, easier to keep track of failures with a separate step. Merge later to regular tests step
 unittest-blenddata:
-  stage: test
+  stage: qa_and_test
   tags:
     - blender
   variables:
@@ -44,3 +34,14 @@ unittest-blenddata:
     DCCSYNC_BLENDER_EXE_DIR: D:\gitlab_runner\blender-2.82a-windows64
   script:
     - gitlab\run_unittest_blenddata.bat
+
+# https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
+unittest:
+  stage: qa_and_test
+  tags:
+    - blender
+  variables:
+    DCCSYNC_BLENDER_EXE_PATH: D:\gitlab_runner\blender-2.82a-windows64\blender.exe
+    DCCSYNC_BLENDER_EXE_DIR: D:\gitlab_runner\blender-2.82a-windows64
+  script:
+    - gitlab\run_unittest.bat

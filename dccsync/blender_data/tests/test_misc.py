@@ -10,9 +10,8 @@ from dccsync.blender_data.proxy import (
     BpyIDProxy,
     BpyIDRefProxy,
     BpyPropertyGroupProxy,
-    write_attribute,
 )
-from dccsync.blender_data.tests.utils import register_bl_equals, test_blend_file
+from dccsync.blender_data.tests.utils import test_blend_file
 
 from dccsync.blender_data.filter import (
     Context,
@@ -20,7 +19,6 @@ from dccsync.blender_data.filter import (
     default_context,
     default_filter,
 )
-from mathutils import Matrix, Vector
 
 
 class TestLoadProxy(unittest.TestCase):
