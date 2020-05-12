@@ -1,14 +1,14 @@
 from enum import IntEnum
-from functools import lru_cache
 import logging
-from typing import Any, Mapping, Union
+from typing import Any, Mapping, Union, Set, List, Tuple
 from uuid import uuid4
+from contextlib import contextmanager
 
 import bpy
 import bpy.types as T  # noqa
 
 from dccsync.blender_data.filter import Context
-from dccsync.blender_data.blenddata import BlendData
+from dccsync.blender_data.blenddata import BlendData, rna_identifier_to_collection_name, bl_rna_to_type
 from dccsync.blender_data.types import is_builtin, is_vector, is_matrix
 
 blenddata = BlendData.instance()
@@ -34,6 +34,36 @@ def debug_check_stack_overflow(func, *args, **kwargs):
     return wrapper
 
 
+class BlendDataVisitContext:
+    """
+    Context class only used during BpyBlendProxy construction, to keep contextual data during traversal
+    of the blender data hierarchy and perform safety checkes
+    """
+
+    # ID elements stored in bpy.data.* collections, computed before recursive visit starts:
+    root_ids: Set[bpy.types.ID] = set()
+    serialized_addresses: Set[bpy.types.ID] = set()  # Already serialized addresses (struct or IDs), for debug
+    property_stack: List[Tuple[str, any]] = []  # Stack of properties up to this point in the visit
+
+    def __init__(self):
+        pass
+
+    @contextmanager
+    def enter(self, property_name, property_value):
+        self.property_stack.append((property_name, property_value))
+        yield
+        self.property_stack.pop()
+        self.serialized_addresses.add(id(property_value))
+
+    def visit_depth(self):
+        # Utility for debug
+        return len(self.property_stack)
+
+    def property_fullpath(self):
+        # Utility for debug
+        return ".".join([p[0] for p in self.property_stack])
+
+
 class LoadElementAs(IntEnum):
     STRUCT = 0
     ID_REF = 1
@@ -44,8 +74,14 @@ def same_rna(a, b):
     return a.bl_rna == b.bl_rna
 
 
-@lru_cache(maxsize=None)
-def load_as_what(parent, attr_property):
+def is_ID_subclass_rna(bl_rna):  # noqa
+    """
+    Return true if the RNA is of a subclass of bpy.types.ID
+    """
+    return issubclass(bl_rna_to_type(bl_rna), bpy.types.ID)
+
+
+def load_as_what(parent, attr_property, attr: any, visit_context: BlendDataVisitContext):
     """
     Determine if we must load an attribute as a struct, a blenddata collection element (ID_DEF)
     or a reference to a BlendData collection element (ID_REF)
@@ -58,92 +94,94 @@ def load_as_what(parent, attr_property):
     parent -- the type that contains the attribute names attr_name, for instance T.Scene
     attr_property -- a bl_rna property of a attribute, that can be a CollectionProperty or a "plain" attribute
     """
-    # In these types, these members are T.ID that to not link to slots in bpy.data collections
-    # so we load them as ID and not as a reference to s also in an bpy.data collection
-    # Only include here types that derive from ID
+    # Reference to an ID element at the root of the blend file
+    if attr in visit_context.root_ids:
+        return LoadElementAs.ID_REF
 
-    # TODO use T.Material.bl_rna.properties['node_tree'] ...
-    # TODO move to context ?
-    force_as_ID_def = {  # noqa N806
-        T.Material.bl_rna: ["node_tree"],
-        T.Scene.bl_rna: ["collection"],
-        T.LayerCollection.bl_rna: ["collection"],
-    }
-    if same_rna(attr_property, T.CollectionProperty) or same_rna(attr_property, T.PointerProperty):
+    if same_rna(attr_property, T.CollectionProperty):
+        if is_ID_subclass_rna(attr_property.fixed_type.bl_rna):
+            # Collections at root level are not handled by this code (See BpyBlendProxy.load()) so here it
+            # should be a nested collection and IDs should be ref to root collections.
+            return LoadElementAs.ID_REF
+        else:
+            # Only collections at the root level of blendfile are id def, so here it can only be struct
+            return LoadElementAs.STRUCT
+
+    if same_rna(attr_property, T.PointerProperty):
         element_property = attr_property.fixed_type
     else:
         element_property = attr_property
 
-    is_a_blenddata_ID = element_property.bl_rna in blenddata.types_rna  # noqa N806
-    if not is_a_blenddata_ID:
-        return LoadElementAs.STRUCT
-
-    if attr_property.identifier in force_as_ID_def.get(parent.bl_rna, []):
+    if is_ID_subclass_rna(element_property.bl_rna):
         return LoadElementAs.ID_DEF
-    else:
-        return LoadElementAs.ID_REF
+
+    return LoadElementAs.STRUCT
 
 
-@debug_check_stack_overflow
-def read_attribute(attr: any, attr_property: any, parent_struct, context: Context):
+# @debug_check_stack_overflow
+def read_attribute(
+    attr: any, attr_property: any, parent_struct, context: Context, visit_context: BlendDataVisitContext
+):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
 
 
     """
-    attr_type = type(attr)
+    with visit_context.enter(attr_property.identifier, attr):
+        attr_type = type(attr)
 
-    if is_builtin(attr_type):
-        return attr
-    if is_vector(attr_type):
-        return list(attr)
-    if is_matrix(attr_type):
-        return [list(col) for col in attr.col]
+        if is_builtin(attr_type):
+            return attr
+        if is_vector(attr_type):
+            return list(attr)
+        if is_matrix(attr_type):
+            return [list(col) for col in attr.col]
 
-    # We have tested the types that are usefully reported by the python binding, now harder work.
-    # These were implemented first and may be better implemented with the bl_rna property of the parent struct
-    if attr_type == T.bpy_prop_array:
-        return [e for e in attr]
+        # We have tested the types that are usefully reported by the python binding, now harder work.
+        # These were implemented first and may be better implemented with the bl_rna property of the parent struct
+        if attr_type == T.bpy_prop_array:
+            return [e for e in attr]
 
-    if attr_type == T.bpy_prop_collection:
-        load_as = load_as_what(parent_struct, attr_property)
+        if attr_type == T.bpy_prop_collection:
+            # need to know for each element if it is a ref or id
+            load_as = load_as_what(parent_struct, attr_property, attr, visit_context)
+            if load_as == LoadElementAs.STRUCT:
+                return BpyPropStructCollectionProxy().load(attr, context, visit_context)
+            elif load_as == LoadElementAs.ID_REF:
+                # References into Blenddata collection, for instance D.scenes[0].objects
+                return BpyPropDataCollectionProxy().load_as_IDref(attr, visit_context)
+            elif load_as == LoadElementAs.ID_DEF:
+                # is  BlendData collection, for instance D.objects
+                return BpyPropDataCollectionProxy().load_as_ID(attr, context, visit_context)
+
+        # TODO merge with previous case
+        if isinstance(attr_property, T.CollectionProperty):
+            return BpyPropStructCollectionProxy().load(attr, context, visit_context)
+
+        bl_rna = attr_property.bl_rna
+        if bl_rna is None:
+            logger.warning("Unimplemented attribute %s", attr)
+            return None
+
+        assert issubclass(attr_type, T.PropertyGroup) == issubclass(attr_type, T.PropertyGroup)
+        if issubclass(attr_type, T.PropertyGroup):
+            return BpyPropertyGroupProxy().load(attr, context, visit_context)
+
+        load_as = load_as_what(parent_struct, attr_property, attr, visit_context)
         if load_as == LoadElementAs.STRUCT:
-            return BpyPropStructCollectionProxy().load(attr, context)
+            return BpyStructProxy().load(attr, context, visit_context)
         elif load_as == LoadElementAs.ID_REF:
-            # References into Blenddata collection, for instance D.scenes[0].objects
-            return BpyPropDataCollectionProxy().load_as_IDref(attr)
+            return BpyIDRefProxy().load(attr, visit_context)
         elif load_as == LoadElementAs.ID_DEF:
-            # is  BlendData collection, for instance D.objects
-            return BpyPropDataCollectionProxy().load_as_ID(attr, context)
+            return BpyIDProxy().load(attr, context, visit_context)
 
-    # TODO merge with previous case
-    if isinstance(attr_property, T.CollectionProperty):
-        return BpyPropStructCollectionProxy().load(attr, context)
+        # assert issubclass(attr_type, T.bpy_struct) == issubclass(attr_type, T.bpy_struct)
+        raise AssertionError("unexpected code path")
+        # should be handled above
+        if issubclass(attr_type, T.bpy_struct):
+            return BpyStructProxy().load(attr, visit_context)
 
-    bl_rna = attr_property.bl_rna
-    if bl_rna is None:
-        logger.warning("Unimplemented attribute %s", attr)
-        return None
-
-    assert issubclass(attr_type, T.PropertyGroup) == issubclass(attr_type, T.PropertyGroup)
-    if issubclass(attr_type, T.PropertyGroup):
-        return BpyPropertyGroupProxy().load(attr, context)
-
-    load_as = load_as_what(parent_struct, attr_property)
-    if load_as == LoadElementAs.STRUCT:
-        return BpyStructProxy().load(attr, context)
-    elif load_as == LoadElementAs.ID_REF:
-        return BpyIDRefProxy().load(attr)
-    elif load_as == LoadElementAs.ID_DEF:
-        return BpyIDProxy().load(attr, context)
-
-    # assert issubclass(attr_type, T.bpy_struct) == issubclass(attr_type, T.bpy_struct)
-    raise AssertionError("unexpected code path")
-    # should be handled above
-    if issubclass(attr_type, T.bpy_struct):
-        return BpyStructProxy().load(attr)
-
-    raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
+        raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
 
 
 class Proxy:
@@ -202,14 +240,15 @@ class StructLikeProxy(Proxy):
         self._data = {}
         pass
 
-    def load(self, bl_instance: any, context: Context):
+    def load(self, bl_instance: any, context: Context, visit_context: BlendDataVisitContext):
+
         """
         Load a Blender object into this proxy
         """
         self._data.clear()
         for name, bl_rna_property in context.properties(bl_instance):
             attr = getattr(bl_instance, name)
-            attr_value = read_attribute(attr, bl_rna_property, bl_instance, context)
+            attr_value = read_attribute(attr, bl_rna_property, bl_instance, context, visit_context)
             if attr_value is not None:
                 self._data[name] = attr_value
         return self
@@ -238,9 +277,9 @@ class BpyIDProxy(BpyStructProxy):
     def __init__(self):
         super().__init__()
 
-    def load(self, bl_instance, context: Context):
+    def load(self, bl_instance, context: Context, visit_context: BlendDataVisitContext):
         # TODO check that bl_instance class derives from ID
-        super().load(bl_instance, context)
+        super().load(bl_instance, context, visit_context)
         self.dccsync_uuid = bl_instance.dccsync_uuid
         return self
 
@@ -253,13 +292,17 @@ class BpyIDRefProxy(Proxy):
     def __init__(self):
         pass
 
-    def load(self, bl_instance):
+    def load(self, bl_instance, visit_context: BlendDataVisitContext):
         # Nothing to filter here, so we do not need the context/filter
 
         # Walk up to child of ID
         class_bl_rna = bl_instance.bl_rna
         while class_bl_rna.base is not None and class_bl_rna.base != bpy.types.ID.bl_rna:
             class_bl_rna = class_bl_rna.base
+
+        # Safety check that the instance can really be accessed from root collections with its full name
+        assert getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier], None) is not None
+        assert bl_instance.name_full in getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier])
 
         # TODO for easier access could keep a ref to the BpyBlendProxy
         # TODO maybe this information does not belong to _data and _data should be reserved to "fields"
@@ -283,13 +326,16 @@ class BpyPropStructCollectionProxy(Proxy):
     def __init__(self):
         self._data: Mapping[Union[str, int], BpyIDProxy] = {}
 
-    def load(self, bl_collection: bpy.types.bpy_prop_collection, context: Context):
+    def load(
+        self, bl_collection: bpy.types.bpy_prop_collection, context: Context, visit_context: BlendDataVisitContext
+    ):
         """
         in bl_collection : a bpy.types.bpy_prop_collection
         """
         # TODO If the key type is an int, load as a a list and check that no indices are missing
         for key, item in bl_collection.items():
-            self._data[key] = BpyStructProxy().load(item, context)
+            with visit_context.enter(key, item):
+                self._data[key] = BpyStructProxy().load(item, context, visit_context)
 
         return self
 
@@ -310,21 +356,31 @@ class BpyPropDataCollectionProxy(Proxy):
     def __init__(self):
         self._data: Mapping[str, BpyIDProxy] = {}
 
-    def load_as_ID(self, bl_collection: bpy.types.bpy_prop_collection, context: Context):  # noqa N802
+    def __len__(self):
+        return len(self._data)
+
+    def load_as_ID(  # noqa N802
+        self, bl_collection: bpy.types.bpy_prop_collection, context: Context, visit_context: BlendDataVisitContext
+    ):
         """
         Load bl_collection elements as plain IDs, with all element properties. Use this lo load from bpy.data
         """
         for name, item in bl_collection.items():
-            ensure_uuid(item)
-            self._data[name] = BpyIDProxy().load(item, context)
+            with visit_context.enter(name, item):
+                ensure_uuid(item)
+                self._data[name] = BpyIDProxy().load(item, context, visit_context)
+
         return self
 
-    def load_as_IDref(self, bl_collection: bpy.types.bpy_prop_collection):  # noqa N802
+    def load_as_IDref(  # noqa N802
+        self, bl_collection: bpy.types.bpy_prop_collection, visit_context: BlendDataVisitContext
+    ):
         """
         Load bl_collection elements as referenced into bpy.data
         """
         for name, item in bl_collection.items():
-            self._data[name] = BpyIDRefProxy().load(item)
+            with visit_context.enter(name, item):
+                self._data[name] = BpyIDRefProxy().load(item, visit_context)
         return self
 
     def update(self, diff):
@@ -332,9 +388,10 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         Update the proxy according to the diff
         """
+        visit_context = BlendDataVisitContext()
         for name, bl_collection in diff.items_added.items():
             item = bl_collection[name]
-            self._data[name] = BpyIDProxy().load(item)
+            self._data[name] = BpyIDProxy().load(item, visit_context)
         for name in diff.items_removed:
             del self._data[name]
         for old_name, new_name in diff.items_renamed:
@@ -348,10 +405,23 @@ class BpyBlendProxy(Proxy):
     def __init__(self, *args, **kwargs):
         self._data: Mapping[str, BpyPropDataCollectionProxy] = {}
 
+    def get_non_empty_collections(self):
+        return {key: value for key, value in self._data.items() if len(value) > 0}
+
     def load(self, context: Context):
+        visit_context = BlendDataVisitContext()
+
+        # First iterate over IDs at the root level of blender file to identify them
+        for name, _ in context.properties(bpy_type=T.BlendData):
+            bl_collection = getattr(bpy.data, name)
+            for _id_name, item in bl_collection.items():
+                ensure_uuid(item)
+                visit_context.root_ids.add(item)
+
         for name, _ in context.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
-            self._data[name] = BpyPropDataCollectionProxy().load_as_ID(collection, context)
+            with visit_context.enter(name, collection):
+                self._data[name] = BpyPropDataCollectionProxy().load_as_ID(collection, context, visit_context)
         return self
 
     def update(self, diff):

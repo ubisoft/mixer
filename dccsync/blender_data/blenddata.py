@@ -3,10 +3,15 @@ import functools
 import bpy
 import bpy.types as T  # noqa N812
 
+
+def bl_rna_to_type(bl_rna):
+    return getattr(T, bl_rna.identifier)
+
+
 # Map root collection name to object type
 # e.g. "objects" -> bpy.types.Object, "lights" -> bpy.types.Light, ...
 data_types = {
-    p.identifier: getattr(T, p.fixed_type.identifier)
+    p.identifier: bl_rna_to_type(p.fixed_type)
     for p in T.BlendData.bl_rna.properties
     if p.bl_rna.identifier == "CollectionProperty"
 }
