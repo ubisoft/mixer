@@ -3,81 +3,17 @@ import functools
 import bpy
 import bpy.types as T  # noqa N812
 
-blenddata_names = {
-    "actions",
-    "armatures",
-    "brushes",
-    "cache_files",
-    "cameras",
-    "collections",
-    "curves",
-    "fonts",
-    "grease_pencils",
-    "images",
-    "lattices",
-    "libraries",
-    "lightprobes",
-    "lights",
-    "linestyles",
-    "masks",
-    "materials",
-    "meshes",
-    "metaballs",
-    "movieclips",
-    "node_groups",
-    "objects",
-    "paint_curves",
-    "palettes",
-    "particles",
-    "scenes",
-    "screens",
-    "shape_keys",
-    "sounds",
-    "speakers",
-    "texts",
-    "textures",
-    "window_managers",
-    "worlds",
-    "workspaces",
+# Map root collection name to object type
+# e.g. "objects" -> bpy.types.Object, "lights" -> bpy.types.Light, ...
+data_types = {
+    p.identifier: getattr(T, p.fixed_type.identifier)
+    for p in T.BlendData.bl_rna.properties
+    if p.bl_rna.identifier == "CollectionProperty"
 }
 
-data_types = {
-    "actions": T.Action,
-    "armatures": T.Armature,
-    "brushes": T.Brush,
-    "cache_files": T.CacheFile,
-    "cameras": T.Camera,
-    "collections": T.Collection,
-    "curves": T.Curve,
-    "fonts": T.VectorFont,
-    "grease_pencils": T.GreasePencil,
-    "images": T.Image,
-    "lattices": T.Lattice,
-    "libraries": T.Library,
-    "lightprobess": T.LightProbe,
-    "lights": T.Light,
-    "linestyles": T.FreestyleLineStyle,
-    "masks": T.Mask,
-    "materials": T.Material,
-    "meshes": T.Mesh,
-    "metaballs": T.MetaBall,
-    "moveclips": T.MovieClip,
-    "node_groups": T.NodeTree,
-    "objects": T.Object,
-    "paint_curves": T.PaintCurve,
-    "palettes": T.Palette,
-    "particles": T.ParticleSettings,
-    "scenes": T.Scene,
-    "screens": T.Screen,
-    "shape_keys": T.Key,
-    "sounds": T.Sound,
-    "speakers": T.Speaker,
-    "texts": T.Text,
-    "textures": T.Texture,
-    "window_managers": T.WindowManager,
-    "worlds": T.World,
-    "workspaces": T.WorkSpace,
-}
+# Map object type name to root collection
+# e.g. "Object" -> "objects", "Light" -> "lights"
+rna_identifier_to_collection_name = {value.bl_rna.identifier: key for key, value in data_types.items()}
 
 
 class BlendDataCollection:
@@ -153,13 +89,8 @@ class BlendData:
         return cls()
 
     def reset(self):
-        self._bpy_collections = {name: getattr(bpy.data, name) for name in blenddata_names}
-        self.types_rna = [bpy.data.bl_rna.properties[name].fixed_type.bl_rna for name in blenddata_names]
-        # Trick to add <bpy_struct, Struct("ID")> RNA to the list:
-        # Can also be obtained base .base of .fixed_type.bl_rna of any ID type in types_rna I guess...
-        # In fact a bl_rna is an ID type is its highest base is ID
-        self.types_rna.append(bpy.types.Object.bl_rna.properties["data"].fixed_type.bl_rna)
-        self._collections = {name: BlendDataCollection(self._bpy_collections[name]) for name in blenddata_names}
+        _bpy_collections = {name: getattr(bpy.data, name) for name in data_types.keys()}
+        self._collections = {name: BlendDataCollection(_bpy_collections[name]) for name in data_types.keys()}
 
     def __getattr__(self, attrname):
         return self._collections[attrname].get()
