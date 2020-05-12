@@ -3,10 +3,10 @@ import logging
 from pathlib import Path
 
 bl_info = {
-    "name": "DCCsync",
+    "name": "Mixer",
     "author": "Ubisoft Animation Studio",
-    "description": "Collaborative 3D edition accross DCCs",
-    "version": (0, 1, 0),
+    "description": "Collaborative 3D edition accross 3D Softwares",
+    "version": (0, 2, 0),
     "blender": (2, 82, 0),
     "location": "",
     "warning": "Experimental addon, can break your scenes",
