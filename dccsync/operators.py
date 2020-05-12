@@ -11,10 +11,12 @@ import bpy
 from bpy.app.handlers import persistent
 
 from dccsync.share_data import share_data, object_visibility
-from dccsync.blender_client import scene as scene_lib
-from dccsync.blender_client import collection as collection_lib
-from dccsync.blender_client import object_ as object_lib
-
+from dccsync.blender_client import collection as collection_api
+from dccsync.blender_client import grease_pencil as grease_pencil_api
+from dccsync.blender_client import object_ as object_api
+from dccsync.blender_client import scene as scene_api
+from dccsync.blender_client.camera import send_camera
+from dccsync.blender_client.light import send_light
 from dccsync import clientBlender
 from dccsync import ui
 from dccsync.data import get_dcc_sync_props
@@ -34,7 +36,7 @@ class TransformStruct:
 def update_params(obj):
     # send collection instances
     if obj.instance_type == "COLLECTION":
-        collection_lib.send_collection_instance(share_data.client, obj)
+        collection_api.send_collection_instance(share_data.client, obj)
         return
 
     if not hasattr(obj, "data"):
@@ -57,16 +59,16 @@ def update_params(obj):
         return
 
     if typename == "Camera":
-        share_data.client.send_camera(obj)
+        send_camera(share_data.client, obj)
 
     if typename == "Sun Light" or typename == "Point Light" or typename == "Spot Light":
-        share_data.client.send_light(obj)
+        send_light(share_data.client, obj)
 
     if typename == "Grease Pencil":
         for material in obj.data.materials:
             share_data.client.send_material(material)
-        share_data.client.send_grease_pencil_mesh(obj)
-        share_data.client.send_grease_pencil_connection(obj)
+        grease_pencil_api.send_grease_pencil_mesh(share_data.client, obj)
+        grease_pencil_api.send_grease_pencil_connection(share_data.client, obj)
 
     if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
         if obj.mode == "OBJECT":
@@ -337,7 +339,7 @@ def remove_objects_from_scenes():
     changed = False
     for scene_name, object_names in share_data.objects_removed_from_scene.items():
         for object_name in object_names:
-            scene_lib.send_remove_object_from_scene(share_data.client, scene_name, object_name)
+            scene_api.send_remove_object_from_scene(share_data.client, scene_name, object_name)
             changed = True
     return changed
 
@@ -349,7 +351,7 @@ def remove_objects_from_collections():
     changed = False
     for collection_name, object_names in share_data.objects_removed_from_collection.items():
         for object_name in object_names:
-            collection_lib.send_remove_object_from_collection(share_data.client, collection_name, object_name)
+            collection_api.send_remove_object_from_collection(share_data.client, collection_name, object_name)
             changed = True
     return changed
 
@@ -357,7 +359,7 @@ def remove_objects_from_collections():
 def remove_collections_from_scenes():
     changed = False
     for scene_name, collection_name in share_data.collections_removed_from_scene:
-        scene_lib.send_remove_collection_from_scene(share_data.client, scene_name, collection_name)
+        scene_api.send_remove_collection_from_scene(share_data.client, scene_name, collection_name)
         changed = True
     return changed
 
@@ -368,7 +370,7 @@ def remove_collections_from_collections():
     """
     changed = False
     for parent_name, child_name in share_data.collections_removed_from_collection:
-        collection_lib.send_remove_collection_from_collection(share_data.client, parent_name, child_name)
+        collection_api.send_remove_collection_from_collection(share_data.client, parent_name, child_name)
         changed = True
     return changed
 
@@ -376,10 +378,10 @@ def remove_collections_from_collections():
 def add_scenes():
     changed = False
     for scene in share_data.scenes_added:
-        scene_lib.send_scene(share_data.client, scene)
+        scene_api.send_scene(share_data.client, scene)
         changed = True
     for old_name, new_name in share_data.scenes_renamed:
-        scene_lib.send_scene_renamed(share_data.client, old_name, new_name)
+        scene_api.send_scene_renamed(share_data.client, old_name, new_name)
         changed = True
     return changed
 
@@ -387,7 +389,7 @@ def add_scenes():
 def remove_scenes():
     changed = False
     for scene in share_data.scenes_removed:
-        scene_lib.send_scene_removed(share_data.client, scene)
+        scene_api.send_scene_removed(share_data.client, scene)
         changed = True
     return changed
 
@@ -395,7 +397,7 @@ def remove_scenes():
 def remove_collections():
     changed = False
     for collection in share_data.collections_removed:
-        collection_lib.send_collection_removed(share_data.client, collection)
+        collection_api.send_collection_removed(share_data.client, collection)
         changed = True
     return changed
 
@@ -414,7 +416,7 @@ def add_objects():
 def add_collections():
     changed = False
     for item in share_data.collections_added:
-        collection_lib.send_collection(share_data.client, get_collection(item))
+        collection_api.send_collection(share_data.client, get_collection(item))
         changed = True
     return changed
 
@@ -422,7 +424,7 @@ def add_collections():
 def add_collections_to_collections():
     changed = False
     for parent_name, child_name in share_data.collections_added_to_collection:
-        collection_lib.send_add_collection_to_collection(share_data.client, parent_name, child_name)
+        collection_api.send_add_collection_to_collection(share_data.client, parent_name, child_name)
         changed = True
     return changed
 
@@ -430,7 +432,7 @@ def add_collections_to_collections():
 def add_collections_to_scenes():
     changed = False
     for scene_name, collection_name in share_data.collections_added_to_scene:
-        scene_lib.send_add_collection_to_scene(share_data.client, scene_name, collection_name)
+        scene_api.send_add_collection_to_scene(share_data.client, scene_name, collection_name)
         changed = True
     return changed
 
@@ -439,7 +441,7 @@ def add_objects_to_collections():
     changed = False
     for collection_name, object_names in share_data.objects_added_to_collection.items():
         for object_name in object_names:
-            collection_lib.send_add_object_to_collection(share_data.client, collection_name, object_name)
+            collection_api.send_add_object_to_collection(share_data.client, collection_name, object_name)
             changed = True
     return changed
 
@@ -448,7 +450,7 @@ def add_objects_to_scenes():
     changed = False
     for scene_name, object_names in share_data.objects_added_to_scene.items():
         for object_name in object_names:
-            scene_lib.send_add_object_to_scene(share_data.client, scene_name, object_name)
+            scene_api.send_add_object_to_scene(share_data.client, scene_name, object_name)
             changed = True
     return changed
 
@@ -459,7 +461,7 @@ def update_collections_parameters():
         info = share_data.collections_info.get(collection.name_full)
         if info:
             if info.hide_viewport != collection.hide_viewport or info.instance_offset != collection.instance_offset:
-                collection_lib.send_collection(share_data.client, collection)
+                collection_api.send_collection(share_data.client, collection)
                 changed = True
     return changed
 
@@ -486,7 +488,7 @@ def update_objects_visibility():
         if obj_name in share_data.blender_objects:
             obj = share_data.blender_objects[obj_name]
             update_transform(obj)
-            object_lib.send_object_visibility(share_data.client, obj)
+            object_api.send_object_visibility(share_data.client, obj)
             changed = True
     return changed
 
@@ -519,7 +521,7 @@ def create_vrtist_objects():
     for obj_name in share_data.objects_added:
         if obj_name in bpy.context.scene.objects:
             obj = bpy.context.scene.objects[obj_name]
-            scene_lib.send_add_object_to_vrtist(share_data.client, bpy.context.scene.name_full, obj.name_full)
+            scene_api.send_add_object_to_vrtist(share_data.client, bpy.context.scene.name_full, obj.name_full)
             changed = True
     return changed
 
@@ -814,7 +816,7 @@ def clear_scene_content():
 
     # Cannot remove the last scene at this point, treat it differently
     for scene in bpy.data.scenes[:-1]:
-        scene_lib.delete_scene(scene)
+        scene_api.delete_scene(scene)
 
     share_data.clear_before_state()
 

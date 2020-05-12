@@ -16,7 +16,7 @@ bl_info = {
 }
 
 logger = logging.getLogger(__name__)
-MODULE_PATH = Path(__file__).parent
+MODULE_PATH = Path(__file__).parent.parent
 
 
 def cleanup():
@@ -44,7 +44,7 @@ class Formatter(logging.Formatter):
         """
         s = super().format(record)
         pathname = Path(record.pathname).relative_to(MODULE_PATH)
-        s += f" [./{pathname}:{record.lineno}]"
+        s += f" [.\\{pathname}:{record.lineno}]"
         return s
 
 
@@ -55,7 +55,7 @@ def register():
 
     if len(logger.handlers) == 0:
         logger.setLevel(logging.WARNING)
-        formatter = Formatter("{asctime} - {name:<36} - {levelname:<8} - {message:<80}", style="{")
+        formatter = Formatter("{asctime} {levelname[0]} {name:<36}  - {message:<80}", style="{")
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         logger.addHandler(handler)

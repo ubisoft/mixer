@@ -1,15 +1,21 @@
 import logging
 import struct
 import os
+from typing import Set
 
 import bpy
 from mathutils import Matrix, Quaternion
+import dccsync
 from dccsync import ui
 from dccsync import data
 from dccsync.share_data import share_data
 from dccsync.broadcaster import common
 from dccsync.broadcaster.client import Client
+from dccsync.blender_client import camera as camera_api
 from dccsync.blender_client import collection as collection_api
+from dccsync.blender_client import grease_pencil as grease_pencil_api
+from dccsync.blender_client import light as light_api
+from dccsync.blender_client import material as material_api
 from dccsync.blender_client import mesh as mesh_api
 from dccsync.blender_client import object_ as object_api
 from dccsync.blender_client import scene as scene_api
@@ -24,7 +30,7 @@ class ClientBlender(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(host, port)
 
-        self.textures = set()
+        self.textures: Set[str] = set()
         self.callbacks = {}
 
         self.blenderPID = os.getpid()
@@ -34,12 +40,7 @@ class ClientBlender(Client):
 
     # returns the path of an object
     def get_object_path(self, obj):
-        path = obj.name_full
-        while obj.parent:
-            obj = obj.parent
-            if obj:
-                path = obj.name_full + "/" + path
-        return path
+        return dccsync.blender_client.misc.get_object_path(obj)
 
     # get first collection
     def get_or_create_collection(self, name: str):
@@ -52,88 +53,10 @@ class ClientBlender(Client):
         return collection
 
     def get_or_create_path(self, path, data=None) -> bpy.types.Object:
-        index = path.rfind("/")
-        if index != -1:
-            share_data.pending_parenting.add(path)  # Parenting is resolved after consumption of all messages
-
-        # Create or get object
-        elem = path[index + 1 :]
-        ob = share_data.blender_objects.get(elem)
-        if not ob:
-            ob = bpy.data.objects.new(elem, data)
-            share_data._blender_objects[ob.name_full] = ob
-        return ob
+        return dccsync.blender_client.misc.get_or_create_path(path, data)
 
     def get_or_create_object_data(self, path, data):
         return self.get_or_create_path(path, data)
-
-    def get_or_create_camera(self, camera_name):
-        camera = share_data.blender_cameras.get(camera_name)
-        if camera:
-            return camera
-        camera = bpy.data.cameras.new(camera_name)
-        share_data._blender_cameras[camera.name_full] = camera
-        return camera
-
-    def build_camera(self, data):
-        camera_path, start = common.decode_string(data, 0)
-
-        camera_name = camera_path.split("/")[-1]
-        camera = self.get_or_create_camera(camera_name)
-
-        camera.lens, start = common.decode_float(data, start)
-        camera.clip_start, start = common.decode_float(data, start)
-        camera.clip_end, start = common.decode_float(data, start)
-        camera.dof.aperture_fstop, start = common.decode_float(data, start)
-        sensor_fit, start = common.decode_int(data, start)
-        camera.sensor_width, start = common.decode_float(data, start)
-        camera.sensor_height, start = common.decode_float(data, start)
-
-        if sensor_fit == 0:
-            camera.sensor_fit = "AUTO"
-        elif sensor_fit == 1:
-            camera.sensor_fit = "VERTICAL"
-        else:
-            camera.sensor_fit = "HORIZONTAL"
-
-        self.get_or_create_object_data(camera_path, camera)
-
-    def get_or_create_light(self, light_name, light_type):
-        light = share_data.blender_lights.get(light_name)
-        if light:
-            return light
-        light = bpy.data.lights.new(light_name, type=light_type)
-        share_data._blender_lights[light.name_full] = light
-        return light
-
-    def build_light(self, data):
-        light_path, start = common.decode_string(data, 0)
-        light_type, start = common.decode_int(data, start)
-        blighttype = "POINT"
-        if light_type == common.LightType.SUN.value:
-            blighttype = "SUN"
-        elif light_type == common.LightType.POINT.value:
-            blighttype = "POINT"
-        else:
-            blighttype = "SPOT"
-
-        light_name = light_path.split("/")[-1]
-        light = self.get_or_create_light(light_name, blighttype)
-
-        shadow, start = common.decode_int(data, start)
-        if shadow != 0:
-            light.use_shadow = True
-        else:
-            light.use_shadow = False
-
-        color, start = common.decode_color(data, start)
-        light.color = (color[0], color[1], color[2])
-        light.energy, start = common.decode_float(data, start)
-        if light_type == common.LightType.SPOT.value:
-            light.spot_size, start = common.decode_float(data, start)
-            light.spot_blend, start = common.decode_float(data, start)
-
-        self.get_or_create_object_data(light_path, light)
 
     def get_or_create_mesh(self, mesh_name):
         me = share_data.blender_meshes.get(mesh_name)
@@ -181,103 +104,6 @@ class ClientBlender(Client):
         if obj:
             self.set_transform(obj, parent_invert_matrix, basis_matrix, local_matrix)
             obj.hide_viewport = not visible
-
-    def get_or_create_material(self, material_name):
-        material = share_data.blender_materials.get(material_name)
-        if material:
-            material.use_nodes = True
-            return material
-
-        material = bpy.data.materials.new(name=material_name)
-        share_data._blender_materials[material.name_full] = material
-        material.use_nodes = True
-        return material
-
-    def build_texture(self, principled, material, channel, is_color, data, index):
-        file_name, index = common.decode_string(data, index)
-        if len(file_name) > 0:
-            tex_image = material.node_tree.nodes.new("ShaderNodeTexImage")
-            try:
-                tex_image.image = bpy.data.images.load(file_name)
-                if not is_color:
-                    tex_image.image.colorspace_settings.name = "Non-Color"
-            except Exception as e:
-                logger.error(e)
-            material.node_tree.links.new(principled.inputs[channel], tex_image.outputs["Color"])
-        return index
-
-    def build_material(self, data):
-        material_name_length = common.bytes_to_int(data[:4])
-        start = 4
-        end = start + material_name_length
-        material_name = data[start:end].decode()
-        start = end
-
-        material = self.get_or_create_material(material_name)
-        nodes = material.node_tree.nodes
-        # Get a principled node
-        principled = None
-        if nodes:
-            for n in nodes:
-                if n.type == "BSDF_PRINCIPLED":
-                    principled = n
-                    break
-
-        if not principled:
-            logger.error("Cannot find Principled BSDF node")
-            return
-
-        index = start
-
-        # Transmission ( 1 - opacity)
-        transmission, index = common.decode_float(data, index)
-        transmission = 1 - transmission
-        principled.inputs["Transmission"].default_value = transmission
-        file_name, index = common.decode_string(data, index)
-        if len(file_name) > 0:
-            invert = material.node_tree.nodes.new("ShaderNodeInvert")
-            material.node_tree.links.new(principled.inputs["Transmission"], invert.outputs["Color"])
-            tex_image = material.node_tree.nodes.new("ShaderNodeTexImage")
-            try:
-                tex_image.image = bpy.data.images.load(file_name)
-                tex_image.image.colorspace_settings.name = "Non-Color"
-            except Exception as e:
-                logger.error("could not load file %s (%s)", file_name, e)
-            material.node_tree.links.new(invert.inputs["Color"], tex_image.outputs["Color"])
-
-        # Base Color
-        base_color, index = common.decode_color(data, index)
-        material.diffuse_color = (base_color[0], base_color[1], base_color[2], 1)
-        principled.inputs["Base Color"].default_value = material.diffuse_color
-        index = self.build_texture(principled, material, "Base Color", True, data, index)
-
-        # Metallic
-        material.metallic, index = common.decode_float(data, index)
-        principled.inputs["Metallic"].default_value = material.metallic
-        index = self.build_texture(principled, material, "Metallic", False, data, index)
-
-        # Roughness
-        material.roughness, index = common.decode_float(data, index)
-        principled.inputs["Roughness"].default_value = material.roughness
-        index = self.build_texture(principled, material, "Roughness", False, data, index)
-
-        # Normal
-        file_name, index = common.decode_string(data, index)
-        if len(file_name) > 0:
-            normal_map = material.node_tree.nodes.new("ShaderNodeNormalMap")
-            material.node_tree.links.new(principled.inputs["Normal"], normal_map.outputs["Normal"])
-            tex_image = material.node_tree.nodes.new("ShaderNodeTexImage")
-            try:
-                tex_image.image = bpy.data.images.load(file_name)
-                tex_image.image.colorspace_settings.name = "Non-Color"
-            except Exception as e:
-                logger.error("could not load file %s (%s)", file_name, e)
-            material.node_tree.links.new(normal_map.inputs["Color"], tex_image.outputs["Color"])
-
-        # Emission
-        emission, index = common.decode_color(data, index)
-        principled.inputs["Emission"].default_value = emission
-        index = self.build_texture(principled, material, "Emission", False, data, index)
 
     def build_rename(self, data):
         old_path, index = common.decode_string(data, 0)
@@ -411,174 +237,6 @@ class ClientBlender(Client):
                 return path
         return None
 
-    def get_material_buffer(self, material):
-        name = material.name_full
-        buffer = common.encode_string(name)
-        principled = None
-        diffuse = None
-        # Get the nodes in the node tree
-        if material.node_tree:
-            nodes = material.node_tree.nodes
-            # Get a principled node
-            if nodes:
-                for n in nodes:
-                    if n.type == "BSDF_PRINCIPLED":
-                        principled = n
-                        break
-                    if n.type == "BSDF_DIFFUSE":
-                        diffuse = n
-            # principled = next(n for n in nodes if n.type == 'BSDF_PRINCIPLED')
-        if principled is None and diffuse is None:
-            base_color = (0.8, 0.8, 0.8)
-            metallic = 0.0
-            roughness = 0.5
-            opacity = 1.0
-            emission_color = (0.0, 0.0, 0.0)
-            buffer += common.encode_float(opacity) + common.encode_string("")
-            buffer += common.encode_color(base_color) + common.encode_string("")
-            buffer += common.encode_float(metallic) + common.encode_string("")
-            buffer += common.encode_float(roughness) + common.encode_string("")
-            buffer += common.encode_string("")
-            buffer += common.encode_color(emission_color) + common.encode_string("")
-            return buffer
-        elif diffuse:
-            opacity = 1.0
-            opacity_texture = None
-            metallic = 0.0
-            metallic_texture = None
-            emission = (0.0, 0.0, 0.0)
-            emission_texture = None
-
-            # Get the slot for 'base color'
-            # Or principled.inputs[0]
-            base_color = (1.0, 1.0, 1.0)
-            base_color_texture = None
-            base_color_input = diffuse.inputs.get("Color")
-            # Get its default value (not the value from a possible link)
-            if base_color_input:
-                base_color = base_color_input.default_value
-                base_color_texture = self.get_texture(base_color_input)
-
-            roughness = 1.0
-            roughness_texture = None
-            roughness_input = diffuse.inputs.get("Roughness")
-            if roughness_input:
-                roughness_texture = self.get_texture(roughness_input)
-                if len(roughness_input.links) == 0:
-                    roughness = roughness_input.default_value
-
-            normal_texture = None
-            norma_input = diffuse.inputs.get("Normal")
-            if norma_input:
-                if len(norma_input.links) == 1:
-                    normal_map = norma_input.links[0].from_node
-                    if "Color" in normal_map.inputs:
-                        color_input = normal_map.inputs["Color"]
-                        normal_texture = self.get_texture(color_input)
-
-        else:
-            opacity = 1.0
-            opacity_texture = None
-            opacity_input = principled.inputs.get("Transmission")
-            if opacity_input:
-                if len(opacity_input.links) == 1:
-                    invert = opacity_input.links[0].from_node
-                    if "Color" in invert.inputs:
-                        color_input = invert.inputs["Color"]
-                        opacity_texture = self.get_texture(color_input)
-                else:
-                    opacity = 1.0 - opacity_input.default_value
-
-            # Get the slot for 'base color'
-            # Or principled.inputs[0]
-            base_color = (1.0, 1.0, 1.0)
-            base_color_texture = None
-            base_color_input = principled.inputs.get("Base Color")
-            # Get its default value (not the value from a possible link)
-            if base_color_input:
-                base_color = base_color_input.default_value
-                base_color_texture = self.get_texture(base_color_input)
-
-            metallic = 0.0
-            metallic_texture = None
-            metallic_input = principled.inputs.get("Metallic")
-            if metallic_input:
-                metallic_texture = self.get_texture(metallic_input)
-                if len(metallic_input.links) == 0:
-                    metallic = metallic_input.default_value
-
-            roughness = 1.0
-            roughness_texture = None
-            roughness_input = principled.inputs.get("Roughness")
-            if roughness_input:
-                roughness_texture = self.get_texture(roughness_input)
-                if len(roughness_input.links) == 0:
-                    roughness = roughness_input.default_value
-
-            normal_texture = None
-            norma_input = principled.inputs.get("Normal")
-            if norma_input:
-                if len(norma_input.links) == 1:
-                    normal_map = norma_input.links[0].from_node
-                    if "Color" in normal_map.inputs:
-                        color_input = normal_map.inputs["Color"]
-                        normal_texture = self.get_texture(color_input)
-
-            emission = (0.0, 0.0, 0.0)
-            emission_texture = None
-            emission_input = principled.inputs.get("Emission")
-            if emission_input:
-                # Get its default value (not the value from a possible link)
-                emission = emission_input.default_value
-                emission_texture = self.get_texture(emission_input)
-
-        buffer += common.encode_float(opacity)
-        if opacity_texture:
-            buffer += common.encode_string(opacity_texture)
-        else:
-            buffer += common.encode_string("")
-        buffer += common.encode_color(base_color)
-        if base_color_texture:
-            buffer += common.encode_string(base_color_texture)
-        else:
-            buffer += common.encode_string("")
-
-        buffer += common.encode_float(metallic)
-        if metallic_texture:
-            buffer += common.encode_string(metallic_texture)
-        else:
-            buffer += common.encode_string("")
-
-        buffer += common.encode_float(roughness)
-        if roughness_texture:
-            buffer += common.encode_string(roughness_texture)
-        else:
-            buffer += common.encode_string("")
-
-        if normal_texture:
-            buffer += common.encode_string(normal_texture)
-        else:
-            buffer += common.encode_string("")
-
-        buffer += common.encode_color(emission)
-        if emission_texture:
-            buffer += common.encode_string(emission_texture)
-        else:
-            buffer += common.encode_string("")
-
-        return buffer
-
-    def get_material_buffers(self, obj):
-        try:
-            buffers = []
-            for slot in obj.material_slots[:]:
-                if slot.material:
-                    buffer = self.get_material_buffer(slot.material)
-                    buffers.append(buffer)
-            return buffers
-        except Exception as e:
-            logger.error(e)
-
     def build_add_keyframe(self, data):
         index = 0
         name, index = common.decode_string(data, index)
@@ -634,9 +292,11 @@ class ClientBlender(Client):
         if not material:
             return
         if material.grease_pencil:
-            self.send_grease_pencil_material(material)
+            grease_pencil_api.send_grease_pencil_material(self, material)
         else:
-            self.add_command(common.Command(common.MessageType.MATERIAL, self.get_material_buffer(material), 0))
+            self.add_command(
+                common.Command(common.MessageType.MATERIAL, material_api.get_material_buffer(self, material), 0)
+            )
 
     def get_mesh_name(self, mesh):
         return mesh.name_full
@@ -733,81 +393,6 @@ class ClientBlender(Client):
         self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
         self.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
 
-    def get_camera_buffer(self, obj):
-        cam = obj.data
-        focal = cam.lens
-        front_clip_plane = cam.clip_start
-        far_clip_plane = cam.clip_end
-        aperture = cam.dof.aperture_fstop
-        sensor_fit_name = cam.sensor_fit
-        sensor_fit = common.SensorFitMode.AUTO
-        if sensor_fit_name == "AUTO":
-            sensor_fit = common.SensorFitMode.AUTO
-        elif sensor_fit_name == "HORIZONTAL":
-            sensor_fit = common.SensorFitMode.HORIZONTAL
-        elif sensor_fit_name == "VERTICAL":
-            sensor_fit = common.SensorFitMode.VERTICAL
-        sensor_width = cam.sensor_width
-        sensor_height = cam.sensor_height
-
-        path = self.get_object_path(obj)
-        return (
-            common.encode_string(path)
-            + common.encode_float(focal)
-            + common.encode_float(front_clip_plane)
-            + common.encode_float(far_clip_plane)
-            + common.encode_float(aperture)
-            + common.encode_int(sensor_fit.value)
-            + common.encode_float(sensor_width)
-            + common.encode_float(sensor_height)
-        )
-
-    def send_camera(self, obj):
-        camera_buffer = self.get_camera_buffer(obj)
-        if camera_buffer:
-            self.add_command(common.Command(common.MessageType.CAMERA, camera_buffer, 0))
-        self.send_camera_animations(obj)
-
-    def get_light_buffer(self, obj):
-        light = obj.data
-        light_type_name = light.type
-        light_type = common.LightType.SUN
-        if light_type_name == "POINT":
-            light_type = common.LightType.POINT
-        elif light_type_name == "SPOT":
-            light_type = common.LightType.SPOT
-        elif light_type_name == "SUN":
-            light_type = common.LightType.SUN
-        else:
-            return None
-        color = light.color
-        power = light.energy
-        if bpy.context.scene.render.engine == "CYCLES":
-            shadow = light.cycles.cast_shadow
-        else:
-            shadow = light.use_shadow
-
-        spot_blend = 10.0
-        spot_size = 0.0
-        if light_type == common.LightType.SPOT:
-            spot_size = light.spot_size
-            spot_blend = light.spot_blend
-
-        return (
-            common.encode_string(self.get_object_path(obj))
-            + common.encode_int(light_type.value)
-            + common.encode_int(shadow)
-            + common.encode_color(color)
-            + common.encode_float(power)
-            + common.encode_float(spot_size)
-            + common.encode_float(spot_blend)
-        )
-
-    def send_light(self, obj):
-        light_buffer = self.get_light_buffer(obj)
-        if light_buffer:
-            self.add_command(common.Command(common.MessageType.LIGHT, light_buffer, 0))
-
     def send_deleted_object(self, obj_name):
         self.send_delete(obj_name)
 
@@ -828,215 +413,6 @@ class ClientBlender(Client):
 
     def send_rename(self, old_name, new_name):
         self.add_command(common.Command(common.MessageType.RENAME, self.get_rename_buffer(old_name, new_name), 0))
-
-    # -----------------------------------------------------------------------------------------------------------
-    #
-    # Grease Pencil
-    #
-    # -----------------------------------------------------------------------------------------------------------
-
-    def send_grease_pencil_stroke(self, stroke):
-        buffer = common.encode_int(stroke.material_index)
-        buffer += common.encode_int(stroke.line_width)
-
-        points = list()
-
-        for point in stroke.points:
-            points.extend(point.co)
-            points.append(point.pressure)
-            points.append(point.strength)
-
-        binary_points_buffer = common.int_to_bytes(len(stroke.points), 4) + struct.pack(f"{len(points)}f", *points)
-        buffer += binary_points_buffer
-        return buffer
-
-    def send_grease_pencil_frame(self, frame):
-        buffer = common.encode_int(frame.frame_number)
-        buffer += common.encode_int(len(frame.strokes))
-        for stroke in frame.strokes:
-            buffer += self.send_grease_pencil_stroke(stroke)
-        return buffer
-
-    def send_grease_pencil_layer(self, layer, name):
-        buffer = common.encode_string(name)
-        buffer += common.encode_bool(layer.hide)
-        buffer += common.encode_int(len(layer.frames))
-        for frame in layer.frames:
-            buffer += self.send_grease_pencil_frame(frame)
-        return buffer
-
-    def send_grease_pencil_time_offset(self, obj):
-        grease_pencil = obj.data
-        buffer = common.encode_string(grease_pencil.name_full)
-
-        for modifier in obj.grease_pencil_modifiers:
-            if modifier.type != "GP_TIME":
-                continue
-            offset = modifier.offset
-            scale = modifier.frame_scale
-            custom_range = modifier.use_custom_frame_range
-            frame_start = modifier.frame_start
-            frame_end = modifier.frame_end
-            buffer += (
-                common.encode_int(offset)
-                + common.encode_float(scale)
-                + common.encode_bool(custom_range)
-                + common.encode_int(frame_start)
-                + common.encode_int(frame_end)
-            )
-            self.add_command(common.Command(common.MessageType.GREASE_PENCIL_TIME_OFFSET, buffer, 0))
-            break
-
-    def send_grease_pencil_mesh(self, obj):
-        grease_pencil = obj.data
-        buffer = common.encode_string(grease_pencil.name_full)
-
-        buffer += common.encode_int(len(grease_pencil.materials))
-        for material in grease_pencil.materials:
-            if not material:
-                material_name = "Default"
-            else:
-                material_name = material.name_full
-            buffer += common.encode_string(material_name)
-
-        buffer += common.encode_int(len(grease_pencil.layers))
-        for name, layer in grease_pencil.layers.items():
-            buffer += self.send_grease_pencil_layer(layer, name)
-
-        self.add_command(common.Command(common.MessageType.GREASE_PENCIL_MESH, buffer, 0))
-
-        self.send_grease_pencil_time_offset(obj)
-
-    def send_grease_pencil_material(self, material):
-        gp_material = material.grease_pencil
-        stroke_enable = gp_material.show_stroke
-        stroke_mode = gp_material.mode
-        stroke_style = gp_material.stroke_style
-        stroke_color = gp_material.color
-        stroke_overlap = gp_material.use_overlap_strokes
-        fill_enable = gp_material.show_fill
-        fill_style = gp_material.fill_style
-        fill_color = gp_material.fill_color
-        gp_material_buffer = common.encode_string(material.name_full)
-        gp_material_buffer += common.encode_bool(stroke_enable)
-        gp_material_buffer += common.encode_string(stroke_mode)
-        gp_material_buffer += common.encode_string(stroke_style)
-        gp_material_buffer += common.encode_color(stroke_color)
-        gp_material_buffer += common.encode_bool(stroke_overlap)
-        gp_material_buffer += common.encode_bool(fill_enable)
-        gp_material_buffer += common.encode_string(fill_style)
-        gp_material_buffer += common.encode_color(fill_color)
-        self.add_command(common.Command(common.MessageType.GREASE_PENCIL_MATERIAL, gp_material_buffer, 0))
-
-    def send_grease_pencil_connection(self, obj):
-        buffer = common.encode_string(self.get_object_path(obj))
-        buffer += common.encode_string(obj.data.name_full)
-        self.add_command(common.Command(common.MessageType.GREASE_PENCIL_CONNECTION, buffer, 0))
-
-    def build_grease_pencil_connection(self, data):
-        path, start = common.decode_string(data, 0)
-        grease_pencil_name, start = common.decode_string(data, start)
-        gp = share_data.blender_grease_pencils[grease_pencil_name]
-        self.get_or_create_object_data(path, gp)
-
-    def decode_grease_pencil_stroke(self, grease_pencil_frame, stroke_index, data, index):
-        material_index, index = common.decode_int(data, index)
-        line_width, index = common.decode_int(data, index)
-        points, index = common.decode_array(data, index, "5f", 5 * 4)
-
-        if stroke_index >= len(grease_pencil_frame.strokes):
-            stroke = grease_pencil_frame.strokes.new()
-        else:
-            stroke = grease_pencil_frame.strokes[stroke_index]
-
-        stroke.material_index = material_index
-        stroke.line_width = line_width
-
-        p = stroke.points
-        if len(points) > len(p):
-            p.add(len(points) - len(p))
-        if len(points) < len(p):
-            max_index = len(points) - 1
-            for _i in range(max_index, len(p)):
-                p.pop(max_index)
-
-        for i in range(len(p)):
-            point = points[i]
-            p[i].co = (point[0], point[1], point[2])
-            p[i].pressure = point[3]
-            p[i].strength = point[4]
-        return index
-
-    def decode_grease_pencil_frame(self, grease_pencil_layer, data, index):
-        grease_pencil_frame, index = common.decode_int(data, index)
-        frame = None
-        for f in grease_pencil_layer.frames:
-            if f.frame_number == grease_pencil_frame:
-                frame = f
-                break
-        if not frame:
-            frame = grease_pencil_layer.frames.new(grease_pencil_frame)
-        stroke_count, index = common.decode_int(data, index)
-        for stroke_index in range(stroke_count):
-            index = self.decode_grease_pencil_stroke(frame, stroke_index, data, index)
-        return index
-
-    def decode_grease_pencil_layer(self, grease_pencil, data, index):
-        grease_pencil_layer_name, index = common.decode_string(data, index)
-        layer = grease_pencil.get(grease_pencil_layer_name)
-        if not layer:
-            layer = grease_pencil.layers.new(grease_pencil_layer_name)
-        layer.hide, index = common.decode_bool(data, index)
-        frame_count, index = common.decode_int(data, index)
-        for _ in range(frame_count):
-            index = self.decode_grease_pencil_frame(layer, data, index)
-        return index
-
-    def build_grease_pencil_mesh(self, data):
-        grease_pencil_name, index = common.decode_string(data, 0)
-
-        grease_pencil = share_data.blender_grease_pencils.get(grease_pencil_name)
-        if not grease_pencil:
-            grease_pencil = bpy.data.grease_pencils.new(grease_pencil_name)
-            share_data._blender_grease_pencils[grease_pencil.name_full] = grease_pencil
-
-        grease_pencil.materials.clear()
-        material_count, index = common.decode_int(data, index)
-        for _ in range(material_count):
-            material_name, index = common.decode_string(data, index)
-            material = share_data.blender_materials.get(material_name)
-            grease_pencil.materials.append(material)
-
-        layer_count, index = common.decode_int(data, index)
-        for _ in range(layer_count):
-            index = self.decode_grease_pencil_layer(grease_pencil, data, index)
-
-    def build_grease_pencil_material(self, data):
-        grease_pencil_material_name, start = common.decode_string(data, 0)
-        material = share_data.blender_materials.get(grease_pencil_material_name)
-        if not material:
-            material = bpy.data.materials.new(grease_pencil_material_name)
-            share_data._blender_materials[material.name_full] = material
-        if not material.grease_pencil:
-            bpy.data.materials.create_gpencil_data(material)
-
-        gp_material = material.grease_pencil
-        gp_material.show_stroke, start = common.decode_bool(data, start)
-        gp_material.mode, start = common.decode_string(data, start)
-        gp_material.stroke_style, start = common.decode_string(data, start)
-        gp_material.color, start = common.decode_color(data, start)
-        gp_material.use_overlap_strokes, start = common.decode_bool(data, start)
-        gp_material.show_fill, start = common.decode_bool(data, start)
-        gp_material.fill_style, start = common.decode_string(data, start)
-        gp_material.fill_color, start = common.decode_color(data, start)
-
-    def build_grease_pencil(self, data):
-        object_path, start = common.decode_string(data, 0)
-        grease_pencil_name, start = common.decode_string(data, start)
-        grease_pencil = share_data.blender_grease_pencils.get(grease_pencil_name)
-        if not grease_pencil:
-            grease_pencil = bpy.data.grease_pencils.new(grease_pencil_name)
-            self.get_or_create_object_data(object_path, grease_pencil)
 
     def get_delete_buffer(self, name):
         encoded_name = name.encode()
@@ -1165,11 +541,11 @@ class ClientBlender(Client):
                         self.send_scene_content()
 
                     elif command.type == common.MessageType.GREASE_PENCIL_MESH:
-                        self.build_grease_pencil_mesh(command.data)
+                        grease_pencil_api.build_grease_pencil_mesh(command.data)
                     elif command.type == common.MessageType.GREASE_PENCIL_MATERIAL:
-                        self.build_grease_pencil_material(command.data)
+                        grease_pencil_api.build_grease_pencil_material(command.data)
                     elif command.type == common.MessageType.GREASE_PENCIL_CONNECTION:
-                        self.build_grease_pencil_connection(command.data)
+                        grease_pencil_api.build_grease_pencil_connection(command.data)
 
                     elif command.type == common.MessageType.CLEAR_CONTENT:
                         self.clear_content()
@@ -1178,13 +554,13 @@ class ClientBlender(Client):
                     elif command.type == common.MessageType.TRANSFORM:
                         self.build_transform(command.data)
                     elif command.type == common.MessageType.MATERIAL:
-                        self.build_material(command.data)
+                        material_api.build_material(command.data)
                     elif command.type == common.MessageType.DELETE:
                         self.build_delete(command.data)
                     elif command.type == common.MessageType.CAMERA:
-                        self.build_camera(command.data)
+                        camera_api.build_camera(command.data)
                     elif command.type == common.MessageType.LIGHT:
-                        self.build_light(command.data)
+                        light_api.build_light(command.data)
                     elif command.type == common.MessageType.RENAME:
                         self.build_rename(command.data)
                     elif command.type == common.MessageType.DUPLICATE:
