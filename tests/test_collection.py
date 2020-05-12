@@ -123,8 +123,8 @@ class TestCollectionDefaultDoc(testcase.BlenderTestCase):
         # if collection instances are create before join we need to ensure that
         # the collection is received before the instance
 
-        self._sender.disconnect_dccsync()
-        self._receiver.disconnect_dccsync()
+        self._sender.disconnect_mixer()
+        self._receiver.disconnect_mixer()
         self.create_collection_in_collection("Collection", "src")
         self.create_object_in_collection("src", "new_object_0_0")
         self.create_collection_in_collection("Collection", "dst")
@@ -132,8 +132,8 @@ class TestCollectionDefaultDoc(testcase.BlenderTestCase):
         self.new_collection_instance("src", "src_instance_in_dst")
         self.link_object_to_collection("Collection", "src_instance_in_Collection")
         self.link_object_to_collection("dst", "src_instance_in_dst")
-        self._sender.connect_and_join_dccsync()
-        self._receiver.connect_and_join_dccsync()
+        self._sender.connect_and_join_mixer()
+        self._receiver.connect_and_join_mixer()
         self.assert_matches()
 
     def test_rename_collection(self):

@@ -1,9 +1,9 @@
 import struct
 
-from dccsync.blender_client.misc import get_or_create_object_data, get_object_path
-from dccsync.broadcaster import common
-from dccsync.broadcaster.client import Client
-from dccsync.share_data import share_data
+from mixer.blender_client.misc import get_or_create_object_data, get_object_path
+from mixer.broadcaster import common
+from mixer.broadcaster.client import Client
+from mixer.share_data import share_data
 import bpy
 
 

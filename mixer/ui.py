@@ -1,7 +1,7 @@
 import bpy
-from dccsync import operators
-from dccsync.data import get_dcc_sync_props
-from dccsync.share_data import share_data
+from mixer import operators
+from mixer.data import get_mixer_props
+from mixer.share_data import share_data
 
 import logging
 
@@ -29,7 +29,7 @@ def update_ui_lists():
 
 
 def update_user_list(do_redraw=True):
-    props = get_dcc_sync_props()
+    props = get_mixer_props()
     props.users.clear()
     if share_data.client_ids is None:
         redraw_if(do_redraw)
@@ -57,7 +57,7 @@ def update_user_list(do_redraw=True):
 
 
 def update_room_list(do_redraw=True):
-    props = get_dcc_sync_props()
+    props = get_mixer_props()
     props.rooms.clear()
     if share_data.client_ids is None:
         redraw_if(do_redraw)
@@ -84,19 +84,17 @@ class USERS_UL_ItemRenderer(bpy.types.UIList):  # noqa
 
 
 class SettingsPanel(bpy.types.Panel):
-    """Creates a Panel in the Object properties window"""
-
-    bl_label = "DCC Sync"
-    bl_idname = "DCCSYNC_PT_settings"
+    bl_label = "Mixer"
+    bl_idname = "MIXER_PT_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "DCC Sync"
+    bl_category = "Mixer"
 
     def draw(self, context):
         logger.debug("SettingsPanel::draw()")
         layout = self.layout
 
-        dcc_sync_props = get_dcc_sync_props()
+        mixer_props = get_mixer_props()
 
         row = layout.row()
         row.label(text="VRtist", icon="SCENE_DATA")
@@ -105,7 +103,7 @@ class SettingsPanel(bpy.types.Panel):
         row.operator(operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
 
         row = layout.row()
-        row.label(text="DCC Sync", icon="SCENE_DATA")
+        row.label(text="Mixer", icon="SCENE_DATA")
 
         row = layout.column()
 
@@ -113,7 +111,7 @@ class SettingsPanel(bpy.types.Panel):
 
             # Room list
             row = layout.row()
-            row.template_list("ROOM_UL_ItemRenderer", "", dcc_sync_props, "rooms", dcc_sync_props, "room_index", rows=4)
+            row.template_list("ROOM_UL_ItemRenderer", "", mixer_props, "rooms", mixer_props, "room_index", rows=4)
 
             # Join room
             col = row.column()
@@ -128,31 +126,29 @@ class SettingsPanel(bpy.types.Panel):
             row = layout.row()
             col = row.column()
             col.label(text="Room Users: ")
-            col.template_list(
-                "USERS_UL_ItemRenderer", "", dcc_sync_props, "users", dcc_sync_props, "user_index", rows=4
-            )
+            col.template_list("USERS_UL_ItemRenderer", "", mixer_props, "users", mixer_props, "user_index", rows=4)
 
             row = layout.row()
-            row.prop(dcc_sync_props, "room", text="Room")
+            row.prop(mixer_props, "room", text="Room")
             row.operator(operators.CreateRoomOperator.bl_idname, text="Create Room")
             row = layout.row()
-            row.prop(dcc_sync_props, "user", text="User")
+            row.prop(mixer_props, "user", text="User")
 
             col = layout.column()
             row = col.row()
             row.prop(
-                dcc_sync_props,
+                mixer_props,
                 "advanced",
-                icon="TRIA_DOWN" if dcc_sync_props.advanced else "TRIA_RIGHT",
+                icon="TRIA_DOWN" if mixer_props.advanced else "TRIA_RIGHT",
                 icon_only=True,
                 emboss=False,
             )
             row.label(text="Advanced options")
-            if dcc_sync_props.advanced:
-                col.prop(dcc_sync_props, "host", text="Host")
-                col.prop(dcc_sync_props, "port", text="Port")
-                col.prop(dcc_sync_props, "VRtist", text="VRtist Path")
-                col.prop(dcc_sync_props, "show_server_console", text="Show server console")
+            if mixer_props.advanced:
+                col.prop(mixer_props, "host", text="Host")
+                col.prop(mixer_props, "port", text="Port")
+                col.prop(mixer_props, "VRtist", text="VRtist Path")
+                col.prop(mixer_props, "show_server_console", text="Show server console")
 
         else:
             col = row.column()
@@ -160,29 +156,27 @@ class SettingsPanel(bpy.types.Panel):
                 operators.LeaveRoomOperator.bl_idname, text=f"Leave Room : {operators.share_data.current_room}"
             )
             col.label(text="Room Users: ")
-            col.template_list(
-                "USERS_UL_ItemRenderer", "", dcc_sync_props, "users", dcc_sync_props, "user_index", rows=4
-            )
+            col.template_list("USERS_UL_ItemRenderer", "", mixer_props, "users", mixer_props, "user_index", rows=4)
 
         col = layout.column()
         row = col.row()
         row.prop(
-            dcc_sync_props,
+            mixer_props,
             "developer_options",
-            icon="TRIA_DOWN" if dcc_sync_props.developer_options else "TRIA_RIGHT",
+            icon="TRIA_DOWN" if mixer_props.developer_options else "TRIA_RIGHT",
             icon_only=True,
             emboss=False,
         )
         row.label(text="Developer options")
-        if dcc_sync_props.developer_options:
-            col.prop(dcc_sync_props, "statistics_directory", text="Stats Directory")
+        if mixer_props.developer_options:
+            col.prop(mixer_props, "statistics_directory", text="Stats Directory")
             col.operator(operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
             col.operator(operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
-            col.prop(dcc_sync_props, "auto_save_statistics", text="Auto Save Statistics")
-            col.prop(dcc_sync_props, "no_send_scene_content", text="No send_scene_content")
-            col.prop(dcc_sync_props, "send_base_meshes", text="Send Base Meshes")
-            col.prop(dcc_sync_props, "send_baked_meshes", text="Send Baked Meshes")
-            col.prop(dcc_sync_props, "log_level", text="Log Level")
+            col.prop(mixer_props, "auto_save_statistics", text="Auto Save Statistics")
+            col.prop(mixer_props, "no_send_scene_content", text="No send_scene_content")
+            col.prop(mixer_props, "send_base_meshes", text="Send Base Meshes")
+            col.prop(mixer_props, "send_baked_meshes", text="Send Baked Meshes")
+            col.prop(mixer_props, "log_level", text="Log Level")
 
 
 classes = (ROOM_UL_ItemRenderer, USERS_UL_ItemRenderer, SettingsPanel)

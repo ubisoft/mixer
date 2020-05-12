@@ -5,13 +5,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run DCC Broadcaster",
+      "name": "Run Mixer Broadcaster",
       "type": "python",
       "request": "launch",
-      "module": "dccsync.broadcaster.dccBroadcaster",
+      "module": "mixer.broadcaster.apps.server",
       "args": [
         "--log-level=DEBUG",
-        "--log-file=${workspaceFolder}/.vscode/logs/dccBroadcaster.log"
+        "--log-file=${workspaceFolder}/.vscode/logs/mixer_broadcaster.log"
       ],
       "console": "integratedTerminal"
     },
@@ -19,14 +19,14 @@
       "name": "Run cli.py (interactive session)",
       "type": "python",
       "request": "launch",
-      "module": "dccsync.broadcaster.cli",
+      "module": "mixer.broadcaster.apps.cli",
       "console": "integratedTerminal"
     },
     {
       "name": "Run cli.py room list",
       "type": "python",
       "request": "launch",
-      "module": "dccsync.broadcaster.cli",
+      "module": "mixer.broadcaster.apps.cli",
       "args": [
         "room",
         "list"

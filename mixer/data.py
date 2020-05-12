@@ -6,10 +6,10 @@ from pathlib import Path
 
 import bpy
 
-from dccsync.broadcaster import common
-from dccsync.share_data import share_data
-from dccsync.stats import get_stats_directory
-from dccsync import ui
+from mixer.broadcaster import common
+from mixer.share_data import share_data
+from mixer.stats import get_stats_directory
+from mixer import ui
 
 logger = logging.getLogger(__name__)
 
@@ -45,15 +45,15 @@ def set_log_level(self, value):
 
 def get_logs_directory():
     def _get_logs_directory():
-        if "DCCSYNC_USER_LOGS_DIR" in os.environ:
+        if "MIXER_USER_LOGS_DIR" in os.environ:
             username = os.getlogin()
-            base_shared_path = Path(os.environ["DCCSYNC_USER_LOGS_DIR"])
+            base_shared_path = Path(os.environ["MIXER_USER_LOGS_DIR"])
             if os.path.exists(base_shared_path):
                 return os.path.join(os.fspath(base_shared_path), username)
             logger.error(
-                f"DCCSYNC_USER_LOGS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location."
+                f"MIXER_USER_LOGS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location."
             )
-        return os.path.join(os.fspath(tempfile.gettempdir()), "dcc_sync")
+        return os.path.join(os.fspath(tempfile.gettempdir()), "mixer")
 
     dir = _get_logs_directory()
     if not os.path.exists(dir):
@@ -62,10 +62,10 @@ def get_logs_directory():
 
 
 def get_log_file():
-    return os.path.join(get_logs_directory(), f"dccsync_logs_{share_data.runId}.log")
+    return os.path.join(get_logs_directory(), f"mixer_logs_{share_data.runId}.log")
 
 
-class DCCSyncProperties(bpy.types.PropertyGroup):
+class MixerProperties(bpy.types.PropertyGroup):
     def on_room_selection_changed(self, context):
         ui.update_user_list()
 
@@ -75,7 +75,7 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
             client.set_client_name(self.user)
 
     # Allows to change behavior according to environment: production or development
-    env: bpy.props.StringProperty(name="Env", default=os.environ.get("DCCSYNC_ENV", "production"))
+    env: bpy.props.StringProperty(name="Env", default=os.environ.get("MIXER_ENV", "production"))
 
     host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
     port: bpy.props.IntProperty(name="Port", default=common.DEFAULT_PORT)
@@ -100,7 +100,7 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
         name="VRtist", default=os.environ.get("VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe")
     )
     statistics_directory: bpy.props.StringProperty(
-        name="Stats Directory", default=os.environ.get("DCCSYNC_STATS_DIR", get_stats_directory())
+        name="Stats Directory", default=os.environ.get("MIXER_STATS_DIR", get_stats_directory())
     )
     auto_save_statistics: bpy.props.BoolProperty(default=True)
 
@@ -121,25 +121,25 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
     )
 
 
-def get_dcc_sync_props() -> DCCSyncProperties:
-    return bpy.context.window_manager.dcc_sync
+def get_mixer_props() -> MixerProperties:
+    return bpy.context.window_manager.mixer
 
 
 classes = (
     RoomItem,
     UserItem,
-    DCCSyncProperties,
+    MixerProperties,
 )
 
 
 def register():
     for _ in classes:
         bpy.utils.register_class(_)
-    bpy.types.Scene.dccsync_uuid = bpy.props.StringProperty(default="")
-    bpy.types.WindowManager.dcc_sync = bpy.props.PointerProperty(type=DCCSyncProperties)
+    bpy.types.Scene.mixer_uuid = bpy.props.StringProperty(default="")
+    bpy.types.WindowManager.mixer = bpy.props.PointerProperty(type=MixerProperties)
 
 
 def unregister():
     for _ in classes:
         bpy.utils.unregister_class(_)
-    del bpy.types.WindowManager.dcc_sync
+    del bpy.types.WindowManager.mixer

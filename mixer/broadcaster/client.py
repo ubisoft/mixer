@@ -2,7 +2,7 @@ import queue
 import socket
 import logging
 
-import dccsync.broadcaster.common as common
+import mixer.broadcaster.common as common
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
 

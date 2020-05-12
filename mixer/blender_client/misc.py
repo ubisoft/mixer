@@ -1,4 +1,4 @@
-from dccsync.share_data import share_data
+from mixer.share_data import share_data
 import bpy
 
 
