@@ -1,27 +1,37 @@
 stages:
-  - codequality
   - test
-  - build
+  - qa_build
 
 flake8:
   tags:
     - linux
   image: python:3
-  stage: codequality
+  stage: qa_build
   script:
     - pip install flake8 flake8-black pep8-naming flake8-bugbear
     - flake8 -v
 
-zip:
+.zip:
   tags:
     - linux
-  stage: build
+  stage: qa_build
   script: exit 0
   artifacts:
-    name: "${CI_PROJECT_NAME}_${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}"
     paths:
       - mixer
     expire_in: 1 week
+
+zip:
+  extends: .zip
+  artifacts:
+    name: "${CI_PROJECT_NAME}_${CI_COMMIT_MESSAGE}"
+
+zip_release:
+  only:
+    - release
+  extends: .zip
+  artifacts:
+    name: "${CI_PROJECT_NAME}_${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}"
 
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
 unittest:
