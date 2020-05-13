@@ -97,6 +97,12 @@ class TestCore(unittest.TestCase):
         data = T.Object.bl_rna.properties["data"]
         self.assertTrue(types.is_pointer_to(data, T.ID))
 
+    def test_scene_viewlayer_layercollection_is_master(self):
+        s = D.scenes["Scene_0"]
+        master_coll = s.collection
+        for vl in s.view_layers:
+            self.assertIs(vl.layer_collection.collection, master_coll)
+
     def test_skip_ShaderNodeTree(self):  # noqa N802
         world = D.worlds["World"]
         proxy = BpyStructProxy().load(world, default_context)

@@ -1119,7 +1119,7 @@ class DisconnectOperator(bpy.types.Operator):
 
     def execute(self, context):
         disconnect()
-        self.report({"INFO"}, f"Disconnected ...")
+        self.report({"INFO"}, "Disconnected ...")
         return {"FINISHED"}
 
 

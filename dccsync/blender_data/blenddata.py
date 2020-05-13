@@ -1,4 +1,5 @@
 import functools
+from typing import Mapping
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -40,6 +41,16 @@ blenddata_names = {
     "worlds",
     "workspaces",
 }
+
+
+@classmethod
+class BlendDataDesc:
+    # objects, lights
+    name: str
+
+    # T.Object, T.Light, ...
+    inner_type: T.bpy_struct_meta_idprop
+
 
 data_types = {
     "actions": T.Action,
@@ -153,9 +164,23 @@ class BlendData:
         return cls()
 
     def reset(self):
-        self._bpy_collections = {name: getattr(bpy.data, name) for name in blenddata_names}
+        # "objects" : D.objects
+        self._bpy_collections: Mapping[str, T.bpy_prop_collection] = {
+            name: getattr(bpy.data, name) for name in blenddata_names
+        }
+
+        # ??
         self.types_rna = [bpy.data.bl_rna.properties[name].fixed_type.bl_rna for name in blenddata_names]
-        self._collections = {name: BlendDataCollection(self._bpy_collections[name]) for name in blenddata_names}
+
+        # "objects": BlendDataCollection
+        self._collections: Mapping[str, BlendDataCollection] = {
+            name: BlendDataCollection(self._bpy_collections[name]) for name in blenddata_names
+        }
+
+        # "Object": "objects"
+        self._collections_name_from_inner_identifier: Mapping[str, str] = {
+            type_.bl_rna.identifier: name for name, type_ in data_types.items()
+        }
 
     def __getattr__(self, attrname):
         return self._collections[attrname].get()
@@ -171,9 +196,11 @@ class BlendData:
     def collection(self, collection_name: str):
         return self._collections[collection_name]
 
-    def message_type(self):
-        # return backward compatible message type
-        pass
+    def bl_collection_name_from_inner_identifier(self, type_identifier: str) -> str:
+        """
+        Blenddata collection from the name of the inner type (e.g. 'Object', 'Light')
+        """
+        return self._collections_name_from_inner_identifier[type_identifier]
 
 
 @bpy.app.handlers.persistent

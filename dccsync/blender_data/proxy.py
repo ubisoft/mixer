@@ -66,7 +66,7 @@ def load_as_what(parent, attr_property):
     # TODO move to context ?
     force_as_ID_def = {  # noqa N806
         T.Material.bl_rna: ["node_tree"],
-        T.Scene.bl_rna: ["collection"],
+        T.Scene.bl_rna: ["collection", "node_tree"],
         T.LayerCollection.bl_rna: ["collection"],
     }
     if same_rna(attr_property, T.CollectionProperty) or same_rna(attr_property, T.PointerProperty):
@@ -160,11 +160,11 @@ class Proxy:
                 return False
         return True
 
-    def save(self, bl_instance: any):
+    def save(self, bl_instance: any, _):
         """
         Save this proxy into a blender object
         """
-        logging.warning(f"save : skipped {bl_instance}")
+        logging.warning(f"save : Not implemented {self.__class__} {bl_instance}")
 
 
 class StructLikeProxy(Proxy):
@@ -214,12 +214,26 @@ class StructLikeProxy(Proxy):
                 self._data[name] = attr_value
         return self
 
-    def save(self, bl_instance: any):
+    def save(self, bl_instance: any, key: Union[int, str]):
         """
         Load a Blender object into this proxy
         """
+        assert isinstance(key, int) or isinstance(key, str)
+        if isinstance(key, int):
+            target = bl_instance[key]
+        elif isinstance(bl_instance, T.bpy_prop_collection):
+            # TODO append an element :
+            # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
+            target = bl_instance.get(key)
+        else:
+            target = getattr(bl_instance, key)
+
+        if target is None:
+            logging.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist")
+            return
+
         for k, v in self._data.items():
-            write_attribute(k, v, bl_instance)
+            write_attribute(target, k, v)
 
 
 class BpyPropertyGroupProxy(StructLikeProxy):
@@ -244,6 +258,25 @@ class BpyIDProxy(BpyStructProxy):
         self.dccsync_uuid = bl_instance.dccsync_uuid
         return self
 
+    def save(self, bl_instance: any, attr_name: str):
+        # TODO always valid ??
+        if isinstance(bl_instance, bpy.types.bpy_prop_collection):
+            target = bl_instance[attr_name]
+        else:
+            target = getattr(bl_instance, attr_name)
+
+        # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
+        if isinstance(target, bpy.types.Scene):
+            use_nodes = self._data.get("use_nodes")
+            if use_nodes:
+                write_attribute(target, "use_nodes", True)
+            sequence_editor = self._data.get("sequence_editor")
+            if sequence_editor is not None and target.sequence_editor is None:
+                target.sequence_editor_create()
+
+        for k, v in self._data.items():
+            write_attribute(target, k, v)
+
 
 class BpyIDRefProxy(Proxy):
     """
@@ -264,10 +297,36 @@ class BpyIDRefProxy(Proxy):
         # TODO for easier access could keep a ref to the BpyBlendProxy
         # TODO maybe this information does not belong to _data and _data should be reserved to "fields"
         self._data = (
-            class_bl_rna.identifier,  # blenddata collection
-            bl_instance.name_full,  # key in blenddata collection
+            # Blenddata collection name, e.g. 'objects', 'lights'
+            blenddata.bl_collection_name_from_inner_identifier(class_bl_rna.identifier),
+            # key in blenddata collection
+            bl_instance.name_full,
         )
         return self
+
+    def save(self, bl_instance: any, attr_name: str):
+        """
+        Save this proxy into bl_instance.attr_name
+        """
+
+        # Cannot save into an attribute, which looks like an r-value.
+        # When setting my_scene.world wen must setattr(scene, "world", data) and cannot
+        # assign scene.world
+        collection_name = self._data[0]
+        collection_key = self._data[1]
+
+        # TODO the identifier garget doest not have the same semantics everywhere
+        # here pointee somewhere else lvalue
+        target = getattr(bpy.data, collection_name)[collection_key]
+        if isinstance(bl_instance, T.bpy_prop_collection):
+            logging.warning(f"not implemented IDRef into collection {attr_name} for {bl_instance}...")
+        else:
+            if not bl_instance.bl_rna.properties[attr_name].is_readonly:
+                try:
+                    setattr(bl_instance, attr_name, target)
+                except Exception as e:
+                    logging.warning(f"write attribute skipped {attr_name} for {bl_instance}...")
+                    logging.warning(f" ...Error: {repr(e)}")
 
 
 def ensure_uuid(item: bpy.types.ID):
@@ -293,12 +352,13 @@ class BpyPropStructCollectionProxy(Proxy):
 
         return self
 
-    def save(self, bl_instance: any):
+    def save(self, bl_instance: any, attr_name: str):
         """
         Load a Blender object into this proxy
         """
+        target = getattr(bl_instance, attr_name)
         for k, v in self._data.items():
-            write_attribute(k, v, bl_instance)
+            write_attribute(target, k, v)
 
 
 # TODO derive from BpyIDProxy
@@ -326,6 +386,14 @@ class BpyPropDataCollectionProxy(Proxy):
         for name, item in bl_collection.items():
             self._data[name] = BpyIDRefProxy().load(item)
         return self
+
+    def save(self, bl_instance: any, attr_name: str):
+        """
+        Load a Blender object into this proxy
+        """
+        target = getattr(bl_instance, attr_name)
+        for k, v in self._data.items():
+            write_attribute(target, k, v)
 
     def update(self, diff):
         # TODO with context
@@ -371,11 +439,9 @@ proxy_classes = [
 ]
 
 
-def write_attribute(key: Union[str, int], value: Any, bl_instance):
+def write_attribute(bl_instance, key: Union[str, int], value: Any):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
-
-
     """
     type_ = type(value)
     if type_ not in proxy_classes:
@@ -389,66 +455,17 @@ def write_attribute(key: Union[str, int], value: Any, bl_instance):
                 logging.warning(f" ...Error: {repr(e)}")
         return
     else:
-        if type(key) is int:
-            # Collection with int key (vertices, points, ...)
-            if len(bl_instance):
-                attr = bl_instance[key]
-            else:
-                attr = None
-        else:
-            # Collection with a string key (T.BlendataObjects, T.ViewLayers)
-            # or a mapping (T.bpy_struct)
-            attr = getattr(bl_instance, key, None)
+        value.save(bl_instance, key)
 
-        if attr is not None:
-            value.save(attr)
-        else:
-            logging.warning(f"write_attribute skipped attribute {key} for {bl_instance}")
+        # if type(key) is int:
+        #     # Collection with int key (vertices, points, ...)
+        #     if len(bl_instance):
+        #         attr = bl_instance[key]
+        #     else:
+        #         logging.warning(f"write attribute skipped {key} for {bl_instance} - not implemented (array insertion)")
+        # else:
+        #     # Collection with a string key (T.BlendataObjects, T.ViewLayers)
+        #     # or a mapping (T.bpy_struct)
+        #     value.save(bl_instance, key)
         return
     raise NotImplementedError
-    """
-    # We have tested the types that are usefully reported by the python binding, now harder work.
-    # These were implemented first and may be better implemented with the bl_rna property of the parent struct
-    if attr_type == T.bpy_prop_array:
-        return [e for e in attr]
-
-    if attr_type == T.bpy_prop_collection:
-        load_as = load_as_what(parent_struct, attr_property)
-        if load_as == LoadElementAs.STRUCT:
-            return BpyPropStructCollectionProxy().load(attr, context)
-        elif load_as == LoadElementAs.ID_REF:
-            # References into Blenddata collection, for instance D.scenes[0].objects
-            return BpyPropDataCollectionProxy().load_as_IDref(attr)
-        elif load_as == LoadElementAs.ID_DEF:
-            # is  BlendData collection, for instance D.objects
-            return BpyPropDataCollectionProxy().load_as_ID(attr, context)
-
-    # TODO merge with previous case
-    if isinstance(attr_property, T.CollectionProperty):
-        return BpyPropStructCollectionProxy().load(attr, context)
-
-    bl_rna = attr_property.bl_rna
-    if bl_rna is None:
-        logger.warning("Unimplemented attribute %s", attr)
-        return None
-
-    assert issubclass(attr_type, T.PropertyGroup) == issubclass(attr_type, T.PropertyGroup)
-    if issubclass(attr_type, T.PropertyGroup):
-        return BpyPropertyGroupProxy().load(attr, context)
-
-    load_as = load_as_what(parent_struct, attr_property)
-    if load_as == LoadElementAs.STRUCT:
-        return BpyStructProxy().load(attr, context)
-    elif load_as == LoadElementAs.ID_REF:
-        return BpyIDRefProxy().load(attr)
-    elif load_as == LoadElementAs.ID_DEF:
-        return BpyIDProxy().load(attr, context)
-
-    # assert issubclass(attr_type, T.bpy_struct) == issubclass(attr_type, T.bpy_struct)
-    raise AssertionError("unexpected code path")
-    # should be handled above
-    if issubclass(attr_type, T.bpy_struct):
-        return BpyStructProxy().load(attr)
-
-    raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
-    """

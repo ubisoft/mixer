@@ -160,7 +160,7 @@ _exclude_names = {
     "dccsync_uuid",
 }
 
-# TODO Collection_of
+# TODO Change to (type, filter) for easier maintenance
 
 default_filter.append(
     {
@@ -170,9 +170,26 @@ default_filter.append(
         T.NodeSocket: [NameFilterOut("node")],
         T.ActionGroup: [NameFilterOut("channels")],
         T.Node: [NameFilterOut("internal_links")],
+        #
         T.Image: [NameFilterOut("pixels")],
         T.CompositorNodeRLayers: [NameFilterOut("scene")],
         None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
+        T.LayerCollection: [
+            # Scene.viewlayers[i].layer_collection.collection is Scene.collection,
+            # see test_scene_viewlayer_layercollection_is_master
+            NameFilterOut("collection"),
+            # Seems to be a view of the master collection children
+            NameFilterOut("children"),
+        ],
+        T.ViewLayer: [
+            # Not useful. Requires array insertion (to do shortly)
+            NameFilterOut("freestyle_settings")
+        ],
+        T.Scene: [
+            # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
+            # it is unclear how to do it.
+            NameFilterOut("tool_settings")
+        ],
     }
 )
 

@@ -1,6 +1,7 @@
 import functools
 from pathlib import Path
 import sys
+from typing import Iterable, List, Union
 import unittest
 
 from bpy import data as D  # noqa
@@ -105,9 +106,10 @@ def bl_equals(attr_a, attr_b, msg=None, skip_name=False, context=None):
     return True
 
 
-def run_tests(test_name: str = None):
-    if test_name is not None:
-        suite = unittest.defaultTestLoader.loadTestsFromName(test_name)
+def run_tests(test_names: Union[str, List[str]] = None):
+    if test_names is not None:
+        test_names = test_names if isinstance(test_names, Iterable) else [test_names]
+        suite = unittest.defaultTestLoader.loadTestsFromNames(test_names)
     else:
         this_dir = str(Path(__file__).parent)
         suite = unittest.defaultTestLoader.discover(this_dir)

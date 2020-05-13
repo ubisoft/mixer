@@ -60,11 +60,13 @@ class DebugDataTestOperator(bpy.types.Operator):
 
         names = get_props().test_names
         if names:
-            test_names = "dccsync.blender_data.tests"
-            test_names = test_names + "." + names
+            base = "dccsync.blender_data.tests."
+            test_names = [base + name for name in names.split()]
         else:
             test_names = None
+
         run_tests(test_names)
+
         return {"FINISHED"}
 
 

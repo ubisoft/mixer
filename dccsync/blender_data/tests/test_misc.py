@@ -62,7 +62,7 @@ class TestLoadProxy(unittest.TestCase):
     def test_scene(self):
         scene = self.proxy._data["scenes"]._data["Scene_0"]._data
         # will vary slightly during tiune tuning of the default filter
-        self.assertEqual(49, len(scene))
+        self.assertEqual(48, len(scene))
 
         objects = scene["objects"]._data
         self.assertEqual(4, len(objects))
