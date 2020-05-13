@@ -44,4 +44,4 @@ REM install Mixer in local blender
 %MIXER_BLENDER_EXE_PATH% --background --python %CURRENT_DIR%\install_mixer.py
 
 REM run unit tests
-REM %PYTHON% -m unittest --verbose
+%PYTHON% -m unittest --verbose
