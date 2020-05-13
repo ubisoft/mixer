@@ -187,4 +187,5 @@ if __name__ == "__main__":
     logger.info("  ptvsd  port %s", args.ptvsd)
     register()
     asyncio.ensure_future(serve(args.port))
+    bpy.ops.preferences.addon_enable(module="mixer")
     bpy.ops.mixer.test_asyncio_loop()
