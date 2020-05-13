@@ -4,91 +4,22 @@ from typing import Mapping
 import bpy
 import bpy.types as T  # noqa N812
 
-blenddata_names = {
-    "actions",
-    "armatures",
-    "brushes",
-    "cache_files",
-    "cameras",
-    "collections",
-    "curves",
-    "fonts",
-    "grease_pencils",
-    "images",
-    "lattices",
-    "libraries",
-    "lightprobes",
-    "lights",
-    "linestyles",
-    "masks",
-    "materials",
-    "meshes",
-    "metaballs",
-    "movieclips",
-    "node_groups",
-    "objects",
-    "paint_curves",
-    "palettes",
-    "particles",
-    "scenes",
-    "screens",
-    "shape_keys",
-    "sounds",
-    "speakers",
-    "texts",
-    "textures",
-    "window_managers",
-    "worlds",
-    "workspaces",
+
+def bl_rna_to_type(bl_rna):
+    return getattr(T, bl_rna.identifier)
+
+
+# Map root collection name to object type
+# e.g. "objects" -> bpy.types.Object, "lights" -> bpy.types.Light, ...
+collection_name_to_type = {
+    p.identifier: bl_rna_to_type(p.fixed_type)
+    for p in T.BlendData.bl_rna.properties
+    if p.bl_rna.identifier == "CollectionProperty"
 }
 
-
-@classmethod
-class BlendDataDesc:
-    # objects, lights
-    name: str
-
-    # T.Object, T.Light, ...
-    inner_type: T.bpy_struct_meta_idprop
-
-
-data_types = {
-    "actions": T.Action,
-    "armatures": T.Armature,
-    "brushes": T.Brush,
-    "cache_files": T.CacheFile,
-    "cameras": T.Camera,
-    "collections": T.Collection,
-    "curves": T.Curve,
-    "fonts": T.VectorFont,
-    "grease_pencils": T.GreasePencil,
-    "images": T.Image,
-    "lattices": T.Lattice,
-    "libraries": T.Library,
-    "lightprobess": T.LightProbe,
-    "lights": T.Light,
-    "linestyles": T.FreestyleLineStyle,
-    "masks": T.Mask,
-    "materials": T.Material,
-    "meshes": T.Mesh,
-    "metaballs": T.MetaBall,
-    "moveclips": T.MovieClip,
-    "node_groups": T.NodeTree,
-    "objects": T.Object,
-    "paint_curves": T.PaintCurve,
-    "palettes": T.Palette,
-    "particles": T.ParticleSettings,
-    "scenes": T.Scene,
-    "screens": T.Screen,
-    "shape_keys": T.Key,
-    "sounds": T.Sound,
-    "speakers": T.Speaker,
-    "texts": T.Text,
-    "textures": T.Texture,
-    "window_managers": T.WindowManager,
-    "worlds": T.World,
-    "workspaces": T.WorkSpace,
-}
+# Map object type name to root collection
+# e.g. "Object" -> "objects", "Light" -> "lights"
+rna_identifier_to_collection_name = {value.bl_rna.identifier: key for key, value in collection_name_to_type.items()}
 
 
 class BlendDataCollection:
@@ -164,22 +95,14 @@ class BlendData:
         return cls()
 
     def reset(self):
-        # "objects" : D.objects
-        self._bpy_collections: Mapping[str, T.bpy_prop_collection] = {
-            name: getattr(bpy.data, name) for name in blenddata_names
-        }
-
-        # ??
-        self.types_rna = [bpy.data.bl_rna.properties[name].fixed_type.bl_rna for name in blenddata_names]
-
-        # "objects": BlendDataCollection
-        self._collections: Mapping[str, BlendDataCollection] = {
-            name: BlendDataCollection(self._bpy_collections[name]) for name in blenddata_names
+        _bpy_collections = {name: getattr(bpy.data, name) for name in collection_name_to_type.keys()}
+        self._collections = {
+            name: BlendDataCollection(_bpy_collections[name]) for name in collection_name_to_type.keys()
         }
 
         # "Object": "objects"
         self._collections_name_from_inner_identifier: Mapping[str, str] = {
-            type_.bl_rna.identifier: name for name, type_ in data_types.items()
+            type_.bl_rna.identifier: name for name, type_ in collection_name_to_type.items()
         }
 
     def __getattr__(self, attrname):
