@@ -4,19 +4,18 @@ import json
 import logging
 import copy
 import tempfile
-from datetime import datetime
 from pathlib import Path
 import functools
 
 logger = logging.getLogger(__name__)
 
 
-class StatsTimer():
+class StatsTimer:
     def __init__(self, share_data, key, log=None):
-        assert(share_data.current_statistics)
+        assert share_data.current_statistics
 
-        if log == None:
-            if share_data.current_stats_timer == None:
+        if log is None:
+            if share_data.current_stats_timer is None:
                 log = False
             else:
                 log = share_data.current_stats_timer.log
@@ -29,14 +28,10 @@ class StatsTimer():
 
         if log:
             logger.debug(key)
-        if not "children" in parent_stats_dict:
+        if "children" not in parent_stats_dict:
             parent_stats_dict["children"] = {}
-        if not key in parent_stats_dict["children"]:
-            parent_stats_dict["children"][key] = {
-                "time": 0,
-                "max_time": 0,
-                "hit_count": 0
-            }
+        if key not in parent_stats_dict["children"]:
+            parent_stats_dict["children"][key] = {"time": 0, "max_time": 0, "hit_count": 0}
         self.key = key
         self.stats_dict = parent_stats_dict["children"][key]
         self.log = log
@@ -71,18 +66,19 @@ class StatsTimer():
 
 
 def get_stats_directory():
-    if "DCCSYNC_USER_STATS_DIR" in os.environ:
+    if "MIXER_USER_STATS_DIR" in os.environ:
         username = os.getlogin()
-        base_shared_path = Path(os.environ["DCCSYNC_USER_STATS_DIR"])
+        base_shared_path = Path(os.environ["MIXER_USER_STATS_DIR"])
         if os.path.exists(base_shared_path):
             return os.path.join(os.fspath(base_shared_path), username)
         logger.error(
-            f"DCCSYNC_USER_STATS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location.")
-    return os.path.join(os.fspath(tempfile.gettempdir()), "dcc_sync")
+            f"MIXER_USER_STATS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location."
+        )
+    return os.path.join(os.fspath(tempfile.gettempdir()), "mixer")
 
 
 def get_stats_filename(run_id, session_id):
-    return f"dccsync_stats_{run_id}_{session_id}.json"
+    return f"mixer_stats_{run_id}_{session_id}.json"
 
 
 def compute_final_statistics(stats_dict):
@@ -95,7 +91,7 @@ def compute_final_statistics(stats_dict):
         if root:
             d["global_percent_time"] = 100 * d["time"] / root["time"] if root["time"] > 0 else 0
         if "children" in d:
-            for child, child_dict in d["children"].items():
+            for _child, child_dict in d["children"].items():
                 recursive_compute(child_dict, d, root)
 
     for _, d in new_dict["children"].items():
@@ -110,11 +106,16 @@ def save_statistics(stats_dict, stats_directory):
         json.dump(compute_final_statistics(stats_dict), f, indent=2)
 
 
-def stats_timer(shareData, log=None):
-    def innerDecorator(func):
+def stats_timer(share_data, log=None):
+    def inner_decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            with StatsTimer(shareData, func.__name__, log):
+            if share_data.current_statistics is None:
                 return func(*args, **kwargs)
+
+            with StatsTimer(share_data, func.__name__, log):
+                return func(*args, **kwargs)
+
         return wrapper
-    return innerDecorator
+
+    return inner_decorator

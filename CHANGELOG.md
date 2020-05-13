@@ -1,12 +1,39 @@
+# 0.2.0 (2020-05-13)
+
+## Release Highlights
+
+- Official new name: Mixer
+- More visibility synchronization
+- Collections and multiple scenes
+- Time control from VRtist
+
+## Features
+
+- Time and keyframe control from VRtist (#71)
+- Support more object visibility attributes (#54)
+- Collections linked to multiple collections (#44)
+
+## Bugfix
+
+- Fix crash during scene switch (#36, #42)
+- Undo failures for collection rename and other cases (#45)
+- Fix scene rename (#43)
+
+## Technical
+
+- Code formatting, linting and developer environment doc (#66)
+- Better python imports (#67)
+- Tests in CI/CD (#68)
+
 # 0.1.0alpha (2020-04-03)
 
-### Release Highlights
+## Release Highlights
 
-First *official* release of dccsync (to be renamed one day) addon for Blender. This addon allows to work collaboratively between multiple Blender and [VRtist](https://gitlab-ncsa.ubisoft.org/motion-pictures/vrtist).
+First _official_ release of dccsync (to be renamed one day) addon for Blender. This addon allows to work collaboratively between multiple Blender and [VRtist](https://gitlab-ncsa.ubisoft.org/motion-pictures/vrtist).
 
 This alpha version offers basic functionnality to start working in collaboration. However it is not safe at all and can break the scene of the first user that connects to a session.
 
-### Features
+## Features
 
 Here are features supported for the synchronization of data among Blender clients.
 
@@ -30,9 +57,10 @@ Here are features supported for the synchronization of data among Blender client
   - However, while it is technically possible to create and sync scenes, many crash of Blender occurs when switching between them. This issue will be resolved in the next release of dccsync.
 - Grease Pencil Objects
 
-### Known Bugs/Limitations
+## Known Bugs/Limitations
 
 These bugs and limitations are known and will be addressed in future releases:
+
 - Collections
   - Linked into multiple collections
 - Scenes
@@ -47,6 +75,7 @@ These bugs and limitations are known and will be addressed in future releases:
 - Working from computers on differents networks has not been tested enough
 
 Things that are not mentionned are not supported at all right know, in particular:
+
 - Modifiers
 - Contraints
 - Bones
@@ -56,13 +85,15 @@ Things that are not mentionned are not supported at all right know, in particula
 - Curves (they will be synched but as meshes, not curves)
 - etc.
 
-### Reporting issues
+# Reporting issues
 
-For now, if the issue is for sync Blender - Blender, send an email to:
+If the issue is for sync Blender - Blender, send an email to:
+
 - laurent.noel@ubisoft.com
 - philippe.crassous@ubisoft.com
 
-If the issue if for sync Blender - VRtist, end an email to:
+If the issue if for sync Blender - VRtist, send an email to:
+
 - thomas.capelle@ubisoft.com
 - sylvain.magdelaine@ubisoft.com
 - nicolas.fauvet@ubisoft.com

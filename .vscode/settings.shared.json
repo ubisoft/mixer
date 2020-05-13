@@ -1,0 +1,23 @@
+{
+  "editor.formatOnSave": true,
+  "python.pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.formatting.provider": "black",
+  "python.testing.unittestArgs": [
+    "-v",
+    "-s",
+    "./tests",
+    "-p",
+    "test_*.py"
+  ],
+  "python.testing.unittestEnabled": true,
+  "python.linting.flake8Enabled": true,
+  "python.linting.flake8Args": [],
+  "python.linting.enabled": true,
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#a0dd50",
+    "titleBar.inactiveBackground": "#3b7718",
+    "titleBar.activeForeground": "#000",
+  },
+  "gitlab.instanceUrl": "https://gitlab-ncsa.ubisoft.org/",
+  "blender.addon.sourceDirectory": "./mixer"
+}

@@ -1,4 +1,3 @@
-
 """
 Functions to be remotely executed in Blender via python_server.py
 
@@ -9,19 +8,29 @@ execution sever, so each function must contain its imports
 
 def connect():
     import bpy
-    bpy.ops.dcc_sync.connect()
+
+    bpy.ops.mixer.connect()
 
 
 def disconnect():
     import bpy
-    bpy.ops.dcc_sync.disconnect()
+
+    bpy.ops.mixer.disconnect()
 
 
 def create_room():
     import bpy
-    bpy.ops.dcc_sync.create_room()
+
+    bpy.ops.mixer.create_room()
 
 
-def join_room():
-    import dccsync
-    dccsync.operators.join_room('dccsync_unittest')
+def set_log_level(log_level):
+    import mixer
+
+    mixer.data.set_log_level(None, log_level)
+
+
+def join_room(room_name: str = "mixer_unittest"):
+    import mixer
+
+    mixer.operators.join_room(room_name)

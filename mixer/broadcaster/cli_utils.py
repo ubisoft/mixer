@@ -9,10 +9,9 @@ def init_logging(args):
     """
     log_numeric_level = getattr(logging, args.log_level.upper(), None)
     if not isinstance(log_numeric_level, int):
-        raise ValueError(f'Invalid log level: {args.log_level}')
+        raise ValueError(f"Invalid log level: {args.log_level}")
 
-    formatter = logging.Formatter(
-        fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d]')
+    formatter = logging.Formatter(fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d]")
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
@@ -22,18 +21,18 @@ def init_logging(args):
     logger.setLevel(log_numeric_level)
 
     if args.log_file:
-        maxBytes = 1024 * 1000 * 512  # 512 MB
-        backupCount = 1024 * 1000  # 1B backup files
-        handler = logging.handlers.RotatingFileHandler(args.log_file, maxBytes=maxBytes, backupCount=backupCount)
+        max_bytes = 1024 * 1000 * 512  # 512 MB
+        backup_count = 1024 * 1000  # 1B backup files
+        handler = logging.handlers.RotatingFileHandler(args.log_file, maxBytes=max_bytes, backupCount=backup_count)
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-        logger.info(f'Logging to file {args.log_file}')
+        logger.info(f"Logging to file {args.log_file}")
 
 
 def add_logging_cli_args(parser: argparse.ArgumentParser):
     """
     Set CLI arguments for logger configuration.
     """
-    parser.add_argument('--log-level', default='WARNING', help='Level of log to use by default.')
-    parser.add_argument('--log-file', help='Path to log file.')
+    parser.add_argument("--log-level", default="WARNING", help="Level of log to use by default.")
+    parser.add_argument("--log-file", help="Path to log file.")

@@ -1,41 +1,40 @@
-from . import ui
-from . import operators
-from . import data
-from . import stats
-from .shareData import shareData
-import bpy
 import atexit
 import logging
 from pathlib import Path
 
 bl_info = {
-    "name": "VRtist",
-    "author": "Ubisoft",
-    "description": "VR manipultation",
-    "blender": (2, 80, 0),
+    "name": "Mixer",
+    "author": "Ubisoft Animation Studio",
+    "description": "Collaborative 3D edition accross 3D Softwares",
+    "version": (0, 2, 0),
+    "blender": (2, 82, 0),
     "location": "",
-    "warning": "",
-    "category": "Generic"
+    "warning": "Experimental addon, can break your scenes",
+    "wiki_url": "",
+    "tracker_url": "",
+    "category": "Collaboration",
 }
 
 logger = logging.getLogger(__name__)
-MODULE_PATH = Path(__file__).parent
+MODULE_PATH = Path(__file__).parent.parent
 
 
 def cleanup():
-    shareData = operators.shareData
-    if None != shareData.current_statistics and shareData.auto_save_statistics:
-        stats.save_statistics(shareData.current_statistics, shareData.statistics_directory)
+    from mixer import stats
+    from mixer.share_data import share_data
+
+    if share_data.current_statistics is not None and share_data.auto_save_statistics:
+        stats.save_statistics(share_data.current_statistics, share_data.statistics_directory)
     try:
-        if shareData.localServerProcess:
-            shareData.localServerProcess.kill()
+        if share_data.localServerProcess:
+            share_data.localServerProcess.kill()
     except Exception:
         pass
 
 
 class Formatter(logging.Formatter):
-    def __init__(self, fmt):
-        super().__init__(fmt)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def format(self, record: logging.LogRecord):
         """
@@ -45,15 +44,18 @@ class Formatter(logging.Formatter):
         """
         s = super().format(record)
         pathname = Path(record.pathname).relative_to(MODULE_PATH)
-        s += f" [./{pathname}:{record.lineno}]"
+        s += f" [.\\{pathname}:{record.lineno}]"
         return s
 
 
 def register():
+    from mixer import ui
+    from mixer import operators
+    from mixer import data
+
     if len(logger.handlers) == 0:
         logger.setLevel(logging.WARNING)
-        formatter = Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = Formatter("{asctime} {levelname[0]} {name:<36}  - {message:<80}", style="{")
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         logger.addHandler(handler)
@@ -70,11 +72,9 @@ def register():
 
 
 def unregister():
-    operators.disconnect()
-
-    if shareData:
-        if shareData.client and bpy.app.timers.is_registered(shareData.client.networkConsumer):
-            bpy.app.timers.unregister(shareData.client.networkConsumer)
+    from mixer import ui
+    from mixer import operators
+    from mixer import data
 
     operators.unregister()
     ui.unregister()
@@ -82,7 +82,3 @@ def unregister():
 
     cleanup()
     atexit.unregister(cleanup)
-
-
-if __name__ == "__main__":
-    register()

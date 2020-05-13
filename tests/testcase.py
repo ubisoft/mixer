@@ -1,12 +1,22 @@
-import unittest
-import time
-import blender_lib as bl
-import dccsync_lib
-from process import BlenderServer
-from typing import List
 import hashlib
-import tempfile
+import logging
 from pathlib import Path
+import tempfile
+import time
+from typing import List
+import unittest
+import sys
+
+import tests.blender_lib as bl
+import tests.mixer_lib as mixer_lib
+from tests.grabber import Grabber
+from tests.grabber import CommandStream
+from tests.process import BlenderServer
+
+from mixer.broadcaster.common import MessageType
+
+logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
 
 class Blender:
@@ -14,20 +24,26 @@ class Blender:
         self._port = port
         self._ptvsd_port = ptvsd_port
         self._wait_for_debugger = wait_for_debugger
-        self.__blender: BlenderServer = None
+        self._blender: BlenderServer = None
+        self._log_level = None
+
+    def set_log_level(self, log_level: int):
+        self._log_level = log_level
 
     def setup(self, blender_args: List = None):
         self._blender = BlenderServer(self._port, self._ptvsd_port, self._wait_for_debugger)
         self._blender.start(blender_args)
         self._blender.connect()
-        self.connect_and_join_dccsync()
+        self.connect_and_join_mixer()
 
-    def connect_and_join_dccsync(self):
-        self._blender.send_function(dccsync_lib.connect)
-        self._blender.send_function(dccsync_lib.join_room)
+    def connect_and_join_mixer(self, room_name="mixer_unittest"):
+        if self._log_level is not None:
+            self._blender.send_function(mixer_lib.set_log_level, self._log_level)
+        self._blender.send_function(mixer_lib.connect)
+        self._blender.send_function(mixer_lib.join_room, room_name)
 
-    def disconnect_dccsync(self):
-        self._blender.send_function(dccsync_lib.disconnect)
+    def disconnect_mixer(self):
+        self._blender.send_function(mixer_lib.disconnect)
 
     def wait(self, timeout: float = None):
         return self._blender.wait(timeout)
@@ -42,18 +58,52 @@ class Blender:
         time.sleep(1)
 
     def quit(self):
-        self._blender.send_function(blender_lib.quit)
+        self._blender.send_function(bl.quit)
+
+    def close(self):
+        self._blender.close()
 
 
 class BlenderTestCase(unittest.TestCase):
-
     def __init__(self, *args, **kwargs):
         self._sender_wait_for_debugger = False
         self._receiver_wait_for_debugger = False
+        self.expected_counts = {}
         super().__init__(*args, **kwargs)
+        self._log_level = None
 
-    def setUp(self, sender_blendfile=None, receiver_blendfile=None,
-              sender_wait_for_debugger=False, receiver_wait_for_debugger=False):
+    def set_log_level(self, log_level):
+        self._log_level = log_level
+
+    def assert_stream_equals(self, a_stream: CommandStream, b_stream: CommandStream, msg: str = None):
+        a, b = a_stream.data, b_stream.data
+        self.assertEqual(a.keys(), b.keys())
+
+        # TODO clarify why we need to ignore TRANSFORM (float comparison)
+        ignore = [MessageType.TRANSFORM]
+        for k in a.keys():
+            message_type = str(MessageType(k))
+            message_count = len(a[k])
+            self.assertEqual(message_count, len(b[k]), f"len mismatch for {message_type}")
+            if message_count != 0:
+                logger.info(f"Message count for {message_type:16} : {message_count}")
+            if k not in ignore:
+                expected_count = self.expected_counts.get(k)
+                if expected_count is not None:
+                    self.assertEqual(
+                        expected_count,
+                        message_count,
+                        f"Unexpected message count for message {message_type}. Expected {expected_count}: found {message_count}",
+                    )
+                self.assertEqual(a[k], b[k], f"content mismatch for {message_type}")
+
+    def setUp(
+        self,
+        sender_blendfile=None,
+        receiver_blendfile=None,
+        sender_wait_for_debugger=False,
+        receiver_wait_for_debugger=False,
+    ):
         """
         if a blendfile if not specified, blender will start with its default file.
         Not recommended) as it is machine dependent
@@ -66,21 +116,58 @@ class BlenderTestCase(unittest.TestCase):
         if sender_blendfile is not None:
             sender_args.append(str(sender_blendfile))
         self._sender = Blender(python_port + 0, ptvsd_port + 0, sender_wait_for_debugger)
+        self._sender.set_log_level(self._log_level)
         self._sender.setup(sender_args)
 
         receiver_args = ["--window-geometry", "960", "0", "960", "1080"]
         if receiver_blendfile is not None:
             receiver_args.append(str(receiver_blendfile))
         self._receiver = Blender(python_port + 1, ptvsd_port + 1, receiver_wait_for_debugger)
+        self._receiver.set_log_level(self._log_level)
         self._receiver.setup(receiver_args)
 
+    def assert_matches(self):
+        # TODO add message cout dict as param
+
+        self._sender.disconnect_mixer()
+        # time.sleep(1)
+        self._receiver.disconnect_mixer()
+        # time.sleep(1)
+
+        host = "127.0.0.1"
+        port = 12800
+        self._sender.connect_and_join_mixer("mixer_grab_sender")
+        time.sleep(1)
+        sender_grabber = Grabber()
+        sender_grabber.grab(host, port, "mixer_grab_sender")
+        self._sender.disconnect_mixer()
+
+        self._receiver.connect_and_join_mixer("mixer_grab_receiver")
+        time.sleep(1)
+        receiver_grabber = Grabber()
+        receiver_grabber.grab(host, port, "mixer_grab_receiver")
+        self._receiver.disconnect_mixer()
+
+        # TODO_ timing error : sometimes succeeds
+        # TODO_ enhance comparison : check # elements, understandable comparison
+        s = sender_grabber.streams
+        r = receiver_grabber.streams
+        self.assert_stream_equals(s, r)
+
+    def end_test(self):
+        self.assert_matches()
+
     def tearDown(self):
-        self._wait_for_debugger = False
+        # quit and wait
+        self._sender.quit()
+        self._receiver.quit()
         self._sender.wait()
         self._receiver.wait()
+        self._sender.close()
+        self._receiver.close()
         super().tearDown()
 
-    def assertUserSuccess(self):
+    def assert_user_success(self):
         """
         Test the processes return codes, that can be set from the TestPanel UI
         """
@@ -91,7 +178,7 @@ class BlenderTestCase(unittest.TestCase):
             if rc is not None:
                 self._receiver.kill()
                 if rc != 0:
-                    self.fail(f'sender return code {rc} ({hex(rc)})')
+                    self.fail(f"sender return code {rc} ({hex(rc)})")
                 else:
                     return
 
@@ -99,11 +186,11 @@ class BlenderTestCase(unittest.TestCase):
             if rc is not None:
                 self._sender.kill()
                 if rc != 0:
-                    self.fail(f'receiver return code {rc} ({hex(rc)})')
+                    self.fail(f"receiver return code {rc} ({hex(rc)})")
                 else:
                     return
 
-    def assertSameFiles(self):
+    def assert_same_files(self):
         """
         Save and quit, then compare files
 
@@ -112,19 +199,19 @@ class BlenderTestCase(unittest.TestCase):
 
         """
         with Path(tempfile.mkdtemp()) as tmp_dir:
-            sender_file = tmp_dir / 'sender'
-            receiver_file = tmp_dir / 'receiver'
-            self._sender.send_function(blender_lib.save, str(sender_file))
-            self._receiver.send_function(blender_lib.save, str(receiver_file))
+            sender_file = tmp_dir / "sender"
+            receiver_file = tmp_dir / "receiver"
+            self._sender.send_function(bl.save, str(sender_file))
+            self._receiver.send_function(bl.save, str(receiver_file))
             self._sender.quit()
             self._receiver.quit()
-            self.assertUserSuccess()
-            self.assertFilesIdentical(sender_file, receiver_file)
+            self.assert_user_success()
+            self.assert_files_identical(sender_file, receiver_file)
 
-    def assertFileExists(self, path):
-        self.assertTrue(Path(path).is_file(), f'File does not exist or is not a file : {path}')
+    def assert_file_exists(self, path):
+        self.assertTrue(Path(path).is_file(), f"File does not exist or is not a file : {path}")
 
-    def assertFilesIdentical(self, *files):
+    def assert_files_identical(self, *files):
         """
 
         """
@@ -133,32 +220,35 @@ class BlenderTestCase(unittest.TestCase):
 
         paths = [Path(f) for f in files]
         for path in paths:
-            self.assertFileExists(path)
+            self.assert_file_exists(path)
 
         attrs = [(path, path.stat().st_size) for path in files]
         p0, s0 = attrs[0]
-        for (p,  s) in attrs:
-            self.assertEqual(s0, s, f'File size differ for {p0} ({s0}) and {p} ({s})')
+        for (p, s) in attrs:
+            self.assertEqual(s0, s, f"File size differ for {p0} ({s0}) and {p} ({s})")
 
         hashes = []
         for path in paths:
             hash = hashlib.md5()
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 hash.update(f.read())
             hashes.append((path, hash))
 
         p0, h0 = hashes[0]
-        for (p,  h) in attrs:
-            self.assertEqual(h0, h, f'Hashes differ for {p0} ({h0.hex()}) and {p} ({h.hex()})')
+        for (p, h) in attrs:
+            self.assertEqual(h0, h, f"Hashes differ for {p0} ({h0.hex()}) and {p} ({h.hex()})")
 
     def connect(self):
-        self._sender.connect_and_join_dccsync()
+        self._sender.connect_and_join_mixer()
         time.sleep(1)
-        self._receiver.connect_and_join_dccsync()
+        self._receiver.connect_and_join_mixer()
 
     def disconnect(self):
-        self._sender.disconnect_dccsync()
-        self._receiver.disconnect_dccsync()
+        self._sender.disconnect_mixer()
+        self._receiver.disconnect_mixer()
+
+    def link_collection_to_collection(self, parent_name: str, child_name: str):
+        self._sender.send_function(bl.link_collection_to_collection, parent_name, child_name)
 
     def create_collection_in_collection(self, parent_name: str, child_name: str):
         self._sender.send_function(bl.create_collection_in_collection, parent_name, child_name)

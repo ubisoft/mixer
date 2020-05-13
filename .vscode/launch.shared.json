@@ -1,0 +1,50 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Mixer Broadcaster",
+      "type": "python",
+      "request": "launch",
+      "module": "mixer.broadcaster.apps.server",
+      "args": [
+        "--log-level=DEBUG",
+        "--log-file=${workspaceFolder}/.vscode/logs/mixer_broadcaster.log"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run cli.py (interactive session)",
+      "type": "python",
+      "request": "launch",
+      "module": "mixer.broadcaster.apps.cli",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run cli.py room list",
+      "type": "python",
+      "request": "launch",
+      "module": "mixer.broadcaster.apps.cli",
+      "args": [
+        "room",
+        "list"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: Remote Attach",
+      "type": "python",
+      "request": "attach",
+      "port": 5688,
+      "host": "localhost",
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}",
+          "remoteRoot": "."
+        }
+      ]
+    }
+  ]
+}
