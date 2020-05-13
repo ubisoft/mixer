@@ -60,3 +60,6 @@ $RECYCLE.BIN/
 
 .local
 .history
+
+# Blender for unit tests
+gitlab/blender
