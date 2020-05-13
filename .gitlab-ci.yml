@@ -40,9 +40,9 @@ unittest:
     - blender
   variables:
     MIXER_BLENDER_ZIP_BASENAME: blender-2.82a-windows64
-    MIXER_BLENDER_VERSION_BASE: 2.82
-  cache:
-    - paths:
-      - gitlab/blender/cache
+    MIXER_BLENDER_VERSION_BASE: "2.82"
   script:
     - gitlab\run_unittest.bat
+  cache:
+    paths:
+      - gitlab/blender/cache
