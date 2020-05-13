@@ -5,8 +5,8 @@ import select
 import threading
 from typing import Tuple, List, Mapping, Union, ValuesView
 
-import dccsync.broadcaster.cli_utils as cli_utils
-import dccsync.broadcaster.common as common
+import mixer.broadcaster.cli_utils as cli_utils
+import mixer.broadcaster.common as common
 
 BINDING_HOST = ""
 SHUTDOWN = False
@@ -471,7 +471,7 @@ def main():
 
 
 def parse_cli_args():
-    parser = argparse.ArgumentParser(description="Start broadcasting server for DCC Sync")
+    parser = argparse.ArgumentParser(description="Start broadcasting server for Mixer")
     cli_utils.add_logging_cli_args(parser)
     return parser.parse_args(), parser
 

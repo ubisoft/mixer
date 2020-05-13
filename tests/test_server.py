@@ -3,9 +3,9 @@ import threading
 import time
 import logging
 
-from dccsync.broadcaster.dccBroadcaster import Server
-from dccsync.broadcaster.client import Client
-import dccsync.broadcaster.common as common
+from mixer.broadcaster.apps.server import Server
+from mixer.broadcaster.client import Client
+import mixer.broadcaster.common as common
 
 
 class Delegate:

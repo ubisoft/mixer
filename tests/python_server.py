@@ -69,7 +69,7 @@ def parse():
 class FailOperator(bpy.types.Operator):
     """Report test failure"""
 
-    bl_idname = "dcc_sync.test_fail"
+    bl_idname = "mixer.test_fail"
     bl_label = "Report test failure"
     bl_options = {"REGISTER"}
 
@@ -95,7 +95,7 @@ class AsyncioLoopOperator(bpy.types.Operator):
     Used by the unit tests (python_server.py)
     """
 
-    bl_idname = "dcc_sync.test_asyncio_loop"
+    bl_idname = "mixer.test_asyncio_loop"
     bl_label = "Test Remote"
     command: bpy.props.EnumProperty(
         name="Command",
@@ -187,4 +187,5 @@ if __name__ == "__main__":
     logger.info("  ptvsd  port %s", args.ptvsd)
     register()
     asyncio.ensure_future(serve(args.port))
-    bpy.ops.dcc_sync.test_asyncio_loop()
+    bpy.ops.preferences.addon_enable(module="mixer")
+    bpy.ops.mixer.test_asyncio_loop()

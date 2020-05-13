@@ -66,19 +66,19 @@ class StatsTimer:
 
 
 def get_stats_directory():
-    if "DCCSYNC_USER_STATS_DIR" in os.environ:
+    if "MIXER_USER_STATS_DIR" in os.environ:
         username = os.getlogin()
-        base_shared_path = Path(os.environ["DCCSYNC_USER_STATS_DIR"])
+        base_shared_path = Path(os.environ["MIXER_USER_STATS_DIR"])
         if os.path.exists(base_shared_path):
             return os.path.join(os.fspath(base_shared_path), username)
         logger.error(
-            f"DCCSYNC_USER_STATS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location."
+            f"MIXER_USER_STATS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location."
         )
-    return os.path.join(os.fspath(tempfile.gettempdir()), "dcc_sync")
+    return os.path.join(os.fspath(tempfile.gettempdir()), "mixer")
 
 
 def get_stats_filename(run_id, session_id):
-    return f"dccsync_stats_{run_id}_{session_id}.json"
+    return f"mixer_stats_{run_id}_{session_id}.json"
 
 
 def compute_final_statistics(stats_dict):

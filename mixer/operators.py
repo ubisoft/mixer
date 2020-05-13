@@ -10,17 +10,17 @@ from uuid import uuid4
 import bpy
 from bpy.app.handlers import persistent
 
-from dccsync.share_data import share_data, object_visibility
-from dccsync.blender_client import collection as collection_api
-from dccsync.blender_client import grease_pencil as grease_pencil_api
-from dccsync.blender_client import object_ as object_api
-from dccsync.blender_client import scene as scene_api
-from dccsync.blender_client.camera import send_camera
-from dccsync.blender_client.light import send_light
-from dccsync import clientBlender
-from dccsync import ui
-from dccsync.data import get_dcc_sync_props
-from dccsync.stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
+from mixer.share_data import share_data, object_visibility
+from mixer.blender_client import collection as collection_api
+from mixer.blender_client import grease_pencil as grease_pencil_api
+from mixer.blender_client import object_ as object_api
+from mixer.blender_client import scene as scene_api
+from mixer.blender_client.camera import send_camera
+from mixer.blender_client.light import send_light
+from mixer import clientBlender
+from mixer import ui
+from mixer.data import get_mixer_props
+from mixer.stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ def join_room(room_name: str):
     logger.info("join_room")
 
     assert share_data.current_room is None
-    user = get_dcc_sync_props().user
+    user = get_mixer_props().user
     share_data.session_id += 1
     share_data.current_room = room_name
     share_data.client.join_room(room_name)
@@ -98,8 +98,8 @@ def join_room(room_name: str):
         "room": room_name,
         "children": {},
     }
-    share_data.auto_save_statistics = get_dcc_sync_props().auto_save_statistics
-    share_data.statistics_directory = get_dcc_sync_props().statistics_directory
+    share_data.auto_save_statistics = get_mixer_props().auto_save_statistics
+    share_data.statistics_directory = get_mixer_props().statistics_directory
     # join a room <==> want to track local changes
     set_handlers(True)
 
@@ -177,11 +177,11 @@ def update_scenes_state():
     """
 
     for scene in share_data.blender_scenes.values():
-        if not scene.dccsync_uuid:
-            scene.dccsync_uuid = str(uuid4())
+        if not scene.mixer_uuid:
+            scene.mixer_uuid = str(uuid4())
 
-    scenes_after = {scene.dccsync_uuid: name for name, scene in share_data.blender_scenes.items()}
-    scenes_before = {scene.dccsync_uuid: name for name, scene in share_data.scenes_info.items()}
+    scenes_after = {scene.mixer_uuid: name for name, scene in share_data.blender_scenes.items()}
+    scenes_before = {scene.mixer_uuid: name for name, scene in share_data.scenes_info.items()}
     share_data.scenes_added, share_data.scenes_removed, share_data.scenes_renamed = find_renamed(
         scenes_before, scenes_after
     )
@@ -838,7 +838,7 @@ def is_parent_in_collection(collection, obj):
 
 @stats_timer(share_data)
 def send_scene_content():
-    if get_dcc_sync_props().no_send_scene_content:
+    if get_mixer_props().no_send_scene_content:
         return
 
     share_data.clear_before_state()
@@ -891,17 +891,17 @@ def wait_for_server(host, port):
 
 
 def start_local_server():
-    import dccsync
+    import mixer
 
-    dir_path = Path(dccsync.__file__).parent.parent  # broadcaster is submodule of dccsync
+    dir_path = Path(mixer.__file__).parent.parent  # broadcaster is submodule of mixer
 
-    if get_dcc_sync_props().show_server_console:
+    if get_mixer_props().show_server_console:
         args = {"creationflags": subprocess.CREATE_NEW_CONSOLE}
     else:
         args = {}
 
     share_data.localServerProcess = subprocess.Popen(
-        [bpy.app.binary_path_python, "-m", "dccsync.broadcaster.dccBroadcaster"], cwd=dir_path, shell=False, **args
+        [bpy.app.binary_path_python, "-m", "mixer.broadcaster.apps.server"], cwd=dir_path, shell=False, **args
     )
 
 
@@ -915,7 +915,7 @@ def connect():
 
     assert share_data.client is None
 
-    props = get_dcc_sync_props()
+    props = get_mixer_props()
     if not create_main_client(props.host, props.port):
         if is_localhost(props.host):
             start_local_server()
@@ -978,7 +978,7 @@ def network_consumer_timer():
     if not share_data.client.is_connected():
         error_msg = "Timer still registered but client disconnected."
         logger.error(error_msg)
-        if get_dcc_sync_props().env != "production":
+        if get_mixer_props().env != "production":
             raise RuntimeError(error_msg)
         # Returning None from a timer unregister it
         return None
@@ -1013,15 +1013,15 @@ def create_main_client(host: str, port: int):
 
 
 class CreateRoomOperator(bpy.types.Operator):
-    """Create a new room on DCC Sync server"""
+    """Create a new room on Mixer server"""
 
-    bl_idname = "dcc_sync.create_room"
-    bl_label = "DCCSync Create Room"
+    bl_idname = "mixer.create_room"
+    bl_label = "Mixer Create Room"
     bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
-        props = get_dcc_sync_props()
+        props = get_mixer_props()
         return is_client_connected() and not share_data.current_room and bool(props.room)
 
     def execute(self, context):
@@ -1029,7 +1029,7 @@ class CreateRoomOperator(bpy.types.Operator):
         if not is_client_connected():
             return {"CANCELLED"}
 
-        props = get_dcc_sync_props()
+        props = get_mixer_props()
         join_room(props.room)
         return {"FINISHED"}
 
@@ -1037,14 +1037,14 @@ class CreateRoomOperator(bpy.types.Operator):
 class JoinRoomOperator(bpy.types.Operator):
     """Join a room"""
 
-    bl_idname = "dcc_sync.join_room"
-    bl_label = "DCCSync Join Room"
+    bl_idname = "mixer.join_room"
+    bl_label = "Mixer Join Room"
     bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
-        room_index = get_dcc_sync_props().room_index
-        return is_client_connected() and room_index < len(get_dcc_sync_props().rooms)
+        room_index = get_mixer_props().room_index
+        return is_client_connected() and room_index < len(get_mixer_props().rooms)
 
     def execute(self, context):
         assert not share_data.current_room
@@ -1052,7 +1052,7 @@ class JoinRoomOperator(bpy.types.Operator):
         share_data.current_room = None
 
         share_data.isLocal = False
-        props = get_dcc_sync_props()
+        props = get_mixer_props()
         room_index = props.room_index
         room = props.rooms[room_index].name
         join_room(room)
@@ -1062,8 +1062,8 @@ class JoinRoomOperator(bpy.types.Operator):
 class LeaveRoomOperator(bpy.types.Operator):
     """Reave the current room"""
 
-    bl_idname = "dcc_sync.leave_room"
-    bl_label = "DCCSync Leave Room"
+    bl_idname = "mixer.leave_room"
+    bl_label = "Mixer Leave Room"
     bl_options = {"REGISTER"}
 
     @classmethod
@@ -1077,9 +1077,9 @@ class LeaveRoomOperator(bpy.types.Operator):
 
 
 class ConnectOperator(bpy.types.Operator):
-    """Connect to the DCCSync server"""
+    """Connect to the Mixer server"""
 
-    bl_idname = "dcc_sync.connect"
+    bl_idname = "mixer.connect"
     bl_label = "Connect to server"
     bl_options = {"REGISTER"}
 
@@ -1088,7 +1088,7 @@ class ConnectOperator(bpy.types.Operator):
         return not is_client_connected()
 
     def execute(self, context):
-        props = get_dcc_sync_props()
+        props = get_mixer_props()
         try:
             self.report({"INFO"}, f'Connecting to "{props.host}:{props.port}" ...')
             if not connect():
@@ -1107,9 +1107,9 @@ class ConnectOperator(bpy.types.Operator):
 
 
 class DisconnectOperator(bpy.types.Operator):
-    """Disconnect from the DccSync server"""
+    """Disconnect from the Mixer server"""
 
-    bl_idname = "dcc_sync.disconnect"
+    bl_idname = "mixer.disconnect"
     bl_label = "Disconnect from server"
     bl_options = {"REGISTER"}
 
@@ -1124,10 +1124,10 @@ class DisconnectOperator(bpy.types.Operator):
 
 
 class SendSelectionOperator(bpy.types.Operator):
-    """Send current selection to DCC Sync server"""
+    """Send current selection to Mixer server"""
 
-    bl_idname = "dcc_sync.send_selection"
-    bl_label = "DCCSync Send selection"
+    bl_idname = "mixer.send_selection"
+    bl_label = "Mixer Send selection"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -1160,52 +1160,52 @@ class LaunchVRtistOperator(bpy.types.Operator):
         return True
 
     def execute(self, context):
-        dcc_sync_props = get_dcc_sync_props()
+        mixer_props = get_mixer_props()
         if not share_data.current_room:
             if not connect():
                 return {"CANCELLED"}
 
-            props = get_dcc_sync_props()
+            props = get_mixer_props()
             join_room(props.room)
 
         hostname = "localhost"
         if not share_data.isLocal:
-            hostname = dcc_sync_props.host
+            hostname = mixer_props.host
         args = [
-            dcc_sync_props.VRtist,
+            mixer_props.VRtist,
             "--room",
             share_data.current_room,
             "--hostname",
             hostname,
             "--port",
-            str(dcc_sync_props.port),
+            str(mixer_props.port),
         ]
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
         return {"FINISHED"}
 
 
 class WriteStatisticsOperator(bpy.types.Operator):
-    """Write dccsync statistics in a file"""
+    """Write Mixer statistics in a file"""
 
-    bl_idname = "dcc_sync.write_statistics"
-    bl_label = "DCCSync Write Statistics"
+    bl_idname = "mixer.write_statistics"
+    bl_label = "Mixer Write Statistics"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
         if share_data.current_statistics is not None:
-            save_statistics(share_data.current_statistics, get_dcc_sync_props().statistics_directory)
+            save_statistics(share_data.current_statistics, get_mixer_props().statistics_directory)
         return {"FINISHED"}
 
 
 class OpenStatsDirOperator(bpy.types.Operator):
-    """Write dccsync stats directory in explorer"""
+    """Write Mixer stats directory in explorer"""
 
-    bl_idname = "dcc_sync.open_stats_dir"
-    bl_label = "DCCSync Open Stats Directory"
+    bl_idname = "mixer.open_stats_dir"
+    bl_label = "Mixer Open Stats Directory"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
-        os.startfile(get_dcc_sync_props().statistics_directory)
+        os.startfile(get_mixer_props().statistics_directory)
         return {"FINISHED"}
 
 

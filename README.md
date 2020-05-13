@@ -71,7 +71,7 @@ Evolution possible : on devrait pouvoir utiliser plusieurs sender et receiver po
 
 Command palette : **Python: Configure Tests**, choisir **unittest**, pattern : **test\_\***
 
-Definir la variables d'environnement DCCSYNC_BLENDER_EXE_PATH
+Definir la variables d'environnement MIXER_BLENDER_EXE_PATH
 
 Détails dans https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework
 
@@ -118,9 +118,9 @@ Coté Blender, `python_server.py` autorise la connexion du debugger sur les port
 
 Ensuite:
 
-- mettre un breakpoint dans le code de dccsync avec une des deux méthodes suivantes :
+- mettre un breakpoint dans le code de mixer avec une des deux méthodes suivantes :
   - ajouter un appel au builtin `breakpoint()` dans le code. Attention le breakpoint ouvrira le fichier qui est dans %ADDPATA% (vois ci dessous) et ne sera pas editable dans VSCode
-  - Ouvrir le fichier de code situé dans `%APPDATA%Blender Foundation\Blender\2.82\scripts\addons\dccsync` et y mettre un breakpoint avec VSCode
+  - Ouvrir le fichier de code situé dans `%APPDATA%Blender Foundation\Blender\2.82\scripts\addons\mixer` et y mettre un breakpoint avec VSCode
 - démarrer l'exécution du test unitaire : Blender se bloque en attendant l'attachement
 - attacher le debugger : l'exécution continue jusqu'au breakpoint
 
@@ -136,12 +136,13 @@ Documentation:
 - Runner commands : https://docs.gitlab.com/runner/commands/
 
 Installation steps: 
-1. Install a gitlab runner on a desktop in `d:\gitlab_runner`
-1. Register a runner with `gitlab-runner-windows-amd64.exe register`. Use `blender` as token and `shell` as executor
-1. Install a portable Blender in the folder with a name used as the value of the variable `DCCSYNC_BLENDER_EXE_DIR` in `.gitlab-ci.yml`
+1. Install a gitlab runner in a folder of your choice. For this tutorial we'll use `d:\gitlab_runner`.
+2. Run a terminal as administrator, create folder `d:\gitlab_runner\working_dir` and place yourself into it in your terminal
+3. Register a runner with `gitlab-runner-windows-amd64.exe register`. Use `https://gitlab-ncsa.ubisoft.org/` as URL, `3doSyUPxsy5hL-svi_Qu` as token, `blender` as tags, `shell` as executor. The token can be found in Settings -> CI/CD page of this repository. This step should create a file `config.toml` in `d:\gitlab_runner\working_dir`.
+4. Edit `d:\gitlab_runner\working_dir` and add an entry `cache_dir = "D:/gitlab_runner/cache"` in the `[[runners]]` section, after the `shell` entry.
 
-Then run an interactive executor as administrator : `gitlab-runner-windows-amd64.exe run`. It must run as administrator because the `TSCON` command requires administrator rights
-to disconnect a session from the remote desktop.
+Then run an interactive : `gitlab-runner-windows-amd64.exe run`. It must run as administrator because the `TSCON` command requires administrator rights to disconnect a session from the remote desktop.
+
 As the runner executes jobs, it will display the jobs status : 
 ```
 D:\gitlab_runner>gitlab-runner-windows-amd64.exe run
@@ -150,12 +151,14 @@ Starting multi-runner from D:\gitlab_runner\config.toml...  builds=0
 Configuration loaded                                builds=0
 listen_address not defined, metrics & debug endpoints disabled  builds=0
 [session_server].listen_address not defined, session endpoints disabled  builds=0
-Checking for jobs... received                       job=11132741 repo_url=https://gitlab-ncsa.ubisoft.org/motion-pictures/blender/dccsync.git runner=Q-sQ1rhN
+Checking for jobs... received                       job=11132741 repo_url=https://gitlab-ncsa.ubisoft.org/animation-studio/blender/mixer.git runner=Q-sQ1rhN
 Job succeeded                                       duration=5m3.2796891s job=11132741 project=39094 runner=Q-sQ1rhN
-Checking for jobs... received                       job=11132866 repo_url=https://gitlab-ncsa.ubisoft.org/motion-pictures/blender/dccsync.git runner=Q-sQ1rhN
+Checking for jobs... received                       job=11132866 repo_url=https://gitlab-ncsa.ubisoft.org/animation-studio/blender/mixer.git runner=Q-sQ1rhN
 WARNING: Job failed: exit status 1                  duration=5m8.5314355s job=11132866 project=39094 runner=Q-sQ1rhN
 WARNING: Failed to process runner                   builds=0 error=exit status 1 executor=shell runner=Q-sQ1rhN
 ```
+
+The builds for the runner will be put in the current working directory `d:\gitlab_runner\working_dir` where you started the runner.
 
 ### Runner as a Windows service
 Using a system service could be difficult because the user profile may not be easy to access and we also need the service to access to the desktop.

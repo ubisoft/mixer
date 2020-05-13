@@ -3,10 +3,10 @@ import logging
 from pathlib import Path
 
 bl_info = {
-    "name": "DCCsync",
+    "name": "Mixer",
     "author": "Ubisoft Animation Studio",
-    "description": "Collaborative 3D edition accross DCCs",
-    "version": (0, 1, 0),
+    "description": "Collaborative 3D edition accross 3D Softwares",
+    "version": (0, 2, 0),
     "blender": (2, 82, 0),
     "location": "",
     "warning": "Experimental addon, can break your scenes",
@@ -20,8 +20,8 @@ MODULE_PATH = Path(__file__).parent.parent
 
 
 def cleanup():
-    from dccsync import stats
-    from dccsync.share_data import share_data
+    from mixer import stats
+    from mixer.share_data import share_data
 
     if share_data.current_statistics is not None and share_data.auto_save_statistics:
         stats.save_statistics(share_data.current_statistics, share_data.statistics_directory)
@@ -49,9 +49,9 @@ class Formatter(logging.Formatter):
 
 
 def register():
-    from dccsync import ui
-    from dccsync import operators
-    from dccsync import data
+    from mixer import ui
+    from mixer import operators
+    from mixer import data
 
     if len(logger.handlers) == 0:
         logger.setLevel(logging.WARNING)
@@ -72,9 +72,9 @@ def register():
 
 
 def unregister():
-    from dccsync import ui
-    from dccsync import operators
-    from dccsync import data
+    from mixer import ui
+    from mixer import operators
+    from mixer import data
 
     operators.unregister()
     ui.unregister()

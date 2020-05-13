@@ -1,7 +1,7 @@
-from dccsync.broadcaster.common import MessageType
-from dccsync.broadcaster.common import Command
-from dccsync.broadcaster.common import ClientDisconnectedException
-from dccsync.broadcaster.client import Client
+from mixer.broadcaster.common import MessageType
+from mixer.broadcaster.common import Command
+from mixer.broadcaster.common import ClientDisconnectedException
+from mixer.broadcaster.client import Client
 from typing import Mapping, List
 import time
 

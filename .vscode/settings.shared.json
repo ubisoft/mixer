@@ -19,5 +19,5 @@
     "titleBar.activeForeground": "#000",
   },
   "gitlab.instanceUrl": "https://gitlab-ncsa.ubisoft.org/",
-  "blender.addon.sourceDirectory": "./dccsync"
+  "blender.addon.sourceDirectory": "./mixer"
 }

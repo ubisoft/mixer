@@ -1,9 +1,9 @@
 import argparse
 import logging
 
-import dccsync.broadcaster.client as client
-import dccsync.broadcaster.common as common
-import dccsync.broadcaster.cli_utils as cli_utils
+import mixer.broadcaster.client as client
+import mixer.broadcaster.common as common
+import mixer.broadcaster.cli_utils as cli_utils
 
 TIMEOUT = 10  # in seconds
 
@@ -215,7 +215,7 @@ def main():
 
 
 def parse_cli_args():
-    parser = argparse.ArgumentParser(prog="cli", description="Command Line Interface for DCC Sync server")
+    parser = argparse.ArgumentParser(prog="cli", description="Command Line Interface for Mixer server")
     cli_utils.add_logging_cli_args(parser)
 
     sub_parsers = parser.add_subparsers()
