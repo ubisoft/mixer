@@ -23,6 +23,8 @@ IF EXIST %CURRENT_DIR%\blender\cache\%MIXER_BLENDER_ZIP_BASENAME% GOTO COPYUNZIP
 IF EXIST %CURRENT_DIR%\blender\cache\%MIXER_BLENDER_ZIP_BASENAME%.zip GOTO UNZIP
 
 REM download zip of blender if not in cache folder
+$pw = powershell ConvertTo-Securestring -AsPlainText -Force -String %MIXER_PROXY_PASSWORD%
+$cred = powershell New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList (%MIXER_PROXY_LOGIN%,$pw)
 powershell Invoke-WebRequest https://download.blender.org/release/Blender%MIXER_BLENDER_VERSION_BASE%/%MIXER_BLENDER_ZIP_BASENAME%.zip -OutFile %CURRENT_DIR%\blender\cache\%MIXER_BLENDER_ZIP_BASENAME%.zip
 
 :UNZIP
