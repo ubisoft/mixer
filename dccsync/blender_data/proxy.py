@@ -305,22 +305,40 @@ class BpyIDProxy(BpyStructProxy):
         self.dccsync_uuid = bl_instance.dccsync_uuid
         return self
 
-    def save(self, bl_instance: any, attr_name: str):
-        # TODO always valid ??
+    def target(self, bl_instance: any, attr_name: str):
         if isinstance(bl_instance, bpy.types.bpy_prop_collection):
-            target = bl_instance[attr_name]
+            return bl_instance[attr_name]
         else:
-            target = getattr(bl_instance, attr_name)
+            return getattr(bl_instance, attr_name)
 
-        # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
+    def pre_save(self, bl_instance: any, attr_name: str):
+        """
+        Process attributes that must be save first and return a possibily updated reference to tha target
+        """
+        target = self.target(bl_instance, attr_name)
+
         if isinstance(target, bpy.types.Scene):
+            # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
             use_nodes = self._data.get("use_nodes")
             if use_nodes:
                 write_attribute(target, "use_nodes", True)
             sequence_editor = self._data.get("sequence_editor")
             if sequence_editor is not None and target.sequence_editor is None:
                 target.sequence_editor_create()
+        elif isinstance(target, bpy.types.Light):
+            # required first to have access to new light type attributes
+            light_type = self._data.get("type")
+            if light_type is not None and light_type != target.type:
+                write_attribute(target, "type", light_type)
+                # must reload the reference
+                target = self.target(bl_instance, attr_name)
+        return target
 
+    def save(self, bl_instance: any, attr_name: str):
+        """
+        - bl_instance: the container attribute
+        """
+        target = self.pre_save(bl_instance, attr_name)
         for k, v in self._data.items():
             write_attribute(target, k, v)
 

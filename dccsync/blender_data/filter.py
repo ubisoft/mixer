@@ -197,6 +197,6 @@ default_context = Context(default_filter)
 
 safe_filter = FilterStack()
 safe_filter.append(default_exclusions)
-safe_blenddata = ["cameras"]
+safe_blenddata = ["cameras", "lights"]
 safe_filter.append({T.BlendData: NameFilterIn(safe_blenddata)})
 safe_context = Context(safe_filter)

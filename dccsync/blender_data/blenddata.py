@@ -140,9 +140,15 @@ class BlendData:
 
     def bl_collection_name_from_ID(self, id: bpy.types.ID) -> str:  # noqa N802
         """
-        Blenddata collection from the name of the inner type (e.g. 'Object', 'Light')
+        Blenddata collection from an Id.
         """
-        type_identifier = id.bl_rna.identifier
+        # Find the topmost type below ID, e.g. Light for AreaLight
+        bl_rna = id.bl_rna
+        while bl_rna is not None and bl_rna.base.bl_rna is not bpy.types.ID.bl_rna:
+            bl_rna = bl_rna.base
+        if bl_rna is None:
+            return None
+        type_identifier = bl_rna.identifier
         return self._collections_name_from_inner_identifier[type_identifier]
 
 

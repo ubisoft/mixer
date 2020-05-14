@@ -127,3 +127,9 @@ class TestBlendData(unittest.TestCase):
         self.assertEqual(scenes, D.scenes)
         self.assertEqual(sounds, D.sounds)
         self.assertIs(scenes["Scene_0"], D.scenes["Scene_0"])
+
+    def test_derived_from_id(self):
+        light = bpy.data.lights.new("new_area", "AREA")
+        blenddata = BlendData.instance()
+        collection_name = blenddata.bl_collection_name_from_ID(type(light))
+        self.assertEqual(collection_name, "lights")
