@@ -16,7 +16,6 @@ from dccsync.blender_data.blenddata import (
 )
 from dccsync.blender_data.types import is_builtin, is_vector, is_matrix
 
-blenddata = BlendData.instance()
 logger = logging.Logger(__name__, logging.INFO)
 
 
@@ -350,7 +349,7 @@ class BpyIDRefProxy(Proxy):
         # TODO maybe this information does not belong to _data and _data should be reserved to "fields"
         self._data = (
             # Blenddata collection name, e.g. 'objects', 'lights'
-            blenddata.bl_collection_name_from_inner_identifier(class_bl_rna.identifier),
+            BlendData.instance().bl_collection_name_from_inner_identifier(class_bl_rna.identifier),
             # key in blenddata collection
             bl_instance.name_full,
         )
@@ -460,6 +459,9 @@ class BpyPropDataCollectionProxy(Proxy):
         for k, v in self._data.items():
             write_attribute(target, k, v)
 
+    def find(self, key: str):
+        return self._data[key]
+
     def update(self, diff):
         # TODO with context
         """
@@ -494,11 +496,22 @@ class BpyBlendProxy(Proxy):
                 self._data[name] = BpyPropDataCollectionProxy().load_as_ID(collection, context, visit_context)
         return self
 
+    def find(self, collection_name: str, key: str) -> BpyIDProxy:
+        if not self._data:
+            return None
+        collection_proxy = self._data.get(collection_name)
+        if collection_proxy is None:
+            return None
+        return collection_proxy.find(key)
+
     def update(self, diff):
         for name in self.iter_all():
             deltas = diff.deltas.get(name)
             if deltas is not None:
                 self._data[name].update(diff.deltas[name])
+
+    def clear(self):
+        self._data.clear()
 
 
 proxy_classes = [

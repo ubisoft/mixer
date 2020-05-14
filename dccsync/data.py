@@ -120,6 +120,10 @@ class DCCSyncProperties(bpy.types.PropertyGroup):
         get=get_log_level,
     )
 
+    experimental_sync: bpy.props.BoolProperty(
+        name="Experimental sync", default=os.environ.get("DCCSYNC_EXPERIMENTAL_SYNC") is not None
+    )
+
 
 def get_dcc_sync_props() -> DCCSyncProperties:
     return bpy.context.window_manager.dcc_sync

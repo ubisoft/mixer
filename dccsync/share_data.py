@@ -1,8 +1,15 @@
-from datetime import datetime
-from typing import List, Mapping, Set
 from collections import namedtuple
+from datetime import datetime
+import logging
+from typing import List, Mapping, Set
 from uuid import uuid4
+
+from dccsync.blender_data.proxy import BpyBlendProxy
+from dccsync.blender_data.filter import safe_context
+
 import bpy
+
+logger = logging.getLogger(__name__)
 
 ObjectVisibility = namedtuple("ObjectVisibility", ["hide_viewport", "hide_select", "hide_render", "visible_get"])
 
@@ -118,6 +125,8 @@ class ShareData:
 
         self.pending_parenting = set()
 
+        self.proxy = None
+
     def leave_current_room(self):
         if self.client is not None:
             self.client.leave_room(share_data.current_room)
@@ -132,6 +141,9 @@ class ShareData:
         self.old_objects = {}
         self.collections_info = {}
         self.scenes_info = {}
+
+        if self.proxy:
+            self.proxy.load(safe_context)
 
     def set_dirty(self):
         self.blender_objects_dirty = True
@@ -286,6 +298,22 @@ class ShareData:
         self.objects_parents = {
             x.name_full: x.parent.name_full if x.parent is not None else "" for x in self.blender_objects.values()
         }
+
+        if self.proxy:
+            # TODO do not reload, but update the diff. Temporary quick and dirty
+            self.proxy.load(safe_context)
+
+    def set_experimental_sync(self, experimental_sync: bool):
+        if experimental_sync:
+            logger.warning("Experimental sync in ON")
+            self.proxy = BpyBlendProxy()
+        else:
+            if self.proxy:
+                logger.warning("Experimental sync in OFF")
+                self.proxy = None
+
+    def use_experimental_sync(self):
+        return self.proxy is not None
 
 
 share_data = ShareData()

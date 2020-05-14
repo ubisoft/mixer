@@ -1,51 +1,46 @@
 import logging
 
+from dccsync.blender_data.blenddata import BlendData
+from dccsync.blender_data.filter import safe_context
+from dccsync.blender_data.json_codec import Codec
+from dccsync.blender_data.proxy import BlendDataVisitContext
 from dccsync.broadcaster import common
-from dccsync.broadcaster.client import Client
 from dccsync.share_data import share_data
 
+import bpy.types
 
 logger = logging.getLogger(__name__)
 
 
-# see send_collection on what to encode next
-def send_data(client: Client, collection_name: str, data_name: str):
-    logger.debug("send_data %s %s", collection_name, data_name)
-    buffer = None
-    command = common.Command(common.MessageType.DATA_ADDED, buffer, 0)
-    client.add_command(command)
+#
+# WARNING There ara duplicate keys in blendata collections with linked blendfiles
+#
+def build_data_update(buffer):
+    collection_name, index = common.decode_string(buffer, 0)
+    key, index = common.decode_string(buffer, index)
+    buffer, _ = common.decode_string(buffer, index)
+    logger.debug("build_data_update")
+    codec = Codec()
+    id_proxy = codec.decode(buffer)
+    blenddata = BlendData.instance()
+    collection = blenddata.bpy_collection(collection_name)
+    # TODO will fail when name != name_full
+    id_proxy.save(collection, key)
 
 
-def build_data(buffer):
-    data_name, _ = common.decode_string(buffer, 0)
-    collection_name = None
-    logger.debug("build_data %s", collection_name, data_name)
-    share_data.blender_datas.collection(collection_name).new(data_name)
-
-
-def send_data_removed(client: Client, collection_name: str, data_name: str):
-    logger.debug("send_data %s %s", collection_name, data_name)
-    buffer = common.encode_string(collection_name) + common.encode_string(data_name)
-    client.add_command(common.Command(common.MessageType.DATA_REMOVED, buffer, 0))
-
-
-def build_data_removed(data):
-    data_name, _ = common.decode_string(data, 0)
-    collection_name, _ = common.decode_string(data, 0)
-    logger.debug("build_data_removed %s %s", collection_name, data_name)
-    share_data.blender_datas.getattr(collection_name).remove(data_name)
-
-
-def send_data_renamed(client: Client, collection_name: str, old_name: str, new_name: str):
-    logger.debug("send_data_renamed %s to %s", old_name, new_name)
-    buffer = common.encode_string(collection_name + common.encode_string(old_name) + common.encode_string(new_name))
-    client.add_command(common.Command(common.MessageType.DATA_RENAMED, buffer, 0))
-
-
-def build_data_renamed(data):
-    # decode collection name, old name, new name
-    collection_name, index = common.decode_string(data, 0)
-    old_name, index = common.decode_string(data, index)
-    new_name, _ = common.decode_string(data, index)
-    logger.debug("build_data_renamed in %s : %s to %s", collection_name, old_name, new_name)
-    share_data.blender_datas.getattr(collection_name).rename(old_name, new_name)
+def send_update(updated_id: bpy.types.ID):
+    global_proxy = share_data.proxy
+    blenddata = BlendData.instance()
+    collection_name = blenddata.bl_collection_name_from_ID(updated_id)
+    if updated_id.name != updated_id.name_full:
+        logging.warning("Not implemented linked objects : {updated_id.name} {updated_id.name_full}")
+    key = updated_id.name
+    id_proxy = global_proxy.find(collection_name, key)
+    if id_proxy is None:
+        return
+    id_proxy.load(updated_id, safe_context, BlendDataVisitContext(safe_context))
+    codec = Codec()
+    message = codec.encode(id_proxy)
+    buffer = common.encode_string(collection_name) + common.encode_string(key) + common.encode_string(message)
+    command = common.Command(common.MessageType.BLENDER_DATA_UPDATE, buffer, 0)
+    share_data.client.add_command(command)

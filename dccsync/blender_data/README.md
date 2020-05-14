@@ -107,6 +107,22 @@ Exclude all readonly except specified (pointer, collections) ?
 Custom properties : `oj.keys()` :
 https://stackoverflow.com/questions/21265676/how-do-i-read-out-custom-properties-in-blender-with-python
 
+# AOS to Big_array
+
+A possibility to save Arrays of structure (`MeshVertices`, `GPencilStrokePoint`) in a 'single' pass
+
+m=D.meshes['Cube']
+vx=m.vertices.values()
+
+1D array, from gererator expression (!). Must be 1D, but can be reshaped afterwards vertex/co-no/xyz or co-no/vertices/xyz
+
+    gen_expr = (f for vertex in vertices for f in (list(vertex.co) + list(vertex.normal)))
+    np.fromiter((gen_expr), numpy.float, len(vx)*6)
+
+2D, from a list comprehension
+
+    np.asarray([(list(v.co), list(v.normal)) for v in vertices])
+
 # Use cases for (de)serialization
 
 simple strut, nested

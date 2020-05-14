@@ -1,4 +1,5 @@
 from typing import Any, ItemsView, Iterable, List, Mapping, Union
+
 from bpy import types as T  # noqa
 
 from dccsync.blender_data.types import is_pointer_to
@@ -161,38 +162,41 @@ _exclude_names = {
 }
 
 # TODO Change to (type, filter) for easier maintenance
+default_exclusions = {
+    T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
+    # TODO this avoids the recursion path Node.socket , NodeSocker.Node
+    # can probably be included in the readonly filter
+    T.NodeSocket: [NameFilterOut("node")],
+    T.ActionGroup: [NameFilterOut("channels")],
+    T.Node: [NameFilterOut("internal_links")],
+    #
+    T.Image: [NameFilterOut("pixels")],
+    T.CompositorNodeRLayers: [NameFilterOut("scene")],
+    None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
+    T.LayerCollection: [
+        # Scene.viewlayers[i].layer_collection.collection is Scene.collection,
+        # see test_scene_viewlayer_layercollection_is_master
+        NameFilterOut("collection"),
+        # Seems to be a view of the master collection children
+        NameFilterOut("children"),
+    ],
+    T.ViewLayer: [
+        # Not useful. Requires array insertion (to do shortly)
+        NameFilterOut("freestyle_settings")
+    ],
+    T.Scene: [
+        # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
+        # it is unclear how to do it.
+        NameFilterOut("tool_settings")
+    ],
+}
 
-default_filter.append(
-    {
-        T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
-        # TODO this avoids the recursion path Node.socket , NodeSocker.Node
-        # can probably be included in the readonly filter
-        T.NodeSocket: [NameFilterOut("node")],
-        T.ActionGroup: [NameFilterOut("channels")],
-        T.Node: [NameFilterOut("internal_links")],
-        #
-        T.Image: [NameFilterOut("pixels")],
-        T.CompositorNodeRLayers: [NameFilterOut("scene")],
-        None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
-        T.LayerCollection: [
-            # Scene.viewlayers[i].layer_collection.collection is Scene.collection,
-            # see test_scene_viewlayer_layercollection_is_master
-            NameFilterOut("collection"),
-            # Seems to be a view of the master collection children
-            NameFilterOut("children"),
-        ],
-        T.ViewLayer: [
-            # Not useful. Requires array insertion (to do shortly)
-            NameFilterOut("freestyle_settings")
-        ],
-        T.Scene: [
-            # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
-            # it is unclear how to do it.
-            NameFilterOut("tool_settings")
-        ],
-    }
-)
-
+default_filter.append(default_exclusions)
 default_context = Context(default_filter)
-# todebug
-# default_filter.append(T.BlendData.bl_rna, NameFilterIn("collections"))
+
+
+safe_filter = FilterStack()
+safe_filter.append(default_exclusions)
+safe_blenddata = ["cameras"]
+safe_filter.append({T.BlendData: NameFilterIn(safe_blenddata)})
+safe_context = Context(safe_filter)

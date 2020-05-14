@@ -12,6 +12,7 @@ from bpy.app.handlers import persistent
 
 from dccsync.share_data import share_data, object_visibility
 from dccsync.blender_client import collection as collection_api
+from dccsync.blender_client import data as data_api
 from dccsync.blender_client import grease_pencil as grease_pencil_api
 from dccsync.blender_client import object_ as object_api
 from dccsync.blender_client import scene as scene_api
@@ -100,6 +101,7 @@ def join_room(room_name: str):
     }
     share_data.auto_save_statistics = get_dcc_sync_props().auto_save_statistics
     share_data.statistics_directory = get_dcc_sync_props().statistics_directory
+    share_data.set_experimental_sync(get_dcc_sync_props().experimental_sync)
     # join a room <==> want to track local changes
     set_handlers(True)
 
@@ -572,6 +574,10 @@ def update_objects_data():
             continue
         for c in container:
             update_params(c)
+
+    if share_data.use_experimental_sync():
+        for update in share_data.depsgraph.updates:
+            data_api.send_update(update.id.original)
 
 
 @persistent

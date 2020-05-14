@@ -27,13 +27,17 @@ class BlendDataCollection:
     Wrapper to any of the collections inside bpy.blenddata
     """
 
-    def __init__(self, bpy_data_collection):
+    def __init__(self, name: str, bpy_data_collection):
+        self._name = name
         self._dirty: bool = True
         self._bpy_data_collection = bpy_data_collection
         self._items = {}
 
     def __getitem__(self, key):
         return self._items[key]
+
+    def name(self):
+        return self._name
 
     def bpy_collection(self):
         return self._bpy_data_collection
@@ -92,12 +96,18 @@ class BlendData:
         https://blender.stackexchange.com/questions/8702/attributeerror-restrictdata-object-has-no-attribute-filepath
         but about bpy.data
         """
+
+        # In the end this is very messy. This structure is to avoid hadcoding information about Blenddata.
+        # The trouble is that during addon loading, getattr(bpy.data, 'cameras') will fail with error
+        #   AttributeError: '_RestrictData' object has no attribute 'cameras'
+        # So any python module that instanciates this class at the module level will cause the error
+
         return cls()
 
     def reset(self):
         _bpy_collections = {name: getattr(bpy.data, name) for name in collection_name_to_type.keys()}
         self._collections = {
-            name: BlendDataCollection(_bpy_collections[name]) for name in collection_name_to_type.keys()
+            name: BlendDataCollection(name, _bpy_collections[name]) for name in collection_name_to_type.keys()
         }
 
         # "Object": "objects"
@@ -105,7 +115,7 @@ class BlendData:
             type_.bl_rna.identifier: name for name, type_ in collection_name_to_type.items()
         }
 
-    def __getattr__(self, attrname):
+    def __getitem__(self, attrname):
         return self._collections[attrname].get()
 
     def set_dirty(self):
@@ -116,13 +126,23 @@ class BlendData:
         for data in self._collections.values():
             data.clear()
 
-    def collection(self, collection_name: str):
+    def collection(self, collection_name: str) -> BlendDataCollection:
         return self._collections[collection_name]
+
+    def bpy_collection(self, collection_name: str) -> bpy.types.bpy_prop_collection:
+        return self._collections[collection_name].bpy_collection()
 
     def bl_collection_name_from_inner_identifier(self, type_identifier: str) -> str:
         """
         Blenddata collection from the name of the inner type (e.g. 'Object', 'Light')
         """
+        return self._collections_name_from_inner_identifier[type_identifier]
+
+    def bl_collection_name_from_ID(self, id: bpy.types.ID) -> str:  # noqa N802
+        """
+        Blenddata collection from the name of the inner type (e.g. 'Object', 'Light')
+        """
+        type_identifier = id.bl_rna.identifier
         return self._collections_name_from_inner_identifier[type_identifier]
 
 
