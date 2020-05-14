@@ -79,6 +79,11 @@ def build_light(data):
 
 def get_or_create_light(light_name, light_type):
     light = share_data.blender_lights.get(light_name)
+    if light and light.type != light_type:
+        light.type = light_type
+        share_data.blender_lights_dirty = True
+        light = share_data.blender_lights.get(light_name)
+
     if light:
         return light
     light = bpy.data.lights.new(light_name, type=light_type)
