@@ -15,6 +15,8 @@ def get_light_buffer(obj):
         light_type = common.LightType.SPOT
     elif light_type_name == "SUN":
         light_type = common.LightType.SUN
+    elif light_type_name == "AREA":
+        light_type = common.LightType.AREA
     else:
         return None
     color = light.color
@@ -55,6 +57,8 @@ def build_light(data):
         blighttype = "SUN"
     elif light_type == common.LightType.POINT.value:
         blighttype = "POINT"
+    elif light_type == common.LightType.AREA.value:
+        blighttype = "AREA"
     else:
         blighttype = "SPOT"
 

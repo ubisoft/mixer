@@ -100,6 +100,7 @@ class LightType(IntEnum):
     SPOT = 0  # directly mapped from Unity enum
     SUN = 1
     POINT = 2
+    AREA = 3
 
 
 class SensorFitMode(IntEnum):

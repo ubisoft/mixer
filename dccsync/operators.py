@@ -47,22 +47,20 @@ def update_params(obj):
     if obj.data:
         typename = obj.data.bl_rna.name
 
+    supported_lights = ["Sun Light", "Point Light", "Spot Light", "Area Light"]
     if (
         typename != "Camera"
         and typename != "Mesh"
         and typename != "Curve"
         and typename != "Text Curve"
-        and typename != "Sun Light"
-        and typename != "Point Light"
-        and typename != "Spot Light"
-        and typename != "Grease Pencil"
+        and typename not in supported_lights
     ):
         return
 
     if typename == "Camera":
         send_camera(share_data.client, obj)
 
-    if typename == "Sun Light" or typename == "Point Light" or typename == "Spot Light":
+    if typename in supported_lights:
         send_light(share_data.client, obj)
 
     if typename == "Grease Pencil":
