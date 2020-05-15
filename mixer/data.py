@@ -139,7 +139,6 @@ classes = (
 def register():
     for _ in classes:
         bpy.utils.register_class(_)
-    bpy.types.Scene.mixer_uuid = bpy.props.StringProperty(default="")
     bpy.types.WindowManager.mixer = bpy.props.PointerProperty(type=MixerProperties)
 
 

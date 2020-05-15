@@ -105,7 +105,9 @@ def get_props() -> DebugDataProperties:
 
 
 def register():
+    print(collection_name_to_type)
     for t in collection_name_to_type.values():
+        print(f"create uuid in {t}")
         t.mixer_uuid = bpy.props.StringProperty(default="")
 
     for class_ in classes:
