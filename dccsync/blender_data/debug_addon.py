@@ -1,5 +1,7 @@
 import bpy
 import logging
+import time
+
 import dccsync.blender_data.blenddata
 from dccsync.blender_data.blenddata import collection_name_to_type
 
@@ -10,6 +12,15 @@ default_test = "test_module.TestCase.test_name"
 class DebugDataProperties(bpy.types.PropertyGroup):
     test_names: bpy.props.StringProperty(name="TestNames", default=default_test)
 
+
+def timeit(func):
+    def wrapper(*arg, **kw):
+        '''source: http://www.daniweb.com/code/snippet368.html'''
+        t1 = time.time()
+        res = func(*arg, **kw)
+        t2 = time.time()
+        return (t2 - t1), res, func.__name__
+    return wrapper
 
 class BuildProxyOperator(bpy.types.Operator):
     """Build proxy from current file"""
@@ -25,8 +36,10 @@ class BuildProxyOperator(bpy.types.Operator):
         from dccsync.blender_data.filter import default_context
 
         proxy = BpyBlendProxy()
+        t1 = time.time()
         proxy.load(default_context)
-
+        t2 = time.time()
+        logger.warning(f"Elapse: {t2 - t1} s.")
         non_empty = proxy.get_non_empty_collections()
         logger.info(f"Number of non empty collections in proxy: {len(non_empty)}")
 

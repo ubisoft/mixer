@@ -107,7 +107,35 @@ Exclude all readonly except specified (pointer, collections) ?
 Custom properties : `oj.keys()` :
 https://stackoverflow.com/questions/21265676/how-do-i-read-out-custom-properties-in-blender-with-python
 
-# AOS to Big_array
+# Performance for array of structures
+
+## Use foreach_get
+
+In this commit, loading GPencilStrokePoint alone with the following devides SS_2_82 proxy load time by 3. A similar work can be done for meshes
+
+    if hasattr(bl_collection, "bl_rna") and bl_collection.bl_rna is T.GPencilStrokePoints.bl_rna:
+      n_points = len(bl_collection)
+      args = [
+        ("co", 3),
+        ("pressure", 1),
+        ("select", 1),
+        ("strength", 1),
+        ("uv_factor", 1),
+        ("uv_rotation", 1),
+      ]
+      for name, l in args:
+        self.\_data[name] = [0] _ l _ n_points
+        bl_collection.foreach_get(name, self.\_data[name])
+
+https://github.com/KhronosGroup/glTF-Blender-IO/issues/76
+https://blender.stackexchange.com/questions/1412/efficient-way-to-get-selected-vertices-via-python-without-iterating-over-the-en
+
+https://blenderartists.org/t/use-of-foreach-get-and-foreach-set/524646/4
+https://blender.stackexchange.com/questions/2407/how-to-create-a-mesh-programmatically-without-bmesh
+
+## Load with a generator expresssion into a numpy array
+
+Superseded by `foreach_get`
 
 A possibility to save Arrays of structure (`MeshVertices`, `GPencilStrokePoint`) in a 'single' pass
 
@@ -118,6 +146,12 @@ vx=m.vertices.values()
 
     gen_expr = (f for vertex in vertices for f in (list(vertex.co) + list(vertex.normal)))
     np.fromiter((gen_expr), numpy.float, len(vx)*6)
+
+for gp strokepoint
+
+    gen_expr = (float_ for p in points for float_ in (p.co[0], p.co[1], p.co[2], p.pressure, float(p.select), p.strength, p.uv_factor, p.uv_rotation))
+    float_count = 8
+    np.fromiter((gen_expr), numpy.float, len(points) \* float_count)
 
 2D, from a list comprehension
 

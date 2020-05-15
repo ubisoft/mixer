@@ -417,11 +417,31 @@ class BpyPropStructCollectionProxy(Proxy):
         """
         in bl_collection : a bpy.types.bpy_prop_collection
         """
-        # TODO If the key type is an int, load as a a list and check that no indices are missing
-        for key, item in bl_collection.items():
-            with visit_context.enter(key, item):
-                self._data[key] = BpyStructProxy().load(item, context, visit_context)
-
+        # 10% faster than previous version on Blender_SS2_82.blend, save remains todo
+        items = bl_collection.items()
+        if not items:
+            return self
+        if hasattr(bl_collection, "bl_rna") and bl_collection.bl_rna is T.GPencilStrokePoints.bl_rna:
+            n_points = len(bl_collection)
+            args = [
+                ("co", 3),
+                ("pressure", 1),
+                ("select", 1),
+                ("strength", 1),
+                ("uv_factor", 1),
+                ("uv_rotation", 1),
+            ]
+            for name, l in args:
+                self._data[name] = [0] * l * n_points
+                bl_collection.foreach_get(name, self._data[name])
+            return self
+        is_int_key = items[0][0] is int
+        if is_int_key:
+            # assert contingous indices
+            assert items[-1][0] == len(items) - 1
+            self._data = [BpyStructProxy().load(v, context, visit_context) for _, v in items]
+        else:
+            self._data = {k: BpyStructProxy().load(v, context, visit_context) for k, v in items}
         return self
 
     def save(self, bl_instance: any, attr_name: str):

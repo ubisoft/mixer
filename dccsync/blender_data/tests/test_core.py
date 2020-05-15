@@ -68,6 +68,12 @@ class TestCore(unittest.TestCase):
         self.assertIs(objects_rna_property.fixed_type.bl_rna, T.Object.bl_rna)
         self.assertIs(T.Mesh.bl_rna.properties["vertices"].srna.bl_rna, T.MeshVertices.bl_rna)
 
+    def test_types_grease_pencil(self):
+        # Grease pencil elements
+        triangles = T.GPencilStroke.bl_rna.properties["triangles"]
+        self.assertIs(triangles.bl_rna, T.CollectionProperty.bl_rna)
+        self.assertIs(triangles.fixed_type.bl_rna, T.GPencilTriangle.bl_rna)
+
     def test_check_types(self):
         # check our own assertions about types
         for t in dir(bpy.types):
