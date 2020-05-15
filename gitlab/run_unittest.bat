@@ -43,5 +43,8 @@ set PYTHON=%MIXER_BLENDER_EXE_DIR%\%MIXER_BLENDER_VERSION_BASE%\python\bin\pytho
 REM install Mixer in local blender
 %MIXER_BLENDER_EXE_PATH% --background --python %CURRENT_DIR%\install_mixer.py
 
-REM run unit tests
+REM Theses tests run within blender
+%MIXER_BLENDER_EXE_PATH% --background --python mixer\blender_data\tests\test_for_debug.py
+
+REM run unit tests. Theses tests launch 2 blender that communicate together
 %PYTHON% -m unittest discover --verbose

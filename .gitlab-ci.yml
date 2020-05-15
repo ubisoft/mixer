@@ -50,14 +50,3 @@ unittest:
   cache:
     paths:
       - gitlab/blender/cache
-
-# During early development, easier to keep track of failures with a separate step. Merge later to regular tests step
-unittest-blenddata:
-  stage: qa_and_test
-  tags:
-    - blender
-  variables:
-    DCCSYNC_BLENDER_EXE_PATH: D:\gitlab_runner\blender-2.82a-windows64\blender.exe
-    DCCSYNC_BLENDER_EXE_DIR: D:\gitlab_runner\blender-2.82a-windows64
-  script:
-    - gitlab\run_unittest_blenddata.bat
