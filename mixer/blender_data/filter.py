@@ -2,7 +2,7 @@ from typing import Any, ItemsView, Iterable, List, Mapping, Union
 
 from bpy import types as T  # noqa
 
-from dccsync.blender_data.types import is_pointer_to
+from mixer.blender_data.types import is_pointer_to
 
 
 class Filter:
@@ -158,7 +158,7 @@ _exclude_names = {
     "library",
     "override_library",
     "preview",
-    "dccsync_uuid",
+    "mixer_uuid",
 }
 
 # TODO Change to (type, filter) for easier maintenance

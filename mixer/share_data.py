@@ -4,8 +4,8 @@ import logging
 from typing import List, Mapping, Set
 from uuid import uuid4
 
-from dccsync.blender_data.proxy import BpyBlendProxy
-from dccsync.blender_data.filter import safe_context
+from mixer.blender_data.proxy import BpyBlendProxy
+from mixer.blender_data.filter import safe_context
 
 import bpy
 

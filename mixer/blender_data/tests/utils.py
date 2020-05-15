@@ -6,8 +6,8 @@ import unittest
 
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from dccsync.blender_data.types import is_builtin, is_vector, is_matrix
-from dccsync.blender_data.filter import default_context
+from mixer.blender_data.types import is_builtin, is_vector, is_matrix
+from mixer.blender_data.filter import default_context
 
 
 this_folder = Path(__file__).parent

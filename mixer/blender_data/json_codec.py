@@ -1,6 +1,6 @@
 import json
 
-from dccsync.blender_data.proxy import (
+from mixer.blender_data.proxy import (
     BpyIDProxy,
     BpyIDRefProxy,
     BpyPropertyGroupProxy,

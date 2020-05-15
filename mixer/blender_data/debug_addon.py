@@ -2,8 +2,8 @@ import bpy
 import logging
 import time
 
-import dccsync.blender_data.blenddata
-from dccsync.blender_data.blenddata import collection_name_to_type
+import mixer.blender_data.blenddata
+from mixer.blender_data.blenddata import collection_name_to_type
 
 logger = logging.Logger(__name__, logging.INFO)
 default_test = "test_module.TestCase.test_name"
@@ -15,25 +15,27 @@ class DebugDataProperties(bpy.types.PropertyGroup):
 
 def timeit(func):
     def wrapper(*arg, **kw):
-        '''source: http://www.daniweb.com/code/snippet368.html'''
+        """source: http://www.daniweb.com/code/snippet368.html"""
         t1 = time.time()
         res = func(*arg, **kw)
         t2 = time.time()
         return (t2 - t1), res, func.__name__
+
     return wrapper
+
 
 class BuildProxyOperator(bpy.types.Operator):
     """Build proxy from current file"""
 
-    bl_idname = "dcc_sync.build_proxy"
-    bl_label = "DCCSync build proxy"
+    bl_idname = "mixer.build_proxy"
+    bl_label = "Mixer build proxy"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
         # Cannot import at module level, since it requires access to bpy.data which is not
         # accessible during module load
-        from dccsync.blender_data.proxy import BpyBlendProxy
-        from dccsync.blender_data.filter import default_context
+        from mixer.blender_data.proxy import BpyBlendProxy
+        from mixer.blender_data.filter import default_context
 
         proxy = BpyBlendProxy()
         t1 = time.time()
@@ -50,18 +52,18 @@ class BuildProxyOperator(bpy.types.Operator):
 class DebugDataTestOperator(bpy.types.Operator):
     """Execute blender_data tests for debugging"""
 
-    bl_idname = "dcc_sync.data_test"
-    bl_label = "DCCSync test data"
+    bl_idname = "mixer.data_test"
+    bl_label = "Mixer test data"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
         # Cannot import at module level, since it requires access to bpy.data which is not
         # accessible during module load
-        from dccsync.blender_data.tests.utils import run_tests
+        from mixer.blender_data.tests.utils import run_tests
 
         names = get_props().test_names
         if names:
-            base = "dccsync.blender_data.tests."
+            base = "mixer.blender_data.tests."
             test_names = [base + name for name in names.split()]
         else:
             test_names = None
@@ -78,7 +80,7 @@ class DebugDataPanel(bpy.types.Panel):
     bl_idname = "DATA_PT_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "DCC Sync"
+    bl_category = "Mixer"
 
     def draw(self, context):
         layout = self.layout
@@ -104,15 +106,15 @@ def get_props() -> DebugDataProperties:
 
 def register():
     for t in collection_name_to_type.values():
-        t.dccsync_uuid = bpy.props.StringProperty(default="")
+        t.mixer_uuid = bpy.props.StringProperty(default="")
 
     for class_ in classes:
         bpy.utils.register_class(class_)
     bpy.types.WindowManager.debug_data_props = bpy.props.PointerProperty(type=DebugDataProperties)
-    bpy.app.handlers.load_post.append(dccsync.blender_data.blenddata.on_load)
+    bpy.app.handlers.load_post.append(mixer.blender_data.blenddata.on_load)
 
 
 def unregister():
     for class_ in classes:
         bpy.utils.unregister_class(class_)
-    bpy.app.handlers.load_post.remove(dccsync.blender_data.blenddata.on_load)
+    bpy.app.handlers.load_post.remove(mixer.blender_data.blenddata.on_load)

@@ -89,8 +89,8 @@ class BpyPropCollectionDiff(BpyDiff):
         blender_items = {}
         for name, item in bl_collection.items():
             ensure_uuid(item)
-            blender_items[item.dccsync_uuid] = (name, bl_collection)
-        proxy_items = {item.dccsync_uuid: name for name, item in proxy.items()}
+            blender_items[item.mixer_uuid] = (name, bl_collection)
+        proxy_items = {item.mixer_uuid: name for name, item in proxy.items()}
         self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
 
         # TODO diff, filter by depsgraph update (add depsgraph parameter ?)
