@@ -4,16 +4,16 @@ import unittest
 import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from dccsync.blender_data.blenddata import BlendData
-from dccsync.blender_data.proxy import (
+from mixer.blender_data.blenddata import BlendData
+from mixer.blender_data.proxy import (
     BpyBlendProxy,
     BpyIDProxy,
     BpyIDRefProxy,
     BpyPropertyGroupProxy,
 )
-from dccsync.blender_data.tests.utils import test_blend_file
+from mixer.blender_data.tests.utils import test_blend_file
 
-from dccsync.blender_data.filter import (
+from mixer.blender_data.filter import (
     Context,
     TypeFilterOut,
     default_context,

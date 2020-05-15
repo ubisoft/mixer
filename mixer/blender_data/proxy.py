@@ -7,14 +7,14 @@ from contextlib import contextmanager
 import bpy
 import bpy.types as T  # noqa
 
-from dccsync.blender_data.filter import Context
-from dccsync.blender_data.blenddata import (
+from mixer.blender_data.filter import Context
+from mixer.blender_data.blenddata import (
     BlendData,
     collection_name_to_type,
     rna_identifier_to_collection_name,
     bl_rna_to_type,
 )
-from dccsync.blender_data.types import is_builtin, is_vector, is_matrix
+from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 
 logger = logging.Logger(__name__, logging.INFO)
 
@@ -302,7 +302,7 @@ class BpyIDProxy(BpyStructProxy):
     def load(self, bl_instance, context: Context, visit_context: BlendDataVisitContext):
         # TODO check that bl_instance class derives from ID
         super().load(bl_instance, context, visit_context)
-        self.dccsync_uuid = bl_instance.dccsync_uuid
+        self.mixer_uuid = bl_instance.mixer_uuid
         return self
 
     def target(self, bl_instance: any, attr_name: str):
@@ -399,8 +399,8 @@ class BpyIDRefProxy(Proxy):
 
 
 def ensure_uuid(item: bpy.types.ID):
-    if item.get("dccsync_uuid") is None:
-        item.dccsync_uuid = str(uuid4())
+    if item.get("mixer_uuid") is None:
+        item.mixer_uuid = str(uuid4())
 
 
 class BpyPropStructCollectionProxy(Proxy):

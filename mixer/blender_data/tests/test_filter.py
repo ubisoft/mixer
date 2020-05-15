@@ -2,9 +2,9 @@ import unittest
 
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from dccsync.blender_data.tests.utils import matches_type
+from mixer.blender_data.tests.utils import matches_type
 
-from dccsync.blender_data.filter import (
+from mixer.blender_data.filter import (
     CollectionFilterOut,
     Context,
     FilterStack,

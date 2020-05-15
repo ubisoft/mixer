@@ -1,11 +1,11 @@
 import logging
 
-from dccsync.blender_data.blenddata import BlendData
-from dccsync.blender_data.filter import safe_context
-from dccsync.blender_data.json_codec import Codec
-from dccsync.blender_data.proxy import BlendDataVisitContext
-from dccsync.broadcaster import common
-from dccsync.share_data import share_data
+from mixer.blender_data.blenddata import BlendData
+from mixer.blender_data.filter import safe_context
+from mixer.blender_data.json_codec import Codec
+from mixer.blender_data.proxy import BlendDataVisitContext
+from mixer.broadcaster import common
+from mixer.share_data import share_data
 
 import bpy.types
 

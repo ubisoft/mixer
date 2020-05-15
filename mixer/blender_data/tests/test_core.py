@@ -3,11 +3,11 @@ import unittest
 import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from dccsync.blender_data.tests.utils import equals, register_bl_equals, test_blend_file
+from mixer.blender_data.tests.utils import equals, register_bl_equals, test_blend_file
 
-from dccsync.blender_data import types
-from dccsync.blender_data.proxy import BpyStructProxy, LoadElementAs, load_as_what, BlendDataVisitContext
-from dccsync.blender_data.filter import default_context, Context, FilterStack
+from mixer.blender_data import types
+from mixer.blender_data.proxy import BpyStructProxy, LoadElementAs, load_as_what, BlendDataVisitContext
+from mixer.blender_data.filter import default_context, Context, FilterStack
 
 
 # @unittest.skip('')
