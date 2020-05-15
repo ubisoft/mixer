@@ -8,12 +8,12 @@ import unittest
 import sys
 
 import tests.blender_lib as bl
-import tests.dccsync_lib as dccsync_lib
+import tests.mixer_lib as mixer_lib
 from tests.grabber import Grabber
 from tests.grabber import CommandStream
 from tests.process import BlenderServer
 
-from dccsync.broadcaster.common import MessageType
+from mixer.broadcaster.common import MessageType
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -34,16 +34,16 @@ class Blender:
         self._blender = BlenderServer(self._port, self._ptvsd_port, self._wait_for_debugger)
         self._blender.start(blender_args)
         self._blender.connect()
-        self.connect_and_join_dccsync()
+        self.connect_and_join_mixer()
 
-    def connect_and_join_dccsync(self, room_name="dccsync_unittest"):
+    def connect_and_join_mixer(self, room_name="mixer_unittest"):
         if self._log_level is not None:
-            self._blender.send_function(dccsync_lib.set_log_level, self._log_level)
-        self._blender.send_function(dccsync_lib.connect)
-        self._blender.send_function(dccsync_lib.join_room, room_name)
+            self._blender.send_function(mixer_lib.set_log_level, self._log_level)
+        self._blender.send_function(mixer_lib.connect)
+        self._blender.send_function(mixer_lib.join_room, room_name)
 
-    def disconnect_dccsync(self):
-        self._blender.send_function(dccsync_lib.disconnect)
+    def disconnect_mixer(self):
+        self._blender.send_function(mixer_lib.disconnect)
 
     def wait(self, timeout: float = None):
         return self._blender.wait(timeout)
@@ -129,24 +129,24 @@ class BlenderTestCase(unittest.TestCase):
     def assert_matches(self):
         # TODO add message cout dict as param
 
-        self._sender.disconnect_dccsync()
+        self._sender.disconnect_mixer()
         # time.sleep(1)
-        self._receiver.disconnect_dccsync()
+        self._receiver.disconnect_mixer()
         # time.sleep(1)
 
         host = "127.0.0.1"
         port = 12800
-        self._sender.connect_and_join_dccsync("dccsync_grab_sender")
+        self._sender.connect_and_join_mixer("mixer_grab_sender")
         time.sleep(1)
         sender_grabber = Grabber()
-        sender_grabber.grab(host, port, "dccsync_grab_sender")
-        self._sender.disconnect_dccsync()
+        sender_grabber.grab(host, port, "mixer_grab_sender")
+        self._sender.disconnect_mixer()
 
-        self._receiver.connect_and_join_dccsync("dccsync_grab_receiver")
+        self._receiver.connect_and_join_mixer("mixer_grab_receiver")
         time.sleep(1)
         receiver_grabber = Grabber()
-        receiver_grabber.grab(host, port, "dccsync_grab_receiver")
-        self._receiver.disconnect_dccsync()
+        receiver_grabber.grab(host, port, "mixer_grab_receiver")
+        self._receiver.disconnect_mixer()
 
         # TODO_ timing error : sometimes succeeds
         # TODO_ enhance comparison : check # elements, understandable comparison
@@ -239,13 +239,13 @@ class BlenderTestCase(unittest.TestCase):
             self.assertEqual(h0, h, f"Hashes differ for {p0} ({h0.hex()}) and {p} ({h.hex()})")
 
     def connect(self):
-        self._sender.connect_and_join_dccsync()
+        self._sender.connect_and_join_mixer()
         time.sleep(1)
-        self._receiver.connect_and_join_dccsync()
+        self._receiver.connect_and_join_mixer()
 
     def disconnect(self):
-        self._sender.disconnect_dccsync()
-        self._receiver.disconnect_dccsync()
+        self._sender.disconnect_mixer()
+        self._receiver.disconnect_mixer()
 
     def link_collection_to_collection(self, parent_name: str, child_name: str):
         self._sender.send_function(bl.link_collection_to_collection, parent_name, child_name)

@@ -5,22 +5,22 @@ from typing import Set
 
 import bpy
 from mathutils import Matrix, Quaternion
-import dccsync
-from dccsync import ui
-from dccsync import data
-from dccsync.share_data import share_data
-from dccsync.broadcaster import common
-from dccsync.broadcaster.client import Client
-from dccsync.blender_client import camera as camera_api
-from dccsync.blender_client import collection as collection_api
-from dccsync.blender_client import data as data_api
-from dccsync.blender_client import grease_pencil as grease_pencil_api
-from dccsync.blender_client import light as light_api
-from dccsync.blender_client import material as material_api
-from dccsync.blender_client import mesh as mesh_api
-from dccsync.blender_client import object_ as object_api
-from dccsync.blender_client import scene as scene_api
-from dccsync.stats import stats_timer
+import mixer
+from mixer import ui
+from mixer import data
+from mixer.share_data import share_data
+from mixer.broadcaster import common
+from mixer.broadcaster.client import Client
+from mixer.blender_client import camera as camera_api
+from mixer.blender_client import collection as collection_api
+from mixer.blender_client import data as data_api
+from mixer.blender_client import grease_pencil as grease_pencil_api
+from mixer.blender_client import light as light_api
+from mixer.blender_client import material as material_api
+from mixer.blender_client import mesh as mesh_api
+from mixer.blender_client import object_ as object_api
+from mixer.blender_client import scene as scene_api
+from mixer.stats import stats_timer
 
 _STILL_ACTIVE = 259
 
@@ -41,7 +41,7 @@ class ClientBlender(Client):
 
     # returns the path of an object
     def get_object_path(self, obj):
-        return dccsync.blender_client.misc.get_object_path(obj)
+        return mixer.blender_client.misc.get_object_path(obj)
 
     # get first collection
     def get_or_create_collection(self, name: str):
@@ -54,7 +54,7 @@ class ClientBlender(Client):
         return collection
 
     def get_or_create_path(self, path, data=None) -> bpy.types.Object:
-        return dccsync.blender_client.misc.get_or_create_path(path, data)
+        return mixer.blender_client.misc.get_or_create_path(path, data)
 
     def get_or_create_object_data(self, path, data):
         return self.get_or_create_path(path, data)
@@ -311,7 +311,7 @@ class ClientBlender(Client):
         binary_buffer = common.encode_string(path) + common.encode_string(mesh_name)
 
         binary_buffer += mesh_api.encode_mesh(
-            obj, data.get_dcc_sync_props().send_base_meshes, data.get_dcc_sync_props().send_baked_meshes
+            obj, data.get_mixer_props().send_base_meshes, data.get_mixer_props().send_baked_meshes
         )
 
         # For now include material slots in the same message, but maybe it should be a separated message

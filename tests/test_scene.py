@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from dccsync.broadcaster.common import MessageType
+from mixer.broadcaster.common import MessageType
 
 import unittest
 import tests.testcase as testcase
@@ -153,8 +153,8 @@ class TestSceneEmptyDoc(SceneTestCase):
     def test_create_instance_in_scene_before_join(self):
         import time
 
-        self._sender.disconnect_dccsync()
-        self._receiver.disconnect_dccsync()
+        self._sender.disconnect_mixer()
+        self._receiver.disconnect_mixer()
         time.sleep(1)
 
         self.new_scene("scene_1")
@@ -164,8 +164,8 @@ class TestSceneEmptyDoc(SceneTestCase):
         self.new_collection_instance("src", "instance_1")
         self.link_object_to_scene("Scene", "instance_1")
 
-        self._sender.connect_and_join_dccsync()
-        self._receiver.connect_and_join_dccsync()
+        self._sender.connect_and_join_mixer()
+        self._receiver.connect_and_join_mixer()
         self.end_test()
 
 

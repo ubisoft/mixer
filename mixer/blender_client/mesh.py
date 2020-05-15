@@ -5,10 +5,10 @@ import bpy
 import bmesh
 from mathutils import Vector
 
-from dccsync.broadcaster import common
-from dccsync.stats import stats_timer
-from dccsync.share_data import share_data
-from dccsync.blender_client import material as material_api
+from mixer.broadcaster import common
+from mixer.stats import stats_timer
+from mixer.share_data import share_data
+from mixer.blender_client import material as material_api
 
 logger = logging.getLogger(__name__)
 

@@ -26,7 +26,7 @@ Receiver Blender
 Diff the scenes
 """
 
-BLENDER_EXE = os.environ.get("DCCSYNC_BLENDER_EXE_PATH", "blender.exe")
+BLENDER_EXE = os.environ.get("MIXER_BLENDER_EXE_PATH", "blender.exe")
 current_dir = Path(__file__).parent
 
 
@@ -68,7 +68,7 @@ class Blender(Process):
             self._process = subprocess.Popen(popen_args, shell=False, **other_args)
         except FileNotFoundError:
             logging.error(
-                f'Cannot start "{BLENDER_EXE}". Define DCCSYNC_BLENDER_EXE_PATH environment variable or add to PATH'
+                f'Cannot start "{BLENDER_EXE}". Define MIXER_BLENDER_EXE_PATH environment variable or add to PATH'
             )
 
     def wait(self, timeout: float = None):
