@@ -38,7 +38,7 @@ zip_release:
 
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
 unittest:
-  stage: qa_and_test
+  stage: test
   tags:
     - blender
   variables:
