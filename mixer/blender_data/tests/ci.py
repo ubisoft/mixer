@@ -1,10 +1,11 @@
-import sys
+from pathlib import Path
 import unittest
+
+this_folder = str(Path(__file__).parent)
 
 
 def main_ci():
-    module = sys.modules[__name__]
-    suite = unittest.defaultTestLoader.loadTestsFromModule(module)
+    suite = unittest.defaultTestLoader.discover(this_folder)
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
     if not result.wasSuccessful():
@@ -14,3 +15,4 @@ def main_ci():
 
 if __name__ == "__main__":
     main_ci()
+    pass
