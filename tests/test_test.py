@@ -18,7 +18,7 @@ class TestTest(testcase.BlenderTestCase):
     def test_selftest(self):
         pass
 
-    # @unittest.skip("")
+    @unittest.skip("")
     def test_just_start(self):
         self.assert_user_success()
 
