@@ -2,7 +2,6 @@ import bpy
 import logging
 import time
 
-import mixer.blender_data.blenddata
 from mixer.blender_data import blenddata
 
 logger = logging.Logger(__name__, logging.INFO)

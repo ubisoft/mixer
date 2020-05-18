@@ -1,6 +1,5 @@
 import functools
 from pathlib import Path
-import sys
 from typing import Iterable, List, Union
 import unittest
 
