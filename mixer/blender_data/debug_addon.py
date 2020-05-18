@@ -3,7 +3,7 @@ import logging
 import time
 
 import mixer.blender_data.blenddata
-from mixer.blender_data.blenddata import collection_name_to_type
+from mixer.blender_data.blenddata import create_uuids
 
 logger = logging.Logger(__name__, logging.INFO)
 default_test = "test_module.TestCase.test_name"
@@ -105,10 +105,7 @@ def get_props() -> DebugDataProperties:
 
 
 def register():
-    print(collection_name_to_type)
-    for t in collection_name_to_type.values():
-        print(f"create uuid in {t}")
-        t.mixer_uuid = bpy.props.StringProperty(default="")
+    create_uuids()
 
     for class_ in classes:
         bpy.utils.register_class(class_)

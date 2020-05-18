@@ -70,6 +70,7 @@ class TestWriteAttribute(unittest.TestCase):
     # explicit test per data type , including addition in collections
 
     def test_write_light(self):
+        self.fail("plop")
         light_name = "Light"
         light = D.lights["Light"]
         clone_name = f"Clone of {light_name}"
@@ -78,7 +79,7 @@ class TestWriteAttribute(unittest.TestCase):
         light_proxy._data["energy"] = expected_energy
         light_type = light_proxy._data["type"]
         light_proxy._data["name"] = clone_name
-        clone = D.lights.new(clone_name, light_type)
+        D.lights.new(clone_name, light_type)
         light_proxy.save(D.lights, clone_name)
         self.assertEqual(light.energy, expected_energy)
 

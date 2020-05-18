@@ -115,23 +115,3 @@ def run_tests(test_names: Union[str, List[str]] = None):
         suite = unittest.defaultTestLoader.discover(this_dir)
     runner = unittest.TextTestRunner(verbosity=2)
     runner.run(suite)
-
-
-def main():
-    module = sys.modules[__name__]
-    suite = unittest.defaultTestLoader.loadTestsFromModule(module)
-    runner = unittest.TextTestRunner(verbosity=2)
-    runner.run(suite)
-
-
-def main_ci():
-    module = sys.modules[__name__]
-    suite = unittest.defaultTestLoader.loadTestsFromModule(module)
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
-    if not result.wasSuccessful():
-        raise AssertionError("Tests failed")
-
-
-if __name__ == "__main__":
-    main_ci()

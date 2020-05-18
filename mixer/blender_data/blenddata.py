@@ -155,3 +155,8 @@ class BlendData:
 @bpy.app.handlers.persistent
 def on_load(dummy):
     BlendData.instance().reset()
+
+
+def create_uuids():
+    for t in collection_name_to_type.values():
+        t.mixer_uuid = bpy.props.StringProperty(default="")
