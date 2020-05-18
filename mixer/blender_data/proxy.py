@@ -15,7 +15,7 @@ from mixer.blender_data.blenddata import (
     rna_identifier_to_collection_name,
     bl_rna_to_type,
 )
-from mixer.blender_data.types import is_builtin, is_vector, is_matrix
+from mixer.blender_data.types import is_builtin, is_vector, is_matrix, soa_initializers, soable_properties
 
 logger = logging.Logger(__name__, logging.INFO)
 
@@ -404,6 +404,63 @@ def ensure_uuid(item: bpy.types.ID):
         item.mixer_uuid = str(uuid4())
 
 
+class AosItem(Proxy):
+    def __init__(self):
+        self._data: Union[array.array, [List]] = None
+
+    def load(
+        self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str,
+    ):
+
+        # logging.warning(f"Not implemented : property {bl_collection}.{attr_name}")
+        return self
+
+
+def soa_initializer(element_init, length):
+    # According to bpy_rna.c:foreach_getset() and rna_access.c:rna_raw_access() implementations,
+    # some cases are implemented as memcpy (buffer interface) or array iteration (sequences),
+    # with more subcases that require reallocation when the buffer type is not suitable,
+    # so try to be smart
+
+    if isinstance(element_init, array.array):
+        return array.array(element_init.typecode, element_init.tolist() * length)
+    elif isinstance(element_init, list):
+        return element_init * length
+
+
+class SoaItem(Proxy):
+    def __init__(self):
+        self._data: Union[array.array, [List]] = None
+
+    def load(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str, prototype_item):
+        # TODO do not reallocate if size does not change
+        attr = getattr(prototype_item, attr_name)
+        attr_type = type(attr)
+        length = len(bl_collection)
+        if is_vector(attr_type):
+            # TODO check matrices
+            length *= len(attr)
+        init = soa_initializers[attr_type]
+        buffer = soa_initializer(init, length)
+        bl_collection.foreach_get(attr_name, buffer)
+        self._data = buffer
+        return self
+
+
+# TODO : is there any way to find this automatically ? Seems esay for the inner structure,
+# but how to get the element type of a bpy _prop_collection
+
+soable_collections = {
+    T.GPencilStrokePoints.bl_rna,
+    T.MeshVertices.bl_rna,
+}
+
+
+def soable_collection(bl_collection):
+    soable = hasattr(bl_collection, "bl_rna") and bl_collection.bl_rna in soable_collections
+    return soable
+
+
 class BpyPropStructCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of non-ID in bpy.data
@@ -415,33 +472,35 @@ class BpyPropStructCollectionProxy(Proxy):
     def load(
         self, bl_collection: bpy.types.bpy_prop_collection, context: Context, visit_context: BlendDataVisitContext
     ):
-        """
-        in bl_collection : a bpy.types.bpy_prop_collection
-        """
-        # 10% faster than previous version on Blender_SS2_82.blend, save remains todo
-        items = bl_collection.items()
-        if not items:
+
+        if len(bl_collection) == 0:
             return self
-        if hasattr(bl_collection, "bl_rna") and bl_collection.bl_rna is T.GPencilStrokePoints.bl_rna:
-            n_points = len(bl_collection)
-            self._data = [
-                ("co", array.array("f", [0.0] * n_points * 3)),
-                ("pressure", array.array("f", [0.0] * n_points)),
-                ("select", [False] * n_points),
-                ("strength", array.array("f", [0.0] * n_points)),
-                ("uv_factor", array.array("f", [0.0] * n_points)),
-                ("uv_rotation", array.array("f", [0.0] * n_points)),
-            ]
-            for k, v in self._data:
-                bl_collection.foreach_get(k, v)
-            return self
-        is_int_key = items[0][0] is int
-        if is_int_key:
-            # assert contingous indices
-            assert items[-1][0] == len(items) - 1
-            self._data = [BpyStructProxy().load(v, context, visit_context) for _, v in items]
+
+        # no keys : it is a sequence. However bl_collection.items() returns [(index, item)...]
+        is_sequence = not bl_collection.keys()
+
+        if is_sequence:
+            if soable_collection(bl_collection):
+                # TODO too much work at load time to find soable information. Do it once for all.
+
+                # Hybrid array_of_struct/ struct_of_array
+                # Hybrid because MeshVertex.groups does not have a fixed size and is not soa-able, but we want
+                # to treat other MeshVertex members as SOAs.
+                # Could be made more efficient later on. Keep the code simple until save() is implemented
+                # and we need better
+                prototype_item = bl_collection[0]
+                for attr_name, bl_rna_property in context.properties(prototype_item):
+                    is_soable = any(isinstance(bl_rna_property, soable) for soable in soable_properties)
+                    if is_soable:
+                        self._data[attr_name] = SoaItem().load(bl_collection, attr_name, prototype_item)
+                    else:
+                        self._data[attr_name] = AosItem().load(bl_collection, attr_name)
+            else:
+                # array of struct
+                self._data = [BpyStructProxy().load(v, context, visit_context) for v in bl_collection.values()]
         else:
-            self._data = {k: BpyStructProxy().load(v, context, visit_context) for k, v in items}
+            # dict of struct
+            self._data = {k: BpyStructProxy().load(v, context, visit_context) for k, v in bl_collection.items()}
         return self
 
     def save(self, bl_instance: any, attr_name: str):

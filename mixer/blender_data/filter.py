@@ -117,7 +117,9 @@ class Context:
         self._filter_stack: FilterStack = filter_stack
 
     def properties(self, bl_rna_property: T.Property = None, bpy_type=None) -> ItemsView:
-        if (bl_rna_property is None) == (bpy_type is None):
+        if (bl_rna_property is None) and (bpy_type is None):
+            return []
+        if (bl_rna_property is not None) and (bpy_type is not None):
             raise ValueError("Exactly one of bl_rna and bpy_type must be provided")
         if bl_rna_property is not None:
             bl_rna = bl_rna_property.bl_rna
