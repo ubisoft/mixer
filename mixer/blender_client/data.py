@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 # WARNING There ara duplicate keys in blendata collections with linked blendfiles
 #
 def build_data_update(buffer):
+    if not share_data.use_experimental_sync():
+        return
+
     collection_name, index = common.decode_string(buffer, 0)
     key, index = common.decode_string(buffer, index)
     buffer, _ = common.decode_string(buffer, index)
@@ -29,6 +32,9 @@ def build_data_update(buffer):
 
 
 def send_update(updated_id: bpy.types.ID):
+    if not share_data.use_experimental_sync():
+        return
+
     global_proxy = share_data.proxy
     blenddata = BlendData.instance()
     collection_name = blenddata.bl_collection_name_from_ID(updated_id)
