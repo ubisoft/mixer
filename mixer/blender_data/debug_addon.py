@@ -3,7 +3,7 @@ import logging
 import time
 
 import mixer.blender_data.blenddata
-from mixer.blender_data.blenddata import create_uuids
+from mixer.blender_data import blenddata
 
 logger = logging.Logger(__name__, logging.INFO)
 default_test = "test_module.TestCase.test_name"
@@ -105,15 +105,13 @@ def get_props() -> DebugDataProperties:
 
 
 def register():
-    create_uuids()
-
     for class_ in classes:
         bpy.utils.register_class(class_)
     bpy.types.WindowManager.debug_data_props = bpy.props.PointerProperty(type=DebugDataProperties)
-    bpy.app.handlers.load_post.append(mixer.blender_data.blenddata.on_load)
+    blenddata.register()
 
 
 def unregister():
     for class_ in classes:
         bpy.utils.unregister_class(class_)
-    bpy.app.handlers.load_post.remove(mixer.blender_data.blenddata.on_load)
+    blenddata.unregister()

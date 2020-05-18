@@ -157,6 +157,12 @@ def on_load(dummy):
     BlendData.instance().reset()
 
 
-def create_uuids():
+def register():
     for t in collection_name_to_type.values():
         t.mixer_uuid = bpy.props.StringProperty(default="")
+
+    bpy.app.handlers.load_post.append(on_load)
+
+
+def unregister():
+    bpy.app.handlers.load_post.remove(on_load)
