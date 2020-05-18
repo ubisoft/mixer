@@ -1,3 +1,4 @@
+import array
 from enum import IntEnum
 import logging
 from typing import Any, Mapping, Union, Set, List, Tuple
@@ -423,17 +424,16 @@ class BpyPropStructCollectionProxy(Proxy):
             return self
         if hasattr(bl_collection, "bl_rna") and bl_collection.bl_rna is T.GPencilStrokePoints.bl_rna:
             n_points = len(bl_collection)
-            args = [
-                ("co", 3),
-                ("pressure", 1),
-                ("select", 1),
-                ("strength", 1),
-                ("uv_factor", 1),
-                ("uv_rotation", 1),
+            self._data = [
+                ("co", array.array("f", [0.0] * n_points * 3)),
+                ("pressure", array.array("f", [0.0] * n_points)),
+                ("select", [False] * n_points),
+                ("strength", array.array("f", [0.0] * n_points)),
+                ("uv_factor", array.array("f", [0.0] * n_points)),
+                ("uv_rotation", array.array("f", [0.0] * n_points)),
             ]
-            for name, l in args:
-                self._data[name] = [0] * l * n_points
-                bl_collection.foreach_get(name, self._data[name])
+            for k, v in self._data:
+                bl_collection.foreach_get(k, v)
             return self
         is_int_key = items[0][0] is int
         if is_int_key:
