@@ -170,7 +170,7 @@ def read_attribute(attr: any, attr_property: any, context: Context, visit_contex
 
         bl_rna = attr_property.bl_rna
         if bl_rna is None:
-            logger.warning("Unimplemented attribute %s", attr)
+            logger.warning("Not implemented: attribute %s", attr)
             return None
 
         assert issubclass(attr_type, T.PropertyGroup) == issubclass(attr_type, T.PropertyGroup)
@@ -208,11 +208,11 @@ class Proxy:
                 return False
         return True
 
-    def save(self, bl_instance: any, _):
+    def save(self, bl_instance: any, attr_name: str):
         """
         Save this proxy into a blender object
         """
-        logging.warning(f"save : Not implemented {self.__class__} {bl_instance}")
+        logging.warning(f"Not implemented: save() for {self.__class__} {bl_instance}.{attr_name}")
 
 
 class StructLikeProxy(Proxy):
@@ -390,7 +390,7 @@ class BpyIDRefProxy(Proxy):
         # here pointee somewhere else lvalue
         target = getattr(bpy.data, collection_name)[collection_key]
         if isinstance(bl_instance, T.bpy_prop_collection):
-            logging.warning(f"not implemented IDRef into collection {attr_name} for {bl_instance}...")
+            logging.warning(f"Not implemented: BpyIDRefProxy.save() for IDRef into collection {bl_instance}{attr_name}")
         else:
             if not bl_instance.bl_rna.properties[attr_name].is_readonly:
                 try:
@@ -466,8 +466,11 @@ class AosElement(Proxy):
         self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str,
     ):
         # the struct element may be missing is soable_properties
-        logging.warning(f"Not implemented : property {bl_collection}.{attr_name}")
+        logging.warning(f"Not implemented: AosElement.load() for {bl_collection}.{attr_name}")
         return self
+
+    def save(self, bl_instance: any, attr_name: str):
+        logging.warning(f"Not implemented: AosElement.save() for {bl_instance}.{attr_name}")
 
 
 class SoaElement(Proxy):
@@ -492,6 +495,9 @@ class SoaElement(Proxy):
         self._data = buffer
         return self
 
+    def save(self, bl_collection, attr_name):
+        bl_collection.foreach_set(attr_name, self._data)
+
 
 class BpyPropStructCollectionProxy(Proxy):
     """
@@ -506,43 +512,34 @@ class BpyPropStructCollectionProxy(Proxy):
     ):
 
         if len(bl_collection) == 0:
+            self._data.clear()
             return self
 
-        # no keys : it is a sequence. However bl_collection.items() returns [(index, item)...]
-        is_sequence = not bl_collection.keys()
+        if soable_collection(bl_collection):
+            # TODO too much work at load time to find soable information. Do it once for all.
 
-        if is_sequence:
-            if soable_collection(bl_collection):
-                # TODO too much work at load time to find soable information. Do it once for all.
-
-                # Hybrid array_of_struct/ struct_of_array
-                # Hybrid because MeshVertex.groups does not have a fixed size and is not soa-able, but we want
-                # to treat other MeshVertex members as SOAs.
-                # Could be made more efficient later on. Keep the code simple until save() is implemented
-                # and we need better
-                prototype_item = bl_collection[0]
-                for attr_name, bl_rna_property in context.properties(prototype_item):
-                    is_soable = any(isinstance(bl_rna_property, soable) for soable in soable_properties)
-                    if is_soable:
-                        self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item)
-                    else:
-                        self._data[attr_name] = AosElement().load(bl_collection, attr_name)
-            else:
-                # WIP and probably wrong
-                # array of struct
-                
-                self._data = [BpyStructProxy().load(v, context, visit_context) for v in bl_collection.values()]
-
-                # must probably be something like
-                # self._data = [read_attribute(v, context, visit_context) for v in bl_collection.values()]
+            # Hybrid array_of_struct/ struct_of_array
+            # Hybrid because MeshVertex.groups does not have a fixed size and is not soa-able, but we want
+            # to treat other MeshVertex members as SOAs.
+            # Could be made more efficient later on. Keep the code simple until save() is implemented
+            # and we need better
+            prototype_item = bl_collection[0]
+            for attr_name, bl_rna_property in context.properties(prototype_item):
+                is_soable = any(isinstance(bl_rna_property, soable) for soable in soable_properties)
+                if is_soable:
+                    self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item)
+                else:
+                    self._data[attr_name] = AosElement().load(bl_collection, attr_name)
         else:
-            # WIP and probably wrong
-            # dict of struct
-            # is this case possible or is it just for blenddata collections
-            self._data = {k: BpyStructProxy().load(v, context, visit_context) for k, v in bl_collection.items()}
+            # This way, some bpy_prop_collection will be loaded as maps with an int key and it is overkill
+            # Check when it happens and load as list. Will require a trick in save
 
-            # must probably be something like
-            # self._data = {k: read_attribute(v, context, visit_context) for k, v in bl_collection.items()}
+            # no keys : it is a sequence. However bl_collection.items() returns [(index, item)...]
+            is_sequence = not bl_collection.keys()
+            if is_sequence:
+                logging.warning(f"Sequence saved as dictionary. Performance mat not be optimal. {bl_collection}")
+
+            self._data = {k: BpyStructProxy().load(v, context, visit_context) for k, v in bl_collection.items()}
 
         return self
 
@@ -661,6 +658,8 @@ proxy_classes = [
     BpyPropertyGroupProxy,
     BpyPropStructCollectionProxy,
     BpyPropDataCollectionProxy,
+    SoaElement,
+    AosElement,
 ]
 
 

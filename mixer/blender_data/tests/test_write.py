@@ -70,7 +70,7 @@ class TestWriteAttribute(unittest.TestCase):
         co_proxy[2] *= 2
 
         vertices_proxy.save(cube, "vertices")
-        self.assertEqual(cube.vertices[0].co, Vector(co_proxy))
+        self.assertListEqual(list(cube.vertices[0].co[0:3]), co_proxy[0:3].tolist())
 
     # explicit test per data type , including addition in collections
 
