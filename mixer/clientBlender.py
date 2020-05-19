@@ -555,6 +555,8 @@ class ClientBlender(Client):
                         self.build_transform(command.data)
                     elif command.type == common.MessageType.MATERIAL:
                         material_api.build_material(command.data)
+                    elif command.type == common.MessageType.ASSIGN_MATERIAL:
+                        material_api.build_assign_material(command.data)
                     elif command.type == common.MessageType.DELETE:
                         self.build_delete(command.data)
                     elif command.type == common.MessageType.CAMERA:
