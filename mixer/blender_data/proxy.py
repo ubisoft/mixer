@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 import bpy
 import bpy.types as T  # noqa
+import mathutils
 
 from mixer.blender_data.filter import Context
 from mixer.blender_data.blenddata import (
@@ -15,7 +16,7 @@ from mixer.blender_data.blenddata import (
     rna_identifier_to_collection_name,
     bl_rna_to_type,
 )
-from mixer.blender_data.types import is_builtin, is_vector, is_matrix, soa_initializers, soable_properties
+from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 
 logger = logging.Logger(__name__, logging.INFO)
 
@@ -404,31 +405,78 @@ def ensure_uuid(item: bpy.types.ID):
         item.mixer_uuid = str(uuid4())
 
 
-class AosItem(Proxy):
-    def __init__(self):
-        self._data: Union[array.array, [List]] = None
+# in sync with soa_initializers
+soable_properties = {
+    T.BoolProperty,
+    T.IntProperty,
+    T.FloatProperty,
+    mathutils.Vector,
+    mathutils.Color,
+    mathutils.Quaternion,
+}
 
-    def load(
-        self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str,
-    ):
+# in sync with soa_initializers
+soa_initializers = {
+    bool: [False],
+    int: array.array("l", [0]),
+    float: array.array("f", [0.0]),
+    mathutils.Vector: array.array("f", [0.0]),
+    mathutils.Color: array.array("f", [0.0]),
+    mathutils.Quaternion: array.array("f", [0.0]),
+}
 
-        # logging.warning(f"Not implemented : property {bl_collection}.{attr_name}")
-        return self
+# TODO : is there any way to find these automatically ? Seems easy to determine if a struct is simple enough so that
+# an array of struct can be loaded as an Soa, but how to get the element type of a bpy _prop_collection ?
+# MeshVertex must be handled as SOA although "groups" is a variable length item. Enums are not handled by foreach_get()
+soable_collections = {
+    T.GPencilStrokePoints.bl_rna,
+    T.MeshVertices.bl_rna,
+    # many more Mesh elements
+}
 
 
-def soa_initializer(element_init, length):
+def soable_collection(bl_collection):
+    return hasattr(bl_collection, "bl_rna") and bl_collection.bl_rna in soable_collections
+
+
+def soa_initializer(attr_type, length):
     # According to bpy_rna.c:foreach_getset() and rna_access.c:rna_raw_access() implementations,
     # some cases are implemented as memcpy (buffer interface) or array iteration (sequences),
     # with more subcases that require reallocation when the buffer type is not suitable,
     # so try to be smart
-
+    element_init = soa_initializers[attr_type]
     if isinstance(element_init, array.array):
         return array.array(element_init.typecode, element_init.tolist() * length)
     elif isinstance(element_init, list):
         return element_init * length
 
 
-class SoaItem(Proxy):
+class AosElement(Proxy):
+    """
+    A structure member inside a bpy_prop_collection aloded as a structure orf array element
+
+    For instance, MeshVertex.groups is a bpy_prop_collection of variable size and it cannot
+    be loaded as an Soa in Mesh.vertices. So Mesh.vertices loads a "groups" AosElement
+    """
+
+    def __init__(self):
+        self._data: Union[array.array, [List]] = None
+
+    def load(
+        self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str,
+    ):
+        # the struct element may be missing is soable_properties
+        logging.warning(f"Not implemented : property {bl_collection}.{attr_name}")
+        return self
+
+
+class SoaElement(Proxy):
+    """
+    A structure member inside a bpy_prop_collection loaded as a structure of array element
+
+    For instance, Mesh.vertices[].co is loaded as an SoaElement of Mesh.vertices. Its _data is an array
+    """
+
     def __init__(self):
         self._data: Union[array.array, [List]] = None
 
@@ -438,27 +486,11 @@ class SoaItem(Proxy):
         attr_type = type(attr)
         length = len(bl_collection)
         if is_vector(attr_type):
-            # TODO check matrices
             length *= len(attr)
-        init = soa_initializers[attr_type]
-        buffer = soa_initializer(init, length)
+        buffer = soa_initializer(attr_type, length)
         bl_collection.foreach_get(attr_name, buffer)
         self._data = buffer
         return self
-
-
-# TODO : is there any way to find this automatically ? Seems esay for the inner structure,
-# but how to get the element type of a bpy _prop_collection
-
-soable_collections = {
-    T.GPencilStrokePoints.bl_rna,
-    T.MeshVertices.bl_rna,
-}
-
-
-def soable_collection(bl_collection):
-    soable = hasattr(bl_collection, "bl_rna") and bl_collection.bl_rna in soable_collections
-    return soable
 
 
 class BpyPropStructCollectionProxy(Proxy):
@@ -492,15 +524,26 @@ class BpyPropStructCollectionProxy(Proxy):
                 for attr_name, bl_rna_property in context.properties(prototype_item):
                     is_soable = any(isinstance(bl_rna_property, soable) for soable in soable_properties)
                     if is_soable:
-                        self._data[attr_name] = SoaItem().load(bl_collection, attr_name, prototype_item)
+                        self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item)
                     else:
-                        self._data[attr_name] = AosItem().load(bl_collection, attr_name)
+                        self._data[attr_name] = AosElement().load(bl_collection, attr_name)
             else:
+                # WIP and probably wrong
                 # array of struct
+                
                 self._data = [BpyStructProxy().load(v, context, visit_context) for v in bl_collection.values()]
+
+                # must probably be something like
+                # self._data = [read_attribute(v, context, visit_context) for v in bl_collection.values()]
         else:
+            # WIP and probably wrong
             # dict of struct
+            # is this case possible or is it just for blenddata collections
             self._data = {k: BpyStructProxy().load(v, context, visit_context) for k, v in bl_collection.items()}
+
+            # must probably be something like
+            # self._data = {k: read_attribute(v, context, visit_context) for k, v in bl_collection.items()}
+
         return self
 
     def save(self, bl_instance: any, attr_name: str):

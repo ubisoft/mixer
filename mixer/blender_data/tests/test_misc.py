@@ -5,12 +5,7 @@ import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
 from mixer.blender_data.blenddata import BlendData
-from mixer.blender_data.proxy import (
-    BpyBlendProxy,
-    BpyIDProxy,
-    BpyIDRefProxy,
-    BpyPropertyGroupProxy,
-)
+from mixer.blender_data.proxy import BpyBlendProxy, BpyIDProxy, BpyIDRefProxy, BpyPropertyGroupProxy, SoaElement
 from mixer.blender_data.tests.utils import test_blend_file
 
 from mixer.blender_data.filter import (
@@ -133,3 +128,37 @@ class TestBlendData(unittest.TestCase):
         blenddata = BlendData.instance()
         collection_name = blenddata.bl_collection_name_from_ID(type(light))
         self.assertEqual(collection_name, "lights")
+
+
+class TestAosSoa(unittest.TestCase):
+    def setUp(self):
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+
+    def test_all_soa_grease_pencil(self):
+        import array
+
+        bpy.ops.object.gpencil_add(type="STROKE")
+        proxy = BpyBlendProxy()
+        proxy.load(default_context)
+        gp_layers = proxy._data["grease_pencils"]._data["Stroke"]._data["layers"]
+        gp_points = gp_layers._data["Lines"]._data["frames"]._data[0]._data["strokes"]._data[0]._data["points"]._data
+        expected = (
+            ("co", array.array, "f"),
+            ("pressure", array.array, "f"),
+            ("strength", array.array, "f"),
+            ("uv_factor", array.array, "f"),
+            ("uv_rotation", array.array, "f"),
+            ("select", list, bool),
+        )
+        for name, type_, element_type in expected:
+            self.assertIn("co", gp_points)
+            item = gp_points[name]
+            self.assertIsInstance(item, SoaElement)
+            self.assertIsInstance(item._data, type_)
+            if type_ is array.array:
+                self.assertEqual(item._data.typecode, element_type)
+            else:
+                self.assertIsInstance(item._data[0], element_type)
+
+        self.assertEqual(len(gp_points["pressure"]._data), len(gp_points["strength"]._data))
+        self.assertEqual(3 * len(gp_points["pressure"]._data), len(gp_points["co"]._data))

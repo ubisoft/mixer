@@ -60,10 +60,15 @@ class TestWriteAttribute(unittest.TestCase):
         # self.addTypeEqualityFunc(D.bpy_struct, bl_equalityfunc)
         cube = D.meshes["Cube"]
         vertices_proxy = self.proxy._data["meshes"]._data["Cube"]._data["vertices"]
-        co_proxy = vertices_proxy._data[0]._data["co"]
+
+        # loaded as SOA into array.array
+        co_proxy = vertices_proxy._data["co"]._data
+
+        # first vertex
         co_proxy[0] *= 2
         co_proxy[1] *= 2
         co_proxy[2] *= 2
+
         vertices_proxy.save(cube, "vertices")
         self.assertEqual(cube.vertices[0].co, Vector(co_proxy))
 
