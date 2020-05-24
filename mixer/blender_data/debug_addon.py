@@ -9,6 +9,8 @@ default_test = "test_module.TestCase.test_name"
 
 
 class DebugDataProperties(bpy.types.PropertyGroup):
+    profile_cumulative: bpy.props.BoolProperty(name="ProfileCumulative", default=False)
+    profile_callers: bpy.props.BoolProperty(name="ProfileCallers", default=False)
     test_names: bpy.props.StringProperty(name="TestNames", default=default_test)
 
 
@@ -35,11 +37,32 @@ class BuildProxyOperator(bpy.types.Operator):
         # accessible during module load
         from mixer.blender_data.proxy import BpyBlendProxy
         from mixer.blender_data.filter import default_context
+        import cProfile
+        import io
+        import pstats
+        from pstats import SortKey
 
+        profile_cumulative = get_props().profile_cumulative
+        profile_callers = get_props().profile_callers
+        profile = profile_callers or profile_cumulative
         proxy = BpyBlendProxy()
+        if profile:
+            pr = cProfile.Profile()
+            pr.enable()
         t1 = time.time()
         proxy.load(default_context)
         t2 = time.time()
+        if profile:
+            pr.disable()
+            s = io.StringIO()
+            sortby = SortKey.CUMULATIVE
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            if profile_cumulative:
+                ps.print_stats()
+            if profile_callers:
+                ps.print_callers()
+            print(s.getvalue())
+
         logger.warning(f"Elapse: {t2 - t1} s.")
         non_empty = proxy.get_non_empty_collections()
         logger.info(f"Number of non empty collections in proxy: {len(non_empty)}")
@@ -86,6 +109,8 @@ class DebugDataPanel(bpy.types.Panel):
 
         row = layout.column()
         row.operator(BuildProxyOperator.bl_idname, text="Build Proxy")
+        row.prop(get_props(), "profile_cumulative", text="Profile Cumulative")
+        row.prop(get_props(), "profile_callers", text="Profile callers")
         row.operator(DebugDataTestOperator.bl_idname, text="Test")
         row = layout.row()
         row.prop(get_props(), "test_names", text="Test")
