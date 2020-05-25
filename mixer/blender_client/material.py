@@ -107,6 +107,16 @@ def build_material(data):
     index = build_texture(principled, material, "Emission", False, data, index)
 
 
+def build_assign_material(data):
+    index = 0
+    object_name, index = common.decode_string(data, index)
+    material_name, index = common.decode_string(data, index)
+    mesh = share_data.blender_objects[object_name]
+    material = get_or_create_material(material_name)
+    for slot in mesh.material_slots:
+        slot.material = material
+
+
 def get_material_buffer(client: Client, material):
     name = material.name_full
     buffer = common.encode_string(name)

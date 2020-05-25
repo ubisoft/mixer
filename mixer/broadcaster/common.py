@@ -91,9 +91,10 @@ class MessageType(IntEnum):
     TRANSFORM = 201
     MESH = 202
     MATERIAL = 203
-    FRAME = 204
-    PLAY = 205
-    PAUSE = 206
+    ASSIGN_MATERIAL = 204
+    FRAME = 205
+    PLAY = 206
+    PAUSE = 207
 
 
 class LightType(IntEnum):
