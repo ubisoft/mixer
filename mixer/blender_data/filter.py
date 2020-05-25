@@ -191,7 +191,7 @@ default_exclusions = {
         # it is unclear how to do it.
         NameFilterOut("tool_settings")
     ],
-    T.MeshPolygon: [NameFilterOut("area"), NameFilterOut("edge_keys"), NameFilterOut("loop_indices"),],
+    T.MeshPolygon: [NameFilterOut("area"), NameFilterOut("edge_keys"), NameFilterOut("loop_indices")],
 }
 
 default_filter.append(default_exclusions)

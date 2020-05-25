@@ -158,7 +158,7 @@ def read_attribute(attr: any, attr_property: any, context: Context, visit_contex
             # need to know for each element if it is a ref or id
             load_as = load_as_what(attr_property, attr, visit_context)
             if load_as == LoadElementAs.STRUCT:
-                return BpyPropStructCollectionProxy().load(attr, context, visit_context)
+                return BpyPropStructCollectionProxy().load(attr, attr_property, context, visit_context)
             elif load_as == LoadElementAs.ID_REF:
                 # References into Blenddata collection, for instance D.scenes[0].objects
                 return BpyPropDataCollectionProxy().load_as_IDref(attr, visit_context)
@@ -168,7 +168,7 @@ def read_attribute(attr: any, attr_property: any, context: Context, visit_contex
 
         # TODO merge with previous case
         if isinstance(attr_property, T.CollectionProperty):
-            return BpyPropStructCollectionProxy().load(attr, context, visit_context)
+            return BpyPropStructCollectionProxy().load(attr, attr_property, context, visit_context)
 
         bl_rna = attr_property.bl_rna
         if bl_rna is None:
@@ -433,25 +433,26 @@ soa_initializers = {
     mathutils.Quaternion: array.array("f", [0.0]),
 }
 
+
 # TODO : is there any way to find these automatically ? Seems easy to determine if a struct is simple enough so that
-# an array of struct can be loaded as an Soa, but how to get the element type of a bpy_prop_collection ?
-# MeshVertex must be handled as SOA although "groups" is a variable length item. Enums are not handled by foreach_get()
-soable_collections_rna = {
-    T.GPencilStrokePoints.bl_rna,
-    T.MeshEdges.bl_rna,
-    T.MeshLoops.bl_rna,
+# an array of struct can be loaded as an Soa. Is it worth ?
+# Beware that MeshVertex must be handled as SOA although "groups" is a variable length item.
+# Enums are not handled by foreach_get()
+soable_collection_properties = {
+    T.GPencilStroke.bl_rna.properties["points"],
+    T.GPencilStroke.bl_rna.properties["triangles"],
+    T.Mesh.bl_rna.properties["vertices"],
+    T.Mesh.bl_rna.properties["edges"],
+    T.Mesh.bl_rna.properties["loops"],
     # messy: :MeshPolygon.vertices has variable length, not 3 as stated in the doc, so ignore
-    # T.MeshPolygons.bl_rna,
-    T.MeshVertices.bl_rna,
-    # many more Mesh elements
+    # T.Mesh.bl_rna.properties["polygons"],
+    T.MeshUVLoopLayer.bl_rna.properties["data"],
+    T.MeshLoopColorLayer.bl_rna.properties["data"],
 }
 
-# Not used
-soable_collections = {T.MeshUVLoopLayer: ["data"]}
 
-
-def is_soable_collection(bl_collection):
-    return hasattr(bl_collection, "bl_rna") and bl_collection.bl_rna in soable_collections_rna
+def is_soable_collection(prop):
+    return prop in soable_collection_properties
 
 
 def is_soable_property(bl_rna_property):
@@ -537,18 +538,18 @@ class BpyPropStructCollectionProxy(Proxy):
         self._data: Mapping[Union[str, int], BpyIDProxy] = {}
 
     def load(
-        self, bl_collection: bpy.types.bpy_prop_collection, context: Context, visit_context: BlendDataVisitContext
+        self,
+        bl_collection: bpy.types.bpy_prop_collection,
+        bl_collection_property: Any,
+        context: Context,
+        visit_context: BlendDataVisitContext,
     ):
 
         if len(bl_collection) == 0:
             self._data.clear()
             return self
-        # This test is currently flawed.
-        # It tests the current collection against a set of collection types like T.GPencilStrokePoints, which is ok,
-        # but some collections like GPencilStroke.triangles have no specific collection type, just bpy_prop_collection
-        # and there is no means to find the inner type of the collection. So we need to find another way, maybe just
-        # member name in struct
-        if is_soable_collection(bl_collection):
+
+        if is_soable_collection(bl_collection_property):
             # TODO too much work at load time to find soable information. Do it once for all.
 
             # Hybrid array_of_struct/ struct_of_array
@@ -565,10 +566,7 @@ class BpyPropStructCollectionProxy(Proxy):
                     # no foreach_get (variable length arrays like MeshVertex.groups, enums, ...)
                     self._data[attr_name] = AosElement().load(bl_collection, attr_name)
         else:
-            # This way, some bpy_prop_collection will be loaded as maps with an int key and it is overkill
-            # Check when it happens and load as list. Will require a trick in save
-
-            # no keys : it is a sequence. However bl_collection.items() returns [(index, item)...]
+            # no keys means it is a sequence. However bl_collection.items() returns [(index, item)...]
             is_sequence = not bl_collection.keys()
             if is_sequence:
                 # easier for the encoder to always have a dict
@@ -590,9 +588,11 @@ class BpyPropStructCollectionProxy(Proxy):
             if len(target) == len(sequence):
                 for i, v in enumerate(sequence):
                     # TODO this way can only save items at pre-existing slots. The bpy_prop_collection API
-                    # uses differents ctors:
+                    # uses struct specific API and ctors:
                     # - CurveMapPoints uses: .new(x, y) and .remove(point), no .clear()
                     # - NodeTreeOutputs uses: .new(type, name), .remove(socket), has .clear()
+                    # - ActionFCurves uses: .new(data_path, index=0, action_group=""), .remove(fcurve)
+                    # - GPencilStrokePoints: .add(count), .pop()
                     write_attribute(target, i, v)
             else:
                 logging.warning(
