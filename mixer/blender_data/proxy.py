@@ -20,6 +20,8 @@ from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 
 logger = logging.Logger(__name__, logging.INFO)
 
+MIXER_SEQUENCE = "__mixer_sequence__"
+
 
 def debug_check_stack_overflow(func, *args, **kwargs):
     """
@@ -208,6 +210,12 @@ class Proxy:
                 return False
         return True
 
+    def data(self, key):
+        if isinstance(key, int):
+            return self._data[MIXER_SEQUENCE][key]
+        else:
+            return self._data[key]
+
     def save(self, bl_instance: any, attr_name: str):
         """
         Save this proxy into a blender object
@@ -265,7 +273,7 @@ class StructLikeProxy(Proxy):
 
     def save(self, bl_instance: any, key: Union[int, str]):
         """
-        Load a Blender object into this proxy
+        Save this proxy into a Blender attribute
         """
         assert isinstance(key, int) or isinstance(key, str)
         if isinstance(key, int):
@@ -315,7 +323,7 @@ class BpyIDProxy(BpyStructProxy):
 
     def pre_save(self, bl_instance: any, attr_name: str):
         """
-        Process attributes that must be save first and return a possibily updated reference to tha target
+        Process attributes that must be saved first and return a possibily updated reference to the target
         """
         target = self.target(bl_instance, attr_name)
 
@@ -426,17 +434,28 @@ soa_initializers = {
 }
 
 # TODO : is there any way to find these automatically ? Seems easy to determine if a struct is simple enough so that
-# an array of struct can be loaded as an Soa, but how to get the element type of a bpy _prop_collection ?
+# an array of struct can be loaded as an Soa, but how to get the element type of a bpy_prop_collection ?
 # MeshVertex must be handled as SOA although "groups" is a variable length item. Enums are not handled by foreach_get()
-soable_collections = {
+soable_collections_rna = {
     T.GPencilStrokePoints.bl_rna,
+    T.MeshEdges.bl_rna,
+    T.MeshLoops.bl_rna,
+    # messy: :MeshPolygon.vertices has variable length, not 3 as stated in the doc, so ignore
+    # T.MeshPolygons.bl_rna,
     T.MeshVertices.bl_rna,
     # many more Mesh elements
 }
 
+# Not used
+soable_collections = {T.MeshUVLoopLayer: ["data"]}
 
-def soable_collection(bl_collection):
-    return hasattr(bl_collection, "bl_rna") and bl_collection.bl_rna in soable_collections
+
+def is_soable_collection(bl_collection):
+    return hasattr(bl_collection, "bl_rna") and bl_collection.bl_rna in soable_collections_rna
+
+
+def is_soable_property(bl_rna_property):
+    return any(isinstance(bl_rna_property, soable) for soable in soable_properties)
 
 
 def soa_initializer(attr_type, length):
@@ -465,12 +484,16 @@ class AosElement(Proxy):
     def load(
         self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str,
     ):
-        # the struct element may be missing is soable_properties
-        logging.warning(f"Not implemented: AosElement.load() for {bl_collection}.{attr_name}")
+        # We may also call this if the struct element type is missing from soable_properties
+
+        self._data = None
+        if len(bl_collection) != 0:
+            logging.warning(f"Not implemented: AosElement.load() for {bl_collection}.{attr_name}")
         return self
 
     def save(self, bl_instance: any, attr_name: str):
-        logging.warning(f"Not implemented: AosElement.save() for {bl_instance}.{attr_name}")
+        if self._data is not None:
+            logging.warning(f"Not implemented: AosElement.save() for {bl_instance}.{attr_name}")
 
 
 class SoaElement(Proxy):
@@ -484,13 +507,19 @@ class SoaElement(Proxy):
         self._data: Union[array.array, [List]] = None
 
     def load(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str, prototype_item):
-        # TODO do not reallocate if size does not change
         attr = getattr(prototype_item, attr_name)
         attr_type = type(attr)
         length = len(bl_collection)
         if is_vector(attr_type):
             length *= len(attr)
+        elif attr_type is T.bpy_prop_array:
+            length *= len(attr)
+            attr_type = type(attr[0])
+
         buffer = soa_initializer(attr_type, length)
+
+        # "RuntimeError: internal error setting the array" means that the array is ill-formed.
+        # Check rna_access.c:rna_raw_access()
         bl_collection.foreach_get(attr_name, buffer)
         self._data = buffer
         return self
@@ -514,8 +543,12 @@ class BpyPropStructCollectionProxy(Proxy):
         if len(bl_collection) == 0:
             self._data.clear()
             return self
-
-        if soable_collection(bl_collection):
+        # This test is currently flawed.
+        # It tests the current collection against a set of collection types like T.GPencilStrokePoints, which is ok,
+        # but some collections like GPencilStroke.triangles have no specific collection type, just bpy_prop_collection
+        # and there is no means to find the inner type of the collection. So we need to find another way, maybe just
+        # member name in struct
+        if is_soable_collection(bl_collection):
             # TODO too much work at load time to find soable information. Do it once for all.
 
             # Hybrid array_of_struct/ struct_of_array
@@ -525,10 +558,11 @@ class BpyPropStructCollectionProxy(Proxy):
             # and we need better
             prototype_item = bl_collection[0]
             for attr_name, bl_rna_property in context.properties(prototype_item):
-                is_soable = any(isinstance(bl_rna_property, soable) for soable in soable_properties)
-                if is_soable:
+                if is_soable_property(bl_rna_property):
+                    # element type supported by foreach_get
                     self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item)
                 else:
+                    # no foreach_get (variable length arrays like MeshVertex.groups, enums, ...)
                     self._data[attr_name] = AosElement().load(bl_collection, attr_name)
         else:
             # This way, some bpy_prop_collection will be loaded as maps with an int key and it is overkill
@@ -537,9 +571,12 @@ class BpyPropStructCollectionProxy(Proxy):
             # no keys : it is a sequence. However bl_collection.items() returns [(index, item)...]
             is_sequence = not bl_collection.keys()
             if is_sequence:
-                logging.warning(f"Sequence saved as dictionary. Performance mat not be optimal. {bl_collection}")
-
-            self._data = {k: BpyStructProxy().load(v, context, visit_context) for k, v in bl_collection.items()}
+                # easier for the encoder to always have a dict
+                self._data = {
+                    MIXER_SEQUENCE: [BpyStructProxy().load(v, context, visit_context) for v in bl_collection.values()]
+                }
+            else:
+                self._data = {k: BpyStructProxy().load(v, context, visit_context) for k, v in bl_collection.items()}
 
         return self
 
@@ -548,8 +585,22 @@ class BpyPropStructCollectionProxy(Proxy):
         Load a Blender object into this proxy
         """
         target = getattr(bl_instance, attr_name)
-        for k, v in self._data.items():
-            write_attribute(target, k, v)
+        sequence = self._data.get(MIXER_SEQUENCE)
+        if sequence:
+            if len(target) == len(sequence):
+                for i, v in enumerate(sequence):
+                    # TODO this way can only save items at pre-existing slots. The bpy_prop_collection API
+                    # uses differents ctors:
+                    # - CurveMapPoints uses: .new(x, y) and .remove(point), no .clear()
+                    # - NodeTreeOutputs uses: .new(type, name), .remove(socket), has .clear()
+                    write_attribute(target, i, v)
+            else:
+                logging.warning(
+                    f"Not implemented: write sequence of different length (incoming: {len(sequence)}, existing: {len(target)})for {bl_instance}.{attr_name}"
+                )
+        else:
+            for k, v in self._data.items():
+                write_attribute(target, k, v)
 
 
 # TODO derive from BpyIDProxy
@@ -677,19 +728,5 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
             except Exception as e:
                 logging.warning(f"write attribute skipped {key} for {bl_instance}...")
                 logging.warning(f" ...Error: {repr(e)}")
-        return
     else:
         value.save(bl_instance, key)
-
-        # if type(key) is int:
-        #     # Collection with int key (vertices, points, ...)
-        #     if len(bl_instance):
-        #         attr = bl_instance[key]
-        #     else:
-        #         logging.warning(f"write attribute skipped {key} for {bl_instance} - not implemented (array insertion)")
-        # else:
-        #     # Collection with a string key (T.BlendataObjects, T.ViewLayers)
-        #     # or a mapping (T.bpy_struct)
-        #     value.save(bl_instance, key)
-        return
-    raise NotImplementedError

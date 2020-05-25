@@ -140,8 +140,8 @@ class TestAosSoa(unittest.TestCase):
         bpy.ops.object.gpencil_add(type="STROKE")
         proxy = BpyBlendProxy()
         proxy.load(default_context)
-        gp_layers = proxy._data["grease_pencils"]._data["Stroke"]._data["layers"]
-        gp_points = gp_layers._data["Lines"]._data["frames"]._data[0]._data["strokes"]._data[0]._data["points"]._data
+        gp_layers = proxy.data("grease_pencils").data("Stroke").data("layers")
+        gp_points = gp_layers.data("Lines").data("frames").data(0).data("strokes").data(0).data("points")._data
         expected = (
             ("co", array.array, "f"),
             ("pressure", array.array, "f"),

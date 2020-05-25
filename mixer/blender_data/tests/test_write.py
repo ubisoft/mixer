@@ -76,16 +76,63 @@ class TestWriteAttribute(unittest.TestCase):
 
     def test_write_light(self):
         light_name = "Light"
-        light = D.lights["Light"]
         clone_name = f"Clone of {light_name}"
         light_proxy = self.proxy._data["lights"]._data[light_name]
         expected_energy = 666
         light_proxy._data["energy"] = expected_energy
         light_type = light_proxy._data["type"]
         light_proxy._data["name"] = clone_name
-        D.lights.new(clone_name, light_type)
+        clone_light = D.lights.new(clone_name, light_type)
         light_proxy.save(D.lights, clone_name)
-        self.assertEqual(light.energy, expected_energy)
+        self.assertEqual(clone_light.energy, expected_energy)
+
+    def test_write_array_curvemap(self):
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+
+        light_name = "Light"
+        light = D.lights["Light"]
+        points = [(0.111, 0.222), (0.333, 0.444)]
+        curve0 = light.falloff_curve.curves[0]
+        for i, point in enumerate(points):
+            curve0.points[i].location = point
+
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(default_context)
+        clone_name = f"Clone of {light_name}"
+        light_proxy = self.proxy._data["lights"]._data[light_name]
+        light_type = light_proxy._data["type"]
+        light_proxy._data["name"] = clone_name
+        clone_light = D.lights.new(clone_name, light_type)
+        light_proxy.save(D.lights, clone_name)
+        clone_curve = clone_light.falloff_curve.curves[0]
+        for i, point in enumerate(points):
+            for clone, expected in zip(clone_curve.points[i].location, point):
+                self.assertAlmostEqual(clone, expected)
+
+    @unittest.skip("bpy_prop_collection extend is not yet implemented")
+    def test_extend_array_curvemap(self):
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+
+        light_name = "Light"
+        light = D.lights["Light"]
+        points = [(0.111, 0.222), (0.333, 0.444), (0.555, 0.666)]
+        curve0 = light.falloff_curve.curves[0]
+        curve0.points.new(*points[2])
+        for i, point in enumerate(points):
+            curve0.points[i].location = point
+
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(default_context)
+        clone_name = f"Clone of {light_name}"
+        light_proxy = self.proxy._data["lights"]._data[light_name]
+        light_type = light_proxy._data["type"]
+        light_proxy._data["name"] = clone_name
+        clone_light = D.lights.new(clone_name, light_type)
+        light_proxy.save(D.lights, clone_name)
+        clone_curve = clone_light.falloff_curve.curves[0]
+        for i, point in enumerate(points):
+            for clone, expected in zip(clone_curve.points[i].location, point):
+                self.assertAlmostEqual(clone, expected)
 
     def test_write_scene(self):
         scene_name = "Scene_0"
