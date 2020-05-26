@@ -53,6 +53,7 @@ def update_params(obj):
         and typename != "Mesh"
         and typename != "Curve"
         and typename != "Text Curve"
+        and typename != "Grease Pencil"
         and typename not in supported_lights
     ):
         return
