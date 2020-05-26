@@ -529,6 +529,33 @@ class SoaElement(Proxy):
         bl_collection.foreach_set(attr_name, self._data)
 
 
+# TODO make his generic after enough sequences have bee seen
+def write_curvemappoints(target, src_sequence):
+    src_length = len(src_sequence)
+
+    # CurveMapPoints specific (alas ...)
+    if src_length < 2:
+        logging.error(f"Invalid length for curvemap: {src_length}. Expected at least 2")
+        return
+
+    # truncate dst
+    while src_length < len(target):
+        target.remove(target[-1])
+
+    # extend dst
+    while src_length > len(target):
+        # .new() parameters are CurveMapPoints specific
+        # for CurvamapPoint, we can initilaize to anything then overwrite. Not sure this is doable for other types
+        # new inserts in head !
+        # Not optimal for big arrays, but much simpler given that the new() parameters depend on the collection
+        # in a way that cannot be determined automatically
+        target.new(0.0, 0.0)
+
+    assert src_length == len(target)
+    for i in range(src_length):
+        write_attribute(target, i, src_sequence[i])
+
+
 class BpyPropStructCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of non-ID in bpy.data
@@ -539,8 +566,8 @@ class BpyPropStructCollectionProxy(Proxy):
 
     def load(
         self,
-        bl_collection: bpy.types.bpy_prop_collection,
-        bl_collection_property: Any,
+        bl_collection: T.bpy_prop_collection,
+        bl_collection_property: T.Property,
         context: Context,
         visit_context: BlendDataVisitContext,
     ):
@@ -558,7 +585,8 @@ class BpyPropStructCollectionProxy(Proxy):
             # Could be made more efficient later on. Keep the code simple until save() is implemented
             # and we need better
             prototype_item = bl_collection[0]
-            for attr_name, bl_rna_property in context.properties(prototype_item):
+            item_bl_rna = bl_collection_property.fixed_type.bl_rna
+            for attr_name, bl_rna_property in context.properties(item_bl_rna):
                 if is_soable_property(bl_rna_property):
                     # element type supported by foreach_get
                     self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item)
@@ -580,16 +608,19 @@ class BpyPropStructCollectionProxy(Proxy):
 
     def save(self, bl_instance: any, attr_name: str):
         """
-        Load a Blender object into this proxy
+        Save this proxy into a Blender object
         """
         target = getattr(bl_instance, attr_name)
         sequence = self._data.get(MIXER_SEQUENCE)
         if sequence:
-            if len(target) == len(sequence):
+            if bl_instance.bl_rna.properties[attr_name].fixed_type.bl_rna is bpy.types.CurveMapPoint.bl_rna:
+                write_curvemappoints(target, sequence)
+            elif len(target) == len(sequence):
                 for i, v in enumerate(sequence):
                     # TODO this way can only save items at pre-existing slots. The bpy_prop_collection API
                     # uses struct specific API and ctors:
-                    # - CurveMapPoints uses: .new(x, y) and .remove(point), no .clear()
+                    # - CurveMapPoints uses: .new(x, y) and .remove(point), no .clear(). new() inserts in head !
+                    #   Must have at least 2 points left !
                     # - NodeTreeOutputs uses: .new(type, name), .remove(socket), has .clear()
                     # - ActionFCurves uses: .new(data_path, index=0, action_group=""), .remove(fcurve)
                     # - GPencilStrokePoints: .add(count), .pop()

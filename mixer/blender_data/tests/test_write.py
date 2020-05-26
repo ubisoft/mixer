@@ -109,30 +109,71 @@ class TestWriteAttribute(unittest.TestCase):
             for clone, expected in zip(clone_curve.points[i].location, point):
                 self.assertAlmostEqual(clone, expected)
 
-    @unittest.skip("bpy_prop_collection extend is not yet implemented")
-    def test_extend_array_curvemap(self):
+    def test_shrink_array_curvemap(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
 
-        light_name = "Light"
-        light = D.lights["Light"]
-        points = [(0.111, 0.222), (0.333, 0.444), (0.555, 0.666)]
-        curve0 = light.falloff_curve.curves[0]
-        curve0.points.new(*points[2])
-        for i, point in enumerate(points):
+        src_light_name = "Light"
+        src_light = D.lights["Light"]
+        src_points = [(0.666, 0.777), (0.888, 0.999)]
+        curve0 = src_light.falloff_curve.curves[0]
+        for i, point in enumerate(src_points):
             curve0.points[i].location = point
 
         self.proxy = BpyBlendProxy()
         self.proxy.load(default_context)
-        clone_name = f"Clone of {light_name}"
-        light_proxy = self.proxy._data["lights"]._data[light_name]
-        light_type = light_proxy._data["type"]
-        light_proxy._data["name"] = clone_name
-        clone_light = D.lights.new(clone_name, light_type)
-        light_proxy.save(D.lights, clone_name)
-        clone_curve = clone_light.falloff_curve.curves[0]
-        for i, point in enumerate(points):
-            for clone, expected in zip(clone_curve.points[i].location, point):
-                self.assertAlmostEqual(clone, expected)
+        light_proxy = self.proxy.data("lights").data(src_light_name)
+        light_type = light_proxy.data("type")
+
+        # Create a light then restore src_light into it
+        dst_light_name = "Dst Light"
+        dst_light = D.lights.new(dst_light_name, light_type)
+        # extend the dst curvemap to 3 points
+        dst_points = [(0.111, 0.222), (0.333, 0.444), (0.555, 0.666)]
+        curve0 = dst_light.falloff_curve.curves[0]
+        curve0.points.new(*dst_points[2])
+        for i, point in enumerate(dst_points):
+            curve0.points[i].location = point
+
+        # patch the light name to restore the proxy into dst_light
+        light_proxy._data["name"] = dst_light_name
+        # save() needs to shrink the dst curvemap
+        light_proxy.save(D.lights, dst_light_name)
+        dst_curve = dst_light.falloff_curve.curves[0]
+        self.assertEqual(len(src_points), len(dst_curve.points))
+        for i, point in enumerate(src_points):
+            for dst, expected in zip(dst_curve.points[i].location, point):
+                self.assertAlmostEqual(dst, expected)
+
+    def test_extend_array_curvemap(self):
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+
+        src_light_name = "Light"
+        src_light = D.lights["Light"]
+        # extend the source curvemap to 3 points
+        src_points = [(0.111, 0.222), (0.333, 0.444), (0.555, 0.666)]
+        curve0 = src_light.falloff_curve.curves[0]
+        curve0.points.new(*src_points[2])
+        for i, point in enumerate(src_points):
+            curve0.points[i].location = point
+
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(default_context)
+        light_proxy = self.proxy.data("lights").data(src_light_name)
+        light_type = light_proxy.data("type")
+
+        # Create a light then restore src_light into it
+        dst_light_name = "Dst Light"
+        dst_light = D.lights.new(dst_light_name, light_type)
+        # patch the light name to restore the proxy into dst_light
+        light_proxy._data["name"] = dst_light_name
+        # the dst curvemap has 2 points by default
+        # save() needs to extend
+        light_proxy.save(D.lights, dst_light_name)
+        dst_curve = dst_light.falloff_curve.curves[0]
+        self.assertEqual(len(src_points), len(dst_curve.points))
+        for i, point in enumerate(src_points):
+            for dst, expected in zip(dst_curve.points[i].location, point):
+                self.assertAlmostEqual(dst, expected)
 
     def test_write_scene(self):
         scene_name = "Scene_0"
