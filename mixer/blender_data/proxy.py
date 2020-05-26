@@ -473,28 +473,65 @@ def soa_initializer(attr_type, length):
 
 class AosElement(Proxy):
     """
-    A structure member inside a bpy_prop_collection aloded as a structure orf array element
+    A structure member inside a bpy_prop_collection loaded as a structure of array element
 
     For instance, MeshVertex.groups is a bpy_prop_collection of variable size and it cannot
     be loaded as an Soa in Mesh.vertices. So Mesh.vertices loads a "groups" AosElement
     """
 
     def __init__(self):
-        self._data: Union[array.array, [List]] = None
+        self._data: Mapping[str, List] = {}
 
     def load(
-        self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str,
+        self,
+        bl_collection: bpy.types.bpy_prop_collection,
+        item_bl_rna,
+        attr_name: str,
+        context: Context,
+        visit_context: BlendDataVisitContext,
     ):
-        # We may also call this if the struct element type is missing from soable_properties
+        """
+        - bl_collection: a collection of structure, e.g. T.Mesh.vertices
+        - item_bl_rna: the bl_rna if the structure contained in the collection, e.g. T.MeshVertices.bl_rna
+        - attr_name: a member if the structure to be loaded as a sequence, e.g. "groups"
+        """
 
-        self._data = None
-        if len(bl_collection) != 0:
-            logging.warning(f"Not implemented: AosElement.load() for {bl_collection}.{attr_name}")
+        logging.warning(f"Not implemented. Load AOS  element for {bl_collection}.{attr_name} ")
         return self
 
-    def save(self, bl_instance: any, attr_name: str):
-        if self._data is not None:
-            logging.warning(f"Not implemented: AosElement.save() for {bl_instance}.{attr_name}")
+        # This was written for MeshVertex.groups, but MeshVertex.groups is updated via Object.vertex_groups so
+        # its is useless in this case.
+        # Any other usage ?
+
+        # self._data.clear()
+        # attr_property = item_bl_rna.properties[attr_name]
+        # # A bit overkill:
+        # # for T.Mesh.vertices[...].groups, generates a BpyPropStructCollectionProxy per Vertex even if empty
+        # self._data[MIXER_SEQUENCE] = [
+        #     read_attribute(getattr(item, attr_name), attr_property, context, visit_context) for item in bl_collection
+        # ]
+        # return self
+
+    def save(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str):
+
+        logging.warning(f"Not implemented. Save AOS  element for {bl_collection}.{attr_name} ")
+
+        # see comment in load()
+
+        # sequence = self._data.get(MIXER_SEQUENCE)
+        # if sequence is None:
+        #     return
+
+        # if len(sequence) != len(bl_collection):
+        #     # Avoid by writing SOA first ? Is is enough to resize the target
+        #     logging.warning(
+        #         f"Not implemented. Save AO size mistmatch (incoming {len(sequence)}, target {len(bl_collection)}for {bl_collection}.{attr_name} "
+        #     )
+        #     return
+
+        # for i, value in enumerate(sequence):
+        #     target = bl_collection[i]
+        #     write_attribute(target, attr_name, value)
 
 
 class SoaElement(Proxy):
@@ -592,7 +629,9 @@ class BpyPropStructCollectionProxy(Proxy):
                     self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item)
                 else:
                     # no foreach_get (variable length arrays like MeshVertex.groups, enums, ...)
-                    self._data[attr_name] = AosElement().load(bl_collection, attr_name)
+                    self._data[attr_name] = AosElement().load(
+                        bl_collection, item_bl_rna, attr_name, context, visit_context
+                    )
         else:
             # no keys means it is a sequence. However bl_collection.items() returns [(index, item)...]
             is_sequence = not bl_collection.keys()

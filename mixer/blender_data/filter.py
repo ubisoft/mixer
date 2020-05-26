@@ -192,6 +192,10 @@ default_exclusions = {
         NameFilterOut("tool_settings")
     ],
     T.MeshPolygon: [NameFilterOut("area"), NameFilterOut("edge_keys"), NameFilterOut("loop_indices")],
+    T.MeshVertex: [
+        # MeshVertex.groups is updated via Object.vertex_groups
+        NameFilterOut("groups")
+    ],
 }
 
 default_filter.append(default_exclusions)
