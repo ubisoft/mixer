@@ -13,6 +13,7 @@ from mixer.broadcaster import common
 from mixer.broadcaster.client import Client
 from mixer.blender_client import camera as camera_api
 from mixer.blender_client import collection as collection_api
+from mixer.blender_client import data as data_api
 from mixer.blender_client import grease_pencil as grease_pencil_api
 from mixer.blender_client import light as light_api
 from mixer.blender_client import material as material_api
@@ -625,6 +626,9 @@ class ClientBlender(Client):
                         self.build_remove_keyframe(command.data)
                     elif command.type == common.MessageType.QUERY_OBJECT_DATA:
                         self.build_query_object_data(command.data)
+
+                    elif command.type == common.MessageType.BLENDER_DATA_UPDATE:
+                        data_api.build_data_update(command.data)
 
                     self.receivedCommands.task_done()
                     self.blockSignals = False

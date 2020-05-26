@@ -120,6 +120,10 @@ class MixerProperties(bpy.types.PropertyGroup):
         get=get_log_level,
     )
 
+    experimental_sync: bpy.props.BoolProperty(
+        name="Experimental sync", default=os.environ.get("MIXER_EXPERIMENTAL_SYNC") is not None
+    )
+
 
 def get_mixer_props() -> MixerProperties:
     return bpy.context.window_manager.mixer
@@ -135,7 +139,6 @@ classes = (
 def register():
     for _ in classes:
         bpy.utils.register_class(_)
-    bpy.types.Scene.mixer_uuid = bpy.props.StringProperty(default="")
     bpy.types.WindowManager.mixer = bpy.props.PointerProperty(type=MixerProperties)
 
 

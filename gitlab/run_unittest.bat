@@ -5,6 +5,7 @@ tscon 3 /dest:console
 tscon 4 /dest:console
 tscon 5 /dest:console
 
+set ERROR=0
 set CURRENT_DIR=%~dp0
 
 REM create local folders if required
@@ -43,5 +44,12 @@ set PYTHON=%MIXER_BLENDER_EXE_DIR%\%MIXER_BLENDER_VERSION_BASE%\python\bin\pytho
 REM install Mixer in local blender
 %MIXER_BLENDER_EXE_PATH% --background --python %CURRENT_DIR%\install_mixer.py
 
-REM run unit tests
-%PYTHON% -m unittest --verbose
+REM Theses tests run within blender
+%MIXER_BLENDER_EXE_PATH% --background --python mixer\blender_data\tests\ci.py
+if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
+
+REM run unit tests. Theses tests launch 2 blender that communicate together
+%PYTHON% -m unittest discover --verbose
+if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
+
+if %ERROR% GEQ 1 EXIT /B %ERROR%

@@ -85,6 +85,8 @@ class MessageType(IntEnum):
     QUERY_CURRENT_FRAME = 137
     QUERY_OBJECT_DATA = 138
 
+    BLENDER_DATA_UPDATE = 139
+
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
     MESH = 202
@@ -99,6 +101,7 @@ class LightType(IntEnum):
     SPOT = 0  # directly mapped from Unity enum
     SUN = 1
     POINT = 2
+    AREA = 3
 
 
 class SensorFitMode(IntEnum):

@@ -1,0 +1,196 @@
+import unittest
+
+import bpy
+from bpy import data as D  # noqa
+from bpy import types as T  # noqa
+from mixer.blender_data.proxy import (
+    BpyBlendProxy,
+    write_attribute,
+)
+from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
+
+from mixer.blender_data.filter import default_context
+from mathutils import Matrix, Vector
+
+
+class TestWriteAttribute(unittest.TestCase):
+    def setUp(self):
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(default_context)
+        register_bl_equals(self, default_context)
+
+    def test_write_simple_types(self):
+        scene = D.scenes[0]
+        object_ = D.objects[0]
+        # matrix = [10.0, 20.0, 30.0, 40.0, 11.0, 21.0, 31.0, 41.0, 12.0, 22.0, 32.0, 42.0, 14.0, 24.0, 34.0, 44]
+        matrix2 = [[10.0, 20.0, 30.0, 40], [11.0, 21.0, 31.0, 41], [12.0, 22.0, 32.0, 42], [14.0, 24.0, 34.0, 44]]
+        values = [
+            # (scene, "name", "Plop"),
+            (scene, "frame_current", 99),
+            (scene, "use_gravity", False),
+            (scene, "gravity", [-1, -2, -3]),
+            (scene, "gravity", Vector([-10, -20, -30])),
+            (scene, "sync_mode", "FRAME_DROP"),
+            # (object_, "matrix_world", matrix),
+            (object_, "matrix_world", Matrix(matrix2)),
+        ]
+        for bl_instance, name, value in values:
+            write_attribute(bl_instance, name, value)
+            stored_value = getattr(bl_instance, name)
+            stored_type = type(stored_value)
+            self.assertEqual(stored_type(value), stored_value)
+
+    def test_write_bpy_struct_scene_eevee(self):
+        scene = D.scenes[0]
+        eevee_proxy = self.proxy._data["scenes"]._data["Scene_0"]._data["eevee"]
+        eevee_proxy._data["gi_cubemap_resolution"] = "64"
+        eevee_proxy.save(scene, "eevee")
+        self.assertEqual("64", scene.eevee.gi_cubemap_resolution)
+
+    def test_write_bpy_property_group_scene_cycles(self):
+        # Not very useful it derives from struct
+        scene = D.scenes[0]
+        cycles_proxy = self.proxy._data["scenes"]._data["Scene_0"]._data["cycles"]
+        cycles_proxy._data["shading_system"] = True
+        cycles_proxy.save(scene, "cycles")
+        self.assertEqual(True, scene.cycles.shading_system)
+
+    def test_write_array_of_struct_with_vec(self):
+        # self.addTypeEqualityFunc(D.bpy_struct, bl_equalityfunc)
+        cube = D.meshes["Cube"]
+        vertices_proxy = self.proxy._data["meshes"]._data["Cube"]._data["vertices"]
+
+        # loaded as SOA into array.array
+        co_proxy = vertices_proxy._data["co"]._data
+
+        # first vertex
+        co_proxy[0] *= 2
+        co_proxy[1] *= 2
+        co_proxy[2] *= 2
+
+        vertices_proxy.save(cube, "vertices")
+        self.assertListEqual(list(cube.vertices[0].co[0:3]), co_proxy[0:3].tolist())
+
+    # explicit test per data type , including addition in collections
+
+    def test_write_light(self):
+        light_name = "Light"
+        clone_name = f"Clone of {light_name}"
+        light_proxy = self.proxy._data["lights"]._data[light_name]
+        expected_energy = 666
+        light_proxy._data["energy"] = expected_energy
+        light_type = light_proxy._data["type"]
+        light_proxy._data["name"] = clone_name
+        clone_light = D.lights.new(clone_name, light_type)
+        light_proxy.save(D.lights, clone_name)
+        self.assertEqual(clone_light.energy, expected_energy)
+
+    def test_write_array_curvemap(self):
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+
+        light_name = "Light"
+        light = D.lights["Light"]
+        points = [(0.111, 0.222), (0.333, 0.444)]
+        curve0 = light.falloff_curve.curves[0]
+        for i, point in enumerate(points):
+            curve0.points[i].location = point
+
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(default_context)
+        clone_name = f"Clone of {light_name}"
+        light_proxy = self.proxy._data["lights"]._data[light_name]
+        light_type = light_proxy._data["type"]
+        light_proxy._data["name"] = clone_name
+        clone_light = D.lights.new(clone_name, light_type)
+        light_proxy.save(D.lights, clone_name)
+        clone_curve = clone_light.falloff_curve.curves[0]
+        for i, point in enumerate(points):
+            for clone, expected in zip(clone_curve.points[i].location, point):
+                self.assertAlmostEqual(clone, expected)
+
+    def test_shrink_array_curvemap(self):
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+
+        src_light_name = "Light"
+        src_light = D.lights["Light"]
+        src_points = [(0.666, 0.777), (0.888, 0.999)]
+        curve0 = src_light.falloff_curve.curves[0]
+        for i, point in enumerate(src_points):
+            curve0.points[i].location = point
+
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(default_context)
+        light_proxy = self.proxy.data("lights").data(src_light_name)
+        light_type = light_proxy.data("type")
+
+        # Create a light then restore src_light into it
+        dst_light_name = "Dst Light"
+        dst_light = D.lights.new(dst_light_name, light_type)
+        # extend the dst curvemap to 3 points
+        dst_points = [(0.111, 0.222), (0.333, 0.444), (0.555, 0.666)]
+        curve0 = dst_light.falloff_curve.curves[0]
+        curve0.points.new(*dst_points[2])
+        for i, point in enumerate(dst_points):
+            curve0.points[i].location = point
+
+        # patch the light name to restore the proxy into dst_light
+        light_proxy._data["name"] = dst_light_name
+        # save() needs to shrink the dst curvemap
+        light_proxy.save(D.lights, dst_light_name)
+        dst_curve = dst_light.falloff_curve.curves[0]
+        self.assertEqual(len(src_points), len(dst_curve.points))
+        for i, point in enumerate(src_points):
+            for dst, expected in zip(dst_curve.points[i].location, point):
+                self.assertAlmostEqual(dst, expected)
+
+    def test_extend_array_curvemap(self):
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+
+        src_light_name = "Light"
+        src_light = D.lights["Light"]
+        # extend the source curvemap to 3 points
+        src_points = [(0.111, 0.222), (0.333, 0.444), (0.555, 0.666)]
+        curve0 = src_light.falloff_curve.curves[0]
+        curve0.points.new(*src_points[2])
+        for i, point in enumerate(src_points):
+            curve0.points[i].location = point
+
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(default_context)
+        light_proxy = self.proxy.data("lights").data(src_light_name)
+        light_type = light_proxy.data("type")
+
+        # Create a light then restore src_light into it
+        dst_light_name = "Dst Light"
+        dst_light = D.lights.new(dst_light_name, light_type)
+        # patch the light name to restore the proxy into dst_light
+        light_proxy._data["name"] = dst_light_name
+        # the dst curvemap has 2 points by default
+        # save() needs to extend
+        light_proxy.save(D.lights, dst_light_name)
+        dst_curve = dst_light.falloff_curve.curves[0]
+        self.assertEqual(len(src_points), len(dst_curve.points))
+        for i, point in enumerate(src_points):
+            for dst, expected in zip(dst_curve.points[i].location, point):
+                self.assertAlmostEqual(dst, expected)
+
+    def test_write_scene(self):
+        scene_name = "Scene_0"
+        scene = D.scenes[scene_name]
+        clone_name = f"Clone of {scene_name}"
+        scene_proxy = self.proxy._data["scenes"]._data[scene_name]
+        scene_proxy._data["name"] = clone_name
+        clone = D.scenes.new(clone_name)
+        scene_proxy.save(D.scenes, clone_name)
+        self.assertEqual(scene, clone)
+
+    def test_write_scene_world(self):
+        scene_name = "Scene_0"
+        scene = D.scenes[scene_name]
+        # scene.world = D.worlds["World_1"]
+        clone_name = f"Clone of {scene_name}"
+        world_proxy = self.proxy._data["scenes"]._data[scene_name]._data["world"]
+        clone = D.scenes.new(clone_name)
+        world_proxy.save(clone, "world")
+        self.assertEqual(scene, clone)

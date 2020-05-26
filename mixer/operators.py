@@ -12,6 +12,7 @@ from bpy.app.handlers import persistent
 
 from mixer.share_data import share_data, object_visibility
 from mixer.blender_client import collection as collection_api
+from mixer.blender_client import data as data_api
 from mixer.blender_client import grease_pencil as grease_pencil_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
@@ -46,22 +47,20 @@ def update_params(obj):
     if obj.data:
         typename = obj.data.bl_rna.name
 
+    supported_lights = ["Sun Light", "Point Light", "Spot Light", "Area Light"]
     if (
         typename != "Camera"
         and typename != "Mesh"
         and typename != "Curve"
         and typename != "Text Curve"
-        and typename != "Sun Light"
-        and typename != "Point Light"
-        and typename != "Spot Light"
-        and typename != "Grease Pencil"
+        and typename not in supported_lights
     ):
         return
 
     if typename == "Camera":
         send_camera(share_data.client, obj)
 
-    if typename == "Sun Light" or typename == "Point Light" or typename == "Spot Light":
+    if typename in supported_lights:
         send_light(share_data.client, obj)
 
     if typename == "Grease Pencil":
@@ -100,6 +99,7 @@ def join_room(room_name: str):
     }
     share_data.auto_save_statistics = get_mixer_props().auto_save_statistics
     share_data.statistics_directory = get_mixer_props().statistics_directory
+    share_data.set_experimental_sync(get_mixer_props().experimental_sync)
     # join a room <==> want to track local changes
     set_handlers(True)
 
@@ -572,6 +572,10 @@ def update_objects_data():
             continue
         for c in container:
             update_params(c)
+
+    if share_data.use_experimental_sync():
+        for update in share_data.depsgraph.updates:
+            data_api.send_update(update.id.original)
 
 
 @persistent
@@ -1119,7 +1123,7 @@ class DisconnectOperator(bpy.types.Operator):
 
     def execute(self, context):
         disconnect()
-        self.report({"INFO"}, f"Disconnected ...")
+        self.report({"INFO"}, "Disconnected ...")
         return {"FINISHED"}
 
 

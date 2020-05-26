@@ -177,6 +177,7 @@ class SettingsPanel(bpy.types.Panel):
             col.prop(mixer_props, "send_base_meshes", text="Send Base Meshes")
             col.prop(mixer_props, "send_baked_meshes", text="Send Baked Meshes")
             col.prop(mixer_props, "log_level", text="Log Level")
+            col.prop(mixer_props, "experimental_sync", text="Experimental sync")
 
 
 classes = (ROOM_UL_ItemRenderer, USERS_UL_ItemRenderer, SettingsPanel)
