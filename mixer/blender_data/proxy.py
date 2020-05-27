@@ -21,6 +21,8 @@ from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 logger = logging.Logger(__name__, logging.INFO)
 
 MIXER_SEQUENCE = "__mixer_sequence__"
+MIXER_BLENDDATA_COLLECTION = "__mixer_blenddata_collection__"
+MIXER_BLENDDATA_KEY = "__mixer_blenddata_key__"
 
 
 def debug_check_stack_overflow(func, *args, **kwargs):
@@ -267,8 +269,8 @@ class StructLikeProxy(Proxy):
         for name, bl_rna_property in context.properties(bl_instance):
             attr = getattr(bl_instance, name)
             attr_value = read_attribute(attr, bl_rna_property, context, visit_context)
-            if attr_value is not None:
-                self._data[name] = attr_value
+            # Also write None values. We use them to reset attributes like Camera.dof.focus_object
+            self._data[name] = attr_value
         return self
 
     def save(self, bl_instance: any, key: Union[int, str]):
@@ -359,7 +361,7 @@ class BpyIDRefProxy(Proxy):
     """
 
     def __init__(self):
-        pass
+        self._data = {}
 
     def load(self, bl_instance, visit_context: BlendDataVisitContext):
         # Nothing to filter here, so we do not need the context/filter
@@ -373,15 +375,21 @@ class BpyIDRefProxy(Proxy):
         assert getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier], None) is not None
         assert bl_instance.name_full in getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier])
 
-        # TODO for easier access could keep a ref to the BpyBlendProxy
-        # TODO maybe this information does not belong to _data and _data should be reserved to "fields"
-        self._data = (
+        self._data = {
             # Blenddata collection name, e.g. 'objects', 'lights'
-            BlendData.instance().bl_collection_name_from_inner_identifier(class_bl_rna.identifier),
+            MIXER_BLENDDATA_COLLECTION: BlendData.instance().bl_collection_name_from_inner_identifier(
+                class_bl_rna.identifier
+            ),
             # key in blenddata collection
-            bl_instance.name_full,
-        )
+            MIXER_BLENDDATA_KEY: bl_instance.name_full,
+        }
         return self
+
+    def collection(self):
+        return self._data[MIXER_BLENDDATA_COLLECTION]
+
+    def key(self):
+        return self._data[MIXER_BLENDDATA_KEY]
 
     def save(self, bl_instance: any, attr_name: str):
         """
@@ -391,8 +399,8 @@ class BpyIDRefProxy(Proxy):
         # Cannot save into an attribute, which looks like an r-value.
         # When setting my_scene.world wen must setattr(scene, "world", data) and cannot
         # assign scene.world
-        collection_name = self._data[0]
-        collection_key = self._data[1]
+        collection_name = self._data[MIXER_BLENDDATA_COLLECTION]
+        collection_key = self._data[MIXER_BLENDDATA_KEY]
 
         # TODO the identifier garget doest not have the same semantics everywhere
         # here pointee somewhere else lvalue
@@ -789,6 +797,10 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
     """
     type_ = type(value)
+    if bl_instance is None:
+        logging.warning(f"unexpected write None attribute")
+        return
+
     if type_ not in proxy_classes:
         # TEMP we should not have readonly items
         assert type(key) is str

@@ -13,9 +13,6 @@ from mixer.blender_data.proxy import (
 # https://stackoverflow.com/questions/38307068/make-a-dict-json-from-string-with-duplicate-keys-python/38307621#38307621
 # https://stackoverflow.com/questions/31085153/easiest-way-to-serialize-object-in-a-nested-dictionary
 
-#
-#   Codec part
-#
 struct_like_classes = [BpyIDProxy, BpyIDRefProxy, BpyStructProxy, BpyPropertyGroupProxy]
 collection_classes = [
     BpyPropStructCollectionProxy,
@@ -28,11 +25,8 @@ _classes.update({c.__name__: c for c in collection_classes})
 def default(obj):
     # called top down
     class_ = obj.__class__
-    if issubclass(class_, StructLikeProxy):
-        d = {"__bpy_proxy_class__": class_.__name__}
-        d.update(obj._data)
-        return d
-    if class_ in collection_classes:
+    is_known = issubclass(class_, StructLikeProxy) or issubclass(class_, BpyIDRefProxy) or class_ in collection_classes
+    if is_known:
         d = {"__bpy_proxy_class__": class_.__name__}
         d.update(obj._data)
         return d

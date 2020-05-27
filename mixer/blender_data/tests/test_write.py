@@ -109,6 +109,30 @@ class TestWriteAttribute(unittest.TestCase):
             for clone, expected in zip(clone_curve.points[i].location, point):
                 self.assertAlmostEqual(clone, expected)
 
+    def test_write_camera_dof_target(self):
+        # test_write.TestWriteAttribute.test_write_camera_dof_target
+        # write an ID ref
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+
+        src_camera_name = "Camera_0"
+        src_camera = D.cameras[src_camera_name]
+        focus_object = D.objects["Cube"]
+        src_camera.dof.focus_object = focus_object
+
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(default_context)
+        camera_proxy = self.proxy.data("cameras").data(src_camera_name)
+
+        # Create a light then restore src_light into it
+        dst_camera_name = "Dst Camera"
+        dst_camera = D.cameras.new(dst_camera_name)
+
+        # patch the light name to restore the proxy into dst_light
+        camera_proxy._data["name"] = dst_camera_name
+        # save() needs to shrink the dst curvemap
+        camera_proxy.save(D.cameras, dst_camera_name)
+        self.assertEqual(dst_camera.dof.focus_object, focus_object)
+
     def test_shrink_array_curvemap(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
 

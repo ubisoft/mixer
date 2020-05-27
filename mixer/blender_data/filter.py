@@ -165,36 +165,38 @@ _exclude_names = {
 
 # TODO Change to (type, filter) for easier maintenance
 default_exclusions = {
+    None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
+    T.ActionGroup: [NameFilterOut("channels")],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
+    # TODO temporary ?
+    T.CompositorNodeRLayers: [NameFilterOut("scene")],
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
-    T.NodeSocket: [NameFilterOut("node")],
-    T.ActionGroup: [NameFilterOut("channels")],
-    T.Node: [NameFilterOut("internal_links")],
-    #
+    # TODO temporary ? Restore after foerach_get()
     T.Image: [NameFilterOut("pixels")],
-    T.CompositorNodeRLayers: [NameFilterOut("scene")],
-    None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
     T.LayerCollection: [
+        # TODO temporary
         # Scene.viewlayers[i].layer_collection.collection is Scene.collection,
         # see test_scene_viewlayer_layercollection_is_master
         NameFilterOut("collection"),
         # Seems to be a view of the master collection children
         NameFilterOut("children"),
     ],
-    T.ViewLayer: [
-        # Not useful. Requires array insertion (to do shortly)
-        NameFilterOut("freestyle_settings")
+    T.MeshPolygon: [NameFilterOut("area"), NameFilterOut("edge_keys"), NameFilterOut("loop_indices")],
+    T.MeshVertex: [
+        # MeshVertex.groups is updated via Object.vertex_groups
+        NameFilterOut("groups")
     ],
+    T.Node: [NameFilterOut("internal_links")],
+    T.NodeSocket: [NameFilterOut("node")],
     T.Scene: [
         # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
         # it is unclear how to do it.
         NameFilterOut("tool_settings")
     ],
-    T.MeshPolygon: [NameFilterOut("area"), NameFilterOut("edge_keys"), NameFilterOut("loop_indices")],
-    T.MeshVertex: [
-        # MeshVertex.groups is updated via Object.vertex_groups
-        NameFilterOut("groups")
+    T.ViewLayer: [
+        # Not useful. Requires array insertion (to do shortly)
+        NameFilterOut("freestyle_settings")
     ],
 }
 
@@ -202,8 +204,13 @@ default_filter.append(default_exclusions)
 default_context = Context(default_filter)
 
 
+safe_exclusions = {
+    # TODO temporary. Requires to load everything in order to properly load an IDRef,
+    # which requires differential proxy update for practical performance
+    T.CameraDOFSettings: [NameFilterOut("focus_object")],
+}
+
 safe_filter = FilterStack()
 safe_filter.append(default_exclusions)
-safe_blenddata = ["cameras", "lights"]
-safe_filter.append({T.BlendData: NameFilterIn(safe_blenddata)})
+safe_filter.append(safe_exclusions)
 safe_context = Context(safe_filter)

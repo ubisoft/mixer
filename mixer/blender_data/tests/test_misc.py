@@ -5,7 +5,13 @@ import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
 from mixer.blender_data.blenddata import BlendData
-from mixer.blender_data.proxy import BpyBlendProxy, BpyIDProxy, BpyIDRefProxy, BpyPropertyGroupProxy, SoaElement
+from mixer.blender_data.proxy import (
+    BpyBlendProxy,
+    BpyIDProxy,
+    BpyIDRefProxy,
+    BpyPropertyGroupProxy,
+    SoaElement,
+)
 from mixer.blender_data.tests.utils import test_blend_file
 
 from mixer.blender_data.filter import (
@@ -55,9 +61,10 @@ class TestLoadProxy(unittest.TestCase):
 
     # @unittest.skip("")
     def test_scene(self):
+        # test_misc.TestLoadProxy.test_scene
         scene = self.proxy._data["scenes"]._data["Scene_0"]._data
         # will vary slightly during tiune tuning of the default filter
-        self.assertEqual(48, len(scene))
+        self.assertEqual(54, len(scene))
 
         objects = scene["objects"]._data
         self.assertEqual(4, len(objects))
@@ -97,6 +104,28 @@ class TestLoadProxy(unittest.TestCase):
             self.assertIsInstance(o, BpyIDRefProxy)
 
         pass
+
+    def test_camera_focus_object_idref(self):
+        # test_misc.TestLoadProxy.test_camera_focus_object_idref
+        cam = D.cameras["Camera_0"]
+        cam.dof.focus_object = D.objects["Cube"]
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(default_context)
+        # load into proxy
+        cam_proxy = self.proxy.data("cameras").data("Camera_0")
+        focus_object_proxy = cam_proxy.data("dof").data("focus_object")
+        self.assertIsInstance(focus_object_proxy, BpyIDRefProxy)
+        self.assertEqual(focus_object_proxy.collection(), "objects")
+        self.assertEqual(focus_object_proxy.key(), "Cube")
+
+    def test_camera_focus_object_none(self):
+        # test_misc.TestLoadProxy.test_camera_focus_object_none
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(default_context)
+        # load into proxy
+        cam_proxy = self.proxy.data("cameras").data("Camera_0")
+        focus_object_proxy = cam_proxy.data("dof").data("focus_object")
+        self.assertIs(focus_object_proxy, None)
 
 
 class TestProperties(unittest.TestCase):
