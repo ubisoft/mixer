@@ -1,8 +1,11 @@
+import logging
 from mixer.blender_client.misc import get_or_create_object_data, get_object_path
 from mixer.broadcaster import common
 from mixer.broadcaster.client import Client
 from mixer.share_data import share_data
 import bpy
+
+logger = logging.getLogger(__name__)
 
 
 def get_light_buffer(obj):
@@ -44,6 +47,7 @@ def get_light_buffer(obj):
 
 
 def send_light(client: Client, obj):
+    logger.info("send_light %s", obj.name_full)
     light_buffer = get_light_buffer(obj)
     if light_buffer:
         client.add_command(common.Command(common.MessageType.LIGHT, light_buffer, 0))
@@ -51,6 +55,7 @@ def send_light(client: Client, obj):
 
 def build_light(data):
     light_path, start = common.decode_string(data, 0)
+    logger.info("build_light %s", light_path)
     light_type, start = common.decode_int(data, start)
     blighttype = "POINT"
     if light_type == common.LightType.SUN.value:

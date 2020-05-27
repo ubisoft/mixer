@@ -1,5 +1,6 @@
 import logging
-
+import pprint
+import traceback
 from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.filter import safe_context
 from mixer.blender_data.json_codec import Codec
@@ -19,21 +20,29 @@ def build_data_update(buffer):
     if not share_data.use_experimental_sync():
         return
 
-    collection_name, index = common.decode_string(buffer, 0)
+    blenddata_collection_name, index = common.decode_string(buffer, 0)
     key, index = common.decode_string(buffer, index)
-    buffer, _ = common.decode_string(buffer, index)
-    logger.debug("build_data_update")
+    data, _ = common.decode_string(buffer, index)
+    logger.info("build_data_update %s[%s]", blenddata_collection_name, key)
     codec = Codec()
-    id_proxy = codec.decode(buffer)
+    id_proxy = codec.decode(data)
     blenddata = BlendData.instance()
-    collection = blenddata.bpy_collection(collection_name)
+    collection = blenddata.bpy_collection(blenddata_collection_name)
     # TODO will fail when name != name_full
-    id_proxy.save(collection, key)
+    try:
+        id_proxy.save(collection, key)
+    except Exception as e:
+        logger.error("Build_data-update: Exception :")
+        logger.error("\n" + traceback.format_exc())
+        logger.error("while processing message:")
+        logger.error("\n" + data)
 
 
 def send_update(updated_id: bpy.types.ID):
     if not share_data.use_experimental_sync():
         return
+
+    logger.info("send_data_update %s", updated_id)
 
     global_proxy = share_data.proxy
     blenddata = BlendData.instance()

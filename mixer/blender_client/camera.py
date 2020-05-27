@@ -1,8 +1,11 @@
+import logging
 from mixer.blender_client.misc import get_or_create_object_data, get_object_path
 from mixer.broadcaster import common
 from mixer.broadcaster.client import Client
 from mixer.share_data import share_data
 import bpy
+
+logger = logging.getLogger(__name__)
 
 
 def get_camera_buffer(obj):
@@ -44,7 +47,7 @@ def send_camera(client: Client, obj):
 
 def build_camera(data):
     camera_path, start = common.decode_string(data, 0)
-
+    logger.info("build_light %s", camera_path)
     camera_name = camera_path.split("/")[-1]
     camera = get_or_create_camera(camera_name)
 
