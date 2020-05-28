@@ -318,8 +318,8 @@ class ShareData:
                 )
                 self.collections_info[collection.name_full] = collection_info
             for child in collection.children:
-                child_layer_collection = self.blender_layer_collections[child.name_full]
                 temporary_hidden = False
+                child_layer_collection = self.blender_layer_collections.get(child.name_full)
                 if child_layer_collection:
                     temporary_hidden = child_layer_collection.hide_viewport
                 collection_info = CollectionInfo(
