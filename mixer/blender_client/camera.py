@@ -28,6 +28,7 @@ def get_camera_buffer(obj):
     path = get_object_path(obj)
     return (
         common.encode_string(path)
+        + common.encode_string(obj.name_full)
         + common.encode_float(focal)
         + common.encode_float(front_clip_plane)
         + common.encode_float(far_clip_plane)
@@ -48,7 +49,7 @@ def send_camera(client: Client, obj):
 def build_camera(data):
     camera_path, start = common.decode_string(data, 0)
     logger.info("build_light %s", camera_path)
-    camera_name = camera_path.split("/")[-1]
+    camera_name, start = common.decode_string(data, start)
     camera = get_or_create_camera(camera_name)
 
     camera.lens, start = common.decode_float(data, start)

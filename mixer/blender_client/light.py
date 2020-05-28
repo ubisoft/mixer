@@ -37,6 +37,7 @@ def get_light_buffer(obj):
 
     return (
         common.encode_string(get_object_path(obj))
+        + common.encode_string(light.name_full)
         + common.encode_int(light_type.value)
         + common.encode_int(shadow)
         + common.encode_color(color)
@@ -55,6 +56,7 @@ def send_light(client: Client, obj):
 
 def build_light(data):
     light_path, start = common.decode_string(data, 0)
+    light_name, start = common.decode_string(data, start)
     logger.info("build_light %s", light_path)
     light_type, start = common.decode_int(data, start)
     blighttype = "POINT"
@@ -67,7 +69,6 @@ def build_light(data):
     else:
         blighttype = "SPOT"
 
-    light_name = light_path.split("/")[-1]
     light = get_or_create_light(light_name, blighttype)
 
     shadow, start = common.decode_int(data, start)
