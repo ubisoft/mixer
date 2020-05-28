@@ -47,10 +47,10 @@ class ClientBlender(Client):
     def get_or_create_collection(self, name: str):
         collection = share_data.blender_collections.get(name)
         if not collection:
-            bpy.ops.collection.create(name=name)
-            collection = bpy.data.collections[name]
+            collection = bpy.data.collections.new(name)
             share_data._blender_collections[name] = collection
             bpy.context.scene.collection.children.link(collection)
+            share_data.update_collection_temporary_visibility(name)
         return collection
 
     def get_or_create_path(self, path, data=None) -> bpy.types.Object:
@@ -96,6 +96,7 @@ class ClientBlender(Client):
         basis_matrix, start = self.decode_matrix(data, start)
         local_matrix, start = self.decode_matrix(data, start)
         visible, start = common.decode_bool(data, start)
+        temporary_visibility, start = common.decode_bool(data, start)
 
         try:
             obj = self.get_or_create_path(object_path)
@@ -105,6 +106,7 @@ class ClientBlender(Client):
         if obj:
             self.set_transform(obj, parent_invert_matrix, basis_matrix, local_matrix)
             obj.hide_viewport = not visible
+            obj.hide_set(not temporary_visibility)
 
     def build_rename(self, data):
         old_path, index = common.decode_string(data, 0)
@@ -178,12 +180,14 @@ class ClientBlender(Client):
     def get_transform_buffer(self, obj):
         path = self.get_object_path(obj)
         visible = not obj.hide_viewport
+        temporary_visibility = not obj.hide_get()
         return (
             common.encode_string(path)
             + common.encode_matrix(obj.matrix_parent_inverse)
             + common.encode_matrix(obj.matrix_basis)
             + common.encode_matrix(obj.matrix_local)
             + common.encode_bool(visible)
+            + common.encode_bool(temporary_visibility)
         )
 
     def send_transform(self, obj):

@@ -92,6 +92,8 @@ def build_collection_to_scene(data):
     collection = share_data.blender_collections[collection_name]
     scene.collection.children.link(collection)
 
+    share_data.update_collection_temporary_visibility(collection_name)
+
 
 def send_remove_collection_from_scene(client: Client, scene_name: str, collection_name: str):
     logger.debug("send_remove_collection_from_scene %s <- %s", scene_name, collection_name)
