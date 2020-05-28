@@ -1,5 +1,4 @@
 import logging
-import pprint
 import traceback
 from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.filter import safe_context
@@ -31,7 +30,7 @@ def build_data_update(buffer):
     # TODO will fail when name != name_full
     try:
         id_proxy.save(collection, key)
-    except Exception as e:
+    except Exception:
         logger.error("Build_data-update: Exception :")
         logger.error("\n" + traceback.format_exc())
         logger.error("while processing message:")
