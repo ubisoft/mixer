@@ -1,7 +1,7 @@
 import bpy
 import bpy.types as T  # noqa
 from typing import Mapping, List, Tuple, Any
-from .proxy import (
+from mixer.blender_data.proxy import (
     BpyBlendProxy,
     BpyIDProxy,
     BpyStructProxy,
@@ -9,6 +9,7 @@ from .proxy import (
     ensure_uuid,
     Proxy,
 )
+from mixer.blender_data.filter import Context
 
 Uuid = str
 Name = str
@@ -81,16 +82,17 @@ class BpyPropCollectionDiff(BpyDiff):
     items_renamed: ItemsRenamed = []
     items_updated: ItemsUpdated = {}
 
-    def diff(self, proxy: BpyPropDataCollectionProxy, bl_collection: T.bpy_prop_collection):
+    def diff(self, proxy: BpyPropDataCollectionProxy, bl_collection: T.bpy_prop_collection, context: Context):
         self.items_added.clear()
         self.items_removed.clear()
         self.items_renamed.clear()
         self.items_updated.clear()
         blender_items = {}
         for name, item in bl_collection.items():
+            # TODO dot it here or in Proxy ?
             ensure_uuid(item)
             blender_items[item.mixer_uuid] = (name, bl_collection)
-        proxy_items = {item.mixer_uuid: name for name, item in proxy.items()}
+        proxy_items = {item.mixer_uuid: name for name, item in proxy._data.items()}
         self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
 
         # TODO diff, filter by depsgraph update (add depsgraph parameter ?)
@@ -112,11 +114,12 @@ class BpyBlendDiff(BpyDiff):
 
     deltas: Mapping[Name, BpyPropCollectionDiff] = {}
 
-    def diff(self, proxy: BpyBlendProxy):
+    def diff(self, proxy: BpyBlendProxy, context: Context):
         self.deltas.clear()
-        for name in proxy.iter_all():
+        for name, _ in context.properties(bpy_type=T.BlendData):
+            collection = getattr(bpy.data, name)
             delta = BpyPropCollectionDiff()
-            delta.diff(proxy._data[name], getattr(bpy.data, name))
+            delta.diff(proxy._data[name], collection, context)
             if not delta.empty():
                 self.deltas[name] = delta
 

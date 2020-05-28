@@ -22,6 +22,8 @@ from mixer import clientBlender
 from mixer import ui
 from mixer.data import get_mixer_props
 from mixer.stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
+from mixer.blender_data.diff import BpyBlendDiff
+from mixer.blender_data.filter import safe_context
 
 logger = logging.getLogger(__name__)
 
@@ -673,6 +675,18 @@ def send_scene_data_to_server(scene, dummy):
         changed |= update_objects_visibility()
         changed |= update_objects_transforms()
         changed |= reparent_objects()
+
+    if share_data.use_experimental_sync:
+        diff = BpyBlendDiff()
+        diff.diff(share_data.proxy, safe_context)
+        for delta in diff.deltas.values():
+            for item in delta.items_removed:
+                logger.info(f"removed {item}")
+            for item in delta.items_added:
+                logger.info(f"added {item}")
+            for item in delta.items_renamed:
+                logger.info(f"renamed {item}")
+        share_data.proxy.update(diff, safe_context)
 
     if not changed:
         with timer.child("update_objects_data"):

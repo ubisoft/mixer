@@ -726,17 +726,15 @@ class BpyPropDataCollectionProxy(Proxy):
             write_attribute(target, k, v)
 
     def find(self, key: str):
-        return self._data[key]
+        return self._data.get(key)
 
-    def update(self, diff):
-        # TODO with context
+    def update(self, diff, context: Context):
         """
         Update the proxy according to the diff
         """
-        visit_context = BlendDataVisitContext()
         for name, bl_collection in diff.items_added.items():
             item = bl_collection[name]
-            self._data[name] = BpyIDProxy().load(item, visit_context)
+            self._data[name] = BpyIDProxy().load(item, context)
         for name in diff.items_removed:
             del self._data[name]
         for old_name, new_name in diff.items_renamed:
@@ -770,11 +768,11 @@ class BpyBlendProxy(Proxy):
             return None
         return collection_proxy.find(key)
 
-    def update(self, diff):
-        for name in self.iter_all():
+    def update(self, diff, context: Context):
+        for name, _ in context.properties(bpy_type=T.BlendData):
             deltas = diff.deltas.get(name)
             if deltas is not None:
-                self._data[name].update(diff.deltas[name])
+                self._data[name].update(diff.deltas[name], context)
 
     def clear(self):
         self._data.clear()
