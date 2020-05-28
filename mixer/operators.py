@@ -465,7 +465,11 @@ def update_collections_parameters():
             temporary_hidden = False
             if layer_collection:
                 temporary_hidden = layer_collection.hide_viewport
-            if info.temporary_hide_viewport != temporary_hidden or info.hide_viewport != collection.hide_viewport or info.instance_offset != collection.instance_offset:
+            if (
+                info.temporary_hide_viewport != temporary_hidden
+                or info.hide_viewport != collection.hide_viewport
+                or info.instance_offset != collection.instance_offset
+            ):
                 collection_api.send_collection(share_data.client, collection)
                 changed = True
     return changed
