@@ -628,7 +628,7 @@ def send_frame_changed(scene):
 @stats_timer(share_data)
 @persistent
 def send_scene_data_to_server(scene, dummy):
-    logger.info("send_scene_data_to_server")
+    logger.debug("send_scene_data_to_server")
 
     timer = share_data.current_stats_timer
 
@@ -644,7 +644,7 @@ def send_scene_data_to_server(scene, dummy):
     if share_data.client.receivedCommandsProcessed:
         if not share_data.client.blockSignals:
             share_data.client.receivedCommandsProcessed = False
-        logger.info("send_scene_data_to_server canceled (receivedCommandsProcessed = True)")
+        logger.debug("send_scene_data_to_server canceled (receivedCommandsProcessed = True)")
         return
 
     if not is_in_object_mode():
