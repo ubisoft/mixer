@@ -107,11 +107,16 @@ class ClientBlender(Client):
             obj.hide_viewport = not visible
 
     def build_rename(self, data):
+        # Object rename, actually
+        # renaming the data referenced by Object.data (Light, Camera, ...) is not supported
         old_path, index = common.decode_string(data, 0)
         new_path, index = common.decode_string(data, index)
+        logger.info("build_rename %s into %s", old_path, new_path)
         old_name = old_path.split("/")[-1]
         new_name = new_path.split("/")[-1]
         share_data.blender_objects.get(old_name).name = new_name
+        share_data.blender_objects_dirty = True
+        share_data.old_objects = share_data.blender_objects
 
     def build_duplicate(self, data):
         src_path, index = common.decode_string(data, 0)
@@ -413,6 +418,7 @@ class ClientBlender(Client):
         return buffer
 
     def send_rename(self, old_name, new_name):
+        logger.info("send_rename %s into %s", old_name, new_name)
         self.add_command(common.Command(common.MessageType.RENAME, self.get_rename_buffer(old_name, new_name), 0))
 
     def get_delete_buffer(self, name):
@@ -421,6 +427,7 @@ class ClientBlender(Client):
         return buffer
 
     def send_delete(self, obj_name):
+        logger.info("send_delate %s", obj_name)
         self.add_command(common.Command(common.MessageType.DELETE, self.get_delete_buffer(obj_name), 0))
 
     def send_list_rooms(self):

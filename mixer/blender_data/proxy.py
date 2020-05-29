@@ -317,9 +317,14 @@ class BpyIDProxy(BpyStructProxy):
 
     def target(self, bl_instance: any, attr_name: str):
         if isinstance(bl_instance, bpy.types.bpy_prop_collection):
-            return bl_instance[attr_name]
+            t = bl_instance.get(attr_name)
+            if t is None:
+                logger.warning(
+                    f"BpyIdProxy: key '{attr_name}'' not found in bpy_prop_collection {bl_instance}. Valid keys are ... {bl_instance.keys()}"
+                )
         else:
-            return getattr(bl_instance, attr_name)
+            t = getattr(bl_instance, attr_name)
+        return t
 
     def pre_save(self, bl_instance: any, attr_name: str):
         """
