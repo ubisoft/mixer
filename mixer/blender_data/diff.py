@@ -86,7 +86,6 @@ class BpyPropCollectionDiff(BpyDiff):
         self.items_added.clear()
         self.items_removed.clear()
         self.items_renamed.clear()
-        self.items_updated.clear()
         blender_items = {}
         for name, item in bl_collection.items():
             # TODO dot it here or in Proxy ?
@@ -109,7 +108,7 @@ class BpyPropCollectionDiff(BpyDiff):
 
 class BpyBlendDiff(BpyDiff):
     """
-    Diff for the whole blen document, currently bpy.data
+    Diff for the whole bpy.data
     """
 
     deltas: Mapping[Name, BpyPropCollectionDiff] = {}

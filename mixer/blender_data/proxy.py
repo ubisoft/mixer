@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import array
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import IntEnum
 import logging
-from typing import Any, Mapping, Union, Set, List, Tuple
+from typing import Any, Mapping, Union, Set, List, Tuple, TypeVar
 from uuid import uuid4
 
 import bpy
@@ -18,6 +20,8 @@ from mixer.blender_data.blenddata import (
     bl_rna_to_type,
 )
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix
+
+BpyBlendDiff = TypeVar("BpyBlendDiff")
 
 logger = logging.Logger(__name__, logging.INFO)
 
@@ -352,6 +356,10 @@ class BpyIDProxy(BpyStructProxy):
         - bl_instance: the container attribute
         """
         target = self.pre_save(bl_instance, attr_name)
+        if target is None:
+            logging.warning(f"BpyIdProxy.save() {bl_instance}.{attr_name} is None")
+            return
+
         for k, v in self._data.items():
             write_attribute(target, k, v)
 
@@ -760,11 +768,30 @@ class BpyBlendProxy(Proxy):
             return None
         return collection_proxy.find(key)
 
-    def update(self, diff, context: Context):
-        for name, _ in context.properties(bpy_type=T.BlendData):
-            deltas = diff.deltas.get(name)
-            if deltas is not None:
-                self._data[name].update(diff.deltas[name], context)
+    def update(self, diff: BpyBlendDiff, context: Context, depsgraph_updates: T.bpy_prop_collection = []):
+        """
+        Update the proxy using the state of the Blendata collections (ID creation, deletion) 
+        and the depsgraph updates (ID modification)
+        """
+        visit_state = VisitState(self.root_ids, context)
+        valid_names = [name for name, _ in context.properties(bpy_type=T.BlendData)]
+        for delta_name, delta in diff.deltas.items():
+            if delta_name in valid_names:
+                self._data[delta_name].update(delta, visit_state)
+
+        return
+        for update in depsgraph_updates:
+            id = update.id.original
+
+            # TODO
+            # may be a BlendData or non-BlendData ID block (node_tree)
+            # find a way to locate it, probably from uuid
+            # - BlendData updates : extend root_ids with references to ID blocks or eccessor ('scenes, 'Scn01')
+            # - Non Blenddata updates : a dict of non-root uuids to the accessor ('scenes, 'Scn01', 'node_tree')
+            # The uuid must be created by the sender and be included in the first full update
+            # Or do we always generate updates that stop at the ID nboiundary, i.e. 2 updates for scene and node_tree
+
+            raise NotImplemented
 
     def clear(self):
         self._data.clear()

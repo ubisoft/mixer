@@ -576,10 +576,6 @@ def update_objects_data():
         for c in container:
             update_params(c)
 
-    if share_data.use_experimental_sync():
-        for update in share_data.depsgraph.updates:
-            data_api.send_update(update.id.original)
-
 
 @persistent
 def send_frame_changed(scene):
@@ -676,22 +672,25 @@ def send_scene_data_to_server(scene, dummy):
         changed |= update_objects_transforms()
         changed |= reparent_objects()
 
+    if not changed:
+        with timer.child("update_objects_data"):
+            share_data.depsgraph = bpy.context.evaluated_depsgraph_get()
+            update_objects_data()
+
     if share_data.use_experimental_sync:
         diff = BpyBlendDiff()
         diff.diff(share_data.proxy, safe_context)
         for delta in diff.deltas.values():
             for item in delta.items_removed:
-                logger.info(f"removed {item}")
-            for item in delta.items_added:
-                logger.info(f"added {item}")
+                logger.info(f"Detected removed {item}")
+            for key, collection in delta.items_added.items():
+                logger.info(f"Detected added {collection}[{key}]")
+                data_api.send_data_new(collection, key)
             for item in delta.items_renamed:
-                logger.info(f"renamed {item}")
-        share_data.proxy.update(diff, safe_context)
-
-    if not changed:
-        with timer.child("update_objects_data"):
-            share_data.depsgraph = bpy.context.evaluated_depsgraph_get()
-            update_objects_data()
+                # TODO maybe not useful, just a name update
+                logger.info(f"Detected renamed {item}")
+        updates = share_data.proxy.update(diff, safe_context, depsgraph_updates=share_data.depsgraph.updates)
+        data_api.send_data_updates(updates)
 
     # update for next change
     with timer.child("update_current_data"):
@@ -803,35 +802,25 @@ def update_list_users(client_ids: Mapping[str, str] = None):
 def clear_scene_content():
     set_handlers(False)
 
-    for obj in bpy.data.objects:
-        bpy.data.objects.remove(obj)
+    data = [
+        "objects",
+        "cameras",
+        "lights",
+        "meshes",
+        "curves",
+        "grease_pencils",
+        "materials",
+        "textures",
+        "images",
+        "collections",
+        # "worlds",
+        "sounds",
+    ]
 
-    for obj in bpy.data.cameras:
-        bpy.data.cameras.remove(obj)
-
-    for obj in bpy.data.lights:
-        bpy.data.lights.remove(obj)
-
-    for block in bpy.data.meshes:
-        bpy.data.meshes.remove(block)
-
-    for block in bpy.data.curves:
-        bpy.data.curves.remove(block)
-
-    for block in bpy.data.grease_pencils:
-        bpy.data.grease_pencils.remove(block)
-
-    for block in bpy.data.materials:
-        bpy.data.materials.remove(block)
-
-    for block in bpy.data.textures:
-        bpy.data.textures.remove(block)
-
-    for block in bpy.data.images:
-        bpy.data.images.remove(block)
-
-    for collection in bpy.data.collections:
-        bpy.data.collections.remove(collection)
+    for name in data:
+        collection = getattr(bpy.data, name)
+        for obj in collection:
+            collection.remove(obj)
 
     # Cannot remove the last scene at this point, treat it differently
     for scene in bpy.data.scenes[:-1]:
@@ -932,7 +921,10 @@ def is_localhost(host):
 def connect():
     logger.info("connect")
 
-    assert share_data.client is None
+    if share_data.client is not None:
+        # a server shutdown was not processed
+        logger.debug("connect: share_data.client is not None")
+        share_data.client = None
 
     props = get_mixer_props()
     if not create_main_client(props.host, props.port):
@@ -1013,7 +1005,11 @@ def network_consumer_timer():
 
 
 def create_main_client(host: str, port: int):
-    assert share_data.client is None
+    if share_data.client is not None:
+        # a server shutdown was not processed
+        logger.debug("create_main_client: share_data.client is not None")
+        share_data.client = None
+
     client = clientBlender.ClientBlender(host, port)
     client.connect()
     if not client.is_connected():

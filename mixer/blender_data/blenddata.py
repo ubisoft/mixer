@@ -1,8 +1,11 @@
 import functools
+import logging
 from typing import Mapping
 
 import bpy
 import bpy.types as T  # noqa N812
+
+logger = logging.Logger(__name__, logging.INFO)
 
 
 def bl_rna_to_type(bl_rna):
@@ -21,6 +24,8 @@ collection_name_to_type = {
 # e.g. "Object" -> "objects", "Light" -> "lights"
 rna_identifier_to_collection_name = {value.bl_rna.identifier: key for key, value in collection_name_to_type.items()}
 
+load_ctors = ["fonts", "movieclips", "sounds"]
+
 
 class BlendDataCollection:
     """
@@ -32,6 +37,12 @@ class BlendDataCollection:
         self._dirty: bool = True
         self._bpy_data_collection = bpy_data_collection
         self._items = {}
+
+        if self._name in load_ctors:
+            ctor_name = "load"
+        else:
+            ctor_name = "new"
+        self._ctor = getattr(self._bpy_data_collection, ctor_name, None)
 
     def __getitem__(self, key):
         return self._items[key]
@@ -49,10 +60,18 @@ class BlendDataCollection:
         self._dirty = False
         return self._items
 
-    def new(self, name: str):
+    def ctor(self, name: str):
+        """
+        Create an instance in the BlendData collection using its ctor (new, load, ...)
+        """
+        if self._ctor is None:
+            logger.warning("unexpected call to BlendDataCollection.ctor() for %s", self._bpy_data_collection)
+            # Should not appen
+            return
         data = self._items.get(name)
         if data is None:
-            data = self._bpy_blenddata_collection.new(name)
+            # TODO more parameters, not just name
+            data = self._ctor(name)
             self._items[name] = data
 
     def remove(self, name_full):
