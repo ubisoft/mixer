@@ -587,6 +587,23 @@ def update_objects_data():
             data_api.send_update(update.id.original)
 
 
+def send_animated_camera_data():
+    animatedCameraSet = set()
+    cameraDict = {}
+    for update in share_data.depsgraph.updates:
+        obj = update.id.original
+        typename = obj.bl_rna.name
+        if typename == "Object":
+            if obj.data and obj.data.bl_rna.name == "Camera":
+                cameraActionName = obj.animation_data.action.name_full
+                cameraDict[cameraActionName] = obj
+        if typename == "Action" and cameraDict.get(cameraActionName):
+            animatedCameraSet.add(cameraDict[cameraActionName])
+
+    for camera in animatedCameraSet:
+        share_data.client.send_camera_attributes(camera)
+
+
 @persistent
 def send_frame_changed(scene):
     logger.info("send_frame_changed")
@@ -623,6 +640,13 @@ def send_frame_changed(scene):
         # update for next change
         with timer.child("update_objects_info"):
             share_data.update_objects_info()
+
+        # temporary code :
+        # animated parameters are not sent, we need camera animated parameters for VRtist
+        # (focal lens etc.)
+        # please remove this when animation is managed
+        with timer.child("send_animated_camera_data"):
+            send_animated_camera_data()
 
 
 @stats_timer(share_data)
@@ -1018,7 +1042,6 @@ def create_main_client(host: str, port: int):
     share_data.client.add_callback("ClearContent", clear_scene_content)
     share_data.client.add_callback("Disconnect", on_disconnect_from_server)
     share_data.client.add_callback("QueryObjectData", on_query_object_data)
-    share_data.client.add_callback("QueryCurrentFrame", on_frame_update)
     if not bpy.app.timers.is_registered(network_consumer_timer):
         bpy.app.timers.register(network_consumer_timer)
 

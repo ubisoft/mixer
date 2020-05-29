@@ -403,6 +403,15 @@ class ClientBlender(Client):
         self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
         self.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
 
+    def send_camera_attributes(self, obj):
+        buffer = (
+            common.encode_string(obj.name_full)
+            + common.encode_float(obj.data.lens)
+            + common.encode_float(obj.data.dof.aperture_fstop)
+            + common.encode_float(obj.data.dof.focus_distance)
+        )
+        self.add_command(common.Command(common.MessageType.CAMERA_ATTRIBUTES, buffer, 0))
+
     def send_deleted_object(self, obj_name):
         self.send_delete(obj_name)
 
@@ -450,9 +459,12 @@ class ClientBlender(Client):
             self.callbacks["SendContent"]()
 
     def build_frame(self, data):
+        previous_value = share_data.client.receivedCommandsProcessed
+        share_data.client.receivedCommandsProcessed = False
         start = 0
         frame, start = common.decode_int(data, start)
-        bpy.context.scene.frame_current = frame
+        bpy.context.scene.frame_set(frame)
+        share_data.client.receivedCommandsProcessed = previous_value
 
     def send_frame(self, frame):
         self.add_command(common.Command(common.MessageType.FRAME, common.encode_int(frame), 0))
@@ -497,11 +509,7 @@ class ClientBlender(Client):
         share_data.client.receivedCommandsProcessed = previous_value
 
     def query_current_frame(self):
-        previous_value = share_data.client.receivedCommandsProcessed
-        share_data.client.receivedCommandsProcessed = False
-        if "QueryCurrentFrame" in self.callbacks:
-            self.callbacks["QueryCurrentFrame"]()
-        share_data.client.receivedCommandsProcessed = previous_value
+        share_data.client.send_frame(scene.frame_current)
 
     @stats_timer(share_data)
     def network_consumer(self):
