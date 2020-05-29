@@ -3,7 +3,6 @@ import logging
 from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.filter import safe_context
 from mixer.blender_data.json_codec import Codec
-from mixer.blender_data.proxy import BlendDataVisitContext
 from mixer.broadcaster import common
 from mixer.share_data import share_data
 
@@ -44,7 +43,7 @@ def send_update(updated_id: bpy.types.ID):
     id_proxy = global_proxy.find(collection_name, key)
     if id_proxy is None:
         return
-    id_proxy.load(updated_id, safe_context, BlendDataVisitContext(safe_context))
+    id_proxy.load(updated_id, safe_context, global_proxy.root_ids)
     codec = Codec()
     message = codec.encode(id_proxy)
     buffer = common.encode_string(collection_name) + common.encode_string(key) + common.encode_string(message)
