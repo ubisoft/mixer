@@ -677,7 +677,7 @@ def send_scene_data_to_server(scene, dummy):
             share_data.depsgraph = bpy.context.evaluated_depsgraph_get()
             update_objects_data()
 
-    if share_data.use_experimental_sync:
+    if share_data.use_experimental_sync():
         diff = BpyBlendDiff()
         diff.diff(share_data.proxy, safe_context)
         for delta in diff.deltas.values():
