@@ -70,6 +70,8 @@ def send_data_update(updated_id: bpy.types.ID):
     if not share_data.use_experimental_sync():
         return
 
+    logger.info("send_data_update %s", updated_id)
+
     global_proxy = share_data.proxy
     blenddata = BlendData.instance()
     collection_name = blenddata.bl_collection_name_from_ID(updated_id)
