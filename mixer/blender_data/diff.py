@@ -1,6 +1,9 @@
+import logging
+from typing import Mapping, List, Tuple, Any
+
 import bpy
 import bpy.types as T  # noqa
-from typing import Mapping, List, Tuple, Any
+
 from mixer.blender_data.proxy import (
     BpyBlendProxy,
     BpyIDProxy,
@@ -11,7 +14,10 @@ from mixer.blender_data.proxy import (
 )
 from mixer.blender_data.filter import Context
 
+logger = logging.Logger(__name__, logging.INFO)
+
 Uuid = str
+BlendDataCollectionName = str
 Name = str
 
 ItemsAdded = Mapping[Name, T.bpy_prop_collection]
@@ -80,7 +86,6 @@ class BpyPropCollectionDiff(BpyDiff):
     items_added: ItemsAdded = {}
     items_removed: ItemsRemoved = []
     items_renamed: ItemsRenamed = []
-    items_updated: ItemsUpdated = {}
 
     def diff(self, proxy: BpyPropDataCollectionProxy, bl_collection: T.bpy_prop_collection, context: Context):
         self.items_added.clear()
@@ -94,16 +99,8 @@ class BpyPropCollectionDiff(BpyDiff):
         proxy_items = {item.mixer_uuid: name for name, item in proxy._data.items()}
         self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
 
-        # TODO diff, filter by depsgraph update (add depsgraph parameter ?)
-        return
-        for name in proxy.iter_all():
-            deltas = BpyIDDiff()
-            deltas.diff(proxy._data[name], getattr(bpy.data, name))
-            if not deltas.empty:
-                self.deltas[name] = deltas
-
     def empty(self):
-        return not (self.items_updated or self.items_added or self.items_removed or self.items_renamed)
+        return not (self.items_added or self.items_removed or self.items_renamed)
 
 
 class BpyBlendDiff(BpyDiff):
@@ -111,16 +108,16 @@ class BpyBlendDiff(BpyDiff):
     Diff for the whole bpy.data
     """
 
-    deltas: Mapping[Name, BpyPropCollectionDiff] = {}
+    collection_deltas: Mapping[BlendDataCollectionName, BpyPropCollectionDiff] = {}
+    id_deltas: List[Tuple[BpyIDProxy, T.ID]] = []
 
-    def diff(self, proxy: BpyBlendProxy, context: Context):
-        self.deltas.clear()
+    def diff(self, blend_proxy: BpyBlendProxy, context: Context):
+        self.collection_deltas.clear()
+        self.id_deltas.clear()
+
         for name, _ in context.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
             delta = BpyPropCollectionDiff()
-            delta.diff(proxy._data[name], collection, context)
+            delta.diff(blend_proxy._data[name], collection, context)
             if not delta.empty():
-                self.deltas[name] = delta
-
-    def empty(self):
-        return not self.deltas
+                self.collection_deltas[name] = delta

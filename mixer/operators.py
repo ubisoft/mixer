@@ -680,17 +680,17 @@ def send_scene_data_to_server(scene, dummy):
     if share_data.use_experimental_sync():
         diff = BpyBlendDiff()
         diff.diff(share_data.proxy, safe_context)
-        for delta in diff.deltas.values():
+        for delta in diff.collection_deltas.values():
             for item in delta.items_removed:
                 logger.info(f"Detected removed {item}")
             for key, collection in delta.items_added.items():
                 logger.info(f"Detected added {collection}[{key}]")
-                data_api.send_data_new(collection, key)
+                # data_api.send_data_new(collection, key)
             for item in delta.items_renamed:
                 # TODO maybe not useful, just a name update
                 logger.info(f"Detected renamed {item}")
-        updates = share_data.proxy.update(diff, safe_context, depsgraph_updates=share_data.depsgraph.updates)
-        data_api.send_data_updates(updates)
+        updated_proxies = share_data.proxy.update(diff, safe_context, share_data.depsgraph.updates)
+        data_api.send_data_updates(updated_proxies)
 
     # update for next change
     with timer.child("update_current_data"):

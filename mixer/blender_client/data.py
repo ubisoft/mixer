@@ -1,15 +1,15 @@
 import logging
 import traceback
-from typing import List, Tuple
+from typing import List
 
 from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.filter import safe_context
 from mixer.blender_data.json_codec import Codec
+from mixer.blender_data.proxy import BpyIDProxy, VisitState
 from mixer.broadcaster import common
 from mixer.share_data import share_data
 
 import bpy.types
-from mixer.blender_data.proxy import VisitState
 
 logger = logging.getLogger(__name__)
 
@@ -90,18 +90,24 @@ def send_data_update(updated_id: bpy.types.ID):
     share_data.client.add_command(command)
 
 
-def send_data_updates(updates: List[Tuple[str, str]]):
+def send_data_updates(updates: List[BpyIDProxy]):
     if not share_data.use_experimental_sync():
         return
     if not updates:
         return
-    global_proxy = share_data.proxy
     codec = Codec()
-    for collection_name, key in updates:
-        id_proxy = global_proxy.find(collection_name, key)
-        if id_proxy is None:
-            return
-        message = codec.encode(id_proxy)
-        buffer = common.encode_string(collection_name) + common.encode_string(key) + common.encode_string(message)
+    for proxy in updates:
+        logger.info("send_data_update %s", proxy)
+
+        encoded_proxy = codec.encode(proxy)
+        # TODO to not emit the collection_name and the name.
+        # They are not needed as the receiver can derive the collection from the class
+        # and the name is the key.
+        # check the situation for IDS not in BlendData
+        buffer = (
+            common.encode_string(proxy.collection_name())
+            + common.encode_string(proxy.collection_key())
+            + common.encode_string(encoded_proxy)
+        )
         command = common.Command(common.MessageType.BLENDER_DATA_UPDATE, buffer, 0)
         share_data.client.add_command(command)

@@ -22,13 +22,20 @@ from mixer.blender_data.blenddata import (
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 
 BpyBlendDiff = TypeVar("BpyBlendDiff")
+BpyIDProxy = TypeVar("BpyIDProxy")
 
 logger = logging.Logger(__name__, logging.INFO)
 
 RootIds = Set[bpy.types.ID]
+# probably superflous but easier to try
+AllIds = Mapping[bpy.types.ID, BpyIDProxy]
+
+# storing everything in a single dictionary is easier for serialization
 MIXER_SEQUENCE = "__mixer_sequence__"
 MIXER_BLENDDATA_COLLECTION = "__mixer_blenddata_collection__"
 MIXER_BLENDDATA_KEY = "__mixer_blenddata_key__"
+MIXER_ID_COLLECTION = "__mixer_id_collection__"
+MIXER_ID_COLLECTION_KEY = "__mixer_id_collection_key__"
 
 
 def debug_check_stack_overflow(func, *args, **kwargs):
@@ -81,6 +88,7 @@ class DebugContext:
 @dataclass
 class VisitState:
     root_ids: RootIds
+    all_ids: AllIds
     context: Context
     debug_context: DebugContext = DebugContext()
 
@@ -316,18 +324,34 @@ class BpyIDProxy(BpyStructProxy):
     def __init__(self):
         super().__init__()
 
-    def load(self, bl_instance, visit_state: VisitState):
+    def load(self, bl_instance: T.ID, visit_state: VisitState, collection_name: str = None, name: str = None):
+        """
+        -- collection_name the bpy.data collection that contains this ID
+        -- the key if this ID in its bpy.data collection
+        """
+
         # TODO check that bl_instance class derives from ID
         super().load(bl_instance, visit_state)
+        if collection_name:
+            self._data[MIXER_BLENDDATA_COLLECTION] = collection_name
+        if name:
+            self._data[MIXER_BLENDDATA_KEY] = name
         self.mixer_uuid = bl_instance.mixer_uuid
+        visit_state.all_ids[bl_instance] = (self, collection_name, name)
         return self
+
+    def collection_name(self) -> str:
+        return self._data.get(MIXER_BLENDDATA_COLLECTION)
+
+    def collection_key(self) -> str:
+        return self._data.get(MIXER_BLENDDATA_KEY)
 
     def target(self, bl_instance: any, attr_name: str):
         if isinstance(bl_instance, bpy.types.bpy_prop_collection):
             t = bl_instance.get(attr_name)
             if t is None:
                 logger.warning(
-                    f"BpyIdProxy: key '{attr_name}'' not found in bpy_prop_collection {bl_instance}. Valid keys are ... {bl_instance.keys()}"
+                    f"BpyIDProxy: key '{attr_name}'' not found in bpy_prop_collection {bl_instance}. Valid keys are ... {bl_instance.keys()}"
                 )
         else:
             t = getattr(bl_instance, attr_name)
@@ -362,7 +386,7 @@ class BpyIDProxy(BpyStructProxy):
         """
         target = self.pre_save(bl_instance, attr_name)
         if target is None:
-            logging.warning(f"BpyIdProxy.save() {bl_instance}.{attr_name} is None")
+            logging.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} is None")
             return
 
         for k, v in self._data.items():
@@ -694,12 +718,13 @@ class BpyPropDataCollectionProxy(Proxy):
 
     def load_as_ID(self, bl_collection: bpy.types.bpy_prop_collection, visit_state: VisitState):  # noqa N802
         """
-        Load bl_collection elements as plain IDs, with all element properties. Use this lo load from bpy.data
+        Load bl_collection elements as plain IDs, with all element properties. Use this to load from bpy.data
         """
         for name, item in bl_collection.items():
+            collection_name = BlendData.instance().bl_collection_name_from_ID(item)
             with visit_state.debug_context.enter(name, item):
                 ensure_uuid(item)
-                self._data[name] = BpyIDProxy().load(item, visit_state)
+                self._data[name] = BpyIDProxy().load(item, visit_state, collection_name, name)
 
         return self
 
@@ -723,25 +748,32 @@ class BpyPropDataCollectionProxy(Proxy):
     def find(self, key: str):
         return self._data.get(key)
 
-    def update(self, diff, context: Context):
+    def update(self, diff, visit_state: VisitState):
         """
         Update the proxy according to the diff
         """
         for name, bl_collection in diff.items_added.items():
-            item = bl_collection[name]
-            self._data[name] = BpyIDProxy().load(item, context)
+            # warning this is the killer access in linear time
+            id_ = bl_collection[name]
+            collection_name = BlendData.instance().collection_name(bl_collection)
+            proxy = BpyIDProxy().load(id_, visit_state, collection_name, name)
+            visit_state.root_ids.add(id_)
+            visit_state.all_ids[id_] = (proxy, collection_name, name)
+            self._data[name] = proxy
+
         for name in diff.items_removed:
+            # WARNING cannot remove from ids lists
             del self._data[name]
+
         for old_name, new_name in diff.items_renamed:
             self._data[new_name] = self._data[old_name]
             del self._data[old_name]
-        for name, delta in diff.items_updated:
-            self._data[name].update(delta)
 
 
 class BpyBlendProxy(Proxy):
     # ID elements stored in bpy.data.* collections, computed before recursive visit starts:
     root_ids: RootIds = set()
+    all_ids: AllIds = {}
 
     def __init__(self, *args, **kwargs):
         self._data: Mapping[str, BpyPropDataCollectionProxy] = {}
@@ -757,7 +789,7 @@ class BpyBlendProxy(Proxy):
                     ensure_uuid(item)
                     self.root_ids.add(item)
 
-        visit_state = VisitState(self.root_ids, context)
+        visit_state = VisitState(self.root_ids, self.all_ids, context)
 
         for name, _ in context.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
@@ -773,30 +805,33 @@ class BpyBlendProxy(Proxy):
             return None
         return collection_proxy.find(key)
 
-    def update(self, diff: BpyBlendDiff, context: Context, depsgraph_updates: T.bpy_prop_collection = []):
+    def update(self, diff: BpyBlendDiff, context: Context, depsgraph_updates: T.bpy_prop_collection):
         """
-        Update the proxy using the state of the Blendata collections (ID creation, deletion) 
+        Update the proxy using the state of the Blendata collections (ID creation, deletion)
         and the depsgraph updates (ID modification)
         """
-        visit_state = VisitState(self.root_ids, context)
+        visit_state = VisitState(self.root_ids, self.all_ids, context)
         valid_names = [name for name, _ in context.properties(bpy_type=T.BlendData)]
-        for delta_name, delta in diff.deltas.items():
+        for delta_name, delta in diff.collection_deltas.items():
             if delta_name in valid_names:
                 self._data[delta_name].update(delta, visit_state)
 
-        return
-        for update in depsgraph_updates:
-            id = update.id.original
+        updated_proxies = []
+        # this should iterate inside_out (Object.data, Object) in the adequate creation order
+        # (creating an Object requires its data)
+        updates = reversed([update.id.original for update in depsgraph_updates])
+        for id_ in updates:
+            proxy, collection_name, name = self.all_ids.get(id_)
+            if proxy is None:
+                logger.warning("BpyBlendDiff.diff(): no proxy for %s", id_)
+                continue
+            # need to store collection_name and name into the proxy so that they can be serialized
+            # TODO : NOT TRUE (and complicated). The receiver could derive the collection from the type
+            # and the name is the key
+            proxy.load(id_, visit_state, collection_name, name)
+            updated_proxies.append(proxy)
 
-            # TODO
-            # may be a BlendData or non-BlendData ID block (node_tree)
-            # find a way to locate it, probably from uuid
-            # - BlendData updates : extend root_ids with references to ID blocks or eccessor ('scenes, 'Scn01')
-            # - Non Blenddata updates : a dict of non-root uuids to the accessor ('scenes, 'Scn01', 'node_tree')
-            # The uuid must be created by the sender and be included in the first full update
-            # Or do we always generate updates that stop at the ID nboiundary, i.e. 2 updates for scene and node_tree
-
-            raise NotImplemented
+        return updated_proxies
 
     def clear(self):
         self._data.clear()

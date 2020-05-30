@@ -125,6 +125,7 @@ class BlendData:
 
     def reset(self):
         _bpy_collections = {name: getattr(bpy.data, name) for name in collection_name_to_type.keys()}
+        self._collection_names = {collection: name for name, collection in _bpy_collections.items()}
         self._collections = {
             name: BlendDataCollection(name, _bpy_collections[name]) for name in collection_name_to_type.keys()
         }
@@ -145,10 +146,13 @@ class BlendData:
         for data in self._collections.values():
             data.clear()
 
+    def collection_name(self, collection: T.bpy_prop_collection) -> str:
+        return self._collection_names[collection]
+
     def collection(self, collection_name: str) -> BlendDataCollection:
         return self._collections[collection_name]
 
-    def bpy_collection(self, collection_name: str) -> bpy.types.bpy_prop_collection:
+    def bpy_collection(self, collection_name: str) -> T.bpy_prop_collection:
         return self._collections[collection_name].bpy_collection()
 
     def bl_collection_name_from_inner_identifier(self, type_identifier: str) -> str:
@@ -157,7 +161,7 @@ class BlendData:
         """
         return self._collections_name_from_inner_identifier[type_identifier]
 
-    def bl_collection_name_from_ID(self, id: bpy.types.ID) -> str:  # noqa N802
+    def bl_collection_name_from_ID(self, id: T.ID) -> str:  # noqa N802
         """
         Blenddata collection from an Id.
         """

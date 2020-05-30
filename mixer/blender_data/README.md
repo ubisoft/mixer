@@ -1,3 +1,13 @@
+# Current task
+
+(metaballs)
+
+- Receive an update for a non existing items means a creation
+- `__mixer_blenddata_collection__` deserialized as a \_data field. Use another
+  BpyProxyAttribute and manage in Codec ?
+- manage differently collection_name and collection_key, not useful n the receiver
+  (derive collecion from type, but need to encode type)
+
 # Blender Type system
 
 WARNING, this is a bit confusing
