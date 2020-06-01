@@ -510,7 +510,7 @@ class ClientBlender(Client):
         share_data.client.receivedCommandsProcessed = previous_value
 
     def query_current_frame(self):
-        share_data.client.send_frame(scene.frame_current)
+        share_data.client.send_frame(bpy.context.scene.frame_current)
 
     @stats_timer(share_data)
     def network_consumer(self):
