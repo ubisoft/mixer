@@ -920,7 +920,7 @@ def is_localhost(host):
 
 def connect():
     logger.info("connect")
-
+    BlendData.instance().reset()
     if share_data.client is not None:
         # a server shutdown was not processed
         logger.debug("connect: share_data.client is not None")
@@ -948,6 +948,7 @@ def disconnect():
     logger.info("disconnect")
 
     leave_current_room()
+    BlendData.instance().reset()
 
     if bpy.app.timers.is_registered(network_consumer_timer):
         bpy.app.timers.unregister(network_consumer_timer)
