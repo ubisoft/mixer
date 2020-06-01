@@ -1,6 +1,6 @@
 import functools
 import logging
-from typing import Mapping
+from typing import Any, List, Mapping, Union
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -43,9 +43,10 @@ class BlendDataCollection:
         else:
             ctor_name = "new"
         self._ctor = getattr(self._bpy_data_collection, ctor_name, None)
+        self._ctor_name = ctor_name
 
     def __getitem__(self, key):
-        return self._items[key]
+        return self.get()[key]
 
     def name(self):
         return self._name
@@ -60,19 +61,22 @@ class BlendDataCollection:
         self._dirty = False
         return self._items
 
-    def ctor(self, name: str):
+    def ctor(self, name: str, ctor_args: List[Any] = ()) -> Union[T.ID, None]:
         """
         Create an instance in the BlendData collection using its ctor (new, load, ...)
         """
         if self._ctor is None:
             logger.warning("unexpected call to BlendDataCollection.ctor() for %s", self._bpy_data_collection)
             # Should not appen
-            return
+            return None
         data = self._items.get(name)
         if data is None:
-            # TODO more parameters, not just name
-            data = self._ctor(name)
+            try:
+                data = self._ctor(name, *ctor_args)
+            except TypeError:
+                logging.error(f"Exception while calling ctor {self.name()}.{self._ctor_name}({name}, {ctor_args})")
             self._items[name] = data
+        return data
 
     def remove(self, name_full):
         collection = self._items[name_full]
@@ -184,6 +188,7 @@ def register():
     for t in collection_name_to_type.values():
         t.mixer_uuid = bpy.props.StringProperty(default="")
 
+    # unfortunately cannot use reset during plugin load/unload
     bpy.app.handlers.load_post.append(on_load)
 
 

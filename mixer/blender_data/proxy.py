@@ -13,6 +13,7 @@ import bpy.types as T  # noqa
 import mathutils
 
 from mixer.blender_data.filter import Context
+from mixer.blender_data.types import is_instance
 from mixer.blender_data.blenddata import (
     BlendData,
     collection_name_to_type,
@@ -27,15 +28,14 @@ BpyIDProxy = TypeVar("BpyIDProxy")
 logger = logging.Logger(__name__, logging.INFO)
 
 RootIds = Set[bpy.types.ID]
+# Access path to the ID starting from bpy.data, such as ("cameras", "Camera")
+# or ("cameras", "Camera", "dof", "focus_object").
+BlenddataPath = Tuple[str]
 # probably superflous but easier to try
 AllIds = Mapping[bpy.types.ID, BpyIDProxy]
 
 # storing everything in a single dictionary is easier for serialization
 MIXER_SEQUENCE = "__mixer_sequence__"
-MIXER_BLENDDATA_COLLECTION = "__mixer_blenddata_collection__"
-MIXER_BLENDDATA_KEY = "__mixer_blenddata_key__"
-MIXER_ID_COLLECTION = "__mixer_id_collection__"
-MIXER_ID_COLLECTION_KEY = "__mixer_id_collection_key__"
 
 
 def debug_check_stack_overflow(func, *args, **kwargs):
@@ -321,33 +321,42 @@ class BpyIDProxy(BpyStructProxy):
     Holds a copy of a Blender ID, i.e a type stored in bpy.data, like Object and Material
     """
 
+    _blenddata_path: BlenddataPath = None
+
+    # Addtitional arguments for the BlendDataXxxx collections object addtition(.new(), .load(), ...), besides name
+    # For instance object_data in BlendDataObject.new(name, object_data)
+    _ctor_args: List[Any] = None
+
     def __init__(self):
         super().__init__()
 
-    def load(self, bl_instance: T.ID, visit_state: VisitState, collection_name: str = None, name: str = None):
+    def load(self, bl_instance: T.ID, visit_state: VisitState, blenddata_path: BlenddataPath = None):
         """
-        -- collection_name the bpy.data collection that contains this ID
-        -- the key if this ID in its bpy.data collection
         """
 
         # TODO check that bl_instance class derives from ID
         super().load(bl_instance, visit_state)
-        if collection_name:
-            self._data[MIXER_BLENDDATA_COLLECTION] = collection_name
-        if name:
-            self._data[MIXER_BLENDDATA_KEY] = name
+
+        if blenddata_path is not None:
+            self._blenddata_path = blenddata_path
+        if isinstance(bl_instance, T.Object):
+            # TODO move ifs into a series of class spefific
+            # a BpyIDRef
+            self._ctor_args = [self._data["data"]]
+
         self.mixer_uuid = bl_instance.mixer_uuid
-        visit_state.all_ids[bl_instance] = (self, collection_name, name)
+        visit_state.all_ids[bl_instance] = self
         return self
 
-    def collection_name(self) -> str:
-        return self._data.get(MIXER_BLENDDATA_COLLECTION)
+    def collection_name(self) -> Union[str, None]:
+        return self._blenddata_path[0]
 
-    def collection_key(self) -> str:
-        return self._data.get(MIXER_BLENDDATA_KEY)
+    def collection_key(self) -> Union[str, None]:
+        return self._blenddata_path[1]
 
     def target(self, bl_instance: any, attr_name: str):
         if isinstance(bl_instance, bpy.types.bpy_prop_collection):
+            # TODO : slow: use BlendData
             t = bl_instance.get(attr_name)
             if t is None:
                 logger.warning(
@@ -378,12 +387,52 @@ class BpyIDProxy(BpyStructProxy):
                 write_attribute(target, "type", light_type)
                 # must reload the reference
                 target = self.target(bl_instance, attr_name)
+        elif isinstance(target, bpy.types.MetaBall):
+            # required first enable write on texspace_location and texspace_size if False
+            # otherwise issues an error message
+            # TODO useless on its own : strip values on load
+            name = "use_auto_texspace"
+            value = self._data.get(name)
+            if value is not None and value != getattr(target, name):
+                write_attribute(target, name, value)
         return target
 
-    def save(self, bl_instance: any, attr_name: str):
+    def save(self, bl_instance: any = None, attr_name: str = None):
         """
         - bl_instance: the container attribute
         """
+        blenddata = BlendData.instance()
+        if self._blenddata_path is None:
+            # TODO ID inside ID, not BlendData collection. We will need a path
+            # do it on save
+            logging.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} has empty blenddata path: ignore")
+            return
+
+        if bl_instance is None:
+            collection_name = self._blenddata_path[0]
+            bl_instance = blenddata.bpy_collection(collection_name)
+        if attr_name is None:
+            attr_name = self._blenddata_path[1]
+
+        # 2 cases
+        # - ID in blenddata collection
+        # - ID in ID
+        # TODO slow use blenddata, redundant with target
+        id_ = bl_instance.get(attr_name)
+        if id_ is None:
+            # assume ID in Blendata collection
+
+            # unwrap the ctor arguments. For instance, creating an Object requires a T.ID
+            ctor_args = []
+            for arg in self._ctor_args or ():
+                if isinstance(arg, BpyIDRefProxy):
+                    data_collection_name, data_key = arg._blenddata_path
+                    id_ = BlendData.instance().collection(data_collection_name)[data_key]
+                    ctor_args.append(id_)
+                else:
+                    ctor_args.append(arg)
+            blenddata.collection(collection_name).ctor(attr_name, ctor_args)
+
         target = self.pre_save(bl_instance, attr_name)
         if target is None:
             logging.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} is None")
@@ -397,6 +446,8 @@ class BpyIDRefProxy(Proxy):
     """
     A reference to an item of bpy_prop_collection in bpy.data member
     """
+
+    _blenddata_path: BlenddataPath = None
 
     def __init__(self):
         self._data = {}
@@ -413,21 +464,17 @@ class BpyIDRefProxy(Proxy):
         assert getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier], None) is not None
         assert bl_instance.name_full in getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier])
 
-        self._data = {
-            # Blenddata collection name, e.g. 'objects', 'lights'
-            MIXER_BLENDDATA_COLLECTION: BlendData.instance().bl_collection_name_from_inner_identifier(
-                class_bl_rna.identifier
-            ),
-            # key in blenddata collection
-            MIXER_BLENDDATA_KEY: bl_instance.name_full,
-        }
+        self._blenddata_path = (
+            BlendData.instance().bl_collection_name_from_inner_identifier(class_bl_rna.identifier),
+            bl_instance.name_full,
+        )
         return self
 
     def collection(self):
-        return self._data[MIXER_BLENDDATA_COLLECTION]
+        return self._blenddata_path[0]
 
     def key(self):
-        return self._data[MIXER_BLENDDATA_KEY]
+        return self._blenddata_path[1]
 
     def save(self, bl_instance: any, attr_name: str):
         """
@@ -437,8 +484,7 @@ class BpyIDRefProxy(Proxy):
         # Cannot save into an attribute, which looks like an r-value.
         # When setting my_scene.world wen must setattr(scene, "world", data) and cannot
         # assign scene.world
-        collection_name = self._data[MIXER_BLENDDATA_COLLECTION]
-        collection_key = self._data[MIXER_BLENDDATA_KEY]
+        collection_name, collection_key = self._blenddata_path
 
         # TODO the identifier garget doest not have the same semantics everywhere
         # here pointee somewhere else lvalue
@@ -724,7 +770,7 @@ class BpyPropDataCollectionProxy(Proxy):
             collection_name = BlendData.instance().bl_collection_name_from_ID(item)
             with visit_state.debug_context.enter(name, item):
                 ensure_uuid(item)
-                self._data[name] = BpyIDProxy().load(item, visit_state, collection_name, name)
+                self._data[name] = BpyIDProxy().load(item, visit_state, (collection_name, name))
 
         return self
 
@@ -756,9 +802,10 @@ class BpyPropDataCollectionProxy(Proxy):
             # warning this is the killer access in linear time
             id_ = bl_collection[name]
             collection_name = BlendData.instance().collection_name(bl_collection)
-            proxy = BpyIDProxy().load(id_, visit_state, collection_name, name)
+            blenddata_path = (collection_name, name)
+            proxy = BpyIDProxy().load(id_, visit_state, blenddata_path)
             visit_state.root_ids.add(id_)
-            visit_state.all_ids[id_] = (proxy, collection_name, name)
+            visit_state.all_ids[id_] = proxy
             self._data[name] = proxy
 
         for name in diff.items_removed:
@@ -821,14 +868,15 @@ class BpyBlendProxy(Proxy):
         # (creating an Object requires its data)
         updates = reversed([update.id.original for update in depsgraph_updates])
         for id_ in updates:
-            proxy, collection_name, name = self.all_ids.get(id_)
+            logger.info("Updating %s(%s)")
+            proxy = self.all_ids.get(id_)
             if proxy is None:
                 logger.warning("BpyBlendDiff.diff(): no proxy for %s", id_)
                 continue
             # need to store collection_name and name into the proxy so that they can be serialized
             # TODO : NOT TRUE (and complicated). The receiver could derive the collection from the type
             # and the name is the key
-            proxy.load(id_, visit_state, collection_name, name)
+            proxy.load(id_, visit_state)
             updated_proxies.append(proxy)
 
         return updated_proxies

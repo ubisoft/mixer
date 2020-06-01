@@ -13,16 +13,19 @@ Use python 3.7 to match Blender's python version.
 Activate the virtual env, on Windows the commands are:
 
 With Git bash:
+
 ```bash
 source .venv/Scripts/activate
 ```
 
 With cmd.exe:
+
 ```bash
 .venv\Scripts\activate.bat
 ```
 
 Then install development packages with pip:
+
 ```bash
 pip install -r requirements-dev.txt
 ```
@@ -36,6 +39,10 @@ If you have a python file open in VSCode, it should automatically detect the vir
 The file `.vscode/settings.shared.json` gives an exemple of settings to fill your own `.vscode/settings.json`. The important parts are `editor`, `python` and `blender` settings.
 
 Similarly you can copy `.vscode/launch.shared.json` and `.vscode/tasks.shared.json` for exemples of debug configurations and tasks to run from VSCode.
+
+### VSCode "configuration"
+
+To prevent VSCode from breaking on generator related exceptions, modify your local installation of `pydevd_frame.py` like stated in https://github.com/fabioz/ptvsd/commit/b297bc027f504cf8679090079aebff6028dfec02.
 
 ## Running code quality tools manually
 
@@ -131,11 +138,14 @@ For a first simple setup, we rely on an interactive gitlab runner setup. Issues 
 The scripts are located in a new `gitlab` folder
 
 ### Interactive runner
-Documentation: 
+
+Documentation:
+
 - Installation : https://docs.gitlab.com/runner/install/windows.html
 - Runner commands : https://docs.gitlab.com/runner/commands/
 
-Installation steps: 
+Installation steps:
+
 1. Install a gitlab runner in a folder of your choice. For this tutorial we'll use `d:\gitlab_runner`.
 2. Run a terminal as administrator, create folder `d:\gitlab_runner\working_dir` and place yourself into it in your terminal
 3. Register a runner with `gitlab-runner-windows-amd64.exe register`. Use `https://gitlab-ncsa.ubisoft.org/` as URL, `3doSyUPxsy5hL-svi_Qu` as token, `blender` as tags, `shell` as executor. The token can be found in Settings -> CI/CD page of this repository. This step should create a file `config.toml` in `d:\gitlab_runner\working_dir`.
@@ -143,7 +153,8 @@ Installation steps:
 
 Then run an interactive : `gitlab-runner-windows-amd64.exe run`. It must run as administrator because the `TSCON` command requires administrator rights to disconnect a session from the remote desktop.
 
-As the runner executes jobs, it will display the jobs status : 
+As the runner executes jobs, it will display the jobs status :
+
 ```
 D:\gitlab_runner>gitlab-runner-windows-amd64.exe run
 Runtime platform                                    arch=amd64 os=windows pid=19628 revision=4c96e5ad version=12.9.0
@@ -161,6 +172,7 @@ WARNING: Failed to process runner                   builds=0 error=exit status 1
 The builds for the runner will be put in the current working directory `d:\gitlab_runner\working_dir` where you started the runner.
 
 ### Runner as a Windows service
+
 Using a system service could be difficult because the user profile may not be easy to access and we also need the service to access to the desktop.
 
 Using a service that logons with a user account requires a user account that can logon as a service as described in https://docs.gitlab.com/runner/faq/README.html#the-service-did-not-start-due-to-a-logon-failure-error-when-starting-service.

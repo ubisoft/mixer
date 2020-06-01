@@ -35,17 +35,17 @@ def build_data_update(buffer):
     if not share_data.use_experimental_sync():
         return
 
-    collection_name, index = common.decode_string(buffer, 0)
-    key, index = common.decode_string(buffer, index)
-    buffer, _ = common.decode_string(buffer, index)
-    logger.info("build_data_update: %s[%s]", collection_name, key)
+    buffer, _ = common.decode_string(buffer, 0)
     codec = Codec()
     try:
         id_proxy = codec.decode(buffer)
-        blenddata = BlendData.instance()
-        collection = blenddata.bpy_collection(collection_name)
-        # TODO will fail when name != name_full
-        id_proxy.save(collection, key)
+        blenddata_path = id_proxy._blenddata_path
+        if blenddata_path[0] is None or blenddata_path[1] is None:
+            logger.error("build_data_update: invalide blenddata_path : %s", blenddata_path)
+            return
+
+        logger.info("build_data_update: %s[%s]", *id_proxy._blenddata_path)
+        id_proxy.save()
     except Exception:
         logging.error(
             "Exception during build_data_update\n" + traceback.format_exc() + "During processing of\n" + buffer
@@ -97,17 +97,10 @@ def send_data_updates(updates: List[BpyIDProxy]):
         return
     codec = Codec()
     for proxy in updates:
-        logger.info("send_data_update %s", proxy)
+        logger.info("send_data_update %s[%s]", *proxy._blenddata_path)
 
         encoded_proxy = codec.encode(proxy)
-        # TODO to not emit the collection_name and the name.
-        # They are not needed as the receiver can derive the collection from the class
-        # and the name is the key.
-        # check the situation for IDS not in BlendData
-        buffer = (
-            common.encode_string(proxy.collection_name())
-            + common.encode_string(proxy.collection_key())
-            + common.encode_string(encoded_proxy)
-        )
+        # For BpyIdProxy, the target is encoded in the proxy._blenddata_path
+        buffer = common.encode_string(encoded_proxy)
         command = common.Command(common.MessageType.BLENDER_DATA_UPDATE, buffer, 0)
         share_data.client.add_command(command)

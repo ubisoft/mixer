@@ -24,6 +24,7 @@ from mixer.data import get_mixer_props
 from mixer.stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
+from mixer.blender_data.blenddata import BlendData
 
 logger = logging.getLogger(__name__)
 
@@ -641,6 +642,25 @@ def send_scene_data_to_server(scene, dummy):
         logger.info("send_scene_data_to_server canceled (not is_in_object_mode)")
         return
 
+    if share_data.use_experimental_sync():
+        # Start with experimental/blender_to_blender mode since the VRtint protocol handling
+        # wil implicitely create objects with unappropriate default values
+        # (e.g. transform creates an object with no data)
+        diff = BpyBlendDiff()
+        diff.diff(share_data.proxy, safe_context)
+        for delta in diff.collection_deltas.values():
+            for item in delta.items_removed:
+                logger.info(f"Detected removed {item}")
+            for key, collection in delta.items_added.items():
+                logger.info(f"Detected added {collection}[{key}]")
+                # TODO be explicit ??
+                # data_api.send_data_new(collection, key)
+            for item in delta.items_renamed:
+                # TODO maybe not useful, just a name update
+                logger.info(f"Detected renamed {item}")
+        updated_proxies = share_data.proxy.update(diff, safe_context, share_data.depsgraph.updates)
+        data_api.send_data_updates(updated_proxies)
+
     update_object_state(share_data.old_objects, share_data.blender_objects)
 
     with timer.child("update_scenes_state"):
@@ -676,21 +696,6 @@ def send_scene_data_to_server(scene, dummy):
         with timer.child("update_objects_data"):
             share_data.depsgraph = bpy.context.evaluated_depsgraph_get()
             update_objects_data()
-
-    if share_data.use_experimental_sync():
-        diff = BpyBlendDiff()
-        diff.diff(share_data.proxy, safe_context)
-        for delta in diff.collection_deltas.values():
-            for item in delta.items_removed:
-                logger.info(f"Detected removed {item}")
-            for key, collection in delta.items_added.items():
-                logger.info(f"Detected added {collection}[{key}]")
-                # data_api.send_data_new(collection, key)
-            for item in delta.items_renamed:
-                # TODO maybe not useful, just a name update
-                logger.info(f"Detected renamed {item}")
-        updated_proxies = share_data.proxy.update(diff, safe_context, share_data.depsgraph.updates)
-        data_api.send_data_updates(updated_proxies)
 
     # update for next change
     with timer.child("update_current_data"):
