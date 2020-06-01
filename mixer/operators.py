@@ -626,7 +626,8 @@ def send_frame_changed(scene):
 
     with StatsTimer(share_data, "send_frame_changed") as timer:
         with timer.child("setFrame"):
-            share_data.client.send_frame(scene.frame_current)
+            if not share_data.client.blockSignals:
+                share_data.client.send_frame(scene.frame_current)
 
         with timer.child("clear_lists"):
             share_data.clear_changed_frame_related_lists()

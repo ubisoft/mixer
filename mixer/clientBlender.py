@@ -459,12 +459,13 @@ class ClientBlender(Client):
             self.callbacks["SendContent"]()
 
     def build_frame(self, data):
-        previous_value = share_data.client.receivedCommandsProcessed
-        share_data.client.receivedCommandsProcessed = False
         start = 0
         frame, start = common.decode_int(data, start)
-        bpy.context.scene.frame_set(frame)
-        share_data.client.receivedCommandsProcessed = previous_value
+        if bpy.context.scene.frame_current != frame:
+            previous_value = share_data.client.receivedCommandsProcessed
+            share_data.client.receivedCommandsProcessed = False
+            bpy.context.scene.frame_set(frame)
+            share_data.client.receivedCommandsProcessed = previous_value
 
     def send_frame(self, frame):
         self.add_command(common.Command(common.MessageType.FRAME, common.encode_int(frame), 0))
