@@ -383,10 +383,6 @@ class ShareData:
             x.name_full: x.parent.name_full if x.parent is not None else "" for x in self.blender_objects.values()
         }
 
-        if self.proxy:
-            # TODO do not reload, but update the diff. Temporary quick and dirty
-            self.proxy.load(safe_context)
-
     def set_experimental_sync(self, experimental_sync: bool):
         if experimental_sync:
             logger.warning("Experimental sync in ON")

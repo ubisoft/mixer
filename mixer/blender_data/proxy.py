@@ -13,7 +13,6 @@ import bpy.types as T  # noqa
 import mathutils
 
 from mixer.blender_data.filter import Context
-from mixer.blender_data.types import is_instance
 from mixer.blender_data.blenddata import (
     BlendData,
     collection_name_to_type,
@@ -488,6 +487,7 @@ class BpyIDRefProxy(Proxy):
 
         # TODO the identifier garget doest not have the same semantics everywhere
         # here pointee somewhere else lvalue
+        # TODO use BlendData
         target = getattr(bpy.data, collection_name)[collection_key]
         if isinstance(bl_instance, T.bpy_prop_collection):
             logging.warning(f"Not implemented: BpyIDRefProxy.save() for IDRef into collection {bl_instance}{attr_name}")
@@ -749,7 +749,7 @@ class BpyPropStructCollectionProxy(Proxy):
             srna = bl_instance.bl_rna.properties[attr_name].srna
             if srna:
                 if srna.bl_rna is bpy.types.CurveMapPoints.bl_rna:
-                write_curvemappoints(target, sequence)
+                    write_curvemappoints(target, sequence)
                 elif srna.bl_rna is bpy.types.MetaBallElements.bl_rna:
                     write_metaballelements(target, sequence)
 
@@ -854,6 +854,7 @@ class BpyBlendProxy(Proxy):
     def load(self, context: Context):
         for name, _ in context.properties(bpy_type=T.BlendData):
             if name in collection_name_to_type:
+                # TODO use BlendData
                 bl_collection = getattr(bpy.data, name)
                 for _id_name, item in bl_collection.items():
                     ensure_uuid(item)
@@ -891,6 +892,13 @@ class BpyBlendProxy(Proxy):
         # (creating an Object requires its data)
         updates = reversed([update.id.original for update in depsgraph_updates])
         for id_ in updates:
+            safe_classes = [T.Light, T.Camera, T.MetaBall]
+            if not any((isinstance(id_, t) for t in safe_classes)):
+                # TODO temporary
+                # We receive meaningless scene update for almost any interaction in the 3D and it hurts performace
+                # Find another way to update scene data ?
+                # Also do not blindly update what is already updated in VRtist code
+                continue
             logger.info("Updating %s(%s)")
             proxy = self.all_ids.get(id_)
             if proxy is None:
@@ -906,6 +914,20 @@ class BpyBlendProxy(Proxy):
 
     def clear(self):
         self._data.clear()
+
+    def debug_check_all_ids(self):
+        # try to find stale entries ASAP, access them all
+        dummy = 0
+        try:
+            dummy = sum(len(id_.name) for id_ in self.root_ids)
+        except ReferenceError:
+            logger.warning("BpyBlendProxy: Stale reference in root_ids")
+
+        try:
+            dummy += sum(len(id_.name) for id_ in self.all_ids.keys())
+        except ReferenceError:
+            logger.warning("BpyBlendProxy: Stale reference in all_ids")
+        return dummy
 
 
 proxy_classes = [

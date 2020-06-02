@@ -643,6 +643,7 @@ def send_scene_data_to_server(scene, dummy):
         return
 
     if share_data.use_experimental_sync():
+        share_data.proxy.debug_check_all_ids()
         # Start with experimental/blender_to_blender mode since the VRtint protocol handling
         # wil implicitely create objects with unappropriate default values
         # (e.g. transform creates an object with no data)
@@ -660,6 +661,7 @@ def send_scene_data_to_server(scene, dummy):
                 logger.info(f"Detected renamed {item}")
         updated_proxies = share_data.proxy.update(diff, safe_context, share_data.depsgraph.updates)
         data_api.send_data_updates(updated_proxies)
+        share_data.proxy.debug_check_all_ids()
 
     update_object_state(share_data.old_objects, share_data.blender_objects)
 
