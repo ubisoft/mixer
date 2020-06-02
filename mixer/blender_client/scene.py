@@ -41,7 +41,7 @@ def build_scene(data):
     scene = share_data.blender_scenes.get(scene_name)
     if scene is None:
         scene = bpy.data.scenes.new(scene_name)
-        share_data.blender_scenes_dirty = True
+        share_data.blender_scenes[scene_name] = scene
 
     if to_remove is not None:
         delete_scene(to_remove)

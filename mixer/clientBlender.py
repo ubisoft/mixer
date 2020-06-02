@@ -145,8 +145,8 @@ class ClientBlender(Client):
         except KeyError:
             # Object doesn't exist anymore
             return
+        del share_data._blender_objects[obj.name_full]
         bpy.data.objects.remove(obj, do_unlink=True)
-        share_data.blender_objects_dirty = True
 
     def build_send_to_trash(self, data):
         path, _ = common.decode_string(data, 0)
