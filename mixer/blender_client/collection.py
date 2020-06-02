@@ -44,8 +44,8 @@ def build_collection_removed(data):
     name_full, index = common.decode_string(data, 0)
     logger.info("build_collectionRemove %s", name_full)
     collection = share_data.blender_collections[name_full]
-    del share_data.blender_collections[name_full]
     bpy.data.collections.remove(collection)
+    share_data.blender_collections_dirty = True
 
 
 def send_add_collection_to_collection(client: Client, parent_collection_name, collection_name):

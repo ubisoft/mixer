@@ -8,6 +8,7 @@ from mixer.blender_data.proxy import BpyBlendProxy
 from mixer.blender_data.filter import safe_context
 
 import bpy
+from mixer.blender_data.blenddata import BlendData
 
 logger = logging.getLogger(__name__)
 
@@ -104,24 +105,25 @@ class ShareData:
         self.restore_to_collections: Mapping[str, List[str]] = {}
 
         self._blender_objects = {}
-        self.blender_objects_dirty = True
+        self._blender_objects_dirty = True
 
         self._blender_materials = {}
-        self.blender_materials_dirty = True
+        self._blender_materials_dirty = True
 
         self._blender_meshes = {}
-        self.blender_meshes_dirty = True
+        self._blender_meshes_dirty = True
 
         self._blender_grease_pencils = {}
-        self.blender_grease_pencils_dirty = True
+        self._blender_grease_pencils_dirty = True
 
         self._blender_cameras = {}
-        self.blender_cameras_dirty = True
+        self._blender_cameras_dirty = True
 
         self._blender_lights = {}
-        self.blender_lights_dirty = True
+        self._blender_lights_dirty = True
+
         self._blender_collections: Mapping[str, bpy.types.Collection] = {}
-        self.blender_collections_dirty = True
+        self._blender_collections_dirty = True
 
         self.pending_parenting = set()
 
@@ -154,6 +156,7 @@ class ShareData:
         self.blender_lights_dirty = True
         self.blender_collections_dirty = True
         self.blender_scenes_dirty = True
+        BlendData.instance().set_dirty()
 
     def get_blender_property(self, property, property_dirty, elems):
         if not property_dirty:
@@ -171,12 +174,33 @@ class ShareData:
         return self._blender_objects
 
     @property
+    def blender_objects_dirty(self):
+        return self._blender_objects_dirty
+
+    @blender_objects_dirty.setter
+    def blender_objects_dirty(self, value):
+        # TODO use only BlendData
+        self._blender_objects_dirty = value
+        if value:
+            BlendData.instance().collection("objects").set_dirty()
+
+    @property
     def blender_materials(self):
         if not self.blender_materials_dirty:
             return self._blender_materials
         self._blender_materials = {x.name_full: x for x in bpy.data.materials}
         self.blender_materials_dirty = False
         return self._blender_materials
+
+    @property
+    def blender_materials_dirty(self):
+        return self._blender_materials_dirty
+
+    @blender_materials_dirty.setter
+    def blender_materials_dirty(self, value):
+        self._blender_materials_dirty = value
+        if value:
+            BlendData.instance().collection("materials").set_dirty()
 
     @property
     def blender_meshes(self):
@@ -187,12 +211,32 @@ class ShareData:
         return self._blender_meshes
 
     @property
+    def blender_meshes_dirty(self):
+        return self._blender_meshes_dirty
+
+    @blender_meshes_dirty.setter
+    def blender_meshes_dirty(self, value):
+        self._blender_meshes_dirty = value
+        if value:
+            BlendData.instance().collection("meshes").set_dirty()
+
+    @property
     def blender_grease_pencils(self):
         if not self.blender_grease_pencils_dirty:
             return self._blender_grease_pencils
         self._blender_grease_pencils = {x.name_full: x for x in bpy.data.grease_pencils}
         self.blender_grease_pencils_dirty = False
         return self._blender_grease_pencils
+
+    @property
+    def blender_grease_pencils_dirty(self):
+        return self._blender_grease_pencils_dirty
+
+    @blender_grease_pencils_dirty.setter
+    def blender_grease_pencils_dirty(self, value):
+        self._blender_grease_pencils_dirty = value
+        if value:
+            BlendData.instance().collection("grease_pencils").set_dirty()
 
     @property
     def blender_cameras(self):
@@ -203,12 +247,32 @@ class ShareData:
         return self._blender_cameras
 
     @property
+    def blender_cameras_dirty(self):
+        return self._blender_cameras_dirty
+
+    @blender_cameras_dirty.setter
+    def blender_cameras_dirty(self, value):
+        self._blender_cameras_dirty = value
+        if value:
+            BlendData.instance().collection("cameras").set_dirty()
+
+    @property
     def blender_lights(self):
         if not self.blender_lights_dirty:
             return self._blender_lights
         self._blender_lights = {x.name_full: x for x in bpy.data.lights}
         self.blender_lights_dirty = False
         return self._blender_lights
+
+    @property
+    def blender_lights_dirty(self):
+        return self._blender_lights_dirty
+
+    @blender_lights_dirty.setter
+    def blender_lights_dirty(self, value):
+        self._blender_lights_dirty = value
+        if value:
+            BlendData.instance().collection("lights").set_dirty()
 
     @property
     def blender_collections(self):
@@ -219,12 +283,32 @@ class ShareData:
         return self._blender_collections
 
     @property
+    def blender_collections_dirty(self):
+        return self._blender_collections_dirty
+
+    @blender_collections_dirty.setter
+    def blender_collections_dirty(self, value):
+        self._blender_collections_dirty = value
+        if value:
+            BlendData.instance().collection("collections").set_dirty()
+
+    @property
     def blender_scenes(self):
         if not self.blender_scenes_dirty:
             return self._blender_scenes
         self._blender_scenes = {x.name_full: x for x in bpy.data.scenes}
         self.blender_scenes_dirty = False
         return self._blender_scenes
+
+    @property
+    def blender_scenes_dirty(self):
+        return self._blender_scenes_dirty
+
+    @blender_scenes_dirty.setter
+    def blender_scenes_dirty(self, value):
+        self._blender_scenes_dirty = value
+        if value:
+            BlendData.instance().collection("scenes").set_dirty()
 
     def clear_changed_frame_related_lists(self):
         self.objects_transformed.clear()
