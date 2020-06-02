@@ -680,6 +680,23 @@ def write_curvemappoints(target, src_sequence):
         write_attribute(target, i, src_sequence[i])
 
 
+def write_metaballelements(target, src_sequence):
+    src_length = len(src_sequence)
+
+    # truncate dst
+    while src_length < len(target):
+        target.remove(target[-1])
+
+    # extend dst
+    while src_length > len(target):
+        # Creates a BALL, but will be changed by write_attribute
+        target.new()
+
+    assert src_length == len(target)
+    for i in range(src_length):
+        write_attribute(target, i, src_sequence[i])
+
+
 class BpyPropStructCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of non-ID in bpy.data
@@ -729,8 +746,13 @@ class BpyPropStructCollectionProxy(Proxy):
         target = getattr(bl_instance, attr_name)
         sequence = self._data.get(MIXER_SEQUENCE)
         if sequence:
-            if bl_instance.bl_rna.properties[attr_name].fixed_type.bl_rna is bpy.types.CurveMapPoint.bl_rna:
+            srna = bl_instance.bl_rna.properties[attr_name].srna
+            if srna:
+                if srna.bl_rna is bpy.types.CurveMapPoints.bl_rna:
                 write_curvemappoints(target, sequence)
+                elif srna.bl_rna is bpy.types.MetaBallElements.bl_rna:
+                    write_metaballelements(target, sequence)
+
             elif len(target) == len(sequence):
                 for i, v in enumerate(sequence):
                     # TODO this way can only save items at pre-existing slots. The bpy_prop_collection API
@@ -746,6 +768,7 @@ class BpyPropStructCollectionProxy(Proxy):
                     f"Not implemented: write sequence of different length (incoming: {len(sequence)}, existing: {len(target)})for {bl_instance}.{attr_name}"
                 )
         else:
+            # dictionary
             for k, v in self._data.items():
                 write_attribute(target, k, v)
 
