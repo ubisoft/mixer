@@ -32,17 +32,18 @@ class BlendDataCollection:
     Wrapper to any of the collections inside bpy.blenddata
     """
 
-    def __init__(self, name: str, bpy_data_collection):
+    # DO NOT keep references to bpy.data collection. They become stale and to not show modifications
+
+    def __init__(self, name: str):
         self._name = name
         self._dirty: bool = True
-        self._bpy_data_collection = bpy_data_collection
         self._items = {}
 
         if self._name in load_ctors:
             ctor_name = "load"
         else:
             ctor_name = "new"
-        self._ctor = getattr(self._bpy_data_collection, ctor_name, None)
+
         self._ctor_name = ctor_name
 
     def __getitem__(self, key):
@@ -51,13 +52,13 @@ class BlendDataCollection:
     def name(self):
         return self._name
 
-    def bpy_collection(self):
-        return self._bpy_data_collection
+    def bpy_collection(self) -> T.bpy_prop_collection:
+        return getattr(bpy.data, self._name)
 
     def get(self):
         if not self._dirty:
             return self._items
-        self._items = {x.name_full: x for x in self._bpy_data_collection}
+        self._items = {x.name_full: x for x in self.bpy_collection()}
         self._dirty = False
         return self._items
 
@@ -65,14 +66,15 @@ class BlendDataCollection:
         """
         Create an instance in the BlendData collection using its ctor (new, load, ...)
         """
-        if self._ctor is None:
-            logger.warning("unexpected call to BlendDataCollection.ctor() for %s", self._bpy_data_collection)
-            # Should not appen
+        collection = self.bpy_collection()
+        ctor = getattr(collection, self._ctor_name, None)
+        if ctor is None:
+            logger.warning("unexpected call to BlendDataCollection.ctor() for %s", self.bpy_collection())
             return None
         data = self._items.get(name)
         if data is None:
             try:
-                data = self._ctor(name, *ctor_args)
+                data = ctor(name, *ctor_args)
             except TypeError:
                 logging.error(f"Exception while calling ctor {self.name()}.{self._ctor_name}({name}, {ctor_args})")
             self._items[name] = data
@@ -81,7 +83,7 @@ class BlendDataCollection:
     def remove(self, name_full):
         collection = self._items[name_full]
         # do something else for scenes
-        self._bpy_data_collection.remove(collection)
+        self.bpy_collection().remove(collection)
         del self._items[name_full]
         self._dirty = True
 
@@ -107,6 +109,8 @@ class BlendData:
     file has been reloaded, hence the handler below.
     """
 
+    # DO NOT keep references to bpy.data collection. They become stale and to not show modifications
+
     def __init__(self):
         self.reset()
 
@@ -128,11 +132,7 @@ class BlendData:
         return cls()
 
     def reset(self):
-        _bpy_collections = {name: getattr(bpy.data, name) for name in collection_name_to_type.keys()}
-        self._collection_names = {collection: name for name, collection in _bpy_collections.items()}
-        self._collections = {
-            name: BlendDataCollection(name, _bpy_collections[name]) for name in collection_name_to_type.keys()
-        }
+        self._collections = {name: BlendDataCollection(name) for name in collection_name_to_type.keys()}
 
         # "Object": "objects"
         self._collections_name_from_inner_identifier: Mapping[str, str] = {
@@ -149,9 +149,6 @@ class BlendData:
     def clear(self):
         for data in self._collections.values():
             data.clear()
-
-    def collection_name(self, collection: T.bpy_prop_collection) -> str:
-        return self._collection_names[collection]
 
     def collection_names(self) -> Iterable[str]:
         return self._collections

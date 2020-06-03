@@ -4,6 +4,8 @@ from typing import Any, List, Mapping, Tuple, TypeVar
 import bpy
 import bpy.types as T  # noqa
 
+from mixer.blender_data.blenddata import BlendData
+from mixer.blender_data.filter import Context
 from mixer.blender_data.proxy import (
     BpyBlendProxy,
     BpyIDProxy,
@@ -12,7 +14,6 @@ from mixer.blender_data.proxy import (
     ensure_uuid,
     Proxy,
 )
-from mixer.blender_data.filter import Context
 
 logger = logging.Logger(__name__, logging.INFO)
 
@@ -100,6 +101,8 @@ class BpyPropCollectionDiff(BpyDiff):
             blender_items[item.mixer_uuid] = (name, collection_name)
         proxy_items = {item.mixer_uuid: name for name, item in proxy._data.items()}
         self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
+        if not self.empty():
+            BlendData.instance().collection(collection_name).set_dirty()
 
     def empty(self):
         return not (self.items_added or self.items_removed or self.items_renamed)

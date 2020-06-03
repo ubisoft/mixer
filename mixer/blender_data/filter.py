@@ -224,7 +224,7 @@ safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall]
 safe_filter = FilterStack()
 # The collections not in this list are not tested by BpyBlendDiff collection update
 # they will not be included in creation messages.
-safe_blenddata_collections = ["meshes", "lights", "cameras", "metaballs", "objects"]
+safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects"]
 safe_blenddata = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
 safe_filter.append(default_exclusions)
 safe_filter.append(safe_exclusions)

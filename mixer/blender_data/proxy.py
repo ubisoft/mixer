@@ -444,6 +444,8 @@ class BpyIDProxy(BpyStructProxy):
                     data_collection_name, data_key = arg._blenddata_path
                     id_ = BlendData.instance().collection(data_collection_name)[data_key]
                     ctor_args.append(id_)
+                elif isinstance(arg, Proxy):
+                    logger.error("Invalid ctor argument : %s", arg)
                 else:
                     ctor_args.append(arg)
             blenddata.collection(collection_name).ctor(attr_name, ctor_args)
@@ -843,7 +845,11 @@ class BpyPropDataCollectionProxy(Proxy):
         blenddata = BlendData.instance()
         for name, collection_name in diff.items_added.items():
             # warning this is the killer access in linear time
-            id_ = blenddata.collection(collection_name)[name]
+            logging.info("update/added for %s[%s]", collection_name, name)
+            id_ = blenddata.collection(collection_name).get().get(name)
+            if id_ is None:
+                logging.info("update/added for %s[%s] : not found", collection_name, name)
+                continue
             uuid = ensure_uuid(id_)
             blenddata_path = (collection_name, name)
             visit_state.root_ids.add(id_)
