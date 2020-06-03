@@ -1,34 +1,29 @@
 # Current task
 
-(metaballs)
-
 ## todo
 
-- write sequence
-
-      WARNING:root:Not implemented: write sequence of different length (incoming: 1, existing: 0)for <bpy_struct, MetaBall("Mball")>.elements
-
-  and also the collestion of Metaball has a new(metaballtype)
-
-- auto_texture space -> do not save if auto ?
+- tests for metaballs
+- tests for initial transfer of lights, camera, metaballs
+- handle specifis separately (curvemaps, metaballelements, ...)
+- Metaball: auto_texture space -> do not save if auto ?
 
       WARNING:root:write attribute skipped texspace_location for <bpy_struct, MetaBall("Mball")>...
       WARNING:root: ...Error: AttributeError('bpy_struct: attribute "texspace_location" from "MetaBall" is read-only')
-      WARNING:root:write attribute skipped texspace_size for <bpy_struct, MetaBall("Mball")>...
-      WARNING:root: ...Error: AttributeError('bpy_struct: attribute "texspace_size" from "MetaBall" is read-only')
 
 - TODOs in BpyIdProxySave
 
 ## done
 
+- remove stale entries from BpyBlendProxy()
+
+  - update BlendData from and only from BpyProxyUpdate
+  - find a way to keep track of removed entries
+
+    - {uuid: ID} in BlyBlendProxy
+    - BpyDiff : provide uuid along with deleted items
+
+- write Metaball sequence
 - saves a metaball without elements
-- build_add_object_to_scene creates wrong type:
-- BlendData.instance().reset() on reload plugin, disconnect, connect, join, leave?
-- Receive an update for a non existing items means a creation
-- `__mixer_blenddata_collection__` deserialized as a \_data field. Use another
-  BpyProxyAttribute and manage in Codec ?
-- manage differently collection_name and collection_key, not useful n the receiver
-  (derive collecion from type, but need to encode type)
 
 # Blender Type system
 

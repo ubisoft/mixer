@@ -26,7 +26,7 @@ class TestDiff(unittest.TestCase):
             D.worlds.new(w)
         diff = BpyBlendDiff()
         diff.diff(self.proxy, default_context)
-        for name, delta in diff.collection_deltas.items():
+        for name, delta in diff.collection_deltas:
             self.assertEqual(0, len(delta.items_removed), f"removed count mismatch for {name}")
             self.assertEqual(0, len(delta.items_renamed), f"renamed count mismatch for {name}")
             if name == "worlds":
@@ -53,12 +53,12 @@ class TestDiff(unittest.TestCase):
 
         diff = BpyBlendDiff()
         diff.diff(self.proxy, default_context)
-        for name, delta in diff.collection_deltas.items():
+        for name, delta in diff.collection_deltas:
             self.assertEqual(0, len(delta.items_added), f"added count mismatch for {name}")
             self.assertEqual(0, len(delta.items_renamed), f"renamed count mismatch for {name}")
             if name == "worlds":
                 self.assertEqual(len(removed), len(delta.items_removed), f"removed count mismatch for {name}")
-                found = list(delta.items_removed)
+                found = [name for name, _ in delta.items_removed]
                 found.sort()
                 self.assertEqual(removed, found, f"removed count mismatch for {name}")
             else:
@@ -80,7 +80,7 @@ class TestDiff(unittest.TestCase):
 
         diff = BpyBlendDiff()
         diff.diff(self.proxy, default_context)
-        for name, delta in diff.collection_deltas.items():
+        for name, delta in diff.collection_deltas:
             self.assertEqual(0, len(delta.items_added), f"added count mismatch for {name}")
             self.assertEqual(0, len(delta.items_removed), f"removed count mismatch for {name}")
             if name == "worlds":
@@ -117,7 +117,7 @@ class TestDiff(unittest.TestCase):
 
         diff = BpyBlendDiff()
         diff.diff(self.proxy, default_context)
-        for name, delta in diff.collection_deltas.items():
+        for name, delta in diff.collection_deltas:
             if name == "worlds":
                 items_added = list(delta.items_added.keys())
                 items_added.sort()
@@ -125,7 +125,7 @@ class TestDiff(unittest.TestCase):
                 items_renamed = delta.items_renamed
                 items_renamed.sort(key=sort_pred)
                 self.assertEqual(items_renamed, [("W2", "W22"), ("W4", "W44")], f"renamed count mismatch for {name}")
-                items_removed = delta.items_removed
+                items_removed = [name for name, _ in delta.items_removed]
                 items_removed.sort()
                 self.assertEqual(items_removed, ["W0", "W1"], f"removed count mismatch for {name}")
             else:

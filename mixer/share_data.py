@@ -142,8 +142,6 @@ class ShareData:
         self.collections_info = {}
         self.scenes_info = {}
 
-        if self.proxy:
-            self.proxy.load(safe_context)
 
     def set_dirty(self):
         self.blender_objects_dirty = True

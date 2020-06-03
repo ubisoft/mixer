@@ -1,5 +1,5 @@
 import logging
-from typing import Mapping, List, Tuple, Any
+from typing import Any, List, Mapping, Tuple, TypeVar
 
 import bpy
 import bpy.types as T  # noqa
@@ -19,11 +19,11 @@ logger = logging.Logger(__name__, logging.INFO)
 Uuid = str
 BlendDataCollectionName = str
 Name = str
-
+BpyIDDiff = TypeVar("BpyIDDiff")
 ItemsAdded = Mapping[Name, T.bpy_prop_collection]
-ItemsRemoved = List[Name]
+ItemsRemoved = List[Tuple[Name, Uuid]]
 ItemsRenamed = List[Tuple[Name, Name]]
-ItemsUpdated = Mapping[Name, "BpyIDDiff"]
+ItemsUpdated = Mapping[Name, BpyIDDiff]
 
 
 def find_renamed(
@@ -42,7 +42,7 @@ def find_renamed(
     removed_uuids = proxy_uuids - blender_uuids - renamed_uuids
 
     added_items = {blender_items[uuid][0]: blender_items[uuid][1] for uuid in added_uuids}
-    removed_items = [proxy_items[uuid] for uuid in removed_uuids]
+    removed_items = [(proxy_items[uuid], uuid) for uuid in removed_uuids]
     renamed_items = [(proxy_items[uuid], blender_items[uuid][0]) for uuid in renamed_uuids]
 
     return added_items, removed_items, renamed_items
@@ -108,7 +108,7 @@ class BpyBlendDiff(BpyDiff):
     Diff for the whole bpy.data
     """
 
-    collection_deltas: Mapping[BlendDataCollectionName, BpyPropCollectionDiff] = {}
+    collection_deltas: List[Tuple[BlendDataCollectionName, BpyPropCollectionDiff]] = []
     id_deltas: List[Tuple[BpyIDProxy, T.ID]] = []
 
     def diff(self, blend_proxy: BpyBlendProxy, context: Context):
@@ -120,4 +120,4 @@ class BpyBlendDiff(BpyDiff):
             delta = BpyPropCollectionDiff()
             delta.diff(blend_proxy._data[name], collection, context)
             if not delta.empty():
-                self.collection_deltas[name] = delta
+                self.collection_deltas.append((name, delta))
