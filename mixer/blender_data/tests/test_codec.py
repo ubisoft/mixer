@@ -11,14 +11,14 @@ from mixer.blender_data.proxy import (
 )
 from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
-from mixer.blender_data.filter import default_context
+from mixer.blender_data.filter import test_context
 
 
 class TestCodec(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
         self.proxy = BpyBlendProxy()
-        register_bl_equals(self, default_context)
+        register_bl_equals(self, test_context)
 
     def test_camera(self):
         # test_codec.TestCodec.test_camera
@@ -30,7 +30,7 @@ class TestCodec(unittest.TestCase):
         cam_sent.dof.focus_object = D.objects["Cube"]
 
         # load into proxy
-        self.proxy.load(default_context)
+        self.proxy.load(test_context)
 
         # patch the name so that it does not get mixed up as we restore later in the same scene
         cam_proxy_sent = self.proxy.data("cameras").data("Camera_0")

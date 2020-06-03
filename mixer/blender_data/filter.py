@@ -133,7 +133,7 @@ class Context:
         return bl_rna_properties.items()
 
 
-default_filter = FilterStack()
+test_filter = FilterStack()
 blenddata_exclude = [
     # "brushes" generates harmless warnings when EnumProperty properties are initialized with a value not in the enum
     "brushes",
@@ -163,7 +163,7 @@ _exclude_names = {
     "mixer_uuid",
 }
 
-# TODO Change to (type, filter) for easier maintenance
+# What we never want to load, ither because it is meaningless (depsgraph) or because it is not implemented at all
 default_exclusions = {
     None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
     T.ActionGroup: [NameFilterOut("channels")],
@@ -200,10 +200,11 @@ default_exclusions = {
     ],
 }
 
-default_filter.append(default_exclusions)
-default_context = Context(default_filter)
+test_filter.append(default_exclusions)
+test_context = Context(test_filter)
 
 
+# safe means "can be released"
 safe_exclusions = {
     # TODO temporary. Requires to load everything in order to properly load an IDRef,
     # which requires differential proxy update for practical performance

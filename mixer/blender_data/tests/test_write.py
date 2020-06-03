@@ -9,7 +9,7 @@ from mixer.blender_data.proxy import (
 )
 from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
-from mixer.blender_data.filter import default_context
+from mixer.blender_data.filter import test_context
 from mathutils import Matrix, Vector
 
 
@@ -17,8 +17,8 @@ class TestWriteAttribute(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
         self.proxy = BpyBlendProxy()
-        self.proxy.load(default_context)
-        register_bl_equals(self, default_context)
+        self.proxy.load(test_context)
+        register_bl_equals(self, test_context)
 
     def test_write_simple_types(self):
         scene = D.scenes[0]
@@ -97,7 +97,7 @@ class TestWriteAttribute(unittest.TestCase):
             curve0.points[i].location = point
 
         self.proxy = BpyBlendProxy()
-        self.proxy.load(default_context)
+        self.proxy.load(test_context)
         clone_name = f"Clone of {light_name}"
         light_proxy = self.proxy._data["lights"]._data[light_name]
         light_type = light_proxy._data["type"]
@@ -120,7 +120,7 @@ class TestWriteAttribute(unittest.TestCase):
         src_camera.dof.focus_object = focus_object
 
         self.proxy = BpyBlendProxy()
-        self.proxy.load(default_context)
+        self.proxy.load(test_context)
         camera_proxy = self.proxy.data("cameras").data(src_camera_name)
 
         # Create a light then restore src_light into it
@@ -144,7 +144,7 @@ class TestWriteAttribute(unittest.TestCase):
             curve0.points[i].location = point
 
         self.proxy = BpyBlendProxy()
-        self.proxy.load(default_context)
+        self.proxy.load(test_context)
         light_proxy = self.proxy.data("lights").data(src_light_name)
         light_type = light_proxy.data("type")
 
@@ -181,7 +181,7 @@ class TestWriteAttribute(unittest.TestCase):
             curve0.points[i].location = point
 
         self.proxy = BpyBlendProxy()
-        self.proxy.load(default_context)
+        self.proxy.load(test_context)
         light_proxy = self.proxy.data("lights").data(src_light_name)
         light_type = light_proxy.data("type")
 
