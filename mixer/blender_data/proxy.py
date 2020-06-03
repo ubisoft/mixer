@@ -342,10 +342,7 @@ class BpyIDProxy(BpyStructProxy):
 
         if blenddata_path is not None:
             self._blenddata_path = blenddata_path
-        if isinstance(bl_instance, T.Object):
-            # TODO move ifs into a series of class spefific
-            # a BpyIDRef
-            self._ctor_args = [self._data["data"]]
+        self._ctor_args = specifics.ctor_args(bl_instance, self)
 
         uuid = bl_instance.mixer_uuid
         if uuid:
