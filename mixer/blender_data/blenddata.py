@@ -1,6 +1,6 @@
 import functools
 import logging
-from typing import Any, List, Mapping, Union
+from typing import Any, Iterable, List, Mapping, Union
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -152,6 +152,9 @@ class BlendData:
 
     def collection_name(self, collection: T.bpy_prop_collection) -> str:
         return self._collection_names[collection]
+
+    def collection_names(self) -> Iterable[str]:
+        return self._collections
 
     def collection(self, collection_name: str) -> BlendDataCollection:
         return self._collections[collection_name]

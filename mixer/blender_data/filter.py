@@ -211,7 +211,22 @@ safe_exclusions = {
     T.CameraDOFSettings: [NameFilterOut("focus_object")],
 }
 
+# depsgraph updates not in this ist are not handled by BpyBlendProxy.update()
+# more types are just waiting to be tested
+# A specific proble for Scene as the depsgraph reports numerous meaningless Scene updates
+# that will probably hurt performance. We may have to find another way to update Scene or maybe
+# ignore scene updates when it is the only update in the despgrtaph update + a timer update just for
+# Scene
+# Also do not blindly update what is already updated in VRtist code without checking that
+# they do not interfere
+safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall]
+
 safe_filter = FilterStack()
+# The collections not in this list are not tested by BpyBlendDiff collection update
+# they will not be included in creation messages.
+safe_blenddata_collections = ["meshes", "lights", "cameras", "metaballs", "objects"]
+safe_blenddata = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
 safe_filter.append(default_exclusions)
 safe_filter.append(safe_exclusions)
+safe_filter.append(safe_blenddata)
 safe_context = Context(safe_filter)

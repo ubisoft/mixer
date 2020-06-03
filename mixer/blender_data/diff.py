@@ -20,7 +20,8 @@ Uuid = str
 BlendDataCollectionName = str
 Name = str
 BpyIDDiff = TypeVar("BpyIDDiff")
-ItemsAdded = Mapping[Name, T.bpy_prop_collection]
+# Item name : collection name
+ItemsAdded = Mapping[Name, Name]
 ItemsRemoved = List[Tuple[Name, Uuid]]
 ItemsRenamed = List[Tuple[Name, Name]]
 ItemsUpdated = Mapping[Name, BpyIDDiff]
@@ -87,15 +88,16 @@ class BpyPropCollectionDiff(BpyDiff):
     items_removed: ItemsRemoved = []
     items_renamed: ItemsRenamed = []
 
-    def diff(self, proxy: BpyPropDataCollectionProxy, bl_collection: T.bpy_prop_collection, context: Context):
+    def diff(self, proxy: BpyPropDataCollectionProxy, collection_name: str, context: Context):
         self.items_added.clear()
         self.items_removed.clear()
         self.items_renamed.clear()
+        bl_collection = getattr(bpy.data, collection_name)
         blender_items = {}
         for name, item in bl_collection.items():
             # TODO dot it here or in Proxy ?
             ensure_uuid(item)
-            blender_items[item.mixer_uuid] = (name, bl_collection)
+            blender_items[item.mixer_uuid] = (name, collection_name)
         proxy_items = {item.mixer_uuid: name for name, item in proxy._data.items()}
         self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
 
@@ -115,9 +117,8 @@ class BpyBlendDiff(BpyDiff):
         self.collection_deltas.clear()
         self.id_deltas.clear()
 
-        for name, _ in context.properties(bpy_type=T.BlendData):
-            collection = getattr(bpy.data, name)
+        for collection_name, _ in context.properties(bpy_type=T.BlendData):
             delta = BpyPropCollectionDiff()
-            delta.diff(blend_proxy._data[name], collection, context)
+            delta.diff(blend_proxy._data[collection_name], collection_name, context)
             if not delta.empty():
-                self.collection_deltas.append((name, delta))
+                self.collection_deltas.append((collection_name, delta))

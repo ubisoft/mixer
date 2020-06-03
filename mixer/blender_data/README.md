@@ -2,9 +2,12 @@
 
 ## todo
 
+- experimental Mesh receive fails, but sending is required (check this)
+- lighting aspect changes according to world (transferred or not, deleted or not)
+- detect data cycle (stackoverflow) in repaire
 - tests for metaballs
 - tests for initial transfer of lights, camera, metaballs
-- handle specifis separately (curvemaps, metaballelements, ...)
+- handle specifics separately (curvemaps, metaballelements, ...)
 - Metaball: auto_texture space -> do not save if auto ?
 
       WARNING:root:write attribute skipped texspace_location for <bpy_struct, MetaBall("Mball")>...
@@ -14,16 +17,7 @@
 
 ## done
 
-- remove stale entries from BpyBlendProxy()
-
-  - update BlendData from and only from BpyProxyUpdate
-  - find a way to keep track of removed entries
-
-    - {uuid: ID} in BlyBlendProxy
-    - BpyDiff : provide uuid along with deleted items
-
-- write Metaball sequence
-- saves a metaball without elements
+- changing light type changes ID and cause experimental updates to fail as the proxy is nop more found in BpyBlendProxy
 
 # Blender Type system
 

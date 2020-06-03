@@ -12,7 +12,8 @@ import bpy
 import bpy.types as T  # noqa
 import mathutils
 
-from mixer.blender_data.filter import Context
+from mixer.blender_data import specifics
+from mixer.blender_data.filter import Context, safe_depsgraph_updates
 from mixer.blender_data.blenddata import (
     BlendData,
     collection_name_to_type,
@@ -26,13 +27,10 @@ BpyIDProxy = TypeVar("BpyIDProxy")
 
 logger = logging.Logger(__name__, logging.INFO)
 
-RootIds = Set[T.ID]
 # Access path to the ID starting from bpy.data, such as ("cameras", "Camera")
 # or ("cameras", "Camera", "dof", "focus_object").
 BlenddataPath = Tuple[str]
-# probably superflous but easier to try
-IDProxies = Mapping[T.ID, BpyIDProxy]
-IDs = Mapping[str, T.ID]
+
 
 # storing everything in a single dictionary is easier for serialization
 MIXER_SEQUENCE = "__mixer_sequence__"
@@ -83,6 +81,13 @@ class DebugContext:
     def property_fullpath(self):
         # Utility for debug
         return ".".join([p[0] for p in self.property_stack])
+
+
+# TODO useless after IDProxies addition
+# Warning, unusable to retrieve proxies from depsgraph update
+RootIds = Set[T.ID]
+IDProxies = Mapping[str, BpyIDProxy]
+IDs = Mapping[str, T.ID]
 
 
 @dataclass
@@ -349,11 +354,13 @@ class BpyIDProxy(BpyStructProxy):
             # It is a bpy.data ID, not an ID "embedded" inside another ID, like scene.collection
             id_ = visit_state.ids.get(uuid)
             if id_ is not bl_instance:
-                # this occurs when the ID are not properly ordred at creation time, for instance (objects, meshes)
-                # instead of (meshes, objects)
-                logger.warning("visit_state.ids[uuid] is not bl_instance")
+                # this occurs when
+                # - when we find a reference to a BlendData ID that was not loaded
+                # - the ID are not properly ordred at creation time, for instance (objects, meshes)
+                # instead of (meshes, objects) : a bug
+                logger.debug("BpyIDProxy.load(): %s not in visit_state.ids[uuid]", bl_instance)
             self.mixer_uuid = uuid
-            visit_state.id_proxies[bl_instance] = self
+            visit_state.id_proxies[uuid] = self
         return self
 
     def collection_name(self) -> Union[str, None]:
@@ -828,36 +835,40 @@ class BpyPropDataCollectionProxy(Proxy):
     def find(self, key: str):
         return self._data.get(key)
 
-    def update(self, diff, visit_state: VisitState):
+    def update(self, diff, visit_state: VisitState) -> List[BpyIDProxy]:
         """
         Update the proxy according to the diff
         """
-        for name, bl_collection in diff.items_added.items():
+        created = []
+        blenddata = BlendData.instance()
+        for name, collection_name in diff.items_added.items():
             # warning this is the killer access in linear time
-            id_ = bl_collection[name]
+            id_ = blenddata.collection(collection_name)[name]
             uuid = ensure_uuid(id_)
-            collection_name = BlendData.instance().collection_name(bl_collection)
             blenddata_path = (collection_name, name)
             visit_state.root_ids.add(id_)
             visit_state.ids[uuid] = id_
             proxy = BpyIDProxy().load(id_, visit_state, blenddata_path)
-            visit_state.id_proxies[id_] = proxy
+            visit_state.id_proxies[uuid] = proxy
             self._data[name] = proxy
+            created.append(proxy)
 
         for name, uuid in diff.items_removed:
             del self._data[name]
             id_ = visit_state.ids[uuid]
             visit_state.root_ids.remove(id_)
-            del visit_state.id_proxies[id_]
+            del visit_state.id_proxies[uuid]
             del visit_state.ids[uuid]
 
         for old_name, new_name in diff.items_renamed:
             self._data[new_name] = self._data[old_name]
             del self._data[old_name]
 
+        return created
+
 
 # to sort delta in the bottom up order in the hierarchy ( creation order, mesh before object, ..)
-_creation_order = {"scene": 20, "objects": 10}
+_creation_order = {"scenes": 20, "objects": 10}
 
 
 def _pred_by_creation_order(item: Tuple[str, Any]):
@@ -865,15 +876,15 @@ def _pred_by_creation_order(item: Tuple[str, Any]):
 
 
 class BpyBlendProxy(Proxy):
-
-
     def __init__(self, *args, **kwargs):
         # ID elements stored in bpy.data.* collections, computed before recursive visit starts:
         self.root_ids: RootIds = set()
         self.id_proxies: IDProxies = {}
         # Only needed to cleanup root_ids and id_proxies on ID removal
         self.ids: IDs = {}
-        self._data: Mapping[str, BpyPropDataCollectionProxy] = {}
+        self._data: Mapping[str, BpyPropDataCollectionProxy] = {
+            name: BpyPropDataCollectionProxy() for name in BlendData.instance().collection_names()
+        }
 
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}
@@ -909,35 +920,35 @@ class BpyBlendProxy(Proxy):
         Update the proxy using the state of the Blendata collections (ID creation, deletion)
         and the depsgraph updates (ID modification)
         """
-        # Update the bpy.data collections status
+        updated_proxies = []
+
+        # Update the bpy.data collections status and get the list of newly created bpy.data entries.
+        # Updated proxies will contain the IDs to send as an initial transfer
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
-        valid_names = [name for name, _ in context.properties(bpy_type=T.BlendData)]
         deltas = sorted(diff.collection_deltas, key=_pred_by_creation_order)
         for delta_name, delta in deltas:
-            if delta_name in valid_names:
-                self._data[delta_name].update(delta, visit_state)
+            created = self._data[delta_name].update(delta, visit_state)
+            updated_proxies.extend(created)
 
-        # Update the ID proxied from the depsgraph update
-        updated_proxies = []
+        # Update the ID proxies from the depsgraph update
         # this should iterate inside_out (Object.data, Object) in the adequate creation order
         # (creating an Object requires its data)
         updates = reversed([update.id.original for update in depsgraph_updates])
+        # WARNING:
+        #   depsgraph_updates[i].id.original IS NOT bpy.lights['Point']
+        # or whatever as you might expect, so you cannot use it to index into the map
+        # to find the proxy to update.
+        # However
+        #   - mixer_uuid attributes have the same value
+        #   - __hash__() returns the same value
         for id_ in updates:
-            safe_classes = [T.Light, T.Camera, T.MetaBall]
-            if not any((isinstance(id_, t) for t in safe_classes)):
-                # TODO temporary
-                # We receive meaningless scene update for almost any interaction in the 3D and it hurts performace
-                # Find another way to update scene data ?
-                # Also do not blindly update what is already updated in VRtist code
+            if not any((isinstance(id_, t) for t in safe_depsgraph_updates)):
                 continue
             logger.info("Updating %s(%s)")
-            proxy = self.id_proxies.get(id_)
+            proxy = self.id_proxies.get(id_.mixer_uuid)
             if proxy is None:
-                logger.warning("BpyBlendDiff.diff(): no proxy for %s", id_)
+                logger.warning("BpyBlendProxy.update(): Ignoring %s (no proxy)", id_)
                 continue
-            # need to store collection_name and name into the proxy so that they can be serialized
-            # TODO : NOT TRUE (and complicated). The receiver could derive the collection from the type
-            # and the name is the key
             proxy.load(id_, visit_state)
             updated_proxies.append(proxy)
 
@@ -950,7 +961,8 @@ class BpyBlendProxy(Proxy):
         self.ids.clear()
 
     def debug_check_id_proxies(self):
-        # try to find stale entries ASAP, access them all
+        return 0
+        # try to find stale entries ASAP: access them all
         dummy = 0
         try:
             dummy = sum(len(id_.name) for id_ in self.root_ids)
@@ -961,10 +973,6 @@ class BpyBlendProxy(Proxy):
         except ReferenceError:
             logger.warning("BpyBlendProxy: Stale reference in root_ids")
 
-        try:
-            dummy += sum(len(id_.name) for id_ in self.id_proxies.keys())
-        except ReferenceError:
-            logger.warning("BpyBlendProxy: Stale reference in id_proxies")
         return dummy
 
 

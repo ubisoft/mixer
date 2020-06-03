@@ -5,7 +5,6 @@ from typing import List, Mapping, Set
 from uuid import uuid4
 
 from mixer.blender_data.proxy import BpyBlendProxy
-from mixer.blender_data.filter import safe_context
 
 import bpy
 
@@ -141,7 +140,6 @@ class ShareData:
         self.old_objects = {}
         self.collections_info = {}
         self.scenes_info = {}
-
 
     def set_dirty(self):
         self.blender_objects_dirty = True
