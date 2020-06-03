@@ -47,10 +47,10 @@ class ClientBlender(Client):
     def get_or_create_collection(self, name: str):
         collection = share_data.blender_collections.get(name)
         if not collection:
-            bpy.ops.collection.create(name=name)
-            collection = bpy.data.collections[name]
+            collection = bpy.data.collections.new(name)
             share_data._blender_collections[name] = collection
             bpy.context.scene.collection.children.link(collection)
+            share_data.update_collection_temporary_visibility(name)
         return collection
 
     def get_or_create_path(self, path, data=None) -> bpy.types.Object:
@@ -96,6 +96,7 @@ class ClientBlender(Client):
         basis_matrix, start = self.decode_matrix(data, start)
         local_matrix, start = self.decode_matrix(data, start)
         visible, start = common.decode_bool(data, start)
+        temporary_visibility, start = common.decode_bool(data, start)
 
         try:
             obj = self.get_or_create_path(object_path)
@@ -105,6 +106,7 @@ class ClientBlender(Client):
         if obj:
             self.set_transform(obj, parent_invert_matrix, basis_matrix, local_matrix)
             obj.hide_viewport = not visible
+            obj.hide_set(not temporary_visibility)
 
     def build_rename(self, data):
         # Object rename, actually
@@ -183,12 +185,14 @@ class ClientBlender(Client):
     def get_transform_buffer(self, obj):
         path = self.get_object_path(obj)
         visible = not obj.hide_viewport
+        temporary_visibility = not obj.hide_get()
         return (
             common.encode_string(path)
             + common.encode_matrix(obj.matrix_parent_inverse)
             + common.encode_matrix(obj.matrix_basis)
             + common.encode_matrix(obj.matrix_local)
             + common.encode_bool(visible)
+            + common.encode_bool(temporary_visibility)
         )
 
     def send_transform(self, obj):
@@ -399,6 +403,15 @@ class ClientBlender(Client):
         self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
         self.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
 
+    def send_camera_attributes(self, obj):
+        buffer = (
+            common.encode_string(obj.name_full)
+            + common.encode_float(obj.data.lens)
+            + common.encode_float(obj.data.dof.aperture_fstop)
+            + common.encode_float(obj.data.dof.focus_distance)
+        )
+        self.add_command(common.Command(common.MessageType.CAMERA_ATTRIBUTES, buffer, 0))
+
     def send_deleted_object(self, obj_name):
         self.send_delete(obj_name)
 
@@ -448,7 +461,11 @@ class ClientBlender(Client):
     def build_frame(self, data):
         start = 0
         frame, start = common.decode_int(data, start)
-        bpy.context.scene.frame_current = frame
+        if bpy.context.scene.frame_current != frame:
+            previous_value = share_data.client.receivedCommandsProcessed
+            share_data.client.receivedCommandsProcessed = False
+            bpy.context.scene.frame_set(frame)
+            share_data.client.receivedCommandsProcessed = previous_value
 
     def send_frame(self, frame):
         self.add_command(common.Command(common.MessageType.FRAME, common.encode_int(frame), 0))
@@ -493,11 +510,7 @@ class ClientBlender(Client):
         share_data.client.receivedCommandsProcessed = previous_value
 
     def query_current_frame(self):
-        previous_value = share_data.client.receivedCommandsProcessed
-        share_data.client.receivedCommandsProcessed = False
-        if "QueryCurrentFrame" in self.callbacks:
-            self.callbacks["QueryCurrentFrame"]()
-        share_data.client.receivedCommandsProcessed = previous_value
+        share_data.client.send_frame(bpy.context.scene.frame_current)
 
     @stats_timer(share_data)
     def network_consumer(self):
