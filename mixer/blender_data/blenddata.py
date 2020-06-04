@@ -76,7 +76,7 @@ class BlendDataCollection:
             try:
                 data = ctor(name, *ctor_args)
             except TypeError:
-                logging.error(f"Exception while calling ctor {self.name()}.{self._ctor_name}({name}, {ctor_args})")
+                logger.error(f"Exception while calling ctor {self.name()}.{self._ctor_name}({name}, {ctor_args})")
             self._items[name] = data
         return data
 

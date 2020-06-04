@@ -241,7 +241,7 @@ class Proxy:
         """
         Save this proxy into a blender object
         """
-        logging.warning(f"Not implemented: save() for {self.__class__} {bl_instance}.{attr_name}")
+        logger.warning(f"Not implemented: save() for {self.__class__} {bl_instance}.{attr_name}")
 
 
 class StructLikeProxy(Proxy):
@@ -307,7 +307,7 @@ class StructLikeProxy(Proxy):
             target = getattr(bl_instance, key)
 
         if target is None:
-            logging.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist")
+            logger.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist")
             return
 
         for k, v in self._data.items():
@@ -420,7 +420,7 @@ class BpyIDProxy(BpyStructProxy):
         if self._blenddata_path is None:
             # TODO ID inside ID, not BlendData collection. We will need a path
             # do it on save
-            logging.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} has empty blenddata path: ignore")
+            logger.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} has empty blenddata path: ignore")
             return
 
         if bl_instance is None:
@@ -452,7 +452,7 @@ class BpyIDProxy(BpyStructProxy):
 
         target = self.pre_save(bl_instance, attr_name)
         if target is None:
-            logging.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} is None")
+            logger.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} is None")
             return
 
         for k, v in self._data.items():
@@ -508,14 +508,14 @@ class BpyIDRefProxy(Proxy):
         # TODO use BlendData
         target = getattr(bpy.data, collection_name)[collection_key]
         if isinstance(bl_instance, T.bpy_prop_collection):
-            logging.warning(f"Not implemented: BpyIDRefProxy.save() for IDRef into collection {bl_instance}{attr_name}")
+            logger.warning(f"Not implemented: BpyIDRefProxy.save() for IDRef into collection {bl_instance}{attr_name}")
         else:
             if not bl_instance.bl_rna.properties[attr_name].is_readonly:
                 try:
                     setattr(bl_instance, attr_name, target)
                 except Exception as e:
-                    logging.warning(f"write attribute skipped {attr_name} for {bl_instance}...")
-                    logging.warning(f" ...Error: {repr(e)}")
+                    logger.warning(f"write attribute skipped {attr_name} for {bl_instance}...")
+                    logger.warning(f" ...Error: {repr(e)}")
 
 
 def ensure_uuid(item: bpy.types.ID) -> str:
@@ -603,7 +603,7 @@ class AosElement(Proxy):
         - attr_name: a member if the structure to be loaded as a sequence, e.g. "groups"
         """
 
-        logging.warning(f"Not implemented. Load AOS  element for {bl_collection}.{attr_name} ")
+        logger.warning(f"Not implemented. Load AOS  element for {bl_collection}.{attr_name} ")
         return self
 
         # This was written for MeshVertex.groups, but MeshVertex.groups is updated via Object.vertex_groups so
@@ -621,7 +621,7 @@ class AosElement(Proxy):
 
     def save(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str):
 
-        logging.warning(f"Not implemented. Save AOS  element for {bl_collection}.{attr_name} ")
+        logger.warning(f"Not implemented. Save AOS  element for {bl_collection}.{attr_name} ")
 
         # see comment in load()
 
@@ -631,7 +631,7 @@ class AosElement(Proxy):
 
         # if len(sequence) != len(bl_collection):
         #     # Avoid by writing SOA first ? Is is enough to resize the target
-        #     logging.warning(
+        #     logger.warning(
         #         f"Not implemented. Save AO size mistmatch (incoming {len(sequence)}, target {len(bl_collection)}for {bl_collection}.{attr_name} "
         #     )
         #     return
@@ -679,7 +679,7 @@ def write_curvemappoints(target, src_sequence):
 
     # CurveMapPoints specific (alas ...)
     if src_length < 2:
-        logging.error(f"Invalid length for curvemap: {src_length}. Expected at least 2")
+        logger.error(f"Invalid length for curvemap: {src_length}. Expected at least 2")
         return
 
     # truncate dst
@@ -784,7 +784,7 @@ class BpyPropStructCollectionProxy(Proxy):
                     # - GPencilStrokePoints: .add(count), .pop()
                     write_attribute(target, i, v)
             else:
-                logging.warning(
+                logger.warning(
                     f"Not implemented: write sequence of different length (incoming: {len(sequence)}, existing: {len(target)})for {bl_instance}.{attr_name}"
                 )
         else:
@@ -845,10 +845,10 @@ class BpyPropDataCollectionProxy(Proxy):
         blenddata = BlendData.instance()
         for name, collection_name in diff.items_added.items():
             # warning this is the killer access in linear time
-            logging.info("update/added for %s[%s]", collection_name, name)
+            logger.info("update/added for %s[%s]", collection_name, name)
             id_ = blenddata.collection(collection_name).get().get(name)
             if id_ is None:
-                logging.info("update/added for %s[%s] : not found", collection_name, name)
+                logger.info("update/added for %s[%s] : not found", collection_name, name)
                 continue
             uuid = ensure_uuid(id_)
             blenddata_path = (collection_name, name)
@@ -1000,7 +1000,7 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
     """
     type_ = type(value)
     if bl_instance is None:
-        logging.warning(f"unexpected write None attribute")
+        logger.warning(f"unexpected write None attribute")
         return
 
     if type_ not in proxy_classes:
@@ -1010,7 +1010,7 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
             try:
                 setattr(bl_instance, key, value)
             except Exception as e:
-                logging.warning(f"write attribute skipped {key} for {bl_instance}...")
-                logging.warning(f" ...Error: {repr(e)}")
+                logger.warning(f"write attribute skipped {key} for {bl_instance}...")
+                logger.warning(f" ...Error: {repr(e)}")
     else:
         value.save(bl_instance, key)
