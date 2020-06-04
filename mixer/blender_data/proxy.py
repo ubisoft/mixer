@@ -342,8 +342,15 @@ class BpyIDProxy(BpyStructProxy):
         """
         """
 
-        # TODO check that bl_instance class derives from ID
-        super().load(bl_instance, visit_state)
+        self._data.clear()
+        properties = visit_state.context.properties(bl_instance)
+        # assume that specifics apply only to Id, not Struct
+        properties = specifics.conditional_properties(bl_instance, properties)
+        for name, bl_rna_property in properties:
+            attr = getattr(bl_instance, name)
+            attr_value = read_attribute(attr, bl_rna_property, visit_state)
+            # Also write None values. We use them to reset attributes like Camera.dof.focus_object
+            self._data[name] = attr_value
 
         if blenddata_path is not None:
             self._blenddata_path = blenddata_path
@@ -402,14 +409,6 @@ class BpyIDProxy(BpyStructProxy):
                 write_attribute(target, "type", light_type)
                 # must reload the reference
                 target = self.target(bl_instance, attr_name)
-        elif isinstance(target, bpy.types.MetaBall):
-            # required first enable write on texspace_location and texspace_size if False
-            # otherwise issues an error message
-            # TODO useless on its own : strip values on load
-            name = "use_auto_texspace"
-            value = self._data.get(name)
-            if value is not None and value != getattr(target, name):
-                write_attribute(target, name, value)
         return target
 
     def save(self, bl_instance: any = None, attr_name: str = None):
