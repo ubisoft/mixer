@@ -653,10 +653,7 @@ def send_scene_data_to_server(scene, dummy):
                 logger.info(f"Detected removed {name}")
             for key, collection in delta.items_added.items():
                 logger.info(f"Detected added {collection}[{key}]")
-                # TODO be explicit ??
-                # data_api.send_data_new(collection, key)
             for item in delta.items_renamed:
-                # TODO maybe not useful, just a name update
                 logger.info(f"Detected renamed {item}")
         updated_proxies = share_data.proxy.update(diff, safe_context, share_data.depsgraph.updates)
         data_api.send_data_updates(updated_proxies)

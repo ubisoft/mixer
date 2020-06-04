@@ -81,11 +81,10 @@ class BlendDataCollection:
         return data
 
     def remove(self, name_full):
-        collection = self._items[name_full]
+        item = self._items[name_full]
         # do something else for scenes
-        self.bpy_collection().remove(collection)
-        del self._items[name_full]
-        self._dirty = True
+        self.bpy_collection().remove(item)
+        self.set_dirty()
 
     def rename(self, old_name, new_name):
         item = self._items[old_name]
@@ -95,10 +94,8 @@ class BlendDataCollection:
 
     def set_dirty(self):
         self._dirty = True
-
-    def clear(self):
-        self._data.clear()
-        self._dirty = True
+        # avoid stale entries, that might cause problems while debugging
+        self._items.clear()
 
 
 class BlendData:
