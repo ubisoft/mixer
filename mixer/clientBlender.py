@@ -546,7 +546,11 @@ class ClientBlender(Client):
                     if command.type == common.MessageType.CONTENT:
                         # The server asks for scene content (at room creation)
                         self.receivedCommandsProcessed = False
-                        self.send_scene_content()
+                        try:
+                            self.send_scene_content()
+                        except Exception:
+                            self.on_connection_lost()
+                            raise
 
                     elif command.type == common.MessageType.GREASE_PENCIL_MESH:
                         grease_pencil_api.build_grease_pencil_mesh(command.data)
