@@ -841,14 +841,15 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         Update the proxy according to the diff
         """
-        created = []
+        creations = []
+        removals = []
         blenddata = BlendData.instance()
         for name, collection_name in diff.items_added.items():
             # warning this is the killer access in linear time
-            logger.info("update/added for %s[%s]", collection_name, name)
+            logger.info("Perform update/creation for %s[%s]", collection_name, name)
             id_ = blenddata.collection(collection_name).get().get(name)
             if id_ is None:
-                logger.info("update/added for %s[%s] : not found", collection_name, name)
+                logger.warning("update/added for %s[%s] : not found", collection_name, name)
                 continue
             uuid = ensure_uuid(id_)
             blenddata_path = (collection_name, name)
@@ -857,9 +858,13 @@ class BpyPropDataCollectionProxy(Proxy):
             proxy = BpyIDProxy().load(id_, visit_state, blenddata_path)
             visit_state.id_proxies[uuid] = proxy
             self._data[name] = proxy
-            created.append(proxy)
+            creations.append(proxy)
 
         for name, uuid in diff.items_removed:
+            proxy = visit_state.id_proxies[uuid]
+            removal = proxy._blenddata_path[0:2]
+            logger.info("Perform removal for %s[%s]", removal[0], removal[1])
+            removals.append(removal)
             del self._data[name]
             id_ = visit_state.ids[uuid]
             visit_state.root_ids.remove(id_)
@@ -867,10 +872,11 @@ class BpyPropDataCollectionProxy(Proxy):
             del visit_state.ids[uuid]
 
         for old_name, new_name in diff.items_renamed:
+            logger.warning("not implemented renamed %s into %s", old_name, new_name)
             self._data[new_name] = self._data[old_name]
             del self._data[old_name]
 
-        return created
+        return creations, removals
 
 
 # to sort delta in the bottom up order in the hierarchy ( creation order, mesh before object, ..)
@@ -921,25 +927,28 @@ class BpyBlendProxy(Proxy):
             return None
         return collection_proxy.find(key)
 
-    def update(self, diff: BpyBlendDiff, context: Context, depsgraph_updates: T.bpy_prop_collection):
+    def update(
+        self, diff: BpyBlendDiff, context: Context, depsgraph_updates: T.bpy_prop_collection
+    ) -> Tuple[List[BpyIDProxy], List[Tuple[str, str]]]:
         """
         Update the proxy using the state of the Blendata collections (ID creation, deletion)
         and the depsgraph updates (ID modification)
         """
-        updated_proxies = []
-
+        updates = []
+        removals = []
         # Update the bpy.data collections status and get the list of newly created bpy.data entries.
         # Updated proxies will contain the IDs to send as an initial transfer
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
         deltas = sorted(diff.collection_deltas, key=_pred_by_creation_order)
         for delta_name, delta in deltas:
-            created = self._data[delta_name].update(delta, visit_state)
-            updated_proxies.extend(created)
+            creation, removal = self._data[delta_name].update(delta, visit_state)
+            updates.extend(creation)
+            removals.extend(removal)
 
         # Update the ID proxies from the depsgraph update
         # this should iterate inside_out (Object.data, Object) in the adequate creation order
         # (creating an Object requires its data)
-        updates = reversed([update.id.original for update in depsgraph_updates])
+        depsgraph_updated_ids = reversed([update.id.original for update in depsgraph_updates])
         # WARNING:
         #   depsgraph_updates[i].id.original IS NOT bpy.lights['Point']
         # or whatever as you might expect, so you cannot use it to index into the map
@@ -947,7 +956,7 @@ class BpyBlendProxy(Proxy):
         # However
         #   - mixer_uuid attributes have the same value
         #   - __hash__() returns the same value
-        for id_ in updates:
+        for id_ in depsgraph_updated_ids:
             if not any((isinstance(id_, t) for t in safe_depsgraph_updates)):
                 continue
             logger.info("Updating %s(%s)")
@@ -956,9 +965,9 @@ class BpyBlendProxy(Proxy):
                 logger.warning("BpyBlendProxy.update(): Ignoring %s (no proxy)", id_)
                 continue
             proxy.load(id_, visit_state)
-            updated_proxies.append(proxy)
+            updates.append(proxy)
 
-        return updated_proxies
+        return updates, removals
 
     def clear(self):
         self._data.clear()

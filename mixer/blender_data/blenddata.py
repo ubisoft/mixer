@@ -82,7 +82,10 @@ class BlendDataCollection:
 
     def remove(self, name_full):
         item = self._items[name_full]
-        # do something else for scenes
+        if self._name == "scenes":
+            # search for __last_scene_to_be_removed__
+            logger.error("Not implemented : remove scene %s", name_full)
+            return
         self.bpy_collection().remove(item)
         self.set_dirty()
 

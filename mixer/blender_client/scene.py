@@ -145,5 +145,7 @@ def build_remove_object_from_scene(data):
     object_name, _ = common.decode_string(data, index)
     logger.info("build_remove_object_from_scene %s <- %s", scene_name, object_name)
     scene = share_data.blender_scenes[scene_name]
-    object_ = share_data.blender_objects[object_name]
-    scene.collection.objects.unlink(object_)
+    object_ = share_data.blender_objects.get(object_name)
+    if object_:
+        # otherwise already removed by Blender protocol
+        scene.collection.objects.unlink(object_)

@@ -648,15 +648,9 @@ def send_scene_data_to_server(scene, dummy):
         # (e.g. transform creates an object with no data)
         diff = BpyBlendDiff()
         diff.diff(share_data.proxy, safe_context)
-        for _, delta in diff.collection_deltas:
-            for name, _ in delta.items_removed:
-                logger.info(f"Detected removed {name}")
-            for key, collection in delta.items_added.items():
-                logger.info(f"Detected added {collection}[{key}]")
-            for item in delta.items_renamed:
-                logger.info(f"Detected renamed {item}")
-        updated_proxies = share_data.proxy.update(diff, safe_context, share_data.depsgraph.updates)
-        data_api.send_data_updates(updated_proxies)
+        updates, removals = share_data.proxy.update(diff, safe_context, share_data.depsgraph.updates)
+        data_api.send_data_removals(removals)
+        data_api.send_data_updates(updates)
         share_data.proxy.debug_check_id_proxies()
 
     update_object_state(share_data.old_objects, share_data.blender_objects)

@@ -636,8 +636,8 @@ class ClientBlender(Client):
 
                     elif command.type == common.MessageType.BLENDER_DATA_UPDATE:
                         data_api.build_data_update(command.data)
-                    elif command.type == common.MessageType.BLENDER_DATA_NEW:
-                        data_api.build_data_new(command.data)
+                    elif command.type == common.MessageType.BLENDER_DATA_REMOVE:
+                        data_api.build_data_remove(command.data)
 
                     self.receivedCommands.task_done()
                     self.blockSignals = False
