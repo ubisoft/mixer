@@ -12,8 +12,8 @@ import bpy
 import bpy.types as T  # noqa
 import mathutils
 
+from mixer.blender_data.filter import Context, safe_depsgraph_updates, safe_context
 from mixer.blender_data import specifics
-from mixer.blender_data.filter import Context, safe_depsgraph_updates
 from mixer.blender_data.blenddata import (
     BlendData,
     collection_name_to_type,
@@ -25,10 +25,10 @@ from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 BpyBlendDiff = TypeVar("BpyBlendDiff")
 BpyIDProxy = TypeVar("BpyIDProxy")
 
-logger = logging.Logger(__name__, logging.INFO)
+logger = logging.Logger(__name__)
 
 # Access path to the ID starting from bpy.data, such as ("cameras", "Camera")
-# or ("cameras", "Camera", "dof", "focus_object").
+# or later the path of an ID not in bpy.data if useful
 BlenddataPath = Tuple[str]
 
 
@@ -141,6 +141,10 @@ def load_as_what(attr_property: bpy.types.Property, attr: any, root_ids: RootIds
         else:
             # Only collections at the root level of blendfile are id def, so here it can only be struct
             return LoadElementAs.STRUCT
+
+    # HACK while not all items are atgged in new update scheme
+    if isinstance(attr, T.Mesh):
+        return LoadElementAs.ID_REF
 
     if same_rna(attr_property, T.PointerProperty):
         element_property = attr_property.fixed_type
@@ -332,11 +336,12 @@ class BpyIDProxy(BpyStructProxy):
     # Addtitional arguments for the BlendDataXxxx collections object addtition(.new(), .load(), ...), besides name
     # For instance object_data in BlendDataObject.new(name, object_data)
     _ctor_args: List[Any] = None
-    # Has a value if this proxy comes from a bpy.data ID
-    mixer_uuid: str = None
 
     def __init__(self):
         super().__init__()
+
+    def mixer_uuid(self) -> str:
+        return self._data["mixer_uuid"]
 
     def load(self, bl_instance: T.ID, visit_state: VisitState, blenddata_path: BlenddataPath = None):
         """
@@ -356,7 +361,7 @@ class BpyIDProxy(BpyStructProxy):
             self._blenddata_path = blenddata_path
         self._ctor_args = specifics.ctor_args(bl_instance, self)
 
-        uuid = bl_instance.mixer_uuid
+        uuid = bl_instance.get("mixer_uuid")
         if uuid:
             # It is a bpy.data ID, not an ID "embedded" inside another ID, like scene.collection
             id_ = visit_state.ids.get(uuid)
@@ -366,7 +371,7 @@ class BpyIDProxy(BpyStructProxy):
                 # - the ID are not properly ordred at creation time, for instance (objects, meshes)
                 # instead of (meshes, objects) : a bug
                 logger.debug("BpyIDProxy.load(): %s not in visit_state.ids[uuid]", bl_instance)
-            self.mixer_uuid = uuid
+            self._data["mixer_uuid"] = bl_instance.mixer_uuid
             visit_state.id_proxies[uuid] = self
         return self
 
@@ -411,16 +416,16 @@ class BpyIDProxy(BpyStructProxy):
                 target = self.target(bl_instance, attr_name)
         return target
 
-    def save(self, bl_instance: any = None, attr_name: str = None):
+    def save(self, bl_instance: any = None, attr_name: str = None) -> T.ID:
         """
-        - bl_instance: the container attribute
+        - bl_instance: the container attribute, often a bpy.data collection
         """
         blenddata = BlendData.instance()
         if self._blenddata_path is None:
             # TODO ID inside ID, not BlendData collection. We will need a path
             # do it on save
             logger.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} has empty blenddata path: ignore")
-            return
+            return None
 
         if bl_instance is None:
             collection_name = self._blenddata_path[0]
@@ -438,24 +443,52 @@ class BpyIDProxy(BpyStructProxy):
 
             # unwrap the ctor arguments. For instance, creating an Object requires a T.ID
             ctor_args = []
-            for arg in self._ctor_args or ():
-                if isinstance(arg, BpyIDRefProxy):
-                    data_collection_name, data_key = arg._blenddata_path
-                    id_ = BlendData.instance().collection(data_collection_name)[data_key]
-                    ctor_args.append(id_)
-                elif isinstance(arg, Proxy):
-                    logger.error("Invalid ctor argument : %s", arg)
-                else:
-                    ctor_args.append(arg)
-            blenddata.collection(collection_name).ctor(attr_name, ctor_args)
+            if self._ctor_args:
+                for arg in self._ctor_args:
+                    if isinstance(arg, BpyIDRefProxy):
+                        data_collection_name, data_key = arg._blenddata_path
+                        collection = BlendData.instance().collection(data_collection_name)
+                        arg_id_ = collection.items.get(data_key)
+                        if arg_id_ is None:
+                            if data_collection_name != "meshes":
+                                logger.warning(f"Cannot create {collection_name}[{attr_name}] ...")
+                                logger.warning(f"   ... Ref ctor parameter is None: {data_collection_name}[{data_key}]")
+                            else:
+                                # HACK for meshes
+                                logger.info(f"Cannot create {collection_name}[{attr_name}] ...")
+                                logger.info(f"   ... Ref ctor parameter is None: {data_collection_name}[{data_key}]")
+                                logger.info("   ... not an error")
+                            return None
+                        ctor_args.append(arg_id_)
+                    elif isinstance(arg, Proxy):
+                        # an error on the sender side. Il we receive and BpyIDProxy, it may mean that the sender
+                        # misloaded an IDDef instead of an IDRef
+                        logger.error("Invalid ctor argument : %s", arg)
+                        ctor_args = None
+                        break
+                    else:
+                        ctor_args.append(arg)
+            if ctor_args is not None:
+                blenddata.collection(collection_name).ctor(attr_name, ctor_args)
+                id_ = bl_instance.get(attr_name)
+                id_.mixer_uuid = self.mixer_uuid()
+                id_ = bl_instance.get(attr_name)
+
+        if id_ is None:
+            return None
 
         target = self.pre_save(bl_instance, attr_name)
         if target is None:
             logger.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} is None")
-            return
+            return None
 
         for k, v in self._data.items():
             write_attribute(target, k, v)
+
+        return id_
+
+    def update(self, other: BpyIdProxy):
+        self._data.update(other._data)
 
 
 class BpyIDRefProxy(Proxy):
@@ -505,7 +538,12 @@ class BpyIDRefProxy(Proxy):
         # TODO the identifier garget doest not have the same semantics everywhere
         # here pointee somewhere else lvalue
         # TODO use BlendData
-        target = getattr(bpy.data, collection_name)[collection_key]
+        collection = getattr(bpy.data, collection_name)
+        target = collection.get(collection_key)
+        if target is None:
+            logger.warning(
+                f"BpyIDRefProxy.save do not save reference (target does not exist) {bl_instance}.{attr_name} -> {collection_name}[{collection_key}]"
+            )
         if isinstance(bl_instance, T.bpy_prop_collection):
             logger.warning(f"Not implemented: BpyIDRefProxy.save() for IDRef into collection {bl_instance}{attr_name}")
         else:
@@ -520,7 +558,8 @@ class BpyIDRefProxy(Proxy):
 def ensure_uuid(item: bpy.types.ID) -> str:
     uuid = item.get("mixer_uuid")
     if uuid is None:
-        item.mixer_uuid = str(uuid4())
+        uuid = str(uuid4())
+        item.mixer_uuid = uuid
     return uuid
 
 
@@ -812,6 +851,12 @@ class BpyPropDataCollectionProxy(Proxy):
             collection_name = BlendData.instance().bl_collection_name_from_ID(item)
             with visit_state.debug_context.enter(name, item):
                 ensure_uuid(item)
+                # # HACK: Skip objects with a mesh in order to process D.objects withtout processing D.meshes
+                # # - writing meshes is not currently implemented and we must avoid double processing with VRtist
+                # # - reading objects is required for metaballs
+                # if collection_name == "objects" and isinstance(item.data, T.Mesh):
+                #     continue
+                # # /HACK
                 self._data[name] = BpyIDProxy().load(item, visit_state, (collection_name, name))
 
         return self
@@ -836,6 +881,41 @@ class BpyPropDataCollectionProxy(Proxy):
     def find(self, key: str):
         return self._data.get(key)
 
+    def update_one(self, proxy: BpyIDProxy, visit_state: VisitState):
+        collection_name, name = proxy._blenddata_path[0:2]
+        existing_proxy = self._data.get(name)
+        if existing_proxy is None:
+            self._data[name] = proxy
+            id_ = proxy.save()
+            uuid = proxy.mixer_uuid()
+            visit_state.root_ids.add(id_)
+            visit_state.ids[uuid] = id_
+            visit_state.id_proxies[uuid] = proxy
+        else:
+            # Do not replace the existing proxy by the new one as it wil no more work with
+            # differential updates
+            existing_proxy.update(proxy)
+            existing_proxy.save()
+
+    def remove_one(self, name, visit_state: VisitState):
+        proxy = self._data.get(name)
+        if proxy is None:
+            logger.warning("remove: proxy not found for key %s", name)
+            return
+
+        collection_name, key = proxy._blenddata_path[0:2]
+        logger.info("Perform removal for %s[%s]", collection_name, key)
+        if key != name:
+            logger.error(f"remove: {key} != {name}")
+            return
+        BlendData.instance().collection(collection_name).remove(key)
+        uuid = proxy.mixer_uuid()
+        del self._data[name]
+        id_ = visit_state.ids[uuid]
+        visit_state.root_ids.remove(id_)
+        del visit_state.id_proxies[uuid]
+        del visit_state.ids[uuid]
+
     def update(self, diff, visit_state: VisitState) -> List[BpyIDProxy]:
         """
         Update the proxy according to the diff
@@ -846,7 +926,7 @@ class BpyPropDataCollectionProxy(Proxy):
         for name, collection_name in diff.items_added.items():
             # warning this is the killer access in linear time
             logger.info("Perform update/creation for %s[%s]", collection_name, name)
-            id_ = blenddata.collection(collection_name).get().get(name)
+            id_ = blenddata.collection(collection_name).items.get(name)
             if id_ is None:
                 logger.warning("update/added for %s[%s] : not found", collection_name, name)
                 continue
@@ -860,6 +940,7 @@ class BpyPropDataCollectionProxy(Proxy):
             creations.append(proxy)
 
         for name, uuid in diff.items_removed:
+            # TODO do we need uuid. Can find the proxy by name, no ?
             proxy = visit_state.id_proxies[uuid]
             removal = proxy._blenddata_path[0:2]
             logger.info("Perform removal for %s[%s]", removal[0], removal[1])
@@ -927,7 +1008,7 @@ class BpyBlendProxy(Proxy):
         return collection_proxy.find(key)
 
     def update(
-        self, diff: BpyBlendDiff, context: Context, depsgraph_updates: T.bpy_prop_collection
+        self, diff: BpyBlendDiff, context: Context = safe_context, depsgraph_updates: T.bpy_prop_collection = ()
     ) -> Tuple[List[BpyIDProxy], List[Tuple[str, str]]]:
         """
         Update the proxy using the state of the Blendata collections (ID creation, deletion)
@@ -967,6 +1048,21 @@ class BpyBlendProxy(Proxy):
             updates.append(proxy)
 
         return updates, removals
+
+    def update_one(self, proxy: BpyIDProxy, context: Context = safe_context):
+        """
+        Create or update a bpy.data collection item and update the proxy accordingly
+        """
+        visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
+        collection_name, _ = proxy._blenddata_path[0:2]
+        self._data[collection_name].update_one(proxy, visit_state)
+
+    def remove_one(self, collection_name: str, key: str, context: Context = safe_context):
+        """
+        Remove a bpy.data collection item and update the proxy accordingly
+        """
+        visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
+        self._data[collection_name].remove_one(key, visit_state)
 
     def clear(self):
         self._data.clear()
@@ -1014,11 +1110,11 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
     if type_ not in proxy_classes:
         # TEMP we should not have readonly items
         assert type(key) is str
-        if not bl_instance.bl_rna.properties[key].is_readonly:
-            try:
+        try:
+            if not bl_instance.bl_rna.properties[key].is_readonly:
                 setattr(bl_instance, key, value)
-            except Exception as e:
-                logger.warning(f"write attribute skipped {key} for {bl_instance}...")
-                logger.warning(f" ...Error: {repr(e)}")
+        except Exception as e:
+            logger.warning(f"write attribute skipped {key} for {bl_instance}...")
+            logger.warning(f" ...Error: {repr(e)}")
     else:
         value.save(bl_instance, key)

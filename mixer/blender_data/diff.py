@@ -99,7 +99,7 @@ class BpyPropCollectionDiff(BpyDiff):
             # TODO dot it here or in Proxy ?
             ensure_uuid(item)
             blender_items[item.mixer_uuid] = (name, collection_name)
-        proxy_items = {item.mixer_uuid: name for name, item in proxy._data.items()}
+        proxy_items = {item.mixer_uuid(): name for name, item in proxy._data.items()}
         self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
         if not self.empty():
             BlendData.instance().collection(collection_name).set_dirty()

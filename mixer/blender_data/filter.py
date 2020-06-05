@@ -168,6 +168,8 @@ default_exclusions = {
     None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
     T.ActionGroup: [NameFilterOut("channels")],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
+    # makes a loop
+    T.Bone: [NameFilterOut("parent")],
     # TODO temporary ?
     T.CompositorNodeRLayers: [NameFilterOut("scene")],
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
@@ -189,6 +191,12 @@ default_exclusions = {
     ],
     T.Node: [NameFilterOut("internal_links")],
     T.NodeSocket: [NameFilterOut("node")],
+    T.Object: [
+        # TODO triggers an error on metaballs
+        #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
+        #   looks like a bpy_prop_collection and the key is and empy string
+        NameFilterOut("material_slots")
+    ],
     T.Scene: [
         # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
         # it is unclear how to do it.
@@ -203,13 +211,10 @@ default_exclusions = {
 test_filter.append(default_exclusions)
 test_context = Context(test_filter)
 
-
+#
 # safe means "can be released"
-safe_exclusions = {
-    # TODO temporary. Requires to load everything in order to properly load an IDRef,
-    # which requires differential proxy update for practical performance
-    T.CameraDOFSettings: [NameFilterOut("focus_object")],
-}
+#
+safe_exclusions = {}
 
 # depsgraph updates not in this ist are not handled by BpyBlendProxy.update()
 # more types are just waiting to be tested

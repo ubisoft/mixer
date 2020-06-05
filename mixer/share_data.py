@@ -124,7 +124,7 @@ class ShareData:
 
         self.pending_parenting = set()
 
-        self.proxy = None
+        self.proxy: BpyBlendProxy = None
 
     def leave_current_room(self):
         if self.client is not None:

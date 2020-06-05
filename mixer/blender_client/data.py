@@ -2,7 +2,6 @@ import logging
 import traceback
 from typing import List, Tuple
 
-from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.json_codec import Codec
 from mixer.blender_data.proxy import BpyIDProxy
 from mixer.broadcaster import common
@@ -23,7 +22,11 @@ def build_data_remove(buffer):
     collection_name, index = common.decode_string(buffer, 0)
     key, index = common.decode_string(buffer, index)
     logger.info("build_data_remove: %s[%s]", collection_name, key)
-    BlendData.instance().collection(collection_name).remove(key)
+    # Update through the proxy so that it updates itself and does not trigger removals
+    share_data.proxy.remove_one(collection_name, key)
+
+    # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
+    share_data.set_dirty()
 
 
 #
@@ -37,13 +40,15 @@ def build_data_update(buffer):
     codec = Codec()
     try:
         id_proxy = codec.decode(buffer)
-        blenddata_path = id_proxy._blenddata_path
-        if blenddata_path[0] is None or blenddata_path[1] is None:
-            logger.error("build_data_update: invalide blenddata_path : %s", blenddata_path)
+        collection_name, key = id_proxy._blenddata_path
+        if collection_name is None or key is None:
+            logger.error("build_data_update: invalide blenddata_path : %s[%s]", collection_name, key)
             return
 
-        logger.info("build_data_update: %s[%s]", *id_proxy._blenddata_path)
-        id_proxy.save()
+        logger.info("build_data_update: %s[%s]", collection_name, key)
+        share_data.proxy.update_one(id_proxy)
+        # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
+        share_data.set_dirty()
     except Exception:
         logger.error(
             "Exception during build_data_update\n"

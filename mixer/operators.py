@@ -642,17 +642,6 @@ def send_scene_data_to_server(scene, dummy):
         logger.info("send_scene_data_to_server canceled (not is_in_object_mode)")
         return
 
-    if share_data.use_experimental_sync():
-        # Start with experimental/blender_to_blender mode since the VRtint protocol handling
-        # wil implicitely create objects with unappropriate default values
-        # (e.g. transform creates an object with no data)
-        diff = BpyBlendDiff()
-        diff.diff(share_data.proxy, safe_context)
-        updates, removals = share_data.proxy.update(diff, safe_context, share_data.depsgraph.updates)
-        data_api.send_data_removals(removals)
-        data_api.send_data_updates(updates)
-        share_data.proxy.debug_check_id_proxies()
-
     update_object_state(share_data.old_objects, share_data.blender_objects)
 
     with timer.child("update_scenes_state"):
@@ -672,6 +661,21 @@ def send_scene_data_to_server(scene, dummy):
         changed |= add_scenes()
         changed |= add_collections()
         changed |= add_objects()
+
+        # After creation of meshes, since meshes are not yet supported, but needed to propermy create
+        # objects
+        if share_data.use_experimental_sync():
+            # Start with experimental/blender_to_blender mode since the VRtint protocol handling
+            # wil implicitely create objects with unappropriate default values
+            # (e.g. transform creates an object with no data)
+            diff = BpyBlendDiff()
+            diff.diff(share_data.proxy, safe_context)
+            depsgraph = bpy.context.evaluated_depsgraph_get()
+            updates, removals = share_data.proxy.update(diff, safe_context, depsgraph.updates)
+            data_api.send_data_removals(removals)
+            data_api.send_data_updates(updates)
+            share_data.proxy.debug_check_id_proxies()
+
         changed |= add_collections_to_scenes()
         changed |= add_collections_to_collections()
         changed |= add_objects_to_collections()

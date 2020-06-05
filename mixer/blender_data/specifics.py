@@ -36,7 +36,7 @@ def conditional_properties(id_: T.ID, properties: ItemsView) -> ItemsView:
     Args:
         properties: the properties list to filter
     Returns:
-        
+
     """
     if isinstance(id_, T.Object):
         if not id_.data:

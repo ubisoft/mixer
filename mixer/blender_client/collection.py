@@ -114,8 +114,10 @@ def build_remove_object_from_collection(data):
     logger.info("build_remove_object_from_collection %s <- %s", collection_name, object_name)
 
     collection = share_data.blender_collections[collection_name]
-    object_ = share_data.blender_objects[object_name]
-    collection.objects.unlink(object_)
+    object_ = share_data.blender_objects.get(object_name)
+    if object_ is not None:
+        # may have been removed bu the Blender protocol
+        collection.objects.unlink(object_)
 
 
 def send_collection_instance(client: Client, obj):
