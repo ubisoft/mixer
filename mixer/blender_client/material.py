@@ -69,7 +69,8 @@ def build_material(data):
             tex_image.image = bpy.data.images.load(file_name)
             tex_image.image.colorspace_settings.name = "Non-Color"
         except Exception as e:
-            logger.error("could not load file %s (%s)", file_name, e)
+            logger.error("could not load file %s ...", file_name)
+            logger.error("... %s", e)
         material.node_tree.links.new(invert.inputs["Color"], tex_image.outputs["Color"])
 
     # Base Color
@@ -98,7 +99,8 @@ def build_material(data):
             tex_image.image = bpy.data.images.load(file_name)
             tex_image.image.colorspace_settings.name = "Non-Color"
         except Exception as e:
-            logger.error("could not load file %s (%s)", file_name, e)
+            logger.error("could not load file %s ...", file_name)
+            logger.error("... %s", e)
         material.node_tree.links.new(normal_map.inputs["Color"], tex_image.outputs["Color"])
 
     # Emission

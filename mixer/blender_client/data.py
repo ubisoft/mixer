@@ -46,7 +46,12 @@ def build_data_update(buffer):
         id_proxy.save()
     except Exception:
         logger.error(
-            "Exception during build_data_update\n" + traceback.format_exc() + "During processing of\n" + buffer
+            "Exception during build_data_update\n"
+            + traceback.format_exc()
+            + "During processing of\n"
+            + buffer[0:200]
+            + "\n...\n"
+            + buffer[-200:0]
         )
 
 

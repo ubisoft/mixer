@@ -205,7 +205,8 @@ class ClientBlender(Client):
                 f.close()
                 self.textures.add(path)
             except Exception as e:
-                logger.error("could not write file %s (%s)", path, e)
+                logger.error("could not write file %s ...", path)
+                logger.error("... %s", e)
 
     def send_texture_file(self, path):
         if path in self.textures:
@@ -217,7 +218,8 @@ class ClientBlender(Client):
                 f.close()
                 self.send_texture_data(path, data)
             except Exception as e:
-                logger.error("could not read file %s (%s)", path, e)
+                logger.error("could not read file %s ...", path)
+                logger.error("... %s", e)
 
     def send_texture_data(self, path, data):
         name_buffer = common.encode_string(path)
