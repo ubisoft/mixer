@@ -36,6 +36,14 @@ BlenddataPath = Tuple[str]
 MIXER_SEQUENCE = "__mixer_sequence__"
 
 
+def debug_check_proxy(proxy: BpyIDProxy):
+    if proxy._class_name == "Object":
+        data = proxy.data("data")
+        if data is not None and not isinstance(data, BpyIDRefProxy):
+            collection, key = proxy._blenddata_path
+            logger.error(f"Ill formed Object proxy for {collection}[{key}] : data is {data}")
+
+
 def debug_check_stack_overflow(func, *args, **kwargs):
     """
     Use as a function decorator to detect probable stack overflow in case of circular references
@@ -311,9 +319,15 @@ class StructLikeProxy(Proxy):
             target = getattr(bl_instance, key)
 
         if target is None:
-            logger.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist")
-            return
+            logger.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist.")
+            if isinstance(bl_instance, T.bpy_prop_collection):
 
+                logger.warning(f"Note: Not implemented write to dict")
+            else:
+                logger.warning(
+                    f"Note: May be due to unimplemented 'use_{key}' implementation for type {type(bl_instance)}"
+                )
+            return
         for k, v in self._data.items():
             write_attribute(target, k, v)
 
@@ -336,6 +350,7 @@ class BpyIDProxy(BpyStructProxy):
     # Addtitional arguments for the BlendDataXxxx collections object addtition(.new(), .load(), ...), besides name
     # For instance object_data in BlendDataObject.new(name, object_data)
     _ctor_args: List[Any] = None
+    _class_name = ""
 
     def __init__(self):
         super().__init__()
@@ -357,6 +372,7 @@ class BpyIDProxy(BpyStructProxy):
             # Also write None values. We use them to reset attributes like Camera.dof.focus_object
             self._data[name] = attr_value
 
+        self._class_name = bl_instance.__class__.__name__
         if blenddata_path is not None:
             self._blenddata_path = blenddata_path
         self._ctor_args = specifics.ctor_args(bl_instance, self)
@@ -373,6 +389,8 @@ class BpyIDProxy(BpyStructProxy):
                 logger.debug("BpyIDProxy.load(): %s not in visit_state.ids[uuid]", bl_instance)
             self._data["mixer_uuid"] = bl_instance.mixer_uuid
             visit_state.id_proxies[uuid] = self
+
+        debug_check_proxy(self)
         return self
 
     def collection_name(self) -> Union[str, None]:
@@ -397,8 +415,8 @@ class BpyIDProxy(BpyStructProxy):
         """
         Process attributes that must be saved first and return a possibily updated reference to the target
         """
+        # TODO move to specifics
         target = self.target(bl_instance, attr_name)
-
         if isinstance(target, bpy.types.Scene):
             # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
             use_nodes = self._data.get("use_nodes")

@@ -22,6 +22,8 @@ collection_classes = [
 _classes = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
 
+options = ["_blenddata_path", "_ctor_args", "_class_name"]
+
 
 def default_optional(obj, option_name: str) -> Mapping[str, Any]:
     option = getattr(obj, option_name, None)
@@ -41,8 +43,8 @@ def default(obj):
 
         # the blendata_path for BpyIDProxy for instance ("cameras", "Camera"), or
         # ("cameras", "Camera", "dof", "focus_object")
-        d.update(default_optional(obj, "_blenddata_path"))
-        d.update(default_optional(obj, "_ctor_args"))
+        for option in options:
+            d.update(default_optional(obj, option))
         return d
     return None
 
@@ -63,8 +65,8 @@ def decode_hook(x):
     obj = class_()
     obj._data.update(x["_data"])
 
-    decode_optional(obj, x, "_blenddata_path")
-    decode_optional(obj, x, "_ctor_args")
+    for option in options:
+        decode_optional(obj, x, option)
     return obj
 
 
