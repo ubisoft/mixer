@@ -86,6 +86,7 @@ def join_room(room_name: str):
     logger.info("join_room")
 
     assert share_data.current_room is None
+    BlendData.instance().reset()
     user = get_mixer_props().user
     share_data.session_id += 1
     share_data.current_room = room_name
