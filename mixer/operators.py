@@ -413,6 +413,15 @@ def add_objects():
         obj = share_data.blender_objects.get(obj_name)
         if obj:
             update_params(obj)
+            changed = True
+    return changed
+
+
+def update_transforms():
+    changed = False
+    for obj_name in share_data.objects_added:
+        obj = share_data.blender_objects.get(obj_name)
+        if obj:
             update_transform(obj)
             changed = True
     return changed
@@ -677,6 +686,9 @@ def send_scene_data_to_server(scene, dummy):
             data_api.send_data_updates(updates)
             share_data.proxy.debug_check_id_proxies()
 
+        # send the VRtist transforms after full Blender Protocol has the opportunity to create the object data
+        # that is not handled by VRtist protocol, otherwise the receiver creates an empty when it receives a transform
+        changed |= update_transforms()
         changed |= add_collections_to_scenes()
         changed |= add_collections_to_collections()
         changed |= add_objects_to_collections()
@@ -853,7 +865,7 @@ def send_scene_content():
         return
 
     share_data.clear_before_state()
-
+    share_data.init_proxy()
     share_data.client.send_group_begin()
 
     # Temporary waiting for material sync. Should move to send_scene_data_to_server

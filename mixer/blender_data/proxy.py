@@ -981,7 +981,19 @@ class BpyBlendProxy(Proxy):
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}
 
-    def load(self, context: Context):
+    def initialize_ref_targets(self, context: Context):
+        """Keep track of all bpy.data items so that loading recognises references to them
+
+        Call this before updading the proxy from send_scene_content. It is not needed on the
+        receiver side
+        """
+        # Normal operation no more involve BpyBlendProxy.load() ad initial synchronization behaves
+        # like a creation. The current load_as_what() implementation relies on root_ids to determine if
+        # a T.ID must ne loaded as an IDRef (pointer to bpy.data) or an IDDef (pointer to an "owned" ID).
+        # so we need to load all the root_ids before loading anything into the proxy.
+        # However, root_ids may no more be required if we can load all the proxies inside out (deepmost first, i.e
+        # (Mesh, Metaball, ..), then Object, the Scene). This should be possible as as we sort
+        # the updates inside out in update() to the receiver gets them in order
         for name, _ in context.properties(bpy_type=T.BlendData):
             if name in collection_name_to_type:
                 # TODO use BlendData
@@ -991,6 +1003,8 @@ class BpyBlendProxy(Proxy):
                     self.root_ids.add(item)
                     self.ids[uuid] = item
 
+    def load(self, context: Context):
+        self.initialize_ref_targets(context)
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
 
         for name, _ in context.properties(bpy_type=T.BlendData):

@@ -5,6 +5,7 @@ from typing import List, Mapping, Set
 from uuid import uuid4
 
 from mixer.blender_data.proxy import BpyBlendProxy
+from mixer.blender_data.filter import test_context
 
 import bpy
 
@@ -294,6 +295,12 @@ class ShareData:
         self.objects_parents = {
             x.name_full: x.parent.name_full if x.parent is not None else "" for x in self.blender_objects.values()
         }
+
+    def init_proxy(self):
+        if self.use_experimental_sync():
+            # default, not safe
+            # the initialisation must initialize reference target for all useful collections (except screens, ...)
+            self.proxy.initialize_ref_targets(test_context)
 
     def set_experimental_sync(self, experimental_sync: bool):
         if experimental_sync:
