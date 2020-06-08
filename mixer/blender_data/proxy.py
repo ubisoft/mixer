@@ -505,8 +505,13 @@ class BpyIDProxy(BpyStructProxy):
 
         return id_
 
-    def update(self, other: BpyIdProxy):
-        self._data.update(other._data)
+    def update(self, other: BpyIDProxy):
+        # Currently, we receive the full list of attributes, so replace everything. Do not keep
+        # existing attribute that bmay not be applicable any more to the new object, for instance
+        # if a light has been morphed from POINT to SUN, the 'falloff_curve' attribute no more exists
+        #
+        # To perform differential updates in the future, we will need markers for removed attributes
+        self._data = other._data
 
 
 class BpyIDRefProxy(Proxy):
@@ -913,7 +918,15 @@ class BpyPropDataCollectionProxy(Proxy):
             # Do not replace the existing proxy by the new one as it wil no more work with
             # differential updates
             existing_proxy.update(proxy)
-            existing_proxy.save()
+
+            # the ID will have changed if the object has been morphed (change light type, for instance)
+            uuid = proxy.mixer_uuid()
+            existing_id = visit_state.ids[uuid]
+            new_id = existing_proxy.save()
+            if existing_id != new_id:
+                visit_state.root_ids.remove(existing_id)
+                visit_state.root_ids.add(new_id)
+                visit_state.ids[uuid] = new_id
 
     def remove_one(self, name, visit_state: VisitState):
         proxy = self._data.get(name)
