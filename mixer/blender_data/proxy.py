@@ -150,7 +150,6 @@ def load_as_what(attr_property: bpy.types.Property, attr: any, root_ids: RootIds
             # Only collections at the root level of blendfile are id def, so here it can only be struct
             return LoadElementAs.STRUCT
 
-    # HACK while not all items are atgged in new update scheme
     if isinstance(attr, T.Mesh):
         return LoadElementAs.ID_REF
 
@@ -345,6 +344,8 @@ class BpyIDProxy(BpyStructProxy):
     Holds a copy of a Blender ID, i.e a type stored in bpy.data, like Object and Material
     """
 
+    # The path of this ID startting from bpy.data, for instance ('objects', 'Cube').
+    # May be later extended to target "embedded" IDs not in bpy.data
     _blenddata_path: BlenddataPath = None
 
     # Addtitional arguments for the BlendDataXxxx collections object addtition(.new(), .load(), ...), besides name
@@ -364,17 +365,20 @@ class BpyIDProxy(BpyStructProxy):
 
         self._data.clear()
         properties = visit_state.context.properties(bl_instance)
-        # assume that specifics apply only to Id, not Struct
+        # this assumes that specifics.py apply only to ID, not Struct
         properties = specifics.conditional_properties(bl_instance, properties)
         for name, bl_rna_property in properties:
             attr = getattr(bl_instance, name)
             attr_value = read_attribute(attr, bl_rna_property, visit_state)
-            # Also write None values. We use them to reset attributes like Camera.dof.focus_object
+            # Also write None values to reset attributes like Camera.dof.focus_object
             self._data[name] = attr_value
 
         self._class_name = bl_instance.__class__.__name__
         if blenddata_path is not None:
             self._blenddata_path = blenddata_path
+
+        # Create the ctor arguments that save() will need on the receiver side to create this item in a
+        # bpy.data collectton
         self._ctor_args = specifics.ctor_args(bl_instance, self)
 
         uuid = bl_instance.get("mixer_uuid")
@@ -412,10 +416,16 @@ class BpyIDProxy(BpyStructProxy):
         return t
 
     def pre_save(self, bl_instance: any, attr_name: str):
+        """Process attributes that must be saved first and return a possibily updated reference to the target
+
+        Args:
+            bl_instance: The collection that contgains the ID
+            attr_name: Its key
+
+        Returns:
+            [bpy.types.ID]: a possibly new ID
         """
-        Process attributes that must be saved first and return a possibily updated reference to the target
-        """
-        # TODO move to specifics
+        # TODO move to specifics.py
         target = self.target(bl_instance, attr_name)
         if isinstance(target, bpy.types.Scene):
             # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
@@ -435,9 +445,6 @@ class BpyIDProxy(BpyStructProxy):
         return target
 
     def save(self, bl_instance: any = None, attr_name: str = None) -> T.ID:
-        """
-        - bl_instance: the container attribute, often a bpy.data collection
-        """
         blenddata = BlendData.instance()
         if self._blenddata_path is None:
             # TODO ID inside ID, not BlendData collection. We will need a path
@@ -454,16 +461,17 @@ class BpyIDProxy(BpyStructProxy):
         # 2 cases
         # - ID in blenddata collection
         # - ID in ID
-        # TODO slow use blenddata, redundant with target
+        # TODO slow use BlendData, redundant with target
         id_ = bl_instance.get(attr_name)
         if id_ is None:
-            # assume ID in Blendata collection
-
-            # unwrap the ctor arguments. For instance, creating an Object requires a T.ID
+            # assume we must create an ID in a bpy.data collection
+            # find the ctor arguments. For instance, creating an Object requires a T.ID
             ctor_args = []
             if self._ctor_args:
                 for arg in self._ctor_args:
                     if isinstance(arg, BpyIDRefProxy):
+                        # Find the target ID. This supposes that is was already created, hence that we receive the
+                        # updates in creation order (deepmost first)
                         data_collection_name, data_key = arg._blenddata_path
                         collection = BlendData.instance().collection(data_collection_name)
                         arg_id_ = collection.items.get(data_key)
@@ -485,11 +493,13 @@ class BpyIDProxy(BpyStructProxy):
                         ctor_args = None
                         break
                     else:
+                        # for instance the light type
                         ctor_args.append(arg)
             if ctor_args is not None:
                 blenddata.collection(collection_name).ctor(attr_name, ctor_args)
                 id_ = bl_instance.get(attr_name)
                 id_.mixer_uuid = self.mixer_uuid()
+                # TODO remove this line
                 id_ = bl_instance.get(attr_name)
 
         if id_ is None:
@@ -506,8 +516,8 @@ class BpyIDProxy(BpyStructProxy):
         return id_
 
     def update(self, other: BpyIDProxy):
-        # Currently, we receive the full list of attributes, so replace everything. Do not keep
-        # existing attribute that bmay not be applicable any more to the new object, for instance
+        # Currently, we receive the full list of attributes, so replace everything.
+        # Do not keep existing attribute as they may not be applicable any more to the new object. For instance
         # if a light has been morphed from POINT to SUN, the 'falloff_curve' attribute no more exists
         #
         # To perform differential updates in the future, we will need markers for removed attributes
@@ -516,9 +526,13 @@ class BpyIDProxy(BpyStructProxy):
 
 class BpyIDRefProxy(Proxy):
     """
-    A reference to an item of bpy_prop_collection in bpy.data member
+    A reference to an item of a collection in bpy.data.
+
+    Examples of such references are :
+    - Camera.dof.focus_object
     """
 
+    # same meaning as for BpyIDProxy, but limited to two compoments (bpy.data collection and key)
     _blenddata_path: BlenddataPath = None
 
     def __init__(self):
@@ -549,16 +563,13 @@ class BpyIDRefProxy(Proxy):
         return self._blenddata_path[1]
 
     def save(self, bl_instance: any, attr_name: str):
-        """
-        Save this proxy into bl_instance.attr_name
-        """
 
         # Cannot save into an attribute, which looks like an r-value.
         # When setting my_scene.world wen must setattr(scene, "world", data) and cannot
         # assign scene.world
         collection_name, collection_key = self._blenddata_path
 
-        # TODO the identifier garget doest not have the same semantics everywhere
+        # TODO the identifier target doest not have the same semantics everywhere
         # here pointee somewhere else lvalue
         # TODO use BlendData
         collection = getattr(bpy.data, collection_name)
@@ -572,6 +583,7 @@ class BpyIDRefProxy(Proxy):
         else:
             if not bl_instance.bl_rna.properties[attr_name].is_readonly:
                 try:
+                    # This is what saves Camera.dof.focus_object, for instance
                     setattr(bl_instance, attr_name, target)
                 except Exception as e:
                     logger.warning(f"write attribute skipped {attr_name} for {bl_instance}...")
@@ -636,7 +648,7 @@ def soa_initializer(attr_type, length):
     # According to bpy_rna.c:foreach_getset() and rna_access.c:rna_raw_access() implementations,
     # some cases are implemented as memcpy (buffer interface) or array iteration (sequences),
     # with more subcases that require reallocation when the buffer type is not suitable,
-    # so try to be smart
+    # TODO try to be smart
     element_init = soa_initializers[attr_type]
     if isinstance(element_init, array.array):
         return array.array(element_init.typecode, element_init.tolist() * length)
@@ -667,9 +679,8 @@ class AosElement(Proxy):
         logger.warning(f"Not implemented. Load AOS  element for {bl_collection}.{attr_name} ")
         return self
 
-        # This was written for MeshVertex.groups, but MeshVertex.groups is updated via Object.vertex_groups so
-        # its is useless in this case.
-        # Any other usage ?
+        # The code below was initially written for MeshVertex.groups, but MeshVertex.groups is updated
+        # via Object.vertex_groups so it is useless in this case. Any other usage ?
 
         # self._data.clear()
         # attr_property = item_bl_rna.properties[attr_name]
@@ -731,10 +742,12 @@ class SoaElement(Proxy):
         return self
 
     def save(self, bl_collection, attr_name):
+        # TODO : serialization currently not performed
         bl_collection.foreach_set(attr_name, self._data)
 
 
-# TODO make his generic after enough sequences have bee seen
+# TODO make thses functions generic after enough sequences have been seen
+# TODO move to specifics.py
 def write_curvemappoints(target, src_sequence):
     src_length = len(src_sequence)
 
@@ -905,6 +918,11 @@ class BpyPropDataCollectionProxy(Proxy):
         return self._data.get(key)
 
     def update_one(self, proxy: BpyIDProxy, visit_state: VisitState):
+        """Update a bpy.data item from a received BpyIDProxy and update the proxy structures accordingly
+
+        Args:
+            proxy : this proxy contents is used to update the bpy.data collection item
+        """
         collection_name, name = proxy._blenddata_path[0:2]
         existing_proxy = self._data.get(name)
         if existing_proxy is None:
@@ -929,6 +947,11 @@ class BpyPropDataCollectionProxy(Proxy):
                 visit_state.ids[uuid] = new_id
 
     def remove_one(self, name, visit_state: VisitState):
+        """Remove a bpy.data collection item and update the proxy structures
+
+        Args:
+            name ([type]): the key in the bpy.data collection
+        """
         proxy = self._data.get(name)
         if proxy is None:
             logger.warning("remove: proxy not found for key %s", name)
@@ -983,6 +1006,7 @@ class BpyPropDataCollectionProxy(Proxy):
             del visit_state.ids[uuid]
 
         for old_name, new_name in diff.items_renamed:
+            # TODO not actually implemented
             logger.warning("not implemented renamed %s into %s", old_name, new_name)
             self._data[new_name] = self._data[old_name]
             del self._data[old_name]
@@ -1035,6 +1059,10 @@ class BpyBlendProxy(Proxy):
                     self.ids[uuid] = item
 
     def load(self, context: Context):
+        """Load the current scene into thjis proxy
+
+        Only used for test. The initial load is performed by update()
+        """
         self.initialize_ref_targets(context)
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
 
@@ -1045,6 +1073,7 @@ class BpyBlendProxy(Proxy):
         return self
 
     def find(self, collection_name: str, key: str) -> BpyIDProxy:
+        # TODO not used ?
         if not self._data:
             return None
         collection_proxy = self._data.get(collection_name)
@@ -1055,15 +1084,21 @@ class BpyBlendProxy(Proxy):
     def update(
         self, diff: BpyBlendDiff, context: Context = safe_context, depsgraph_updates: T.bpy_prop_collection = ()
     ) -> Tuple[List[BpyIDProxy], List[Tuple[str, str]]]:
-        """
-        Update the proxy using the state of the Blendata collections (ID creation, deletion)
+        """ Update the proxy using the state of the Blendata collections (ID creation, deletion)
         and the depsgraph updates (ID modification)
+
+        Returns:
+            A list a creations/updates and a list of removals
         """
         updates = []
         removals = []
         # Update the bpy.data collections status and get the list of newly created bpy.data entries.
-        # Updated proxies will contain the IDs to send as an initial transfer
+        # Updated proxies will contain the IDs to send as an initial transfer.
+        # There is no difference between a creation and a subsequent update
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
+
+        # sort the updates deppmost first so that teh receiver will create meshes and lights
+        # before objects, for instance
         deltas = sorted(diff.collection_deltas, key=_pred_by_creation_order)
         for delta_name, delta in deltas:
             creation, removal = self._data[delta_name].update(delta, visit_state)
@@ -1073,7 +1108,7 @@ class BpyBlendProxy(Proxy):
         # Update the ID proxies from the depsgraph update
         # this should iterate inside_out (Object.data, Object) in the adequate creation order
         # (creating an Object requires its data)
-        depsgraph_updated_ids = reversed([update.id.original for update in depsgraph_updates])
+
         # WARNING:
         #   depsgraph_updates[i].id.original IS NOT bpy.lights['Point']
         # or whatever as you might expect, so you cannot use it to index into the map
@@ -1081,6 +1116,8 @@ class BpyBlendProxy(Proxy):
         # However
         #   - mixer_uuid attributes have the same value
         #   - __hash__() returns the same value
+
+        depsgraph_updated_ids = reversed([update.id.original for update in depsgraph_updates])
         for id_ in depsgraph_updated_ids:
             if not any((isinstance(id_, t) for t in safe_depsgraph_updates)):
                 continue
@@ -1095,16 +1132,14 @@ class BpyBlendProxy(Proxy):
         return updates, removals
 
     def update_one(self, proxy: BpyIDProxy, context: Context = safe_context):
-        """
-        Create or update a bpy.data collection item and update the proxy accordingly
+        """ Create or update a bpy.data collection item and update the proxy accordingly
         """
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
         collection_name, _ = proxy._blenddata_path[0:2]
         self._data[collection_name].update_one(proxy, visit_state)
 
     def remove_one(self, collection_name: str, key: str, context: Context = safe_context):
-        """
-        Remove a bpy.data collection item and update the proxy accordingly
+        """ Remove a bpy.data collection item and update the proxy accordingly
         """
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
         self._data[collection_name].remove_one(key, visit_state)

@@ -35,14 +35,15 @@ def default_optional(obj, option_name: str) -> Mapping[str, Any]:
 def default(obj):
     # called top down
     class_ = obj.__class__
+
+    # TODO AOS and SOA
+
     is_known = issubclass(class_, StructLikeProxy) or issubclass(class_, BpyIDRefProxy) or class_ in collection_classes
     if is_known:
         # Add the proxy class so that the decoder and instanciate the right type
         d = {"__bpy_proxy_class__": class_.__name__}
         d.update({"_data": obj._data})
 
-        # the blendata_path for BpyIDProxy for instance ("cameras", "Camera"), or
-        # ("cameras", "Camera", "dof", "focus_object")
         for option in options:
             d.update(default_optional(obj, option))
         return d

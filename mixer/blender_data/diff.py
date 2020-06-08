@@ -55,9 +55,17 @@ class BpyDiff:
 
 
 class BpyStructDiff(BpyDiff):
+    """Perform a diff between a BpyStructProxy and a Blender item.
+
+    Provides a result that can be used to update the proxy and can also be serialized
+    """
+
     deltas: {Name, Any} = {}
 
     def diff(self, proxy: BpyStructProxy, bl_struct: T.bpy_struct):
+
+        # TODO untested draft
+
         self.deltas.clear()
         # updated only, suppose the names are the same
         # peoperties have already been filtered when loading the proxy, so use the
@@ -113,7 +121,11 @@ class BpyBlendDiff(BpyDiff):
     Diff for the whole bpy.data
     """
 
+    # A list of deltas per bpy.data collection. Use a list bacause if will be sorted later
     collection_deltas: List[Tuple[BlendDataCollectionName, BpyPropCollectionDiff]] = []
+
+    # TODO cleanup: not used.
+    # Will not be used as the per_DI deltas will be limited to the depsgraph updates
     id_deltas: List[Tuple[BpyIDProxy, T.ID]] = []
 
     def diff(self, blend_proxy: BpyBlendProxy, context: Context):

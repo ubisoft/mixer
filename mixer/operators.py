@@ -672,12 +672,11 @@ def send_scene_data_to_server(scene, dummy):
         changed |= add_collections()
         changed |= add_objects()
 
-        # After creation of meshes, since meshes are not yet supported, but needed to propermy create
-        # objects
+        # After creation of meshes : meshes are not yet supported by full Blender protocol,
+        # but needed to properly create objects
+        # Before creation of objects :  the VRtint protocol  will implicitely create objects with
+        # unappropriate default values (e.g. transform creates an object with no data)
         if share_data.use_experimental_sync():
-            # Start with experimental/blender_to_blender mode since the VRtint protocol handling
-            # wil implicitely create objects with unappropriate default values
-            # (e.g. transform creates an object with no data)
             diff = BpyBlendDiff()
             diff.diff(share_data.proxy, safe_context)
             depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -686,7 +685,7 @@ def send_scene_data_to_server(scene, dummy):
             data_api.send_data_updates(updates)
             share_data.proxy.debug_check_id_proxies()
 
-        # send the VRtist transforms after full Blender Protocol has the opportunity to create the object data
+        # send the VRtist transforms after full Blender protocol has the opportunity to create the object data
         # that is not handled by VRtist protocol, otherwise the receiver creates an empty when it receives a transform
         changed |= update_transforms()
         changed |= add_collections_to_scenes()

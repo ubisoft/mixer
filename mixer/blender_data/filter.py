@@ -225,11 +225,17 @@ safe_exclusions = {}
 # Also do not blindly update what is already updated in VRtist code without checking that
 # they do not interfere
 safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall]
+# this also mostly works
+# safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall, T.Object, T.Scene]
 
 safe_filter = FilterStack()
-# The collections not in this list are not tested by BpyBlendDiff collection update
-# they will not be included in creation messages.
+# The collections in this list are tested by BpyBlendDiff collection update
+# they will be included in creation messages.
+# objects is needed to items not created by VRtsist
 safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects"]
+
+# mostly works
+# safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]
 safe_blenddata = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
 safe_filter.append(default_exclusions)
 safe_filter.append(safe_exclusions)

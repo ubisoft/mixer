@@ -95,9 +95,7 @@ class BlendDataCollection:
         if item is None:
             logger.warning(f"BlendDataCollection.remove(): item not found {self._name}[{name_full}]")
             return
-        # removing a mesh alone will remove the object without us knowing
         self.bpy_collection().remove(item)
-        # BlendData.instance().set_dirty()
         self.set_dirty()
 
     def rename(self, old_name, new_name):
@@ -119,6 +117,8 @@ class BlendData:
     These objects keep live reference to Blender blenddata collection, so they must not be used after the
     file has been reloaded, hence the handler below.
     """
+
+    # TODO rework the APi to look more like bpy.data, with a bpy_data() instead of BlendData.instance()
 
     # DO NOT keep references to bpy.data collection. They become stale and to not show modifications
 
