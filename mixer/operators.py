@@ -474,7 +474,15 @@ def update_collections_parameters():
     for collection in share_data.blender_collections.values():
         info = share_data.collections_info.get(collection.name_full)
         if info:
-            if info.hide_viewport != collection.hide_viewport or info.instance_offset != collection.instance_offset:
+            layer_collection = share_data.blender_layer_collections.get(collection.name_full)
+            temporary_hidden = False
+            if layer_collection:
+                temporary_hidden = layer_collection.hide_viewport
+            if (
+                info.temporary_hide_viewport != temporary_hidden
+                or info.hide_viewport != collection.hide_viewport
+                or info.instance_offset != collection.instance_offset
+            ):
                 collection_api.send_collection(share_data.client, collection)
                 changed = True
     return changed
@@ -588,6 +596,23 @@ def update_objects_data():
             update_params(c)
 
 
+def send_animated_camera_data():
+    animated_camera_set = set()
+    camera_dict = {}
+    for update in share_data.depsgraph.updates:
+        obj = update.id.original
+        typename = obj.bl_rna.name
+        if typename == "Object":
+            if obj.data and obj.data.bl_rna.name == "Camera":
+                camera_action_name = obj.animation_data.action.name_full
+                camera_dict[camera_action_name] = obj
+        if typename == "Action" and camera_dict.get(camera_action_name):
+            animated_camera_set.add(camera_dict[camera_action_name])
+
+    for camera in animated_camera_set:
+        share_data.client.send_camera_attributes(camera)
+
+
 @persistent
 def send_frame_changed(scene):
     logger.info("send_frame_changed")
@@ -610,7 +635,8 @@ def send_frame_changed(scene):
 
     with StatsTimer(share_data, "send_frame_changed") as timer:
         with timer.child("setFrame"):
-            share_data.client.send_frame(scene.frame_current)
+            if not share_data.client.blockSignals:
+                share_data.client.send_frame(scene.frame_current)
 
         with timer.child("clear_lists"):
             share_data.clear_changed_frame_related_lists()
@@ -624,6 +650,13 @@ def send_frame_changed(scene):
         # update for next change
         with timer.child("update_objects_info"):
             share_data.update_objects_info()
+
+        # temporary code :
+        # animated parameters are not sent, we need camera animated parameters for VRtist
+        # (focal lens etc.)
+        # please remove this when animation is managed
+        with timer.child("send_animated_camera_data"):
+            send_animated_camera_data()
 
 
 @stats_timer(share_data)
@@ -1035,7 +1068,6 @@ def create_main_client(host: str, port: int):
     share_data.client.add_callback("ClearContent", clear_scene_content)
     share_data.client.add_callback("Disconnect", on_disconnect_from_server)
     share_data.client.add_callback("QueryObjectData", on_query_object_data)
-    share_data.client.add_callback("QueryCurrentFrame", on_frame_update)
     if not bpy.app.timers.is_registered(network_consumer_timer):
         bpy.app.timers.register(network_consumer_timer)
 

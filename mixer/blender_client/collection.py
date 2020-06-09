@@ -11,10 +11,16 @@ logger = logging.getLogger(__name__)
 def send_collection(client: Client, collection: bpy.types.Collection):
     logger.info("send_collection %s", collection.name_full)
     collection_instance_offset = collection.instance_offset
+    temporary_visibility = True
+    layer_collection = share_data.blender_layer_collections.get(collection.name_full)
+    if layer_collection:
+        temporary_visibility = not layer_collection.hide_viewport
+
     buffer = (
         common.encode_string(collection.name_full)
         + common.encode_bool(not collection.hide_viewport)
         + common.encode_vector3(collection_instance_offset)
+        + common.encode_bool(temporary_visibility)
     )
     client.add_command(common.Command(common.MessageType.COLLECTION, buffer, 0))
 
@@ -23,15 +29,24 @@ def build_collection(data):
     name_full, index = common.decode_string(data, 0)
     visible, index = common.decode_bool(data, index)
     hide_viewport = not visible
-    offset, _ = common.decode_vector3(data, index)
+    offset, index = common.decode_vector3(data, index)
+    temporary_visibility, index = common.decode_bool(data, index)
 
     logger.info("build_collection %s", name_full)
     collection = share_data.blender_collections.get(name_full)
     if collection is None:
         collection = bpy.data.collections.new(name_full)
         share_data.blender_collections[name_full] = collection
+
     collection.hide_viewport = hide_viewport
     collection.instance_offset = offset
+
+    layer_collection = share_data.blender_layer_collections.get(name_full)
+    if layer_collection:
+        layer_collection.hide_viewport = not temporary_visibility
+    else:
+        # if the layer collection does not exists, store its state for later
+        share_data.blender_collection_temporary_visibility[name_full] = temporary_visibility
 
 
 def send_collection_removed(client: Client, collection_name):

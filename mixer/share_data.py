@@ -10,19 +10,25 @@ from mixer.blender_data.filter import test_context
 import bpy
 
 logger = logging.getLogger(__name__)
-
-ObjectVisibility = namedtuple("ObjectVisibility", ["hide_viewport", "hide_select", "hide_render", "visible_get"])
+ObjectVisibility = namedtuple("ObjectVisibility", ["hide_viewport", "hide_select", "hide_render", "hide_get"])
 
 
 def object_visibility(o: bpy.types.Object):
-    return ObjectVisibility(o.hide_viewport, o.hide_select, o.hide_render, o.visible_get())
+    return ObjectVisibility(o.hide_viewport, o.hide_select, o.hide_render, o.hide_get())
 
 
 class CollectionInfo:
     def __init__(
-        self, hide_viewport: bool, instance_offset, children: List[str], parent: List[str], objects: List[str] = None
+        self,
+        hide_viewport: bool,
+        tmp_hide_viewport: bool,
+        instance_offset,
+        children: List[str],
+        parent: List[str],
+        objects: List[str] = None,
     ):
         self.hide_viewport = hide_viewport
+        self.temporary_hide_viewport = tmp_hide_viewport
         self.instance_offset = instance_offset
         self.children = children
         self.parent = parent
@@ -123,6 +129,13 @@ class ShareData:
         self._blender_collections: Mapping[str, bpy.types.Collection] = {}
         self.blender_collections_dirty = True
 
+        # maps collection name to layerCollection
+        self._blender_layer_collections: Mapping[str, bpy.types.LayerCollection] = {}
+        self.blender_layer_collections_dirty = True
+        # the layer collection is created when the collection is added to scene
+        # keep track of the temporary visibility to apply when the layer collection will be created
+        self.blender_collection_temporary_visibility: Mapping[str, bool] = {}
+
         self.pending_parenting = set()
 
         self.proxy: BpyBlendProxy = None
@@ -150,6 +163,7 @@ class ShareData:
         self.blender_cameras_dirty = True
         self.blender_lights_dirty = True
         self.blender_collections_dirty = True
+        self.blender_layer_collections_dirty = True
         self.blender_scenes_dirty = True
 
     def get_blender_property(self, property, property_dirty, elems):
@@ -215,6 +229,23 @@ class ShareData:
         self.blender_collections_dirty = False
         return self._blender_collections
 
+    def recurs_blender_layer_collections(self, layer_collection):
+        self._blender_layer_collections[layer_collection.collection.name_full] = layer_collection
+        for child_collection in layer_collection.children:
+            self.recurs_blender_layer_collections(child_collection)
+
+    @property
+    def blender_layer_collections(self):
+        if not self.blender_layer_collections_dirty:
+            return self._blender_layer_collections
+        self._blender_layer_collections.clear()
+        layer = bpy.context.view_layer
+        layer_collections = layer.layer_collection.children
+        for collection in layer_collections:
+            self.recurs_blender_layer_collections(collection)
+        self.blender_layer_collections_dirty = False
+        return self._blender_layer_collections
+
     @property
     def blender_scenes(self):
         if not self.blender_scenes_dirty:
@@ -254,22 +285,43 @@ class ShareData:
     def update_scenes_info(self):
         self.scenes_info = {scene.name_full: SceneInfo(scene) for scene in self.blender_scenes.values()}
 
+    # apply temporary visibility to layerCollection
+    def update_collection_temporary_visibility(self, collection_name):
+        bpy.context.view_layer.update()
+        temporary_visible = self.blender_collection_temporary_visibility.get(collection_name)
+        if temporary_visible is not None:
+            share_data.blender_layer_collections_dirty = True
+            layer_collection = self.blender_layer_collections.get(collection_name)
+            if layer_collection:
+                layer_collection.hide_viewport = not temporary_visible
+            del self.blender_collection_temporary_visibility[collection_name]
+
     def update_collections_info(self):
         self.collections_info = {}
 
         # All non master collections
         for collection in self.blender_collections.values():
             if not self.collections_info.get(collection.name_full):
+                layer_collection = self.blender_layer_collections.get(collection.name_full)
+                temporary_hidden = False
+                if layer_collection:
+                    temporary_hidden = layer_collection.hide_viewport
                 collection_info = CollectionInfo(
                     collection.hide_viewport,
+                    temporary_hidden,
                     collection.instance_offset,
                     [x.name_full for x in collection.children],
                     None,
                 )
                 self.collections_info[collection.name_full] = collection_info
             for child in collection.children:
+                temporary_hidden = False
+                child_layer_collection = self.blender_layer_collections.get(child.name_full)
+                if child_layer_collection:
+                    temporary_hidden = child_layer_collection.hide_viewport
                 collection_info = CollectionInfo(
                     child.hide_viewport,
+                    temporary_hidden,
                     child.instance_offset,
                     [x.name_full for x in child.children],
                     collection.name_full,
