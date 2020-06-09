@@ -1,10 +1,10 @@
 import unittest
-import tests.testcase as testcase
+from tests.vrtist_testcase import VRtistTestCase
 from pathlib import Path
 import logging
 
 
-class TestCollectionDefaultDoc(testcase.BlenderTestCase):
+class TestCollectionDefaultDoc(VRtistTestCase):
     def setUp(self):
         folder = Path(__file__).parent
         sender_blendfile = folder / "basic.blend"
