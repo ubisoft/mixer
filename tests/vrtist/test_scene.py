@@ -2,7 +2,7 @@ from pathlib import Path
 import unittest
 
 from mixer.broadcaster.common import MessageType
-from tests.vrtist_testcase import VRtistTestCase
+from tests.vrtist.testcase import VRtistTestCase
 
 
 class TestSceneEmptyDoc(VRtistTestCase):

@@ -1,5 +1,5 @@
 import unittest
-from tests.vrtist_testcase import VRtistTestCase
+from tests.vrtist.testcase import VRtistTestCase
 from pathlib import Path
 import logging
 

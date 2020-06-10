@@ -1,9 +1,9 @@
 import unittest
-import tests.testcase as testcase
+from tests.mixer_testcase import MixerTestCase
 from pathlib import Path
 
 
-class TestTest(testcase.BlenderTestCase):
+class TestTest(MixerTestCase):
     def setUp(self):
         # Everything will apply to the whole testcase
 

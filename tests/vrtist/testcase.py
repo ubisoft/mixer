@@ -1,11 +1,7 @@
-import hashlib
 import logging
-from pathlib import Path
-import tempfile
 import time
 import sys
 
-import tests.blender_lib as bl
 from mixer.broadcaster.common import MessageType
 from tests.grabber import Grabber
 from tests.grabber import CommandStream
@@ -77,74 +73,3 @@ class VRtistTestCase(MixerTestCase):
 
     def end_test(self):
         self.assert_matches()
-
-    def assert_user_success(self):
-        """
-        Test the processes return codes, that can be set from the TestPanel UI
-        """
-        timeout = 0.2
-        rc = None
-        while True:
-            rc = self._sender.wait(timeout)
-            if rc is not None:
-                self._receiver.kill()
-                if rc != 0:
-                    self.fail(f"sender return code {rc} ({hex(rc)})")
-                else:
-                    return
-
-            rc = self._receiver.wait(timeout)
-            if rc is not None:
-                self._sender.kill()
-                if rc != 0:
-                    self.fail(f"receiver return code {rc} ({hex(rc)})")
-                else:
-                    return
-
-    def assert_same_files(self):
-        """
-        Save and quit, then compare files
-
-        This currently fails :
-        - files are different for no apparent reason one file contains an extra Image block name Viewer Node
-
-        """
-        with Path(tempfile.mkdtemp()) as tmp_dir:
-            sender_file = tmp_dir / "sender"
-            receiver_file = tmp_dir / "receiver"
-            self._sender.send_function(bl.save, str(sender_file))
-            self._receiver.send_function(bl.save, str(receiver_file))
-            self._sender.quit()
-            self._receiver.quit()
-            self.assert_user_success()
-            self.assert_files_identical(sender_file, receiver_file)
-
-    def assert_file_exists(self, path):
-        self.assertTrue(Path(path).is_file(), f"File does not exist or is not a file : {path}")
-
-    def assert_files_identical(self, *files):
-        """
-
-        """
-        if len(files) == 0:
-            return
-
-        paths = [Path(f) for f in files]
-        for path in paths:
-            self.assert_file_exists(path)
-
-        attrs = [(path, path.stat().st_size) for path in files]
-        p0, s0 = attrs[0]
-        for (p, s) in attrs:
-            self.assertEqual(s0, s, f"File size differ for {p0} ({s0}) and {p} ({s})")
-
-        hashes = []
-        for path in paths:
-            hash = hashlib.md5()
-            with open(path, "rb") as f:
-                hash.update(f.read())
-            hashes.append((path, hash))
-
-        p0, h0 = hashes[0]
-        for (p, h) in attrs:
-            self.assertEqual(h0, h, f"Hashes differ for {p0} ({h0.hex()}) and {p} ({h.hex()})")

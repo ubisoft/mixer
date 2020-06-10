@@ -53,6 +53,29 @@ class MixerTestCase(unittest.TestCase):
     def end_test(self):
         self.assert_matches()
 
+    def assert_user_success(self):
+        """
+        Test the processes return codes, that can be set from the TestPanel UI
+        """
+        timeout = 0.2
+        rc = None
+        while True:
+            rc = self._sender.wait(timeout)
+            if rc is not None:
+                self._receiver.kill()
+                if rc != 0:
+                    self.fail(f"sender return code {rc} ({hex(rc)})")
+                else:
+                    return
+
+            rc = self._receiver.wait(timeout)
+            if rc is not None:
+                self._sender.kill()
+                if rc != 0:
+                    self.fail(f"receiver return code {rc} ({hex(rc)})")
+                else:
+                    return
+
     def tearDown(self):
         # quit and wait
         self._sender.quit()
