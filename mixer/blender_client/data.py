@@ -24,11 +24,11 @@ def build_data_update(buffer):
     data, _ = common.decode_string(buffer, index)
     logger.info("build_data_update %s[%s]", blenddata_collection_name, key)
     codec = Codec()
-    id_proxy = codec.decode(data)
     blenddata = BlendData.instance()
     collection = blenddata.bpy_collection(blenddata_collection_name)
     # TODO will fail when name != name_full
     try:
+        id_proxy = codec.decode(data)
         id_proxy.save(collection, key)
     except Exception:
         logger.error("Build_data-update: Exception :")
@@ -54,7 +54,13 @@ def send_update(updated_id: bpy.types.ID):
         return
     id_proxy.load(updated_id, safe_context, BlendDataVisitContext(safe_context))
     codec = Codec()
-    message = codec.encode(id_proxy)
+    try:
+        message = codec.encode(id_proxy)
+    except Exception:
+        logger.error("send_update: Exception :")
+        logger.error("\n" + traceback.format_exc())
+        logger.error(f"while processing bpy.data.{collection_name}[{key}]:")
+
     buffer = common.encode_string(collection_name) + common.encode_string(key) + common.encode_string(message)
     command = common.Command(common.MessageType.BLENDER_DATA_UPDATE, buffer, 0)
     share_data.client.add_command(command)
