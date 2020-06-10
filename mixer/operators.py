@@ -12,6 +12,7 @@ from bpy.app.handlers import persistent
 
 from mixer.share_data import share_data, object_visibility
 from mixer.blender_client import collection as collection_api
+from mixer.blender_client import data as data_api
 from mixer.blender_client import grease_pencil as grease_pencil_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
@@ -46,22 +47,21 @@ def update_params(obj):
     if obj.data:
         typename = obj.data.bl_rna.name
 
+    supported_lights = ["Sun Light", "Point Light", "Spot Light", "Area Light"]
     if (
         typename != "Camera"
         and typename != "Mesh"
         and typename != "Curve"
         and typename != "Text Curve"
-        and typename != "Sun Light"
-        and typename != "Point Light"
-        and typename != "Spot Light"
         and typename != "Grease Pencil"
+        and typename not in supported_lights
     ):
         return
 
     if typename == "Camera":
         send_camera(share_data.client, obj)
 
-    if typename == "Sun Light" or typename == "Point Light" or typename == "Spot Light":
+    if typename in supported_lights:
         send_light(share_data.client, obj)
 
     if typename == "Grease Pencil":
@@ -100,6 +100,7 @@ def join_room(room_name: str):
     }
     share_data.auto_save_statistics = get_mixer_props().auto_save_statistics
     share_data.statistics_directory = get_mixer_props().statistics_directory
+    share_data.set_experimental_sync(get_mixer_props().experimental_sync)
     # join a room <==> want to track local changes
     set_handlers(True)
 
@@ -460,7 +461,15 @@ def update_collections_parameters():
     for collection in share_data.blender_collections.values():
         info = share_data.collections_info.get(collection.name_full)
         if info:
-            if info.hide_viewport != collection.hide_viewport or info.instance_offset != collection.instance_offset:
+            layer_collection = share_data.blender_layer_collections.get(collection.name_full)
+            temporary_hidden = False
+            if layer_collection:
+                temporary_hidden = layer_collection.hide_viewport
+            if (
+                info.temporary_hide_viewport != temporary_hidden
+                or info.hide_viewport != collection.hide_viewport
+                or info.instance_offset != collection.instance_offset
+            ):
                 collection_api.send_collection(share_data.client, collection)
                 changed = True
     return changed
@@ -573,6 +582,27 @@ def update_objects_data():
         for c in container:
             update_params(c)
 
+    if share_data.use_experimental_sync():
+        for update in share_data.depsgraph.updates:
+            data_api.send_update(update.id.original)
+
+
+def send_animated_camera_data():
+    animated_camera_set = set()
+    camera_dict = {}
+    for update in share_data.depsgraph.updates:
+        obj = update.id.original
+        typename = obj.bl_rna.name
+        if typename == "Object":
+            if obj.data and obj.data.bl_rna.name == "Camera":
+                camera_action_name = obj.animation_data.action.name_full
+                camera_dict[camera_action_name] = obj
+        if typename == "Action" and camera_dict.get(camera_action_name):
+            animated_camera_set.add(camera_dict[camera_action_name])
+
+    for camera in animated_camera_set:
+        share_data.client.send_camera_attributes(camera)
+
 
 @persistent
 def send_frame_changed(scene):
@@ -596,7 +626,8 @@ def send_frame_changed(scene):
 
     with StatsTimer(share_data, "send_frame_changed") as timer:
         with timer.child("setFrame"):
-            share_data.client.send_frame(scene.frame_current)
+            if not share_data.client.blockSignals:
+                share_data.client.send_frame(scene.frame_current)
 
         with timer.child("clear_lists"):
             share_data.clear_changed_frame_related_lists()
@@ -611,11 +642,18 @@ def send_frame_changed(scene):
         with timer.child("update_objects_info"):
             share_data.update_objects_info()
 
+        # temporary code :
+        # animated parameters are not sent, we need camera animated parameters for VRtist
+        # (focal lens etc.)
+        # please remove this when animation is managed
+        with timer.child("send_animated_camera_data"):
+            send_animated_camera_data()
+
 
 @stats_timer(share_data)
 @persistent
 def send_scene_data_to_server(scene, dummy):
-    logger.info("send_scene_data_to_server")
+    logger.debug("send_scene_data_to_server")
 
     timer = share_data.current_stats_timer
 
@@ -631,7 +669,7 @@ def send_scene_data_to_server(scene, dummy):
     if share_data.client.receivedCommandsProcessed:
         if not share_data.client.blockSignals:
             share_data.client.receivedCommandsProcessed = False
-        logger.info("send_scene_data_to_server canceled (receivedCommandsProcessed = True)")
+        logger.debug("send_scene_data_to_server canceled (receivedCommandsProcessed = True)")
         return
 
     if not is_in_object_mode():
@@ -1005,7 +1043,6 @@ def create_main_client(host: str, port: int):
     share_data.client.add_callback("ClearContent", clear_scene_content)
     share_data.client.add_callback("Disconnect", on_disconnect_from_server)
     share_data.client.add_callback("QueryObjectData", on_query_object_data)
-    share_data.client.add_callback("QueryCurrentFrame", on_frame_update)
     if not bpy.app.timers.is_registered(network_consumer_timer):
         bpy.app.timers.register(network_consumer_timer)
 
@@ -1119,7 +1156,7 @@ class DisconnectOperator(bpy.types.Operator):
 
     def execute(self, context):
         disconnect()
-        self.report({"INFO"}, f"Disconnected ...")
+        self.report({"INFO"}, "Disconnected ...")
         return {"FINISHED"}
 
 

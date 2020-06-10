@@ -1,8 +1,11 @@
+import logging
 from mixer.blender_client.misc import get_or_create_object_data, get_object_path
 from mixer.broadcaster import common
 from mixer.broadcaster.client import Client
 from mixer.share_data import share_data
 import bpy
+
+logger = logging.getLogger(__name__)
 
 
 def get_light_buffer(obj):
@@ -15,6 +18,8 @@ def get_light_buffer(obj):
         light_type = common.LightType.SPOT
     elif light_type_name == "SUN":
         light_type = common.LightType.SUN
+    elif light_type_name == "AREA":
+        light_type = common.LightType.AREA
     else:
         return None
     color = light.color
@@ -32,6 +37,7 @@ def get_light_buffer(obj):
 
     return (
         common.encode_string(get_object_path(obj))
+        + common.encode_string(light.name_full)
         + common.encode_int(light_type.value)
         + common.encode_int(shadow)
         + common.encode_color(color)
@@ -42,6 +48,7 @@ def get_light_buffer(obj):
 
 
 def send_light(client: Client, obj):
+    logger.info("send_light %s", obj.name_full)
     light_buffer = get_light_buffer(obj)
     if light_buffer:
         client.add_command(common.Command(common.MessageType.LIGHT, light_buffer, 0))
@@ -49,16 +56,19 @@ def send_light(client: Client, obj):
 
 def build_light(data):
     light_path, start = common.decode_string(data, 0)
+    light_name, start = common.decode_string(data, start)
+    logger.info("build_light %s", light_path)
     light_type, start = common.decode_int(data, start)
     blighttype = "POINT"
     if light_type == common.LightType.SUN.value:
         blighttype = "SUN"
     elif light_type == common.LightType.POINT.value:
         blighttype = "POINT"
+    elif light_type == common.LightType.AREA.value:
+        blighttype = "AREA"
     else:
         blighttype = "SPOT"
 
-    light_name = light_path.split("/")[-1]
     light = get_or_create_light(light_name, blighttype)
 
     shadow, start = common.decode_int(data, start)
@@ -79,6 +89,11 @@ def build_light(data):
 
 def get_or_create_light(light_name, light_type):
     light = share_data.blender_lights.get(light_name)
+    if light and light.type != light_type:
+        light.type = light_type
+        share_data.blender_lights_dirty = True
+        light = share_data.blender_lights.get(light_name)
+
     if light:
         return light
     light = bpy.data.lights.new(light_name, type=light_type)

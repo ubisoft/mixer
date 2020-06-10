@@ -85,19 +85,24 @@ class MessageType(IntEnum):
     QUERY_CURRENT_FRAME = 137
     QUERY_OBJECT_DATA = 138
 
+    BLENDER_DATA_UPDATE = 139
+    CAMERA_ATTRIBUTES = 140
+
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
     MESH = 202
     MATERIAL = 203
-    FRAME = 204
-    PLAY = 205
-    PAUSE = 206
+    ASSIGN_MATERIAL = 204
+    FRAME = 205
+    PLAY = 206
+    PAUSE = 207
 
 
 class LightType(IntEnum):
     SPOT = 0  # directly mapped from Unity enum
     SUN = 1
     POINT = 2
+    AREA = 3
 
 
 class SensorFitMode(IntEnum):
