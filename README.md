@@ -1,6 +1,28 @@
-# Developer environment
+# Mixer
 
-## Python Virtual Environment
+**Disclaimer**: This project is in experimental state and actively developped. Do not use it to edit your production assets without a backup or you might break them.
+
+## Introduction
+
+Mixer is a Blender addon developped at Ubisoft Animation Studio for Real Time Collaboration in 3D edition. It allows multiple Blender users to work on the same scene at the same time. Thanks to a broadcasting server that is independent from Blender, it is also possible to implement a connection for other 3D editing softwares.
+
+## Usage
+
+You can download the addon from the release page and install it into Blender.
+
+We didn't write extensive documentation for the user interface because it is still a work in progress and might be changed often. If will be done when the addon become more stable.
+
+From the Mixer panel in the 3D viewport you can enter an IP address, a port and connect to a server. If you enter `localhost` and no Mixer server is already running on your computer, then the addon will start one in the background when you click `Connect`.
+
+Then you can test locally between two Blender instances, or you can open the port on your router and give you external IP address to someone so he can join your session.
+
+If you are on the Ubisoft network you don't need any router configuration but beware that the VPN apply some rules and you might not be able to reach the IP of someone else behind the VPN. A configuration that should work is to start the server on a workstation from a Ubisoft site, and to have all participants connect to it.
+
+A Mixer broadcaster hosts rooms that are created by users. By default there is no room and someone needs to create one. The creator of the room will upload its current scene to the server, and this scene will be transfered to people that connect to the room. When all users leave a room its content is destroyed, so someone needs to save the scene before everyone leave if you want to keep it.
+
+## Developer environment
+
+### Python Virtual Environment
 
 After cloning the repository, create a Virtual Environment in the code directory:
 
@@ -30,7 +52,7 @@ Then install development packages with pip:
 pip install -r requirements-dev.txt
 ```
 
-## Visual Studio Code
+### Visual Studio Code
 
 We recommand Visual Studio Code, with Python and Blender VSCode extensions.
 
@@ -40,11 +62,11 @@ The file `.vscode/settings.shared.json` gives an exemple of settings to fill you
 
 Similarly you can copy `.vscode/launch.shared.json` and `.vscode/tasks.shared.json` for exemples of debug configurations and tasks to run from VSCode.
 
-### VSCode "configuration"
+#### VSCode "configuration"
 
 To prevent VSCode from breaking on generator related exceptions, modify your local installation of `pydevd_frame.py` like stated in https://github.com/fabioz/ptvsd/commit/b297bc027f504cf8679090079aebff6028dfec02.
 
-## Running code quality tools manually
+### Running code quality tools manually
 
 With the above setup, all the code you type should be formatted on save and you should have flake8 warning messages.
 
@@ -54,13 +76,13 @@ If you want to check flake warnings, run `flake8` in the terminal. Note that the
 
 You need to have the virtual env activated for these commands to work.
 
-## CI/CD
+### CI/CD
 
 The CI/CD script `.gitlab-ci.yml` has a codequality stage that run flake8 on the codebase. Go to the pipeline pages of the project to check if your commits meet the quality check.
 
-# Unit tests
+## Unit tests
 
-## Fonctionnement en bref
+### Fonctionnement en bref
 
 - La classe `BlenderTestCase` lance deux Blender (un sender et un receiver) qui exécutent `python_server.py`.
 - `python_server.py` enregistre un opérateur qui gère une boucle asyncio.
@@ -74,7 +96,7 @@ Limites : je n'ai pas géré la comparaison automatique de fichiers. Ca ne march
 
 Evolution possible : on devrait pouvoir utiliser plusieurs sender et receiver pour faire des tests de charge
 
-## Activer les tests
+### Activer les tests
 
 Command palette : **Python: Configure Tests**, choisir **unittest**, pattern : **test\_\***
 
@@ -82,11 +104,11 @@ Definir la variables d'environnement MIXER_BLENDER_EXE_PATH
 
 Détails dans https://code.visualstudio.com/docs/python/testing#_enable-a-test-framework
 
-## Ecrire un test
+### Ecrire un test
 
 Voir `tests\test_test.py`
 
-## Debugger les tests
+### Debugger les tests
 
 To enable justMyCode in the uni tests, see https://github.com/microsoft/vscode-python/issues/7131#issuecomment-525873210
 
@@ -131,13 +153,13 @@ Ensuite:
 - démarrer l'exécution du test unitaire : Blender se bloque en attendant l'attachement
 - attacher le debugger : l'exécution continue jusqu'au breakpoint
 
-## CI/CD on unit tests
+### CI/CD on unit tests
 
 For a first simple setup, we rely on an interactive gitlab runner setup. Issues related to service-based runners are described below.
 
 The scripts are located in a new `gitlab` folder
 
-### Interactive runner
+#### Interactive runner
 
 Documentation:
 
@@ -171,19 +193,19 @@ WARNING: Failed to process runner                   builds=0 error=exit status 1
 
 The builds for the runner will be put in the current working directory `d:\gitlab_runner\working_dir` where you started the runner.
 
-### Runner as a Windows service
+#### Runner as a Windows service
 
 Using a system service could be difficult because the user profile may not be easy to access and we also need the service to access to the desktop.
 
 Using a service that logons with a user account requires a user account that can logon as a service as described in https://docs.gitlab.com/runner/faq/README.html#the-service-did-not-start-due-to-a-logon-failure-error-when-starting-service.
 
-# Misc
+## Misc
 
-## Guidelines
+### Guidelines
 
 - Use name_full instead of name for Blender objects (because of external links)
 
-## Blender stuff
+### Blender stuff
 
 import bmesh
 bm = bmesh.new() bm.free()

@@ -25,7 +25,7 @@ from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 BpyBlendDiff = TypeVar("BpyBlendDiff")
 BpyIDProxy = TypeVar("BpyIDProxy")
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Access path to the ID starting from bpy.data, such as ("cameras", "Camera")
 # or later the path of an ID not in bpy.data if useful
@@ -837,7 +837,11 @@ class BpyPropStructCollectionProxy(Proxy):
         """
         Save this proxy into a Blender object
         """
-        target = getattr(bl_instance, attr_name)
+        target = getattr(bl_instance, attr_name, None)
+        if target is None:
+            logger.warning(f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored")
+            return
+
         sequence = self._data.get(MIXER_SEQUENCE)
         if sequence:
             srna = bl_instance.bl_rna.properties[attr_name].srna
@@ -910,7 +914,11 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         Load a Blender object into this proxy
         """
-        target = getattr(bl_instance, attr_name)
+        target = getattr(bl_instance, attr_name, None)
+        if target is None:
+            logger.warning(f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored")
+            return
+
         for k, v in self._data.items():
             write_attribute(target, k, v)
 
@@ -1188,13 +1196,20 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
         return
 
     if type_ not in proxy_classes:
-        # TEMP we should not have readonly items
-        assert type(key) is str
-        try:
-            if not bl_instance.bl_rna.properties[key].is_readonly:
+        if type(key) is not str:
+            logging.warning(f"Unexpected type {type(key)} for {bl_instance}.{key} : skipped")
+            return
+
+        prop = bl_instance.bl_rna.properties.get(key)
+        if prop is None:
+            logging.warning(f"Attempt to write to non-existent attribute {bl_instance}.{key} : skipped")
+            return
+
+        if not prop.is_readonly:
+            try:
                 setattr(bl_instance, key, value)
-        except Exception as e:
-            logger.warning(f"write attribute skipped {key} for {bl_instance}...")
-            logger.warning(f" ...Error: {repr(e)}")
+            except Exception as e:
+                logging.warning(f"write attribute skipped {bl_instance}.{key}...")
+                logging.warning(f" ...Error: {repr(e)}")
     else:
         value.save(bl_instance, key)

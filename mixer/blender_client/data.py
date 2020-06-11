@@ -80,7 +80,14 @@ def send_data_updates(updates: List[BpyIDProxy]):
     for proxy in updates:
         logger.info("send_data_update %s[%s]", *proxy._blenddata_path)
 
-        encoded_proxy = codec.encode(proxy)
+        try:
+            encoded_proxy = codec.encode(proxy)
+        except Exception:
+            collection_name, key = proxy._blenddata_path
+            logger.error("send_update: Exception :")
+            logger.error("\n" + traceback.format_exc())
+            logger.error(f"while processing bpy.data.{collection_name}[{key}]:")
+
         # For BpyIdProxy, the target is encoded in the proxy._blenddata_path
         buffer = common.encode_string(encoded_proxy)
         command = common.Command(common.MessageType.BLENDER_DATA_UPDATE, buffer, 0)
