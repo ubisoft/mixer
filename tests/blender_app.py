@@ -26,7 +26,6 @@ class BlenderApp:
         self._blender = BlenderServer(self._port, self._ptvsd_port, self._wait_for_debugger)
         self._blender.start(blender_args)
         self._blender.connect()
-        self.connect_and_join_mixer()
 
     def connect_and_join_mixer(self, room_name="mixer_unittest"):
         if self._log_level is not None:
@@ -48,6 +47,10 @@ class BlenderApp:
     def send_function(self, f, *args, **kwargs):
         self._blender.send_function(f, *args, **kwargs)
         time.sleep(1)
+
+    def send_string(self, s):
+        self._blender.send_string(s)
+        time.sleep(0.5)
 
     def quit(self):
         self._blender.send_function(bl.quit)

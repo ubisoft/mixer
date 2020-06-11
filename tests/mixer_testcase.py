@@ -27,6 +27,7 @@ class MixerTestCase(unittest.TestCase):
         receiver_blendfile=None,
         sender_wait_for_debugger=False,
         receiver_wait_for_debugger=False,
+        join=True,
     ):
         """
         if a blendfile if not specified, blender will start with its default file.
@@ -42,6 +43,8 @@ class MixerTestCase(unittest.TestCase):
         self._sender = BlenderApp(python_port + 0, ptvsd_port + 0, sender_wait_for_debugger)
         self._sender.set_log_level(self._log_level)
         self._sender.setup(sender_args)
+        if join:
+            self._sender.connect_and_join_mixer()
 
         receiver_args = ["--window-geometry", "960", "0", "960", "1080"]
         if receiver_blendfile is not None:
@@ -49,6 +52,12 @@ class MixerTestCase(unittest.TestCase):
         self._receiver = BlenderApp(python_port + 1, ptvsd_port + 1, receiver_wait_for_debugger)
         self._receiver.set_log_level(self._log_level)
         self._receiver.setup(receiver_args)
+        if join:
+            self._receiver.connect_and_join_mixer()
+
+    def join(self):
+        self._sender.connect_and_join_mixer()
+        self._receiver.connect_and_join_mixer()
 
     def end_test(self):
         self.assert_matches()
@@ -94,6 +103,9 @@ class MixerTestCase(unittest.TestCase):
     def disconnect(self):
         self._sender.disconnect_mixer()
         self._receiver.disconnect_mixer()
+
+    def send_string(self, s: str):
+        self._sender.send_string(s)
 
     def link_collection_to_collection(self, parent_name: str, child_name: str):
         self._sender.send_function(bl.link_collection_to_collection, parent_name, child_name)

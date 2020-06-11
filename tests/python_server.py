@@ -1,8 +1,11 @@
-import bpy
-import asyncio
 import argparse
-import sys
+import asyncio
 import logging
+import sys
+
+import bpy
+
+from mixer.share_data import share_data
 
 """
 Socket server for Blender that receives python strings, compiles
@@ -34,12 +37,14 @@ async def exec_buffer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
         logger.debug(buffer.decode("utf-8"))
         try:
             code = compile(buffer, "<string>", "exec")
+            share_data.pending_test_update = True
             exec(code, {})
         except Exception:
             import traceback
 
             logger.error("Exception")
             logger.error(traceback.format_exc())
+
         logger.info("-- Done")
 
 
@@ -174,7 +179,7 @@ if __name__ == "__main__":
     if args.ptvsd:
         # do not attempt to load ptvsd by default as it tends to crash Blender
         try:
-            import ptvsd
+            import ptvsd  # noqa
 
             ptvsd.enable_attach(address=("localhost", args.ptvsd), redirect_output=True)
             if args.wait_for_debugger:

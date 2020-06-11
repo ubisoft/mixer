@@ -6,7 +6,7 @@ import logging
 
 class TestCollectionDefaultDoc(VRtistTestCase):
     def setUp(self):
-        folder = Path(__file__).parent
+        folder = Path(__file__).parent.parent
         sender_blendfile = folder / "basic.blend"
         receiver_blendfile = folder / "empty.blend"
         sender_wait_for_debugger = False

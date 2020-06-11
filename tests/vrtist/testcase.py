@@ -57,12 +57,16 @@ class VRtistTestCase(MixerTestCase):
         time.sleep(1)
         sender_grabber = Grabber()
         sender_grabber.grab(host, port, "mixer_grab_sender")
+        # HACK messages are not delivered in the same order on the receiver and the sender
+        # so sort each substream
+        sender_grabber.sort()
         self._sender.disconnect_mixer()
 
         self._receiver.connect_and_join_mixer("mixer_grab_receiver")
         time.sleep(1)
         receiver_grabber = Grabber()
         receiver_grabber.grab(host, port, "mixer_grab_receiver")
+        receiver_grabber.sort()
         self._receiver.disconnect_mixer()
 
         # TODO_ timing error : sometimes succeeds

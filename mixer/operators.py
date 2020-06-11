@@ -682,12 +682,20 @@ def send_scene_data_to_server(scene, dummy):
     with timer.child("clear_lists"):
         share_data.clear_lists()
 
-    # prevent processing self events
-    if share_data.client.receivedCommandsProcessed:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    if depsgraph.updates:
+        logger.debug("Current dg updates ...")
+        for update in depsgraph.updates:
+            logger.debug(" ......%s", {update.id.original})
+
+    # prevent processing self events, but always process test updates
+    if not share_data.pending_test_update and share_data.client.receivedCommandsProcessed:
         if not share_data.client.blockSignals:
             share_data.client.receivedCommandsProcessed = False
-        logger.debug("send_scene_data_to_server canceled (receivedCommandsProcessed = True)")
+        logger.debug("send_scene_data_to_server canceled (receivedCommandsProcessed = True) ...")
         return
+
+    share_data.pending_test_update = False
 
     if not is_in_object_mode():
         logger.info("send_scene_data_to_server canceled (not is_in_object_mode)")
