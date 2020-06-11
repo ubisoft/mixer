@@ -1,6 +1,7 @@
 import logging
-import time
 import sys
+import time
+import unittest
 
 from mixer.broadcaster.common import MessageType
 from tests.grabber import Grabber
@@ -12,6 +13,7 @@ logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
+@unittest.skip("debugging")
 class VRtistTestCase(MixerTestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

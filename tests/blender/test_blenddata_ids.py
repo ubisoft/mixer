@@ -2,6 +2,7 @@ import unittest
 from tests.blender.blender_testcase import TestGenericJoinBefore
 
 
+@unittest.skip("debugging")
 class TestMetaBall(TestGenericJoinBefore):
     def test_bpy_data_new(self):
         create_metaball = f"""

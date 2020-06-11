@@ -2,6 +2,7 @@ import unittest
 from tests.blender.blender_testcase import TestGenericJoinBefore
 
 
+@unittest.skip("debug")
 class TestBpyPropStructCollectionProxy(TestGenericJoinBefore):
     def test_light_falloff_curve(self):
         action = f"""
