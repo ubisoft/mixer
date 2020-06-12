@@ -5,7 +5,6 @@ import sys
 
 import bpy
 
-from mixer.data import get_mixer_props
 from mixer.share_data import share_data
 
 """
@@ -192,7 +191,6 @@ if __name__ == "__main__":
     logger.info("  python port %s", args.port)
     logger.info("  ptvsd  port %s", args.ptvsd)
     register()
-    get_mixer_props().experimental_sync = True
     asyncio.ensure_future(serve(args.port))
     bpy.ops.preferences.addon_enable(module="mixer")
     bpy.ops.mixer.test_asyncio_loop()
