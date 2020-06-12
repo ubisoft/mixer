@@ -23,6 +23,7 @@ from mixer.blender_data.blenddata import (
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 
 BpyBlendDiff = TypeVar("BpyBlendDiff")
+BpyPropCollectionDiff = TypeVar("BpyPropCollectionDiff")
 BpyIDProxy = TypeVar("BpyIDProxy")
 
 logger = logging.getLogger(__name__)
@@ -981,15 +982,18 @@ class BpyPropDataCollectionProxy(Proxy):
         del visit_state.id_proxies[uuid]
         del visit_state.ids[uuid]
 
-    def update(self, diff, visit_state: VisitState) -> List[BpyIDProxy]:
+    def update(self, diff: BpyPropCollectionDiff, visit_state: VisitState) -> List[BpyIDProxy]:
         """
         Update the proxy according to the diff
         """
         creations = []
         removals = []
         blenddata = BlendData.instance()
-        for name, collection_name in diff.items_added.items():
-            # warning this is the killer access in linear time
+        # Sort so that the tests receive the messages in deterministic order. Sad but not very harmfull
+        # TODO items_added boes not deen the collection name since it should be known by self
+        added_names = sorted(diff.items_added.keys())
+        for name in added_names:
+            collection_name = diff.items_added[name]
             logger.info("Perform update/creation for %s[%s]", collection_name, name)
             id_ = blenddata.collection(collection_name).items.get(name)
             if id_ is None:
@@ -1108,7 +1112,7 @@ class BpyBlendProxy(Proxy):
         # There is no difference between a creation and a subsequent update
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
 
-        # sort the updates deppmost first so that teh receiver will create meshes and lights
+        # sort the updates deppmost first so that the receiver will create meshes and lights
         # before objects, for instance
         deltas = sorted(diff.collection_deltas, key=_pred_by_creation_order)
         for delta_name, delta in deltas:
