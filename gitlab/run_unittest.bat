@@ -49,7 +49,15 @@ REM Theses tests run within blender
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
 REM run unit tests. Theses tests launch 2 blender that communicate together
-%PYTHON% -m unittest discover --verbose
+%PYTHON% -m unittest discover --verbose tests.vrtist
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
+
+%PYTHON% -m unittest discover --verbose tests.broadcaster
+if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
+
+set MIXER_EXPERIMENTAL_SYNC=1
+%PYTHON% -m unittest discover --verbose tests.blender
+if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
+
 
 if %ERROR% GEQ 1 EXIT /B %ERROR%
