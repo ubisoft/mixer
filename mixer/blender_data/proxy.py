@@ -40,8 +40,11 @@ def debug_check_proxy(proxy: BpyIDProxy):
     if proxy._class_name == "Object":
         data = proxy.data("data")
         if data is not None and not isinstance(data, BpyIDRefProxy):
-            collection, key = proxy._blenddata_path
-            logger.error(f"Ill formed Object proxy for {collection}[{key}] : data is {data}")
+            if proxy._blenddata_path is not None:
+                collection, key = proxy._blenddata_path
+                logger.error(f"Ill formed Object proxy for {collection}[{key}] : data is {data}")
+            else:
+                logger.warning(f"Empty blenddata_path for {collection}[{key}] : data is {data}")
 
 
 def debug_check_stack_overflow(func, *args, **kwargs):
@@ -1129,7 +1132,7 @@ class BpyBlendProxy(Proxy):
         for id_ in depsgraph_updated_ids:
             if not any((isinstance(id_, t) for t in safe_depsgraph_updates)):
                 continue
-            logger.info("Updating %s(%s)")
+            logger.info("Updating %s", id_)
             proxy = self.id_proxies.get(id_.mixer_uuid)
             if proxy is None:
                 logger.warning("BpyBlendProxy.update(): Ignoring %s (no proxy)", id_)
