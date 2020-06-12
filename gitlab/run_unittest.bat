@@ -55,9 +55,12 @@ if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 %PYTHON% -m unittest discover --verbose tests.broadcaster
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
-set MIXER_EXPERIMENTAL_SYNC=1
-%PYTHON% -m unittest discover --verbose tests.blender
-if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
+
+REM Skip as not reliable enough on the GitLab runner
+
+REM set MIXER_EXPERIMENTAL_SYNC=1
+REM %PYTHON% -m unittest discover --verbose tests.blender
+REM if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
 
 if %ERROR% GEQ 1 EXIT /B %ERROR%
