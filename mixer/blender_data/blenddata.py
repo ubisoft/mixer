@@ -95,7 +95,13 @@ class BlendDataCollection:
         if item is None:
             logger.warning(f"BlendDataCollection.remove(): item not found {self._name}[{name_full}]")
             return
-        self.bpy_collection().remove(item)
+        collection = self.bpy_collection()
+        if collection.find(name_full) != -1:
+            self.bpy_collection().remove(item)
+        else:
+            logger.info(
+                "BlendDataCollection.remove(): attempt to remove non-existent_object bpy.data.{self._name}[{name_full}]. Ignoring"
+            )
         self.set_dirty()
 
     def rename(self, old_name, new_name):
