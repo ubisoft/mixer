@@ -88,6 +88,9 @@ class BpyIDDiff(BpyStructDiff):
         super().diff(proxy, bl_id)
 
 
+excluded_names = ["__last_scene_to_be_removed__"]
+
+
 class BpyPropCollectionDiff(BpyDiff):
     """
     Diff for a bpy_prop_collection. May not work as is for bpy_prop_collection not in bpy.data
@@ -104,6 +107,8 @@ class BpyPropCollectionDiff(BpyDiff):
         bl_collection = getattr(bpy.data, collection_name)
         blender_items = {}
         for name, item in bl_collection.items():
+            if name in excluded_names:
+                continue
             # TODO dot it here or in Proxy ?
             ensure_uuid(item)
             blender_items[item.mixer_uuid] = (name, collection_name)
