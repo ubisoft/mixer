@@ -607,11 +607,12 @@ def update_objects_data():
 def send_animated_camera_data():
     animated_camera_set = set()
     camera_dict = {}
-    for update in share_data.depsgraph.updates:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    for update in depsgraph.updates:
         obj = update.id.original
         typename = obj.bl_rna.name
         if typename == "Object":
-            if obj.data and obj.data.bl_rna.name == "Camera":
+            if obj.data and obj.data.bl_rna.name == "Camera" and obj.animation_data is not None:
                 camera_action_name = obj.animation_data.action.name_full
                 camera_dict[camera_action_name] = obj
         if typename == "Action" and camera_dict.get(camera_action_name):
