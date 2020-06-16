@@ -1,4 +1,5 @@
 from extra.inject_version import main as inject_version, get_version
+from extra.get_release_description import get_release_description
 
 import argparse
 import subprocess
@@ -27,17 +28,16 @@ def main():
     args = parser.parse_args()
 
     tag_name = f"v{args.major}.{args.minor}.{args.bugfix}"
+    version_string = tag_name[1:]
 
     if tag_name in all_tags:
         print(f"Version tag {tag_name} already defined.")
         exit(1)
 
-    with open("CHANGELOG.md", "r") as f:
-        if f"# {args.major}.{args.minor}.{args.bugfix}" not in f.read():
-            print(
-                f"No section for version {args.major}.{args.minor}.{args.bugfix} in CHANGELOG.md, add one and commit first."
-            )
-            exit(1)
+    release_description = get_release_description(version_string)
+    if release_description == "":
+        print(f"No section for version {version_string} in CHANGELOG.md, add one and commit first.")
+        exit(1)
 
     exit(0)
 
