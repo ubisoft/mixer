@@ -16,7 +16,7 @@ flake8:
 zip_release:
   only:
     refs:
-      - tags
+      - /^v[0-9]+.[0-9]+.[0-9]+$/
   tags:
     - linux
   stage: qa_build
