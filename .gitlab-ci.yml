@@ -5,7 +5,7 @@ stages:
   - qa_build
   - release
 
-.flake8:
+flake8:
   tags:
     - linux
   image: python:3
@@ -42,7 +42,7 @@ release:
     - python -m gitlab.release mixer-${CI_COMMIT_REF_NAME}.zip
 
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
-.unittest:
+unittest:
   stage:
     - test
   tags:
