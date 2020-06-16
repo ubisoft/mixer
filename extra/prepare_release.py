@@ -1,4 +1,4 @@
-from extra.version_scripts.inject_version import main as inject_version, get_version
+from extra.inject_version import main as inject_version, get_version
 
 import argparse
 import subprocess
@@ -35,7 +35,7 @@ def main():
     with open("CHANGELOG.md", "r") as f:
         if f"# {args.major}.{args.minor}.{args.bugfix}" not in f.read():
             print(
-                f"No section for version {args.major}.{args.minor}.{args.bugfix} found in CHANGELOG.md, add one and commit first."
+                f"No section for version {args.major}.{args.minor}.{args.bugfix} in CHANGELOG.md, add one and commit first."
             )
             exit(1)
 
