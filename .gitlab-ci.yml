@@ -5,7 +5,7 @@ stages:
   - qa_build
   - release
 
-flake8:
+.flake8:
   tags:
     - linux
   image: python:3
