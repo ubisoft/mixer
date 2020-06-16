@@ -17,7 +17,7 @@ def main():
 
         print(f"Current version: {version}")
 
-    parser = argparse.ArgumentParser("set_version", description="Set a new version number for the project.")
+    parser = argparse.ArgumentParser(description="Set a new version number for the project.")
 
     parser.add_argument("major", type=int, help="Major version number")
     parser.add_argument("minor", type=int, help="Minor version number")
