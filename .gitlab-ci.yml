@@ -1,15 +1,14 @@
 # a single stage allows test to run even if flake8 fails,
 # and makes it possible to get all the errors at once
 stages:
-  - test
-  - qa_build
+  - pre_release
   - release
 
 flake8:
   tags:
     - linux
   image: python:3
-  stage: qa_build
+  stage: pre_release
   script:
     - pip install flake8==3.7.9 flake8-black pep8-naming flake8-bugbear
     - flake8 -v
@@ -17,7 +16,7 @@ flake8:
 zip:
   tags:
     - linux
-  stage: qa_build
+  stage: pre_release
   script:
     - cp CHANGELOG.md README.md mixer/
   artifacts:
@@ -43,8 +42,7 @@ release:
 
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
 unittest:
-  stage:
-    - test
+  stage: pre_release
   tags:
     - blender
   variables:
