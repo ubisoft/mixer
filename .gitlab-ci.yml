@@ -13,11 +13,30 @@ flake8:
     - pip install flake8==3.7.9 flake8-black pep8-naming flake8-bugbear
     - flake8 -v
 
-zip:
+zip_release:
+  only:
+    refs:
+      - tags
   tags:
     - linux
   stage: qa_build
-  script: exit 0
+  script:
+    - cp CHANGELOG.md README.md mixer/
+  artifacts:
+    name: "${CI_PROJECT_NAME}_${CI_COMMIT_REF_NAME}"
+    paths:
+      - mixer
+    expire_in: 42 yrs
+
+zip:
+  except:
+    refs:
+      - tags
+  tags:
+    - linux
+  stage: qa_build
+  script:
+    - cp CHANGELOG.md README.md mixer/
   artifacts:
     name: "${CI_PROJECT_NAME}_${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}"
     paths:
