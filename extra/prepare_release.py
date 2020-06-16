@@ -40,8 +40,12 @@ def main():
 
     subprocess.run(["git", "tag", tag_name], check=True)
     inject_version()
-    subprocess.run(["git", "commit", "-a", "--amend", "--no-edit"], check=True)
-    subprocess.run(["git", "tag", "-f", tag_name, "-m", f"Version {version_string}"], check=True)
+
+    cp = subprocess.run(["git", "status", "s"], stdout=subprocess.PIPE, check=True)
+    if str(cp.stdout, encoding="utf8").strip() != "":
+        # Only if something has changed according to git status:
+        subprocess.run(["git", "commit", "-a", "--amend", "--no-edit"], check=True)
+        subprocess.run(["git", "tag", "-f", tag_name, "-m", f"Version {version_string}"], check=True)
 
 
 if __name__ == "__main__":
