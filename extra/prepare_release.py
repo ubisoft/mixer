@@ -23,7 +23,6 @@ def main():
     parser.add_argument("major", type=int, help="Major version number")
     parser.add_argument("minor", type=int, help="Minor version number")
     parser.add_argument("bugfix", type=int, help="Bugfix version number")
-    parser.add_argument("message", type=str, help="Message for version tag")
 
     args = parser.parse_args()
 
@@ -42,7 +41,7 @@ def main():
     subprocess.run(["git", "tag", tag_name], check=True)
     inject_version()
     subprocess.run(["git", "commit", "-a", "--amend", "--no-edit"], check=True)
-    subprocess.run(["git", "tag", "-f", tag_name, "-m", args.message], check=True)
+    subprocess.run(["git", "tag", "-f", tag_name, "-m", f"Version {version_string}"], check=True)
 
 
 if __name__ == "__main__":
