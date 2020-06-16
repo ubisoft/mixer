@@ -15,9 +15,6 @@ stages:
     - flake8 -v
 
 zip:
-  except:
-    refs:
-      - tags
   tags:
     - linux
   stage: qa_build
