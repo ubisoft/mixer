@@ -1,7 +1,6 @@
 # a single stage allows test to run even if flake8 fails,
 # and makes it possible to get all the errors at once
 stages:
-  - test
   - qa_build
   - release
 
@@ -45,15 +44,15 @@ release:
     - ls mixer
 
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
-unittest:
-  tags:
-    - blender
-  variables:
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.82a-windows64
-    MIXER_BLENDER_VERSION_BASE: "2.82"
-    MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
-  script:
-    - gitlab\run_unittest.bat
-  cache:
-    paths:
-      - gitlab/blender/cache
+# unittest:
+#   tags:
+#     - blender
+#   variables:
+#     MIXER_BLENDER_ZIP_BASENAME: blender-2.82a-windows64
+#     MIXER_BLENDER_VERSION_BASE: "2.82"
+#     MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
+#   script:
+#     - gitlab\run_unittest.bat
+#   cache:
+#     paths:
+#       - gitlab/blender/cache
