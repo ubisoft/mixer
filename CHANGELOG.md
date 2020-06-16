@@ -8,8 +8,7 @@
 
 ## Technical
 
-- Add scripts to simplify version injection and tagging for release
-- Improve CICD
+- Resolve "Implement CI/CD for Release" (#48)
 
 # 0.3.0 (2020-06-10)
 
