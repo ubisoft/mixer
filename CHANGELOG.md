@@ -1,3 +1,11 @@
+# 0.3.0 (2020-06-10)
+
+## Release Highlights
+
+- Implementation of generic data serialization/deserialization (accessible from experimental flag in GUI)
+- Animated camera parameters for VRtist
+- Better logging
+
 # 0.2.0 (2020-05-13)
 
 ## Release Highlights
