@@ -1,3 +1,9 @@
+# 0.4.0 (2020-06-16)
+
+## Bugfix
+
+- Resolve "Crash in send_animated_camera_data" (#92)
+
 # 0.3.1 (2020-06-16)
 
 ## Bugfix
