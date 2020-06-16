@@ -39,8 +39,6 @@ def main():
         print(f"No section for version {version_string} in CHANGELOG.md, add one and commit first.")
         exit(1)
 
-    exit(0)
-
     subprocess.run(["git", "tag", tag_name], check=True)
     inject_version()
     subprocess.run(["git", "commit", "-a", "--amend", "--no-edit"], check=True)
