@@ -40,9 +40,11 @@ release:
   image: python:3
   stage: release
   script:
-    - python -m zipfile -c mixer-${CI_COMMIT_REF_NAME} mixer/
+    - echo $GITLAB_API_TOKEN
+    - python -m zipfile -c mixer-${CI_COMMIT_REF_NAME}.zip mixer/
     - ls -la
     - ls mixer
+    - curl --request POST --header "PRIVATE-TOKEN:\ ${GITLAB_API_TOKEN}" --form "file=mixer-${CI_COMMIT_REF_NAME}.zip" $CI_API_V4_URL/projects/$CI_PROJECT_ID/uploads
 
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
 .unittest:
