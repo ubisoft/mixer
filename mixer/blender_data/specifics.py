@@ -3,6 +3,8 @@
 import logging
 import traceback
 from typing import Any, ItemsView, List, TypeVar
+
+import bpy
 import bpy.types as T  # noqa N812
 
 logger = logging.getLogger(__name__)
@@ -121,6 +123,9 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
         return collection.new(name=key, idname=idname)
 
     if isinstance(collection.bl_rna, type(T.KeyingSetPaths.bl_rna)):
+        # TODO current implementation fails
+        # All keying sets paths have an empty name, and insertion with add()à failes
+        # with an empty name
         target_ref = proxy.data("id")
         if target_ref is None:
             target = None
@@ -145,3 +150,23 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
         for s in traceback.format_exc().splitlines():
             logger.warning(f"...{s}")
         return None
+
+
+def truncate_collection(target: T.bpy_prop_collection, incoming_keys: List[str]):
+    incoming_keys = set(incoming_keys)
+    existing_keys = set(target.keys())
+    truncate_keys = existing_keys - incoming_keys
+    if not truncate_keys:
+        return
+    if isinstance(target.bl_rna, type(T.KeyingSets.bl_rna)):
+        for k in truncate_keys:
+            target.active_index = target.find(k)
+            bpy.ops.anim.keying_set_remove()
+    else:
+        try:
+            for k in truncate_keys:
+                target.remove(target[k])
+        except Exception:
+            logger.warning(f"Not implemented truncate_collection for type {target.bl_rna} for {target} ...")
+            for s in traceback.format_exc().splitlines():
+                logger.warning(f"...{s}")

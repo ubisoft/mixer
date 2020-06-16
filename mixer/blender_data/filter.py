@@ -195,6 +195,8 @@ default_exclusions = {
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foerach_get()
     T.Image: [NameFilterOut("pixels")],
+    # TODO see comment in specifics.py:add_element()
+    T.KeyingSets: [NameFilterOut("paths")],
     T.LayerCollection: [
         # TODO temporary
         # Scene.viewlayers[i].layer_collection.collection is Scene.collection,

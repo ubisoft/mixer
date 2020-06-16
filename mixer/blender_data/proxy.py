@@ -898,6 +898,7 @@ class BpyPropStructCollectionProxy(Proxy):
                 )
         else:
             # dictionary
+            specifics.truncate_collection(target, self._data.keys())
             for k, v in self._data.items():
                 write_attribute(target, k, v)
 
