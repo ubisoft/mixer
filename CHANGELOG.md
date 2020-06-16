@@ -1,3 +1,16 @@
+# 0.3.1 (2020-06-16)
+
+## Bugfix
+
+- Resolve "Scene \__last_scene_to_be_removed__ is sometimes created" (#89)
+- Resolve "Gracefully ignore unknown attributes on receive" (#87)
+- Resolve "JSON decode error" (#88)
+
+## Technical
+
+- Add scripts to simplify version injection and tagging for release
+- Improve CICD
+
 # 0.3.0 (2020-06-10)
 
 ## Release Highlights
