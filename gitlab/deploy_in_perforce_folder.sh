@@ -20,10 +20,15 @@ PERFORCE_PATH=`echo $CI_ENVIRONMENT_URL | cut -c $OFFSET-`
 echo "PERFORCE_PATH = $PERFORCE_PATH"
 
 PATHS=`p4 where $PERFORCE_PATH | tr '\' '/'`
+if [ -z $PATHS ]; then
+  echo "Empty PATHS returned by p4 where for $PERFORCE_PATH, check that is it correct."
+  exit 1
+fi
+
 IFS=' '
 read -a strarr <<< "$PATHS"
 
-echo "PATHS = $PATH"
+echo "PATHS = $PATHS"
 
 DEPLOY_PATH=${strarr[-1]}
 
