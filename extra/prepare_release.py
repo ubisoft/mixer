@@ -47,6 +47,9 @@ def main():
         subprocess.run(["git", "commit", "-a", "--amend", "--no-edit"], check=True)
         subprocess.run(["git", "tag", "-f", tag_name, "-m", f"Version {version_string}"], check=True)
 
+    version = get_version()
+    print(f"New version: {version}")
+
 
 if __name__ == "__main__":
     main()
