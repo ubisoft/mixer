@@ -74,5 +74,5 @@ deploy:network_common:
   environment:
     name: network_common
   script:
-    - %MIXER_BASH_EXE% gitlab\deploy_network_common.sh mixer-${CI_COMMIT_REF_NAME}.zip
+    - $MIXER_BASH_EXE gitlab\deploy_network_common.sh mixer-${CI_COMMIT_REF_NAME}.zip
   when: manual
