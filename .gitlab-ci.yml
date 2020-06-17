@@ -71,6 +71,8 @@ deploy:network_common:
     - release
   environment:
     name: network_common
+  variables:
+    MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
   script:
-    - gitlab\deploy_network_common.bat mixer-${CI_COMMIT_REF_NAME}.zip
+    - ${MIXER_BASH_EXE} gitlab\deploy_in_network_folder.sh mixer-${CI_COMMIT_REF_NAME}.zip
   when: manual
