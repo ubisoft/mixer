@@ -21,7 +21,7 @@ test_bash_on_windows:
   variables:
     MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
   script:
-    - \& '$MIXER_BASH_EXE' -c "echo lol"
+    - '$MIXER_BASH_EXE' -c "echo lol"
 
 zip:
   tags:
