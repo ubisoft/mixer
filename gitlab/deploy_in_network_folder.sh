@@ -5,8 +5,10 @@ if [ -z $1 ]; then
   exit 1
 fi
 
-OFFSET=`echo "file://" | wc -c`
+OFFSET=`echo "http://" | wc -c`
 DEPLOY_PATH=/`echo $CI_ENVIRONMENT_URL | cut -c $OFFSET-`
+
+echo "DEPLOY_PATH = $DEPLOY_PATH"
 
 mkdir -p $DEPLOY_PATH
 if [ -e $DEPLOY_PATH/mixer ]; then

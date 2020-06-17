@@ -14,6 +14,15 @@ stages:
     - pip install flake8==3.7.9 flake8-black pep8-naming flake8-bugbear
     - flake8 -v
 
+test_bash_on_windows:
+  tags:
+    - uas
+  stage: pre_release
+  variables:
+    MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
+  script:
+    - \"${MIXER_BASH_EXE}\" -c "echo lol"
+
 zip:
   tags:
     - linux
