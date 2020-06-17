@@ -3,8 +3,9 @@
 stages:
   - pre_release
   - release
+  - deploy
 
-flake8:
+.flake8:
   tags:
     - linux
   image: python:3
@@ -25,12 +26,15 @@ zip:
       - mixer
     expire_in: 1 week
 
-release:
-  dependencies:
-    - zip
+.on_version_tag: &tpl_on_version_tag
   only:
     refs:
       - /^v[0-9]+.[0-9]+.[0-9]+$/
+
+release:
+  <<: *tpl_on_version_tag
+  dependencies:
+    - zip
   tags:
     - linux
   image: python:3
@@ -41,7 +45,7 @@ release:
     - python -m gitlab.release mixer-${CI_COMMIT_REF_NAME}.zip
 
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
-unittest:
+.unittest:
   stage: pre_release
   tags:
     - blender
@@ -54,3 +58,17 @@ unittest:
   cache:
     paths:
       - gitlab/blender/cache
+
+deploy:network_common:
+  <<: *tpl_on_version_tag
+  stage: deploy
+  tags:
+    - uas
+  variables:
+    MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
+  dependencies:
+    - release
+  environment:
+    name: network_common
+  script:
+    - $MIXER_BASH_EXE gitlab/deploy_network_common.sh

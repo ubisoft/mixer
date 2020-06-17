@@ -44,6 +44,7 @@ def main():
     data = {
         "name": f"Version {VERSION_TAG[1:]}",
         "tag_name": VERSION_TAG,
+        "filepath": "/mixer-addon-zip",
         "description": release_description,
         "assets": {
             "links": [
