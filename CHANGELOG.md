@@ -1,3 +1,9 @@
+# 0.5.1 (2020-06-17)
+
+## Bugfix
+
+- Fix deploy on perforce
+
 # 0.5.0 (2020-06-17)
 
 ## Technical

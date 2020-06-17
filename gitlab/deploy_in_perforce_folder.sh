@@ -23,6 +23,8 @@ PATHS=`p4 where $PERFORCE_PATH | tr '\' '/'`
 IFS=' '
 read -a strarr <<< "$PATHS"
 
+echo "PATHS = $PATH"
+
 DEPLOY_PATH=${strarr[-1]}
 
 echo "Local path is $DEPLOY_PATH"
