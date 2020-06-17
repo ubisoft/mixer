@@ -43,6 +43,9 @@ release:
     - pip install requests
     - python -m zipfile -c mixer-${CI_COMMIT_REF_NAME}.zip mixer/
     - python -m gitlab.release mixer-${CI_COMMIT_REF_NAME}.zip
+  artifacts:
+    paths:
+      - mixer-${CI_COMMIT_REF_NAME}.zip
 
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
 .unittest:
@@ -71,5 +74,5 @@ deploy:network_common:
   environment:
     name: network_common
   script:
-    - $MIXER_BASH_EXE gitlab/deploy_network_common.sh
+    - %MIXER_BASH_EXE% gitlab\deploy_network_common.sh mixer-${CI_COMMIT_REF_NAME}.zip
   when: manual
