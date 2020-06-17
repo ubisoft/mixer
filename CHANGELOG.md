@@ -1,3 +1,9 @@
+# 0.5.0 (2020-06-17)
+
+## Technical
+
+- Resolve "Add deploy stage and environments handling to CICD" (#94)
+
 # 0.4.0 (2020-06-16)
 
 ## Bugfix
