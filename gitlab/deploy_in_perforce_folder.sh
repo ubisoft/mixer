@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # This script assume $CI_ENVIRONMENT_URL contains a perforce folder path after http://
 # For example http://RRSpecial/_Tech/Blender/addons would map to //RRSpecial/_Tech/Blender/addons
 # Perforce access is made with client workspace stored in P4CLIENT

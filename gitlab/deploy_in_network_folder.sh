@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # This script assume $CI_ENVIRONMENT_URL contains a network folder path after http://
 # For example http:///A/B/C/D would deploy to //A/B/C/D
 
