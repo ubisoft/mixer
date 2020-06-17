@@ -1,3 +1,7 @@
+# 0.4.1 (2020-06-17)
+
+- Fake release, should be removed later.
+
 # 0.4.0 (2020-06-16)
 
 ## Bugfix
