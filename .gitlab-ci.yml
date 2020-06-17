@@ -72,3 +72,4 @@ deploy:network_common:
     name: network_common
   script:
     - $MIXER_BASH_EXE gitlab/deploy_network_common.sh
+  when: manual

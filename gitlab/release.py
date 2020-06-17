@@ -2,6 +2,7 @@ import requests
 import os
 import argparse
 import logging
+import pprint
 from extra.get_release_description import get_release_description
 
 GITLAB_API_TOKEN = os.environ["GITLAB_API_TOKEN"]
@@ -44,13 +45,13 @@ def main():
     data = {
         "name": f"Version {VERSION_TAG[1:]}",
         "tag_name": VERSION_TAG,
-        "filepath": "/mixer-addon-zip",
         "description": release_description,
         "assets": {
             "links": [
                 {
                     "name": upload_result["alt"],
                     "url": f"{CI_SERVER_URL}{upload_result['full_path']}",
+                    "filepath": "/mixer-addon-zip",
                     "link_type": "other",
                 }
             ]
@@ -65,7 +66,7 @@ def main():
         logging.error(r.text)
         exit(1)
 
-    logging.info(r.json())
+    pprint.pprint(r.json())
 
 
 if __name__ == "__main__":
