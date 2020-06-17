@@ -62,7 +62,7 @@ release:
     paths:
       - gitlab/blender/cache
 
-deploy:network_common:
+deploy:incubator:
   <<: *tpl_on_version_tag
   stage: deploy
   tags:
@@ -70,7 +70,7 @@ deploy:network_common:
   dependencies:
     - release
   environment:
-    name: network_common
+    name: incubator
   variables:
     MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
   script:
