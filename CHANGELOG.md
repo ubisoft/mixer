@@ -1,3 +1,29 @@
+# 0.4.0 (2020-06-16)
+
+## Bugfix
+
+- Resolve "Crash in send_animated_camera_data" (#92)
+
+# 0.3.1 (2020-06-16)
+
+## Bugfix
+
+- Resolve "Scene \__last_scene_to_be_removed__ is sometimes created" (#89)
+- Resolve "Gracefully ignore unknown attributes on receive" (#87)
+- Resolve "JSON decode error" (#88)
+
+## Technical
+
+- Resolve "Implement CI/CD for Release" (#48)
+
+# 0.3.0 (2020-06-10)
+
+## Release Highlights
+
+- Implementation of generic data serialization/deserialization (accessible from experimental flag in GUI)
+- Animated camera parameters for VRtist
+- Better logging
+
 # 0.2.0 (2020-05-13)
 
 ## Release Highlights
