@@ -319,14 +319,14 @@ class StructLikeProxy(Proxy):
             # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             target = bl_instance.get(key)
         else:
-            target = getattr(bl_instance, key)
+            target = getattr(bl_instance, key, None)
 
         if target is None:
             logger.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist.")
             if isinstance(bl_instance, T.bpy_prop_collection):
-
                 logger.warning(f"Note: Not implemented write to dict")
             else:
+                logger.warning(f"Note: May be due to a plugin used by the sender and not on this Blender")
                 logger.warning(
                     f"Note: May be due to unimplemented 'use_{key}' implementation for type {type(bl_instance)}"
                 )
