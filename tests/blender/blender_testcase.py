@@ -27,14 +27,23 @@ class BlenderTestCase(MixerTestCase):
         a_sorted = sort(a)
         b_sorted = sort(b)
         self.assertSequenceEqual(a.keys(), b.keys(), msg=msg)
-        for ia, ib in zip(a_sorted.values(), b_sorted.values()):
-            self.assertIs(type(ia), type(ib), msg=msg)
-            if isinstance(ia, dict):
-                self.assertDictAlmostEqual(ia, ib, msg=msg)
-            elif type(ia) is float:
-                self.assertAlmostEqual(ia, ib, places=3, msg=msg)
+        try:
+            for (_k, ia), ib in zip(a_sorted.items(), b_sorted.values()):
+                self.assertIs(type(ia), type(ib), msg=msg)
+                if isinstance(ia, dict):
+                    self.assertDictAlmostEqual(ia, ib, msg=msg)
+                elif type(ia) is float:
+                    self.assertAlmostEqual(ia, ib, places=3, msg=msg)
+                else:
+                    self.assertEqual(ia, ib, msg=msg)
+        except AssertionError as e:
+            exc_class = type(e)
+            if _k == "_data":
+                item = a.get("_class_name")
             else:
-                self.assertEqual(ia, ib, msg=msg)
+                item = _k
+            message = f"{e.args[0]} '{item}'"
+            raise exc_class(message) from None
 
     def assert_stream_equals(self, a_stream: CommandStream, b_stream: CommandStream, msg: str = None):
         a, b = a_stream.data, b_stream.data

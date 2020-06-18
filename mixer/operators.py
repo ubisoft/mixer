@@ -105,6 +105,8 @@ def join_room(room_name: str):
     share_data.auto_save_statistics = get_mixer_props().auto_save_statistics
     share_data.statistics_directory = get_mixer_props().statistics_directory
     share_data.set_experimental_sync(get_mixer_props().experimental_sync)
+    share_data.pending_test_update = False
+
     # join a room <==> want to track local changes
     set_handlers(True)
 
@@ -671,7 +673,11 @@ def send_frame_changed(scene):
 @stats_timer(share_data)
 @persistent
 def send_scene_data_to_server(scene, dummy):
-    logger.debug("send_scene_data_to_server")
+    logger.debug(
+        "send_scene_data_to_server(): receivedCommandProcessed %s, pending_test_update %s",
+        share_data.pending_test_update,
+        share_data.client.receivedCommandsProcessed,
+    )
 
     timer = share_data.current_stats_timer
 
@@ -687,7 +693,7 @@ def send_scene_data_to_server(scene, dummy):
     if depsgraph.updates:
         logger.debug("Current dg updates ...")
         for update in depsgraph.updates:
-            logger.debug(" ......%s", {update.id.original})
+            logger.debug(" ......%s", update.id.original)
 
     # prevent processing self events, but always process test updates
     if not share_data.pending_test_update and share_data.client.receivedCommandsProcessed:
@@ -758,6 +764,8 @@ def send_scene_data_to_server(scene, dummy):
     # update for next change
     with timer.child("update_current_data"):
         share_data.update_current_data()
+
+    logger.debug("send_scene_data_to_server: end")
 
 
 @persistent

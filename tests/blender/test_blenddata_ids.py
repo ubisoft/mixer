@@ -94,5 +94,19 @@ light.type = "SUN"
         self.end_test()
 
 
+class TestScene(TestGenericJoinBefore):
+    def test_bpy_ops_scene_new(self):
+        action = """
+import bpy
+scene = bpy.ops.scene_new(type="NEW")
+print(scene)
+print(f"new scene is {scene}")
+scene.unit_settings.system = "IMPERIAL"
+scene.use_gravity = True
+"""
+        self.send_string(action)
+        self.end_test()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -48,7 +48,7 @@ def send_camera(client: Client, obj):
 
 def build_camera(data):
     camera_path, start = common.decode_string(data, 0)
-    logger.info("build_light %s", camera_path)
+    logger.info("build_camera %s", camera_path)
     camera_name, start = common.decode_string(data, start)
     camera = get_or_create_camera(camera_name)
 
