@@ -346,10 +346,14 @@ class ClientBlender(Client):
 
         path, index = common.decode_string(command_data, index)
         mesh_name, index = common.decode_string(command_data, index)
-
+        logger.info("build_mesh %s", mesh_name)
         obj = self.get_or_create_object_data(path, self.get_or_create_mesh(mesh_name))
         if obj.mode == "EDIT":
             logger.error("Received a mesh for object %s while begin in EDIT mode, ignoring.", path)
+            return
+
+        if obj.data is None:
+            logger.warning(f"build_mesh: obj.data is None for {obj}")
             return
 
         index = mesh_api.decode_mesh(self, obj, command_data, index)
