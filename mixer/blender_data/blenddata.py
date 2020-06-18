@@ -50,7 +50,10 @@ class BlendDataCollection:
         self._ctor_name = ctor_name
 
     def __getitem__(self, key):
-        return self.items[key]
+        item = self.items.get(key)
+        if item is None:
+            self._reload()
+        return self.items.get(key)
 
     def name(self):
         return self._name
@@ -62,9 +65,13 @@ class BlendDataCollection:
     def items(self):
         if not self._dirty:
             return self._items
+
+        self._reload()
+        return self._items
+
+    def _reload(self):
         self._items = {x.name_full: x for x in self.bpy_collection()}
         self._dirty = False
-        return self._items
 
     def ctor(self, name: str, ctor_args: List[Any] = ()) -> Union[T.ID, None]:
         """
