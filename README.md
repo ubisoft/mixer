@@ -14,7 +14,7 @@ We didn't write extensive documentation for the user interface because it is sti
 
 From the Mixer panel in the 3D viewport you can enter an IP address, a port and connect to a server. If you enter `localhost` and no Mixer server is already running on your computer, then the addon will start one in the background when you click `Connect`.
 
-Then you can test locally between two Blender instances, or you can open the port on your router and give you external IP address to someone so he can join your session. 
+Then you can test locally between two Blender instances, or you can open the port on your router and give you external IP address to someone so he can join your session.
 
 If you are on the Ubisoft network you don't need any router configuration but beware that the VPN apply some rules and you might not be able to reach the IP of someone else behind the VPN. A configuration that should work is to start the server on a workstation from a Ubisoft site, and to have all participants connect to it.
 
@@ -35,16 +35,19 @@ Use python 3.7 to match Blender's python version.
 Activate the virtual env, on Windows the commands are:
 
 With Git bash:
+
 ```bash
 source .venv/Scripts/activate
 ```
 
 With cmd.exe:
+
 ```bash
 .venv\Scripts\activate.bat
 ```
 
 Then install development packages with pip:
+
 ```bash
 pip install -r requirements-dev.txt
 ```
@@ -163,7 +166,8 @@ Documentation:
 - Installation : https://docs.gitlab.com/runner/install/windows.html
 - Runner commands : https://docs.gitlab.com/runner/commands/
 
-Installation steps: 
+Installation steps:
+
 1. Install a gitlab runner in a folder of your choice. For this tutorial we'll use `d:\gitlab_runner`.
 2. Run a terminal as administrator, create folder `d:\gitlab_runner\working_dir` and place yourself into it in your terminal
 3. Register a runner with `gitlab-runner-windows-amd64.exe register`. Use `https://gitlab-ncsa.ubisoft.org/` as URL, `3doSyUPxsy5hL-svi_Qu` as token, `blender` as tags, `shell` as executor. The token can be found in Settings -> CI/CD page of this repository. This step should create a file `config.toml` in `d:\gitlab_runner\working_dir`.
@@ -171,7 +175,8 @@ Installation steps:
 
 Then run an interactive : `gitlab-runner-windows-amd64.exe run`. It must run as administrator because the `TSCON` command requires administrator rights to disconnect a session from the remote desktop.
 
-As the runner executes jobs, it will display the jobs status : 
+As the runner executes jobs, it will display the jobs status :
+
 ```
 D:\gitlab_runner>gitlab-runner-windows-amd64.exe run
 Runtime platform                                    arch=amd64 os=windows pid=19628 revision=4c96e5ad version=12.9.0

@@ -1,15 +1,32 @@
 import logging
 import traceback
-from mixer.blender_data.blenddata import BlendData
-from mixer.blender_data.filter import safe_context
+from typing import List, Tuple
+
 from mixer.blender_data.json_codec import Codec
-from mixer.blender_data.proxy import BlendDataVisitContext
+from mixer.blender_data.proxy import BpyIDProxy
 from mixer.broadcaster import common
 from mixer.share_data import share_data
 
-import bpy.types
-
 logger = logging.getLogger(__name__)
+
+# No explicit creations here.
+# The creations are perfomed as part of an update of an item that does not exist.
+# It is easier to manage ctor parameters beyond name that are sometimes required
+# and stored the serialized proxy (_ctor_args)
+
+
+def build_data_remove(buffer):
+    if not share_data.use_experimental_sync():
+        return
+
+    collection_name, index = common.decode_string(buffer, 0)
+    key, index = common.decode_string(buffer, index)
+    logger.info("build_data_remove: %s[%s]", collection_name, key)
+    # Update through the proxy so that it updates itself and does not trigger removals
+    share_data.proxy.remove_one(collection_name, key)
+
+    # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
+    share_data.set_dirty()
 
 
 #
@@ -19,48 +36,59 @@ def build_data_update(buffer):
     if not share_data.use_experimental_sync():
         return
 
-    blenddata_collection_name, index = common.decode_string(buffer, 0)
-    key, index = common.decode_string(buffer, index)
-    data, _ = common.decode_string(buffer, index)
-    logger.info("build_data_update %s[%s]", blenddata_collection_name, key)
+    buffer, _ = common.decode_string(buffer, 0)
     codec = Codec()
-    blenddata = BlendData.instance()
-    collection = blenddata.bpy_collection(blenddata_collection_name)
-    # TODO will fail when name != name_full
     try:
-        id_proxy = codec.decode(data)
-        id_proxy.save(collection, key)
+        id_proxy = codec.decode(buffer)
+        collection_name, key = id_proxy._blenddata_path
+        if collection_name is None or key is None:
+            logger.error("build_data_update: invalide blenddata_path : %s[%s]", collection_name, key)
+            return
+
+        logger.info("build_data_update: %s[%s]", collection_name, key)
+        share_data.proxy.update_one(id_proxy)
+        # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
+        share_data.set_dirty()
     except Exception:
-        logger.error("Build_data-update: Exception :")
-        logger.error("\n" + traceback.format_exc())
-        logger.error("while processing message:")
-        logger.error("\n" + data)
+        logger.error(
+            "Exception during build_data_update\n"
+            + traceback.format_exc()
+            + "During processing of\n"
+            + buffer[0:200]
+            + "\n...\n"
+            + buffer[-200:0]
+        )
 
 
-def send_update(updated_id: bpy.types.ID):
+def send_data_removals(removals: List[Tuple[str, str]]):
     if not share_data.use_experimental_sync():
         return
 
-    logger.info("send_data_update %s", updated_id)
+    for collection_name, key in removals:
+        logger.info("send_removal: %s[%s]", collection_name, key)
+        buffer = common.encode_string(collection_name) + common.encode_string(key)
+        command = common.Command(common.MessageType.BLENDER_DATA_REMOVE, buffer, 0)
+        share_data.client.add_command(command)
 
-    global_proxy = share_data.proxy
-    blenddata = BlendData.instance()
-    collection_name = blenddata.bl_collection_name_from_ID(updated_id)
-    if updated_id.name != updated_id.name_full:
-        logging.warning("Not implemented linked objects : {updated_id.name} {updated_id.name_full}")
-    key = updated_id.name
-    id_proxy = global_proxy.find(collection_name, key)
-    if id_proxy is None:
+
+def send_data_updates(updates: List[BpyIDProxy]):
+    if not share_data.use_experimental_sync():
         return
-    id_proxy.load(updated_id, safe_context, BlendDataVisitContext(safe_context))
+    if not updates:
+        return
     codec = Codec()
-    try:
-        message = codec.encode(id_proxy)
-    except Exception:
-        logger.error("send_update: Exception :")
-        logger.error("\n" + traceback.format_exc())
-        logger.error(f"while processing bpy.data.{collection_name}[{key}]:")
+    for proxy in updates:
+        logger.info("send_data_update %s[%s]", *proxy._blenddata_path)
 
-    buffer = common.encode_string(collection_name) + common.encode_string(key) + common.encode_string(message)
-    command = common.Command(common.MessageType.BLENDER_DATA_UPDATE, buffer, 0)
-    share_data.client.add_command(command)
+        try:
+            encoded_proxy = codec.encode(proxy)
+        except Exception:
+            collection_name, key = proxy._blenddata_path
+            logger.error("send_update: Exception :")
+            logger.error("\n" + traceback.format_exc())
+            logger.error(f"while processing bpy.data.{collection_name}[{key}]:")
+
+        # For BpyIdProxy, the target is encoded in the proxy._blenddata_path
+        buffer = common.encode_string(encoded_proxy)
+        command = common.Command(common.MessageType.BLENDER_DATA_UPDATE, buffer, 0)
+        share_data.client.add_command(command)

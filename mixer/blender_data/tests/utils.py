@@ -6,7 +6,7 @@ import unittest
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix
-from mixer.blender_data.filter import default_context
+from mixer.blender_data.filter import test_context
 
 
 this_folder = Path(__file__).parent
@@ -33,7 +33,7 @@ def clone(src):
     return dst
 
 
-def equals(attr_a, attr_b, context=default_context):
+def equals(attr_a, attr_b, context=test_context):
     type_a = type(attr_a)
     type_b = type(attr_b)
     if type_a != type_b:
@@ -61,9 +61,6 @@ def equals(attr_a, attr_b, context=default_context):
         raise NotImplementedError
 
     return True
-
-
-# context = default_context
 
 
 def bl_equals(attr_a, attr_b, msg=None, skip_name=False, context=None):

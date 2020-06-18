@@ -36,7 +36,7 @@ class BuildProxyOperator(bpy.types.Operator):
         # Cannot import at module level, since it requires access to bpy.data which is not
         # accessible during module load
         from mixer.blender_data.proxy import BpyBlendProxy
-        from mixer.blender_data.filter import default_context
+        from mixer.blender_data.filter import test_context
         import cProfile
         import io
         import pstats
@@ -50,7 +50,7 @@ class BuildProxyOperator(bpy.types.Operator):
             pr = cProfile.Profile()
             pr.enable()
         t1 = time.time()
-        proxy.load(default_context)
+        proxy.load(test_context)
         t2 = time.time()
         if profile:
             pr.disable()

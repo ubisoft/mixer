@@ -209,7 +209,8 @@ class ClientBlender(Client):
                 f.close()
                 self.textures.add(path)
             except Exception as e:
-                logger.error("could not write file %s (%s)", path, e)
+                logger.error("could not write file %s ...", path)
+                logger.error("... %s", e)
 
     def send_texture_file(self, path):
         if path in self.textures:
@@ -221,7 +222,8 @@ class ClientBlender(Client):
                 f.close()
                 self.send_texture_data(path, data)
             except Exception as e:
-                logger.error("could not read file %s (%s)", path, e)
+                logger.error("could not read file %s ...", path)
+                logger.error("... %s", e)
 
     def send_texture_data(self, path, data):
         name_buffer = common.encode_string(path)
@@ -559,7 +561,11 @@ class ClientBlender(Client):
                     if command.type == common.MessageType.CONTENT:
                         # The server asks for scene content (at room creation)
                         self.receivedCommandsProcessed = False
-                        self.send_scene_content()
+                        try:
+                            self.send_scene_content()
+                        except Exception:
+                            self.on_connection_lost()
+                            raise
 
                     elif command.type == common.MessageType.GREASE_PENCIL_MESH:
                         grease_pencil_api.build_grease_pencil_mesh(command.data)
@@ -649,6 +655,8 @@ class ClientBlender(Client):
 
                     elif command.type == common.MessageType.BLENDER_DATA_UPDATE:
                         data_api.build_data_update(command.data)
+                    elif command.type == common.MessageType.BLENDER_DATA_REMOVE:
+                        data_api.build_data_remove(command.data)
 
                     self.receivedCommands.task_done()
                     self.blockSignals = False

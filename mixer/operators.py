@@ -22,6 +22,9 @@ from mixer import clientBlender
 from mixer import ui
 from mixer.data import get_mixer_props
 from mixer.stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
+from mixer.blender_data.diff import BpyBlendDiff
+from mixer.blender_data.filter import safe_context
+from mixer.blender_data.blenddata import BlendData
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +86,7 @@ def join_room(room_name: str):
     logger.info("join_room")
 
     assert share_data.current_room is None
+    BlendData.instance().reset()
     user = get_mixer_props().user
     share_data.session_id += 1
     share_data.current_room = room_name
@@ -417,6 +421,15 @@ def add_objects():
         obj = share_data.blender_objects.get(obj_name)
         if obj:
             update_params(obj)
+            changed = True
+    return changed
+
+
+def update_transforms():
+    changed = False
+    for obj_name in share_data.objects_added:
+        obj = share_data.blender_objects.get(obj_name)
+        if obj:
             update_transform(obj)
             changed = True
     return changed
@@ -590,10 +603,6 @@ def update_objects_data():
         for c in container:
             update_params(c)
 
-    if share_data.use_experimental_sync():
-        for update in share_data.depsgraph.updates:
-            data_api.send_update(update.id.original)
-
 
 def send_animated_camera_data():
     animated_camera_set = set()
@@ -674,12 +683,20 @@ def send_scene_data_to_server(scene, dummy):
     with timer.child("clear_lists"):
         share_data.clear_lists()
 
-    # prevent processing self events
-    if share_data.client.receivedCommandsProcessed:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    if depsgraph.updates:
+        logger.debug("Current dg updates ...")
+        for update in depsgraph.updates:
+            logger.debug(" ......%s", {update.id.original})
+
+    # prevent processing self events, but always process test updates
+    if not share_data.pending_test_update and share_data.client.receivedCommandsProcessed:
         if not share_data.client.blockSignals:
             share_data.client.receivedCommandsProcessed = False
-        logger.debug("send_scene_data_to_server canceled (receivedCommandsProcessed = True)")
+        logger.debug("send_scene_data_to_server canceled (receivedCommandsProcessed = True) ...")
         return
+
+    share_data.pending_test_update = False
 
     if not is_in_object_mode():
         logger.info("send_scene_data_to_server canceled (not is_in_object_mode)")
@@ -704,6 +721,23 @@ def send_scene_data_to_server(scene, dummy):
         changed |= add_scenes()
         changed |= add_collections()
         changed |= add_objects()
+
+        # After creation of meshes : meshes are not yet supported by full Blender protocol,
+        # but needed to properly create objects
+        # Before creation of objects :  the VRtint protocol  will implicitely create objects with
+        # unappropriate default values (e.g. transform creates an object with no data)
+        if share_data.use_experimental_sync():
+            diff = BpyBlendDiff()
+            diff.diff(share_data.proxy, safe_context)
+            depsgraph = bpy.context.evaluated_depsgraph_get()
+            updates, removals = share_data.proxy.update(diff, safe_context, depsgraph.updates)
+            data_api.send_data_removals(removals)
+            data_api.send_data_updates(updates)
+            share_data.proxy.debug_check_id_proxies()
+
+        # send the VRtist transforms after full Blender protocol has the opportunity to create the object data
+        # that is not handled by VRtist protocol, otherwise the receiver creates an empty when it receives a transform
+        changed |= update_transforms()
         changed |= add_collections_to_scenes()
         changed |= add_collections_to_collections()
         changed |= add_objects_to_collections()
@@ -831,35 +865,26 @@ def update_list_users(client_ids: Mapping[str, str] = None):
 def clear_scene_content():
     set_handlers(False)
 
-    for obj in bpy.data.objects:
-        bpy.data.objects.remove(obj)
+    data = [
+        "cameras",
+        "collections",
+        "curves",
+        "grease_pencils",
+        "images",
+        "lights",
+        "objects",
+        "materials",
+        "metaballs",
+        "meshes",
+        "textures",
+        # "worlds",
+        "sounds",
+    ]
 
-    for obj in bpy.data.cameras:
-        bpy.data.cameras.remove(obj)
-
-    for obj in bpy.data.lights:
-        bpy.data.lights.remove(obj)
-
-    for block in bpy.data.meshes:
-        bpy.data.meshes.remove(block)
-
-    for block in bpy.data.curves:
-        bpy.data.curves.remove(block)
-
-    for block in bpy.data.grease_pencils:
-        bpy.data.grease_pencils.remove(block)
-
-    for block in bpy.data.materials:
-        bpy.data.materials.remove(block)
-
-    for block in bpy.data.textures:
-        bpy.data.textures.remove(block)
-
-    for block in bpy.data.images:
-        bpy.data.images.remove(block)
-
-    for collection in bpy.data.collections:
-        bpy.data.collections.remove(collection)
+    for name in data:
+        collection = getattr(bpy.data, name)
+        for obj in collection:
+            collection.remove(obj)
 
     # Cannot remove the last scene at this point, treat it differently
     for scene in bpy.data.scenes[:-1]:
@@ -889,7 +914,7 @@ def send_scene_content():
         return
 
     share_data.clear_before_state()
-
+    share_data.init_proxy()
     share_data.client.send_group_begin()
 
     # Temporary waiting for material sync. Should move to send_scene_data_to_server
@@ -959,8 +984,11 @@ def is_localhost(host):
 
 def connect():
     logger.info("connect")
-
-    assert share_data.client is None
+    BlendData.instance().reset()
+    if share_data.client is not None:
+        # a server shutdown was not processed
+        logger.debug("connect: share_data.client is not None")
+        share_data.client = None
 
     props = get_mixer_props()
     if not create_main_client(props.host, props.port):
@@ -984,6 +1012,7 @@ def disconnect():
     logger.info("disconnect")
 
     leave_current_room()
+    BlendData.instance().reset()
 
     if bpy.app.timers.is_registered(network_consumer_timer):
         bpy.app.timers.unregister(network_consumer_timer)
@@ -1041,7 +1070,11 @@ def network_consumer_timer():
 
 
 def create_main_client(host: str, port: int):
-    assert share_data.client is None
+    if share_data.client is not None:
+        # a server shutdown was not processed
+        logger.debug("create_main_client: share_data.client is not None")
+        share_data.client = None
+
     client = clientBlender.ClientBlender(host, port)
     client.connect()
     if not client.is_connected():

@@ -1,4 +1,5 @@
 import atexit
+import faulthandler
 import logging
 from pathlib import Path
 
@@ -17,6 +18,7 @@ bl_info = {
 
 logger = logging.getLogger(__name__)
 MODULE_PATH = Path(__file__).parent.parent
+_disable_fault_handler = False
 
 
 def cleanup():
@@ -30,6 +32,9 @@ def cleanup():
             share_data.localServerProcess.kill()
     except Exception:
         pass
+
+    if _disable_fault_handler:
+        faulthandler.disable()
 
 
 class Formatter(logging.Formatter):
@@ -64,6 +69,11 @@ def register():
         handler = logging.FileHandler(data.get_log_file())
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+
+    if not faulthandler.is_enabled():
+        faulthandler.enable()
+        global _disable_fault_handler
+        _disable_fault_handler = True
 
     operators.register()
     ui.register()

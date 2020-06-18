@@ -133,7 +133,7 @@ class Context:
         return bl_rna_properties.items()
 
 
-default_filter = FilterStack()
+test_filter = FilterStack()
 blenddata_exclude = [
     # "brushes" generates harmless warnings when EnumProperty properties are initialized with a value not in the enum
     "brushes",
@@ -163,47 +163,81 @@ _exclude_names = {
     "mixer_uuid",
 }
 
-# TODO Change to (type, filter) for easier maintenance
+# What we never want to load, ither because it is meaningless (depsgraph) or because it is not implemented at all
 default_exclusions = {
+    None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
+    T.ActionGroup: [NameFilterOut("channels")],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
+    # makes a loop
+    T.Bone: [NameFilterOut("parent")],
+    # TODO temporary ?
+    T.CompositorNodeRLayers: [NameFilterOut("scene")],
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
-    T.NodeSocket: [NameFilterOut("node")],
-    T.ActionGroup: [NameFilterOut("channels")],
-    T.Node: [NameFilterOut("internal_links")],
-    #
+    # TODO temporary ? Restore after foerach_get()
     T.Image: [NameFilterOut("pixels")],
-    T.CompositorNodeRLayers: [NameFilterOut("scene")],
-    None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
     T.LayerCollection: [
+        # TODO temporary
         # Scene.viewlayers[i].layer_collection.collection is Scene.collection,
         # see test_scene_viewlayer_layercollection_is_master
         NameFilterOut("collection"),
         # Seems to be a view of the master collection children
         NameFilterOut("children"),
     ],
-    T.ViewLayer: [
-        # Not useful. Requires array insertion (to do shortly)
-        NameFilterOut("freestyle_settings")
+    T.MeshPolygon: [NameFilterOut("area"), NameFilterOut("edge_keys"), NameFilterOut("loop_indices")],
+    T.MeshVertex: [
+        # MeshVertex.groups is updated via Object.vertex_groups
+        NameFilterOut("groups")
+    ],
+    T.Node: [NameFilterOut("internal_links")],
+    T.NodeSocket: [NameFilterOut("node")],
+    T.Object: [
+        # TODO triggers an error on metaballs
+        #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
+        #   looks like a bpy_prop_collection and the key is and empy string
+        NameFilterOut("material_slots")
     ],
     T.Scene: [
         # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
         # it is unclear how to do it.
         NameFilterOut("tool_settings")
     ],
-    T.MeshPolygon: [NameFilterOut("area"), NameFilterOut("edge_keys"), NameFilterOut("loop_indices")],
-    T.MeshVertex: [
-        # MeshVertex.groups is updated via Object.vertex_groups
-        NameFilterOut("groups")
+    T.ViewLayer: [
+        # Not useful. Requires array insertion (to do shortly)
+        NameFilterOut("freestyle_settings")
     ],
 }
 
-default_filter.append(default_exclusions)
-default_context = Context(default_filter)
+test_filter.append(default_exclusions)
+test_context = Context(test_filter)
 
+#
+# safe means "can be released"
+#
+safe_exclusions = {}
+
+# depsgraph updates not in this ist are not handled by BpyBlendProxy.update()
+# more types are just waiting to be tested
+# A specific proble for Scene as the depsgraph reports numerous meaningless Scene updates
+# that will probably hurt performance. We may have to find another way to update Scene or maybe
+# ignore scene updates when it is the only update in the despgrtaph update + a timer update just for
+# Scene
+# Also do not blindly update what is already updated in VRtist code without checking that
+# they do not interfere
+safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall]
+# this also mostly works
+# safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall, T.Object, T.Scene]
 
 safe_filter = FilterStack()
+# The collections in this list are tested by BpyBlendDiff collection update
+# they will be included in creation messages.
+# objects is needed to items not created by VRtsist
+safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects"]
+
+# mostly works
+# safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]
+safe_blenddata = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
 safe_filter.append(default_exclusions)
-safe_blenddata = ["cameras", "lights"]
-safe_filter.append({T.BlendData: NameFilterIn(safe_blenddata)})
+safe_filter.append(safe_exclusions)
+safe_filter.append(safe_blenddata)
 safe_context = Context(safe_filter)

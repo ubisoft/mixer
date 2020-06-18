@@ -1,18 +1,13 @@
 from pathlib import Path
+import unittest
 
 from mixer.broadcaster.common import MessageType
-
-import unittest
-import tests.testcase as testcase
+from tests.vrtist.testcase import VRtistTestCase
 
 
-class SceneTestCase(testcase.BlenderTestCase):
-    pass
-
-
-class TestSceneEmptyDoc(SceneTestCase):
+class TestSceneEmptyDoc(VRtistTestCase):
     def setUp(self):
-        folder = Path(__file__).parent
+        folder = Path(__file__).parent.parent
         sender_blendfile = folder / "empty.blend"
         receiver_blendfile = folder / "empty.blend"
         # super().setUp(sender_blendfile, receiver_blendfile, receiver_wait_for_debugger=True)

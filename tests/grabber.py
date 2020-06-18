@@ -56,4 +56,5 @@ class Grabber:
             pass
         client.threadAlive = False
 
+    def sort(self):
         self.streams.sort()

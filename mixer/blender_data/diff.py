@@ -1,7 +1,12 @@
+import logging
+from typing import Any, List, Mapping, Tuple, TypeVar
+
 import bpy
 import bpy.types as T  # noqa
-from typing import Mapping, List, Tuple, Any
-from .proxy import (
+
+from mixer.blender_data.blenddata import BlendData
+from mixer.blender_data.filter import Context
+from mixer.blender_data.proxy import (
     BpyBlendProxy,
     BpyIDProxy,
     BpyStructProxy,
@@ -10,13 +15,17 @@ from .proxy import (
     Proxy,
 )
 
-Uuid = str
-Name = str
+logger = logging.Logger(__name__, logging.INFO)
 
-ItemsAdded = Mapping[Name, T.bpy_prop_collection]
-ItemsRemoved = List[Name]
+Uuid = str
+BlendDataCollectionName = str
+Name = str
+BpyIDDiff = TypeVar("BpyIDDiff")
+# Item name : collection name
+ItemsAdded = Mapping[Name, Name]
+ItemsRemoved = List[Tuple[Name, Uuid]]
 ItemsRenamed = List[Tuple[Name, Name]]
-ItemsUpdated = Mapping[Name, "BpyIDDiff"]
+ItemsUpdated = Mapping[Name, BpyIDDiff]
 
 
 def find_renamed(
@@ -35,7 +44,7 @@ def find_renamed(
     removed_uuids = proxy_uuids - blender_uuids - renamed_uuids
 
     added_items = {blender_items[uuid][0]: blender_items[uuid][1] for uuid in added_uuids}
-    removed_items = [proxy_items[uuid] for uuid in removed_uuids]
+    removed_items = [(proxy_items[uuid], uuid) for uuid in removed_uuids]
     renamed_items = [(proxy_items[uuid], blender_items[uuid][0]) for uuid in renamed_uuids]
 
     return added_items, removed_items, renamed_items
@@ -46,9 +55,17 @@ class BpyDiff:
 
 
 class BpyStructDiff(BpyDiff):
+    """Perform a diff between a BpyStructProxy and a Blender item.
+
+    Provides a result that can be used to update the proxy and can also be serialized
+    """
+
     deltas: {Name, Any} = {}
 
     def diff(self, proxy: BpyStructProxy, bl_struct: T.bpy_struct):
+
+        # TODO untested draft
+
         self.deltas.clear()
         # updated only, suppose the names are the same
         # peoperties have already been filtered when loading the proxy, so use the
@@ -71,6 +88,9 @@ class BpyIDDiff(BpyStructDiff):
         super().diff(proxy, bl_id)
 
 
+excluded_names = ["__last_scene_to_be_removed__"]
+
+
 class BpyPropCollectionDiff(BpyDiff):
     """
     Diff for a bpy_prop_collection. May not work as is for bpy_prop_collection not in bpy.data
@@ -79,46 +99,46 @@ class BpyPropCollectionDiff(BpyDiff):
     items_added: ItemsAdded = {}
     items_removed: ItemsRemoved = []
     items_renamed: ItemsRenamed = []
-    items_updated: ItemsUpdated = {}
 
-    def diff(self, proxy: BpyPropDataCollectionProxy, bl_collection: T.bpy_prop_collection):
+    def diff(self, proxy: BpyPropDataCollectionProxy, collection_name: str, context: Context):
         self.items_added.clear()
         self.items_removed.clear()
         self.items_renamed.clear()
-        self.items_updated.clear()
+        bl_collection = getattr(bpy.data, collection_name)
         blender_items = {}
         for name, item in bl_collection.items():
+            if name in excluded_names:
+                continue
+            # TODO dot it here or in Proxy ?
             ensure_uuid(item)
-            blender_items[item.mixer_uuid] = (name, bl_collection)
-        proxy_items = {item.mixer_uuid: name for name, item in proxy.items()}
+            blender_items[item.mixer_uuid] = (name, collection_name)
+        proxy_items = {item.mixer_uuid(): name for name, item in proxy._data.items()}
         self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
-
-        # TODO diff, filter by depsgraph update (add depsgraph parameter ?)
-        return
-        for name in proxy.iter_all():
-            deltas = BpyIDDiff()
-            deltas.diff(proxy._data[name], getattr(bpy.data, name))
-            if not deltas.empty:
-                self.deltas[name] = deltas
+        if not self.empty():
+            BlendData.instance().collection(collection_name).set_dirty()
 
     def empty(self):
-        return not (self.items_updated or self.items_added or self.items_removed or self.items_renamed)
+        return not (self.items_added or self.items_removed or self.items_renamed)
 
 
 class BpyBlendDiff(BpyDiff):
     """
-    Diff for the whole blen document, currently bpy.data
+    Diff for the whole bpy.data
     """
 
-    deltas: Mapping[Name, BpyPropCollectionDiff] = {}
+    # A list of deltas per bpy.data collection. Use a list bacause if will be sorted later
+    collection_deltas: List[Tuple[BlendDataCollectionName, BpyPropCollectionDiff]] = []
 
-    def diff(self, proxy: BpyBlendProxy):
-        self.deltas.clear()
-        for name in proxy.iter_all():
+    # TODO cleanup: not used.
+    # Will not be used as the per_DI deltas will be limited to the depsgraph updates
+    id_deltas: List[Tuple[BpyIDProxy, T.ID]] = []
+
+    def diff(self, blend_proxy: BpyBlendProxy, context: Context):
+        self.collection_deltas.clear()
+        self.id_deltas.clear()
+
+        for collection_name, _ in context.properties(bpy_type=T.BlendData):
             delta = BpyPropCollectionDiff()
-            delta.diff(proxy._data[name], getattr(bpy.data, name))
+            delta.diff(blend_proxy._data[collection_name], collection_name, context)
             if not delta.empty():
-                self.deltas[name] = delta
-
-    def empty(self):
-        return not self.deltas
+                self.collection_deltas.append((collection_name, delta))

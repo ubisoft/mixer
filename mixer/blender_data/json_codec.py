@@ -1,4 +1,5 @@
 import json
+from typing import Any, Mapping
 
 from mixer.blender_data.proxy import (
     BpyIDProxy,
@@ -13,9 +14,6 @@ from mixer.blender_data.proxy import (
 # https://stackoverflow.com/questions/38307068/make-a-dict-json-from-string-with-duplicate-keys-python/38307621#38307621
 # https://stackoverflow.com/questions/31085153/easiest-way-to-serialize-object-in-a-nested-dictionary
 
-#
-#   Codec part
-#
 struct_like_classes = [BpyIDProxy, BpyIDRefProxy, BpyStructProxy, BpyPropertyGroupProxy]
 collection_classes = [
     BpyPropStructCollectionProxy,
@@ -24,19 +22,38 @@ collection_classes = [
 _classes = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
 
+options = ["_blenddata_path", "_ctor_args", "_class_name"]
+
+
+def default_optional(obj, option_name: str) -> Mapping[str, Any]:
+    option = getattr(obj, option_name, None)
+    if option is not None:
+        return {option_name: option}
+    return {}
+
 
 def default(obj):
     # called top down
     class_ = obj.__class__
-    if issubclass(class_, StructLikeProxy):
+
+    # TODO AOS and SOA
+
+    is_known = issubclass(class_, StructLikeProxy) or issubclass(class_, BpyIDRefProxy) or class_ in collection_classes
+    if is_known:
+        # Add the proxy class so that the decoder and instanciate the right type
         d = {"__bpy_proxy_class__": class_.__name__}
-        d.update(obj._data)
-        return d
-    if class_ in collection_classes:
-        d = {"__bpy_proxy_class__": class_.__name__}
-        d.update(obj._data)
+        d.update({"_data": obj._data})
+
+        for option in options:
+            d.update(default_optional(obj, option))
         return d
     return None
+
+
+def decode_optional(obj, x, option_name):
+    option = x.get(option_name)
+    if option is not None:
+        setattr(obj, option_name, option)
 
 
 def decode_hook(x):
@@ -47,7 +64,10 @@ def decode_hook(x):
 
     del x["__bpy_proxy_class__"]
     obj = class_()
-    obj._data.update(x)
+    obj._data.update(x["_data"])
+
+    for option in options:
+        decode_optional(obj, x, option)
     return obj
 
 

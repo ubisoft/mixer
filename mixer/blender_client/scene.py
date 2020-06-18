@@ -41,6 +41,8 @@ def build_scene(data):
     scene = share_data.blender_scenes.get(scene_name)
     if scene is None:
         scene = bpy.data.scenes.new(scene_name)
+        if len(bpy.data.worlds):
+            scene.world = bpy.data.worlds[0]
         share_data.blender_scenes[scene_name] = scene
 
     if to_remove is not None:
@@ -147,5 +149,7 @@ def build_remove_object_from_scene(data):
     object_name, _ = common.decode_string(data, index)
     logger.info("build_remove_object_from_scene %s <- %s", scene_name, object_name)
     scene = share_data.blender_scenes[scene_name]
-    object_ = share_data.blender_objects[object_name]
-    scene.collection.objects.unlink(object_)
+    object_ = share_data.blender_objects.get(object_name)
+    if object_:
+        # otherwise already removed by Blender protocol
+        scene.collection.objects.unlink(object_)

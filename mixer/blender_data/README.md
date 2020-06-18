@@ -1,3 +1,24 @@
+# Current task
+
+## todo
+
+- experimental Mesh receive fails, but sending is required (check this)
+- lighting aspect changes according to world (transferred or not, deleted or not)
+- detect data cycle (stackoverflow) in repaire
+- tests for metaballs
+- tests for initial transfer of lights, camera, metaballs
+- handle specifics separately (curvemaps, metaballelements, ...)
+- Metaball: auto_texture space -> do not save if auto ?
+
+      WARNING:root:write attribute skipped texspace_location for <bpy_struct, MetaBall("Mball")>...
+      WARNING:root: ...Error: AttributeError('bpy_struct: attribute "texspace_location" from "MetaBall" is read-only')
+
+- TODOs in BpyIdProxySave
+
+## done
+
+- changing light type changes ID and cause experimental updates to fail as the proxy is nop more found in BpyBlendProxy
+
 # Blender Type system
 
 WARNING, this is a bit confusing

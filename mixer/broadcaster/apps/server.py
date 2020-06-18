@@ -150,7 +150,7 @@ class Connection:
         self._server.broadcast_user_list()
 
     def send_error(self, s: str):
-        logging.debug("Sending error %s", s)
+        logger.debug("Sending error %s", s)
         command = common.Command(common.MessageType.SEND_ERROR, common.encode_string(s))
         with common.mutex:
             self.commands.append(command)

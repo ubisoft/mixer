@@ -6,15 +6,22 @@ from bpy import types as T  # noqa
 from mixer.blender_data.tests.utils import equals, register_bl_equals, test_blend_file
 
 from mixer.blender_data import types
-from mixer.blender_data.proxy import BpyStructProxy, LoadElementAs, load_as_what, BlendDataVisitContext
-from mixer.blender_data.filter import default_context, Context, FilterStack
+from mixer.blender_data.proxy import (
+    BpyBlendProxy,
+    BpyStructProxy,
+    LoadElementAs,
+    VisitState,
+    load_as_what,
+)
+from mixer.blender_data.filter import test_context
 
 
 # @unittest.skip('')
 class TestCore(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
-        register_bl_equals(self, default_context)
+        register_bl_equals(self, test_context)
+        self._visit_state = VisitState({}, {}, {}, test_context)
 
     def test_issubclass(self):
 
@@ -82,23 +89,23 @@ class TestCore(unittest.TestCase):
                 self.assertFalse(isinstance(prop.bl_rna, T.ID))
 
     def test_load_as(self):
-        visit_context = BlendDataVisitContext(Context(FilterStack()))
-
+        proxy = BpyBlendProxy()
+        proxy.load(test_context)
+        root_ids = proxy.root_ids
         self.assertEqual(
             LoadElementAs.STRUCT,
-            load_as_what(T.Scene.bl_rna.properties["display"], bpy.data.scenes[0].display, visit_context),
+            load_as_what(T.Scene.bl_rna.properties["display"], bpy.data.scenes[0].display, root_ids),
         )
         self.assertEqual(
             LoadElementAs.ID_REF,
-            load_as_what(T.Scene.bl_rna.properties["objects"], bpy.data.scenes[0].objects, visit_context),
+            load_as_what(T.Scene.bl_rna.properties["objects"], bpy.data.scenes[0].objects, root_ids),
         )
         self.assertEqual(
-            LoadElementAs.ID_REF,
-            load_as_what(T.Scene.bl_rna.properties["world"], bpy.data.scenes[0].world, visit_context),
+            LoadElementAs.ID_REF, load_as_what(T.Scene.bl_rna.properties["world"], bpy.data.scenes[0].world, root_ids),
         )
         self.assertEqual(
             LoadElementAs.ID_DEF,
-            load_as_what(T.Scene.bl_rna.properties["collection"], bpy.data.scenes[0].collection, visit_context),
+            load_as_what(T.Scene.bl_rna.properties["collection"], bpy.data.scenes[0].collection, root_ids),
         )
 
     def test_pointer_class(self):
@@ -125,8 +132,7 @@ class TestCore(unittest.TestCase):
 
     def test_skip_ShaderNodeTree(self):  # noqa N802
         world = D.worlds["World"]
-        visit_context = BlendDataVisitContext(default_context)
-        proxy = BpyStructProxy().load(world, default_context, visit_context)
+        proxy = BpyStructProxy().load(world, self._visit_state)
         self.assertTrue("color" in proxy._data)
         # self.assertFalse("node_tree" in proxy._data)
 
