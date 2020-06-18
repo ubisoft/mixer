@@ -2,6 +2,7 @@ import requests
 import os
 import argparse
 import logging
+import pprint
 from extra.get_release_description import get_release_description
 
 GITLAB_API_TOKEN = os.environ["GITLAB_API_TOKEN"]
@@ -64,7 +65,7 @@ def main():
         logging.error(r.text)
         exit(1)
 
-    logging.info(r.json())
+    pprint.pprint(r.json())
 
 
 if __name__ == "__main__":

@@ -1,3 +1,15 @@
+# 0.5.1 (2020-06-17)
+
+## Bugfix
+
+- Fix deploy on perforce
+
+# 0.5.0 (2020-06-17)
+
+## Technical
+
+- Resolve "Add deploy stage and environments handling to CICD" (#94)
+
 # 0.4.0 (2020-06-16)
 
 ## Bugfix

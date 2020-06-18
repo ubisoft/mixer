@@ -3,6 +3,7 @@
 stages:
   - pre_release
   - release
+  - deploy
 
 flake8:
   tags:
@@ -25,12 +26,15 @@ zip:
       - mixer
     expire_in: 1 week
 
-release:
-  dependencies:
-    - zip
+.on_version_tag: &tpl_on_version_tag
   only:
     refs:
       - /^v[0-9]+.[0-9]+.[0-9]+$/
+
+release:
+  <<: *tpl_on_version_tag
+  dependencies:
+    - zip
   tags:
     - linux
   image: python:3
@@ -39,6 +43,9 @@ release:
     - pip install requests
     - python -m zipfile -c mixer-${CI_COMMIT_REF_NAME}.zip mixer/
     - python -m gitlab.release mixer-${CI_COMMIT_REF_NAME}.zip
+  artifacts:
+    paths:
+      - mixer-${CI_COMMIT_REF_NAME}.zip
 
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
 unittest:
@@ -54,3 +61,34 @@ unittest:
   cache:
     paths:
       - gitlab/blender/cache
+
+.deploy_windows_git_bash: &tpl_windows_git_bash
+  <<: *tpl_on_version_tag
+  stage: deploy
+  tags:
+    - uas
+  dependencies:
+    - release
+  variables:
+    MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
+  when: manual
+
+.deploy_network_folder: &tpl_deploy_network_folder
+  <<: *tpl_windows_git_bash
+  script:
+    - gitlab\deploy_in_network_folder.bat mixer-${CI_COMMIT_REF_NAME}.zip
+
+.deploy_perforce_folder: &tpl_deploy_perforce_folder
+  <<: *tpl_windows_git_bash
+  script:
+    - gitlab\deploy_in_perforce_folder.bat mixer-${CI_COMMIT_REF_NAME}.zip
+
+deploy:incubator:
+  <<: *tpl_deploy_network_folder
+  environment:
+    name: incubator
+
+deploy:rr_special:
+  <<: *tpl_deploy_perforce_folder
+  environment:
+    name: rr_special
