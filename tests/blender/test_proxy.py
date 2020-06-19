@@ -42,6 +42,20 @@ views.remove(views[0])
 
         self.end_test()
 
+    def test_scene_color_management_curve(self):
+        action = f"""
+import bpy
+settings = bpy.data.scenes[0].view_settings
+settings.use_curve_mapping = True
+rgb = settings.curve_mapping.curves[3]
+points = rgb.points
+points.new(0.2, 0.8)
+points.new(0.7, 0.3)
+"""
+        self.send_string(action)
+
+        self.end_test()
+
 
 if __name__ == "__main__":
     unittest.main()
