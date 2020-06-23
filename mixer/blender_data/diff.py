@@ -15,7 +15,7 @@ from mixer.blender_data.proxy import (
     Proxy,
 )
 
-logger = logging.Logger(__name__, logging.INFO)
+logger = logging.Logger(__name__)
 
 Uuid = str
 BlendDataCollectionName = str
@@ -111,6 +111,10 @@ class BpyPropCollectionDiff(BpyDiff):
                 continue
             # TODO dot it here or in Proxy ?
             ensure_uuid(item)
+            if item.mixer_uuid in blender_items.keys():
+                logger.error(f"Duplicate uuid found for {item}")
+                continue
+
             blender_items[item.mixer_uuid] = (name, collection_name)
         proxy_items = {item.mixer_uuid(): name for name, item in proxy._data.items()}
         self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
