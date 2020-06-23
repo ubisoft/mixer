@@ -29,6 +29,28 @@ def build_data_remove(buffer):
     share_data.set_dirty()
 
 
+class InvalidPath(Exception):
+    pass
+
+
+def blenddata_path(proxy):
+    if proxy._blenddata_path is None:
+        logger.error("blenddata_path is None. _data is ...")
+        logger.error(f"... {proxy._data}")
+        raise InvalidPath
+
+    collection_name, key, *path = proxy._blenddata_path
+    if collection_name is None or key is None:
+        logger.error("invalid blenddata_path : %s[%s], ", collection_name, key)
+        raise InvalidPath
+
+    if path:
+        logger.error("blenddata_path %s[%s] has non empty tail %s", collection_name, key, path)
+        raise InvalidPath
+
+    return collection_name, key
+
+
 #
 # WARNING There ara duplicate keys in blendata collections with linked blendfiles
 #
@@ -40,9 +62,10 @@ def build_data_update(buffer):
     codec = Codec()
     try:
         id_proxy = codec.decode(buffer)
-        collection_name, key = id_proxy._blenddata_path
-        if collection_name is None or key is None:
-            logger.error("build_data_update: invalide blenddata_path : %s[%s]", collection_name, key)
+        try:
+            collection_name, key = blenddata_path(id_proxy)
+        except InvalidPath:
+            logger.error("... update ignored")
             return
 
         logger.info("build_data_update: %s[%s]", collection_name, key)
@@ -53,7 +76,7 @@ def build_data_update(buffer):
         logger.error(
             "Exception during build_data_update\n"
             + traceback.format_exc()
-            + "During processing of\n"
+            + f"During processing of buffer with blenddata_path {id_proxy._blenddata_path}\n"
             + buffer[0:200]
             + "\n...\n"
             + buffer[-200:0]
@@ -78,12 +101,18 @@ def send_data_updates(updates: List[BpyIDProxy]):
         return
     codec = Codec()
     for proxy in updates:
-        logger.info("send_data_update %s[%s]", *proxy._blenddata_path)
+
+        try:
+            collection_name, key = blenddata_path(proxy)
+        except InvalidPath:
+            logger.error("... update ignored")
+            continue
+
+        logger.info("send_data_update %s[%s]", collection_name, key)
 
         try:
             encoded_proxy = codec.encode(proxy)
-        except Exception:
-            collection_name, key = proxy._blenddata_path
+        except InvalidPath:
             logger.error("send_update: Exception :")
             logger.error("\n" + traceback.format_exc())
             logger.error(f"while processing bpy.data.{collection_name}[{key}]:")
