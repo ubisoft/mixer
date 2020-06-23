@@ -1,8 +1,12 @@
+import logging
 from typing import Any, ItemsView, Iterable, List, Mapping, Union
 
 from bpy import types as T  # noqa
 
 from mixer.blender_data.types import is_pointer_to
+
+DEBUG = True
+logger = logging.getLogger(__name__)
 
 
 class Filter:
@@ -55,17 +59,32 @@ class FuncFilterOut(Filter):
 
 class NameFilter(Filter):
     def __init__(self, names: Union[Any, Iterable[str]]):
-        names = names if isinstance(names, Iterable) else [names]
-        self._names: Iterable[str] = names
+        if isinstance(names, set):
+            self._names = list(names)
+        elif isinstance(names, str):
+            self._names = [names]
+        else:
+            self._names = names
+
+    def check_unknown(self, properties):
+        identifiers = [p.identifier for p in properties]
+        local_exclusions = set(self._names) - _exclude_names
+        unknowns = [name for name in local_exclusions if name not in identifiers]
+        for unknown in unknowns:
+            logger.warning(f"Internal error: Filtering unknown property {unknown}. Check spelling")
 
 
 class NameFilterOut(NameFilter):
     def apply(self, properties):
+        if DEBUG:
+            self.check_unknown(properties)
         return [p for p in properties if p.identifier not in self._names]
 
 
 class NameFilterIn(NameFilter):
     def apply(self, properties):
+        if DEBUG:
+            self.check_unknown(properties)
         return [p for p in properties if p.identifier in self._names]
 
 
@@ -176,6 +195,8 @@ default_exclusions = {
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foerach_get()
     T.Image: [NameFilterOut("pixels")],
+    # TODO see comment in specifics.py:add_element()
+    T.KeyingSets: [NameFilterOut("paths")],
     T.LayerCollection: [
         # TODO temporary
         # Scene.viewlayers[i].layer_collection.collection is Scene.collection,
@@ -195,16 +216,39 @@ default_exclusions = {
         # TODO triggers an error on metaballs
         #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
         #   looks like a bpy_prop_collection and the key is and empy string
-        NameFilterOut("material_slots")
+        NameFilterOut("material_slots"),
+        # TODO temporary, has a seed member that makes some tests fail
+        NameFilterOut("field"),
     ],
     T.Scene: [
-        # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
-        # it is unclear how to do it.
-        NameFilterOut("tool_settings")
+        NameFilterOut(
+            [
+                # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
+                # it is unclear how to do it.
+                "tool_settings",
+                # just a view into the scene objects
+                "objects",
+                # TODO temporary, not implemented
+                "collection",
+                "view_layers",
+                "rigidbody_world",
+            ]
+        ),
+    ],
+    T.SceneEEVEE: [
+        NameFilterOut(
+            [
+                # Readonly, not meaningful
+                "gi_cache_info"
+            ]
+        )
     ],
     T.ViewLayer: [
         # Not useful. Requires array insertion (to do shortly)
-        NameFilterOut("freestyle_settings")
+        NameFilterOut("freestyle_settings"),
+        # A view into ViewLayer objects
+        NameFilterOut("objects"),
+        NameFilterOut("active_layer_collection"),
     ],
 }
 
@@ -224,7 +268,7 @@ safe_exclusions = {}
 # Scene
 # Also do not blindly update what is already updated in VRtist code without checking that
 # they do not interfere
-safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall]
+safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall, T.Scene]
 # this also mostly works
 # safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall, T.Object, T.Scene]
 
@@ -232,7 +276,7 @@ safe_filter = FilterStack()
 # The collections in this list are tested by BpyBlendDiff collection update
 # they will be included in creation messages.
 # objects is needed to items not created by VRtsist
-safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects"]
+safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]
 
 # mostly works
 # safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]

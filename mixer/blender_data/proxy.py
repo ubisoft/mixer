@@ -163,6 +163,7 @@ def load_as_what(attr_property: bpy.types.Property, attr: any, root_ids: RootIds
         element_property = attr_property
 
     if is_ID_subclass_rna(element_property.bl_rna):
+        # TODO this is wrong for scene master collection
         return LoadElementAs.ID_DEF
 
     return LoadElementAs.STRUCT
@@ -216,6 +217,7 @@ def read_attribute(attr: any, attr_property: any, visit_state: VisitState):
             return BpyPropertyGroupProxy().load(attr, visit_state)
 
         load_as = load_as_what(attr_property, attr, visit_state.root_ids)
+        # TODO for scene master collection, it is an iddef not inside bpy.data, so treat it as a struct ?
         if load_as == LoadElementAs.STRUCT:
             return BpyStructProxy().load(attr, visit_state)
         elif load_as == LoadElementAs.ID_REF:
@@ -300,7 +302,10 @@ class StructLikeProxy(Proxy):
         Load a Blender object into this proxy
         """
         self._data.clear()
-        for name, bl_rna_property in visit_state.context.properties(bl_instance):
+        properties = visit_state.context.properties(bl_instance)
+        # this assumes that specifics.py apply only to ID, not Struct
+        properties = specifics.conditional_properties(bl_instance, properties)
+        for name, bl_rna_property in properties:
             attr = getattr(bl_instance, name)
             attr_value = read_attribute(attr, bl_rna_property, visit_state)
             # Also write None values. We use them to reset attributes like Camera.dof.focus_object
@@ -318,7 +323,10 @@ class StructLikeProxy(Proxy):
             # TODO append an element :
             # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             target = bl_instance.get(key)
+            if target is None:
+                target = specifics.add_element(self, bl_instance, key)
         else:
+            specifics.pre_save_struct(self, bl_instance, key)
             target = getattr(bl_instance, key, None)
 
         if target is None:
@@ -330,7 +338,10 @@ class StructLikeProxy(Proxy):
                 logger.warning(
                     f"Note: May be due to unimplemented 'use_{key}' implementation for type {type(bl_instance)}"
                 )
+                logger.warning(f"Note: May be {bl_instance}.{key} should not have been saved")
+
             return
+
         for k, v in self._data.items():
             write_attribute(target, k, v)
 
@@ -509,7 +520,7 @@ class BpyIDProxy(BpyStructProxy):
         if id_ is None:
             return None
 
-        target = self.pre_save(bl_instance, attr_name)
+        target = specifics.pre_save_id(self, bl_instance, attr_name)
         if target is None:
             logger.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} is None")
             return None
@@ -560,9 +571,11 @@ class BpyIDRefProxy(Proxy):
         )
         return self
 
+    @property
     def collection(self):
         return self._blenddata_path[0]
 
+    @property
     def key(self):
         return self._blenddata_path[1]
 
@@ -571,27 +584,41 @@ class BpyIDRefProxy(Proxy):
         # Cannot save into an attribute, which looks like an r-value.
         # When setting my_scene.world wen must setattr(scene, "world", data) and cannot
         # assign scene.world
-        collection_name, collection_key = self._blenddata_path
-
-        # TODO the identifier target doest not have the same semantics everywhere
-        # here pointee somewhere else lvalue
-        # TODO use BlendData
-        collection = getattr(bpy.data, collection_name)
-        target = collection.get(collection_key)
-        if target is None:
+        ref_target = self.target()
+        if ref_target is None:
             logger.warning(
-                f"BpyIDRefProxy.save do not save reference (target does not exist) {bl_instance}.{attr_name} -> {collection_name}[{collection_key}]"
+                f"BpyIDRefProxy.save do not save reference (target does not exist) {bl_instance}.{attr_name} -> {self.collection}[{self.key}]"
             )
         if isinstance(bl_instance, T.bpy_prop_collection):
-            logger.warning(f"Not implemented: BpyIDRefProxy.save() for IDRef into collection {bl_instance}{attr_name}")
+            if isinstance(attr_name, str):
+                try:
+                    bl_instance[attr_name] = ref_target
+                except TypeError as e:
+                    logger.warning(
+                        f"BpyIDRefProxy.save() exception while saving {ref_target} into {bl_instance}[{attr_name}]..."
+                    )
+                    logger.warning(f"...{e}")
+
+            else:
+                logger.warning(
+                    f"Not implemented: BpyIDRefProxy.save() for IDRef into collection {bl_instance}[{attr_name}]"
+                )
         else:
             if not bl_instance.bl_rna.properties[attr_name].is_readonly:
                 try:
                     # This is what saves Camera.dof.focus_object, for instance
-                    setattr(bl_instance, attr_name, target)
+                    setattr(bl_instance, attr_name, ref_target)
                 except Exception as e:
                     logger.warning(f"write attribute skipped {attr_name} for {bl_instance}...")
                     logger.warning(f" ...Error: {repr(e)}")
+
+    def target(self) -> T.ID:
+        """The bpy.types.ID pointed to by this reference
+        """
+        collection = self.collection
+        key = self.key
+        id_ = BlendData.instance().collection(collection)[key]
+        return id_
 
 
 def ensure_uuid(item: bpy.types.ID) -> str:
@@ -871,6 +898,7 @@ class BpyPropStructCollectionProxy(Proxy):
                 )
         else:
             # dictionary
+            specifics.truncate_collection(target, self._data.keys())
             for k, v in self._data.items():
                 write_attribute(target, k, v)
 
@@ -918,6 +946,9 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         Load a Blender object into this proxy
         """
+        if not self._data:
+            return
+
         target = getattr(bl_instance, attr_name, None)
         if target is None:
             logger.warning(f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored")
