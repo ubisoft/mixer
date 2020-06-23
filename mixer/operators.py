@@ -557,14 +557,16 @@ def create_vrtist_objects():
 
 
 def update_objects_data():
-    if len(share_data.depsgraph.updates) == 0:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+
+    if len(depsgraph.updates) == 0:
         return  # Exit here to avoid noise if you want to put breakpoints in this function
 
     data_container = {}
     data = set()
     transforms = set()
 
-    for update in share_data.depsgraph.updates:
+    for update in depsgraph.updates:
         obj = update.id.original
         typename = obj.bl_rna.name
 
@@ -752,7 +754,6 @@ def send_scene_data_to_server(scene, dummy):
 
     if not changed:
         with timer.child("update_objects_data"):
-            share_data.depsgraph = bpy.context.evaluated_depsgraph_get()
             update_objects_data()
 
     # update for next change
@@ -853,8 +854,6 @@ def on_undo_redo_post(scene, dummy):
     for material in materials:
         share_data.client.send_material(material)
 
-    share_data.depsgraph = bpy.context.evaluated_depsgraph_get()
-
     share_data.update_current_data()
 
 
@@ -932,7 +931,6 @@ def send_scene_content():
 def set_handlers(connect: bool):
     try:
         if connect:
-            share_data.depsgraph = bpy.context.evaluated_depsgraph_get()
             bpy.app.handlers.frame_change_post.append(send_frame_changed)
             bpy.app.handlers.depsgraph_update_post.append(send_scene_data_to_server)
             bpy.app.handlers.undo_pre.append(on_undo_redo_pre)
@@ -948,7 +946,6 @@ def set_handlers(connect: bool):
             bpy.app.handlers.redo_pre.remove(on_undo_redo_pre)
             bpy.app.handlers.undo_post.remove(on_undo_redo_post)
             bpy.app.handlers.redo_post.remove(on_undo_redo_post)
-            share_data.depsgraph = None
     except Exception as e:
         logger.error("Exception during set_handlers(%s) : %s", connect, e)
 
