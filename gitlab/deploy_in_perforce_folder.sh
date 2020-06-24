@@ -22,7 +22,7 @@ PERFORCE_PATH=`echo $CI_ENVIRONMENT_URL | cut -c $OFFSET-`
 echo "PERFORCE_PATH = $PERFORCE_PATH"
 
 PATHS=`p4 where $PERFORCE_PATH | tr '\' '/'`
-if [ -z $PATHS ]; then
+if [ -z "$PATHS" ]; then
   echo "Empty PATHS returned by p4 where for $PERFORCE_PATH, check that is it correct."
   exit 1
 fi
@@ -48,13 +48,16 @@ if [ -e $DEPLOY_PATH/mixer ]; then
   shopt -s globstar dotglob
   pushd $DEPLOY_PATH/mixer/
   for file in **/*; do
-    p4 delete "$PERFORCE_PATH/mixer/$file"
+    if [ -f "$file" ]; then
+      p4 delete "$PERFORCE_PATH/mixer/$file"
+    fi
   done
   popd
   rm -rf $DEPLOY_PATH/mixer
+
+  p4 submit -d "Remove old mixer installation"
+  p4 sync
 fi
-p4 submit -d "Remove old mixer installation"
-p4 sync
 
 echo "Unzipping mixer installation"
 unzip $1 -d $DEPLOY_PATH
@@ -64,10 +67,12 @@ if [ -e $DEPLOY_PATH/mixer ]; then
   shopt -s globstar dotglob
   pushd $DEPLOY_PATH/mixer/
   for file in **/*; do
-    p4 add "$PERFORCE_PATH/mixer/$file"
+    if [ -f "$file" ]; then
+      p4 add "$PERFORCE_PATH/mixer/$file"
+    fi
   done
   popd
-fi
 
-p4 submit -d "Update mixer to $CI_COMMIT_REF_NAME"
-p4 sync
+  p4 submit -d "Update mixer to $CI_COMMIT_REF_NAME"
+  p4 sync
+fi
