@@ -152,4 +152,9 @@ def build_remove_object_from_scene(data):
     object_ = share_data.blender_objects.get(object_name)
     if object_:
         # otherwise already removed by Blender protocol
-        scene.collection.objects.unlink(object_)
+        try:
+            scene.collection.objects.unlink(object_)
+        except Exception as e:
+            logger.warning(f"build_remove_object_from_scene: exception during unlink... ")
+            logger.warning(f"... {e} ")
+
