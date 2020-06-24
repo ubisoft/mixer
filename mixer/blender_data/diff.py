@@ -15,7 +15,7 @@ from mixer.blender_data.proxy import (
     Proxy,
 )
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 Uuid = str
 BlendDataCollectionName = str

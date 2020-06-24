@@ -2,7 +2,9 @@
 
 ## Features
 
-- Synchronize Scene objects, all panels excluding keying sets and and view layers
+- Full synchronization of lights and cameras
+- Synchronization of metaballs
+- Synchronization of Scene objects: all panels excluding keying sets and and view layers
 
 ## Bugfix
 

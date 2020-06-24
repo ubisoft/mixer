@@ -5,7 +5,7 @@ from mixer.share_data import share_data
 
 import logging
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def redraw():

@@ -7,7 +7,7 @@ from typing import Any, Iterable, List, Mapping, Union
 import bpy
 import bpy.types as T  # noqa N812
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def bl_rna_to_type(bl_rna):
