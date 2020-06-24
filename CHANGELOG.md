@@ -1,3 +1,13 @@
+# 0.6.0 (2020-06-24)
+
+## Features
+
+- Synchronize Scene objects, all panels excluding keying sets and and view layers
+
+## Bugfix
+
+- Failure during initial scene transfer
+
 # 0.5.2 (2020-06-24)
 
 ## Bugfix
