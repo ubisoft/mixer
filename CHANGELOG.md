@@ -1,3 +1,21 @@
+# 0.6.0 (2020-06-24)
+
+## Features
+
+- Synchronize Scene objects, all panels excluding keying sets and and view layers
+
+## Bugfix
+
+- Failure during initial scene transfer
+
+# 0.5.2 (2020-06-24)
+
+## Bugfix
+
+- Fix fatal assertion in decode_mesh
+- Fix error when writing to unknown attribute
+- Fix uncaught exception
+
 # 0.5.1 (2020-06-17)
 
 ## Bugfix
@@ -20,7 +38,7 @@
 
 ## Bugfix
 
-- Resolve "Scene \__last_scene_to_be_removed__ is sometimes created" (#89)
+- Resolve "Scene \_\_last_scene_to_be_removed\_\_ is sometimes created" (#89)
 - Resolve "Gracefully ignore unknown attributes on receive" (#87)
 - Resolve "JSON decode error" (#88)
 

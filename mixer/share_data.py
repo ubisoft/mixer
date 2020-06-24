@@ -57,7 +57,6 @@ class ShareData:
         self.isLocal = False
         self.localServerProcess = None
         self.selected_objects_names = []
-        self.depsgraph = None
 
         self.current_statistics = None
         self.current_stats_timer = None

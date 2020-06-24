@@ -29,6 +29,65 @@ from mixer.blender_data.blenddata import BlendData
 logger = logging.getLogger(__name__)
 
 
+class HandlerManager:
+    """Manages Blender handlers activation state
+
+    HandlerManager.set_handlers(wanted_state) will enable or disable the handlers activation and
+    should be used for initial or final state handling when enterring or leaving a room.
+
+    Temporary activation or desactivation should be performed using
+        with HandlerManager.set_handlers(wanted_state):
+            do_something()
+    """
+
+    _current_state = False
+
+    def __init__(self, wanted_state: bool):
+        self._wanted_state = wanted_state
+        self._enter_state = None
+
+    def __enter__(self):
+        self._enter_state = HandlerManager._current_state
+        if self._wanted_state != self._enter_state:
+            self._set_handlers(self._wanted_state)
+            HandlerManager._current_state = self._wanted_state
+        return self
+
+    def __exit__(self, *exc):
+        if self._current_state != self._enter_state:
+            self._set_handlers(self._enter_state)
+            HandlerManager._current_state = self._enter_state
+        return False
+
+    @classmethod
+    def _set_handlers(cls, connect: bool):
+        try:
+            if connect:
+                bpy.app.handlers.frame_change_post.append(send_frame_changed)
+                bpy.app.handlers.depsgraph_update_post.append(send_scene_data_to_server)
+                bpy.app.handlers.undo_pre.append(on_undo_redo_pre)
+                bpy.app.handlers.redo_pre.append(on_undo_redo_pre)
+                bpy.app.handlers.undo_post.append(on_undo_redo_post)
+                bpy.app.handlers.redo_post.append(on_undo_redo_post)
+                bpy.app.handlers.load_post.append(on_load)
+            else:
+                bpy.app.handlers.load_post.remove(on_load)
+                bpy.app.handlers.frame_change_post.remove(send_frame_changed)
+                bpy.app.handlers.depsgraph_update_post.remove(send_scene_data_to_server)
+                bpy.app.handlers.undo_pre.remove(on_undo_redo_pre)
+                bpy.app.handlers.redo_pre.remove(on_undo_redo_pre)
+                bpy.app.handlers.undo_post.remove(on_undo_redo_post)
+                bpy.app.handlers.redo_post.remove(on_undo_redo_post)
+        except Exception as e:
+            logger.error("Exception during set_handlers(%s) : %s", connect, e)
+
+    @classmethod
+    def set_handlers(cls, wanted_state: bool):
+        if wanted_state != cls._current_state:
+            cls._set_handlers(wanted_state)
+            cls._current_state = wanted_state
+
+
 class TransformStruct:
     def __init__(self, translate, quaternion, scale, visible):
         self.translate = translate
@@ -108,7 +167,7 @@ def join_room(room_name: str):
     share_data.pending_test_update = False
 
     # join a room <==> want to track local changes
-    set_handlers(True)
+    HandlerManager.set_handlers(True)
 
 
 def leave_current_room():
@@ -116,7 +175,7 @@ def leave_current_room():
 
     if share_data.current_room:
         share_data.leave_current_room()
-        set_handlers(False)
+        HandlerManager.set_handlers(False)
 
     share_data.clear_before_state()
 
@@ -559,14 +618,16 @@ def create_vrtist_objects():
 
 
 def update_objects_data():
-    if len(share_data.depsgraph.updates) == 0:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+
+    if len(depsgraph.updates) == 0:
         return  # Exit here to avoid noise if you want to put breakpoints in this function
 
     data_container = {}
     data = set()
     transforms = set()
 
-    for update in share_data.depsgraph.updates:
+    for update in depsgraph.updates:
         obj = update.id.original
         typename = obj.bl_rna.name
 
@@ -758,7 +819,6 @@ def send_scene_data_to_server(scene, dummy):
 
     if not changed:
         with timer.child("update_objects_data"):
-            share_data.depsgraph = bpy.context.evaluated_depsgraph_get()
             update_objects_data()
 
     # update for next change
@@ -861,8 +921,6 @@ def on_undo_redo_post(scene, dummy):
     for material in materials:
         share_data.client.send_material(material)
 
-    share_data.depsgraph = bpy.context.evaluated_depsgraph_get()
-
     share_data.update_current_data()
 
 
@@ -871,40 +929,38 @@ def update_list_users(client_ids: Mapping[str, str] = None):
 
 
 def clear_scene_content():
-    set_handlers(False)
+    with HandlerManager(False):
 
-    data = [
-        "cameras",
-        "collections",
-        "curves",
-        "grease_pencils",
-        "images",
-        "lights",
-        "objects",
-        "materials",
-        "metaballs",
-        "meshes",
-        "textures",
-        "worlds",
-        "sounds",
-    ]
+        data = [
+            "cameras",
+            "collections",
+            "curves",
+            "grease_pencils",
+            "images",
+            "lights",
+            "objects",
+            "materials",
+            "metaballs",
+            "meshes",
+            "textures",
+            "worlds",
+            "sounds",
+        ]
 
-    for name in data:
-        collection = getattr(bpy.data, name)
-        for obj in collection:
-            collection.remove(obj)
+        for name in data:
+            collection = getattr(bpy.data, name)
+            for obj in collection:
+                collection.remove(obj)
 
-    # Cannot remove the last scene at this point, treat it differently
-    for scene in bpy.data.scenes[:-1]:
-        scene_api.delete_scene(scene)
+        # Cannot remove the last scene at this point, treat it differently
+        for scene in bpy.data.scenes[:-1]:
+            scene_api.delete_scene(scene)
 
-    share_data.clear_before_state()
+        share_data.clear_before_state()
 
-    if len(bpy.data.scenes) == 1:
-        scene = bpy.data.scenes[0]
-        scene.name = "__last_scene_to_be_removed__"
-
-    set_handlers(True)
+        if len(bpy.data.scenes) == 1:
+            scene = bpy.data.scenes[0]
+            scene.name = "__last_scene_to_be_removed__"
 
 
 def is_parent_in_collection(collection, obj):
@@ -921,44 +977,24 @@ def send_scene_content():
     if get_mixer_props().no_send_scene_content:
         return
 
-    share_data.clear_before_state()
-    share_data.init_proxy()
-    share_data.client.send_group_begin()
+    with HandlerManager(False):
+        # mesh baking may trigger depsgraph_updatewhen more than one view layer and
+        # cause to reenter send_scene_data_to_server() and send duplicate messages
 
-    # Temporary waiting for material sync. Should move to send_scene_data_to_server
-    for material in bpy.data.materials:
-        share_data.client.send_material(material)
+        share_data.clear_before_state()
+        share_data.init_proxy()
+        share_data.client.send_group_begin()
 
-    send_scene_data_to_server(None, None)
+        # Temporary waiting for material sync. Should move to send_scene_data_to_server
+        for material in bpy.data.materials:
+            share_data.client.send_material(material)
 
-    share_data.client.send_frame_start_end(bpy.context.scene.frame_start, bpy.context.scene.frame_end)
-    share_data.client.send_frame(bpy.context.scene.frame_current)
+        send_scene_data_to_server(None, None)
 
-    share_data.client.send_group_end()
+        share_data.client.send_frame_start_end(bpy.context.scene.frame_start, bpy.context.scene.frame_end)
+        share_data.client.send_frame(bpy.context.scene.frame_current)
 
-
-def set_handlers(connect: bool):
-    try:
-        if connect:
-            share_data.depsgraph = bpy.context.evaluated_depsgraph_get()
-            bpy.app.handlers.frame_change_post.append(send_frame_changed)
-            bpy.app.handlers.depsgraph_update_post.append(send_scene_data_to_server)
-            bpy.app.handlers.undo_pre.append(on_undo_redo_pre)
-            bpy.app.handlers.redo_pre.append(on_undo_redo_pre)
-            bpy.app.handlers.undo_post.append(on_undo_redo_post)
-            bpy.app.handlers.redo_post.append(on_undo_redo_post)
-            bpy.app.handlers.load_post.append(on_load)
-        else:
-            bpy.app.handlers.load_post.remove(on_load)
-            bpy.app.handlers.frame_change_post.remove(send_frame_changed)
-            bpy.app.handlers.depsgraph_update_post.remove(send_scene_data_to_server)
-            bpy.app.handlers.undo_pre.remove(on_undo_redo_pre)
-            bpy.app.handlers.redo_pre.remove(on_undo_redo_pre)
-            bpy.app.handlers.undo_post.remove(on_undo_redo_post)
-            bpy.app.handlers.redo_post.remove(on_undo_redo_post)
-            share_data.depsgraph = None
-    except Exception as e:
-        logger.error("Exception during set_handlers(%s) : %s", connect, e)
+        share_data.client.send_group_end()
 
 
 def wait_for_server(host, port):
