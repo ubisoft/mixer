@@ -52,6 +52,9 @@ unittest:
   stage: pre_release
   tags:
     - blender
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /\[skip-tests\]/
   variables:
     MIXER_BLENDER_ZIP_BASENAME: blender-2.82a-windows64
     MIXER_BLENDER_VERSION_BASE: "2.82"
@@ -66,7 +69,8 @@ unittest:
   <<: *tpl_on_version_tag
   stage: deploy
   tags:
-    - uas
+    - windows
+    - git_bash
   dependencies:
     - release
   variables:
@@ -75,11 +79,15 @@ unittest:
 
 .deploy_network_folder: &tpl_deploy_network_folder
   <<: *tpl_windows_git_bash
+  tags:
+    - uas_network_drive
   script:
     - gitlab\deploy_in_network_folder.bat mixer-${CI_COMMIT_REF_NAME}.zip
 
 .deploy_perforce_folder: &tpl_deploy_perforce_folder
   <<: *tpl_windows_git_bash
+  tags:
+    - uas_perforce_client
   script:
     - gitlab\deploy_in_perforce_folder.bat mixer-${CI_COMMIT_REF_NAME}.zip
 
