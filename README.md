@@ -157,7 +157,11 @@ Ensuite:
 
 For a first simple setup, we rely on an interactive gitlab runner setup. Issues related to service-based runners are described below.
 
-The scripts are located in a new `gitlab` folder
+The scripts are located in a new `gitlab` folder.
+
+#### Skipping automatic tests
+
+You can skip tests by including the string `[skip-tests]` in the commit message.
 
 #### Interactive runner
 

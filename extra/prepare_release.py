@@ -23,6 +23,7 @@ def main():
     parser.add_argument("major", type=int, help="Major version number")
     parser.add_argument("minor", type=int, help="Minor version number")
     parser.add_argument("bugfix", type=int, help="Bugfix version number")
+    parser.add_argument("--skip-tests", action="store_true", help="If specified, skip tests for the taggued commit.")
 
     args = parser.parse_args()
 
@@ -44,7 +45,10 @@ def main():
     cp = subprocess.run(["git", "status", "-s", "-uno"], stdout=subprocess.PIPE, check=True)
     if str(cp.stdout, encoding="utf8").strip() != "":
         # Only if something has changed according to git status:
-        subprocess.run(["git", "commit", "-a", "-m", f"Update version to {version_string}"], check=True)
+        commit_message = f"Update version to {version_string}"
+        if args.skip_tests:
+            commit_message += " [skip-tests]"
+        subprocess.run(["git", "commit", "-a", "-m", commit_message], check=True)
         subprocess.run(["git", "tag", "-f", tag_name, "-m", f"Version {version_string}"], check=True)
 
     version = get_version()
