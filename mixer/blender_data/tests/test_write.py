@@ -86,6 +86,16 @@ class TestWriteAttribute(unittest.TestCase):
         light_proxy.save(D.lights, clone_name)
         self.assertEqual(clone_light.energy, expected_energy)
 
+    def test_write_world(self):
+        # test_write.TestWriteAttribute.test_write_world
+        world_name = "World"
+        clone_name = f"Clone of {world_name}"
+        world_clone = D.worlds.new(clone_name)
+        world_proxy = self.proxy._data["worlds"]._data[world_name]
+        world_proxy._data["name"] = clone_name
+        world_proxy.save(D.worlds, clone_name)
+        self.assertEqual(world_clone, D.worlds[world_name])
+
     def test_write_array_curvemap(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
 
