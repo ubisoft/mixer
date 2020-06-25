@@ -67,11 +67,11 @@ class TestLoadProxy(unittest.TestCase):
         self.assertGreaterEqual(len(scene), 50)
         self.assertLessEqual(len(scene), 60)
 
-        objects = scene["objects"]._data
-        self.assertEqual(4, len(objects))
+        # objects = scene["objects"]._data
+        # self.assertEqual(4, len(objects))
 
-        for o in objects.values():
-            self.assertEqual(type(o), BpyIDRefProxy, o)
+        # for o in objects.values():
+        #     self.assertEqual(type(o), BpyIDRefProxy, o)
 
         # builtin attributes (floats)
         frame_properties = [name for name in scene.keys() if name.startswith("frame_")]
@@ -79,16 +79,17 @@ class TestLoadProxy(unittest.TestCase):
 
         # bpy_struct
         eevee = scene["eevee"]._data
-        self.assertEqual(59, len(eevee))
+        self.assertEqual(58, len(eevee))
 
-        # PropertiesGroup
-        cycles_proxy = scene["view_layers"]._data["View Layer"]._data["cycles"]
-        self.assertIsInstance(cycles_proxy, BpyPropertyGroupProxy)
-        self.assertEqual(32, len(cycles_proxy._data))
+        # Currently mot loaded
+        # # PropertiesGroup
+        # cycles_proxy = scene["view_layers"]._data["View Layer"]._data["cycles"]
+        # self.assertIsInstance(cycles_proxy, BpyPropertyGroupProxy)
+        # self.assertEqual(32, len(cycles_proxy._data))
 
-        # The master collection
-        master_collection = scene["collection"]
-        self.assertIsInstance(master_collection, BpyIDProxy)
+        # # The master collection
+        # master_collection = scene["collection"]
+        # self.assertIsInstance(master_collection, BpyIDProxy)
 
     def test_collections(self):
         collections = self.proxy._data["collections"]
@@ -116,8 +117,8 @@ class TestLoadProxy(unittest.TestCase):
         cam_proxy = self.proxy.data("cameras").data("Camera_0")
         focus_object_proxy = cam_proxy.data("dof").data("focus_object")
         self.assertIsInstance(focus_object_proxy, BpyIDRefProxy)
-        self.assertEqual(focus_object_proxy.collection(), "objects")
-        self.assertEqual(focus_object_proxy.key(), "Cube")
+        self.assertEqual(focus_object_proxy.collection, "objects")
+        self.assertEqual(focus_object_proxy.key, "Cube")
 
     def test_camera_focus_object_none(self):
         # test_misc.TestLoadProxy.test_camera_focus_object_none
