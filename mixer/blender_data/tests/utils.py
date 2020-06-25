@@ -76,7 +76,7 @@ def bl_equals(attr_a, attr_b, msg=None, skip_name=False, context=None):
         if attr_a != attr_b:
             raise failureException(f"Different values : {attr_a} and {attr_b}")
     elif type_a == T.bpy_prop_array:
-        if attr_a != attr_b:
+        if list(attr_a) != list(attr_b):
             raise failureException(f"Different values for array : {attr_a} and {attr_b}")
     elif issubclass(type_a, T.bpy_prop_collection):
         for key in attr_a.keys():

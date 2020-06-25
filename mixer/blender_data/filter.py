@@ -233,6 +233,7 @@ default_exclusions = {
                 # it is unclear how to do it.
                 "tool_settings",
                 # TODO temporary, not implemented
+                "node_tree",
                 "collection",
                 "view_layers",
                 "rigidbody_world",

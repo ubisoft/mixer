@@ -18,6 +18,12 @@ context = test_context
 class TestWriteAttribute(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+
+        # otherwise the loaded scene  way have curves despite use_curve_mapping==False and
+        # the new one will not have curves and will not receive them as they are not send
+        # use_curve_mapping == False
+        D.scenes["Scene_0"].view_settings.use_curve_mapping = True
+
         self.proxy = BpyBlendProxy()
         self.proxy.load(context)
         register_bl_equals(self, context)
