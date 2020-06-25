@@ -62,8 +62,8 @@ class TestLoadProxy(unittest.TestCase):
         # test_misc.TestLoadProxy.test_scene
         scene = self.proxy._data["scenes"]._data["Scene_0"]._data
         # will vary slightly during tiune tuning of the default filter
-        self.assertGreaterEqual(len(scene), 50)
-        self.assertLessEqual(len(scene), 60)
+        self.assertGreaterEqual(len(scene), 45)
+        self.assertLessEqual(len(scene), 55)
 
         # objects = scene["objects"]._data
         # self.assertEqual(4, len(objects))
@@ -73,7 +73,7 @@ class TestLoadProxy(unittest.TestCase):
 
         # builtin attributes (floats)
         frame_properties = [name for name in scene.keys() if name.startswith("frame_")]
-        self.assertEqual(9, len(frame_properties))
+        self.assertEqual(7, len(frame_properties))
 
         # bpy_struct
         eevee = scene["eevee"]._data

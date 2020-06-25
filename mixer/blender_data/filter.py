@@ -223,11 +223,15 @@ default_exclusions = {
     T.Scene: [
         NameFilterOut(
             [
+                # messy in tests because setting either may reset the other to frame_start or frame_end
+                # would require
+                "frame_preview_start",
+                "frame_preview_end",
+                # just a view into the scene objects
+                "objects",
                 # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
                 # it is unclear how to do it.
                 "tool_settings",
-                # just a view into the scene objects
-                "objects",
                 # TODO temporary, not implemented
                 "collection",
                 "view_layers",
