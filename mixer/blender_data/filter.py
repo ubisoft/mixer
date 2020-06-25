@@ -205,7 +205,7 @@ default_exclusions = {
         # Seems to be a view of the master collection children
         NameFilterOut("children"),
     ],
-    T.MeshPolygon: [NameFilterOut("area"), NameFilterOut("edge_keys"), NameFilterOut("loop_indices")],
+    T.MeshPolygon: [NameFilterOut("area")],
     T.MeshVertex: [
         # MeshVertex.groups is updated via Object.vertex_groups
         NameFilterOut("groups")
