@@ -7,9 +7,7 @@ from bpy import types as T  # noqa
 from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.proxy import (
     BpyBlendProxy,
-    BpyIDProxy,
     BpyIDRefProxy,
-    BpyPropertyGroupProxy,
     SoaElement,
 )
 from mixer.blender_data.tests.utils import test_blend_file
