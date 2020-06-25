@@ -229,4 +229,4 @@ class TestWriteAttribute(unittest.TestCase):
         world_proxy = self.proxy._data["scenes"]._data[scene_name]._data["world"]
         clone = D.scenes.new(clone_name)
         world_proxy.save(clone, "world")
-        self.assertEqual(scene, clone)
+        self.assertEqual(scene.world, clone.world)
