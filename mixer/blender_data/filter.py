@@ -210,8 +210,32 @@ default_exclusions = {
         # MeshVertex.groups is updated via Object.vertex_groups
         NameFilterOut("groups")
     ],
-    T.Node: [NameFilterOut("internal_links")],
+    #
+    T.Node: [
+        NameFilterOut(
+            [
+                "internal_links",
+                # TODO temporary exclusions : saving sockest is required to save values for unconnected sockest
+                # but saving the sometimes crashes, maybe because we load an save too much
+                "inputs",
+                "outputs",
+            ]
+        )
+    ],
+    T.NodeLink: [
+        # see NodeLinkProxy
+        NameFilterOut(["from_node", "from_socket", "to_node", "to_socket", "is_hidden"])
+    ],
     T.NodeSocket: [NameFilterOut("node")],
+    T.NodeTree: [
+        NameFilterOut(
+            [
+                # read only
+                "view_center",
+                "name",
+            ]
+        )
+    ],
     T.Object: [
         # TODO triggers an error on metaballs
         #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
@@ -273,7 +297,7 @@ safe_exclusions = {}
 # Scene
 # Also do not blindly update what is already updated in VRtist code without checking that
 # they do not interfere
-safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall, T.Scene, T.World]
+safe_depsgraph_updates = [T.Camera, T.Light, T.MetaBall, T.NodeTree, T.Scene, T.World]
 # this also mostly works
 # safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall, T.Object, T.Scene]
 
@@ -281,7 +305,7 @@ safe_filter = FilterStack()
 # The collections in this list are tested by BpyBlendDiff collection update
 # they will be included in creation messages.
 # objects is needed to items not created by VRtsist
-safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes", "worlds"]
+safe_blenddata_collections = ["cameras", "lights", "metaballs", "objects", "scenes", "worlds"]
 
 # mostly works
 # safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]

@@ -9,12 +9,14 @@ from mixer.blender_data.proxy import (
     BpyPropStructCollectionProxy,
     BpyStructProxy,
     StructLikeProxy,
+    NodeLinksProxy,
+    NodeTreeProxy,
 )
 
 # https://stackoverflow.com/questions/38307068/make-a-dict-json-from-string-with-duplicate-keys-python/38307621#38307621
 # https://stackoverflow.com/questions/31085153/easiest-way-to-serialize-object-in-a-nested-dictionary
 
-struct_like_classes = [BpyIDProxy, BpyIDRefProxy, BpyStructProxy, BpyPropertyGroupProxy]
+struct_like_classes = [BpyIDProxy, BpyIDRefProxy, BpyStructProxy, BpyPropertyGroupProxy, NodeLinksProxy, NodeTreeProxy]
 collection_classes = [
     BpyPropStructCollectionProxy,
     BpyPropDataCollectionProxy,

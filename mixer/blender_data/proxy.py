@@ -20,7 +20,7 @@ from mixer.blender_data.blenddata import (
     rna_identifier_to_collection_name,
     bl_rna_to_type,
 )
-from mixer.blender_data.types import is_builtin, is_vector, is_matrix
+from mixer.blender_data.types import is_builtin, is_vector, is_matrix, is_pointer_to
 
 BpyBlendDiff = TypeVar("BpyBlendDiff")
 BpyPropCollectionDiff = TypeVar("BpyPropCollectionDiff")
@@ -195,7 +195,7 @@ def read_attribute(attr: any, attr_property: any, visit_state: VisitState):
             # need to know for each element if it is a ref or id
             load_as = load_as_what(attr_property, attr, visit_state.root_ids)
             if load_as == LoadElementAs.STRUCT:
-                return BpyPropStructCollectionProxy().load(attr, attr_property, visit_state)
+                return BpyPropStructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
             elif load_as == LoadElementAs.ID_REF:
                 # References into Blenddata collection, for instance D.scenes[0].objects
                 return BpyPropDataCollectionProxy().load_as_IDref(attr, visit_state)
@@ -223,7 +223,7 @@ def read_attribute(attr: any, attr_property: any, visit_state: VisitState):
         elif load_as == LoadElementAs.ID_REF:
             return BpyIDRefProxy().load(attr, visit_state)
         elif load_as == LoadElementAs.ID_DEF:
-            return BpyIDProxy().load(attr, visit_state)
+            return BpyIDProxy.make(attr_property).load(attr, visit_state)
 
         # assert issubclass(attr_type, T.bpy_struct) == issubclass(attr_type, T.bpy_struct)
         raise AssertionError("unexpected code path")
@@ -303,7 +303,8 @@ class StructLikeProxy(Proxy):
         """
         self._data.clear()
         properties = visit_state.context.properties(bl_instance)
-        # this assumes that specifics.py apply only to ID, not Struct
+        # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
+        # that we do not want to load anyway
         properties = specifics.conditional_properties(bl_instance, properties)
         for name, bl_rna_property in properties:
             attr = getattr(bl_instance, name)
@@ -370,6 +371,13 @@ class BpyIDProxy(BpyStructProxy):
 
     def __init__(self):
         super().__init__()
+
+    @classmethod
+    def make(cls, attr_property):
+
+        if is_pointer_to(attr_property, T.NodeTree):
+            return NodeTreeProxy()
+        return BpyIDProxy()
 
     def mixer_uuid(self) -> str:
         return self._data["mixer_uuid"]
@@ -508,6 +516,50 @@ class BpyIDProxy(BpyStructProxy):
         #
         # To perform differential updates in the future, we will need markers for removed attributes
         self._data = other._data
+
+
+class NodeLinksProxy(BpyStructProxy):
+    def __init__(self):
+        super().__init__()
+
+    def load(self, bl_instance, _, visit_state: VisitState):
+        # NodeLink contain pointers to Node and NodeSocket.
+        # Just keep the names to restore the links in ShaderNodeTreeProxy.save
+
+        seq = []
+        for link in bl_instance:
+            link_data = (
+                link.from_node.name,
+                link.from_socket.name,
+                link.to_node.name,
+                link.to_socket.name,
+            )
+            seq.append(link_data)
+        self._data[MIXER_SEQUENCE] = seq
+        return self
+
+
+class NodeTreeProxy(BpyIDProxy):
+    def __init__(self):
+        super().__init__()
+
+    def save(self, bl_instance: any, attr_name: str):
+        # see https://stackoverflow.com/questions/36185377/how-i-can-create-a-material-select-it-create-new-nodes-with-this-material-and
+        # Saving NodeTree.links require access to NodeTree.nodes, so we need an implementation at the NodeTree level
+
+        node_tree = getattr(bl_instance, attr_name)
+
+        # save links last
+        for k, v in self._data.items():
+            if k != "links":
+                write_attribute(node_tree, k, v)
+
+        node_tree.links.clear()
+        seq = self.data("links").data(MIXER_SEQUENCE)
+        for src_node, src_socket, dst_node, dst_socket in seq:
+            src_socket = node_tree.nodes[src_node].outputs[src_socket]
+            dst_socket = node_tree.nodes[dst_node].inputs[dst_socket]
+            node_tree.links.new(src_socket, dst_socket)
 
 
 class BpyIDRefProxy(Proxy):
@@ -800,6 +852,12 @@ class BpyPropStructCollectionProxy(Proxy):
 
     def __init__(self):
         self._data: Mapping[Union[str, int], BpyIDProxy] = {}
+
+    @classmethod
+    def make(cls, attr_property: T.Property):
+        if attr_property.srna == T.NodeLinks.bl_rna:
+            return NodeLinksProxy()
+        return BpyPropStructCollectionProxy()
 
     def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, visit_state: VisitState):
 
@@ -1141,7 +1199,13 @@ class BpyBlendProxy(Proxy):
             logger.info("Updating %s", id_)
             proxy = self.id_proxies.get(id_.mixer_uuid)
             if proxy is None:
-                logger.warning("BpyBlendProxy.update(): Ignoring %s (no proxy)", id_)
+                # Not an error for embedded IDs.
+                # For instance Scene.node_tree is not a reference to a bpy.data collection element
+                # but a "pointer" to a NodeTree owned by Scene. In such a case, the update list contains
+                # scene.node_tree, then scene. We can ignore the scene.node_tree update since the
+                # processing of scene will process scene.node_tree.
+                # However, it is not obvious to detect the safe cases and remove the message in such cases
+                logger.info("BpyBlendProxy.update(): Ignoring %s (no proxy)", id_)
                 continue
             proxy.load(id_, visit_state)
             updates.append(proxy)
@@ -1199,12 +1263,12 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
     """
-    type_ = type(value)
+
     if bl_instance is None:
         logger.warning(f"unexpected write None attribute")
         return
 
-    if type_ not in proxy_classes:
+    if not isinstance(value, Proxy):
         if type(key) is not str:
             logging.warning(f"Unexpected type {type(key)} for {bl_instance}.{key} : skipped")
             return

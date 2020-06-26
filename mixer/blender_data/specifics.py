@@ -69,6 +69,14 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
 
+    if isinstance(bpy_struct, T.Node):
+        if bpy_struct.hide:
+            return properties
+
+        # not hidden: saving width_hidden is ignored
+        filter_props = ["width_hidden"]
+        filtered = {k: v for k, v in properties if k not in filter_props}
+        return filtered.items()
     return properties
 
 
@@ -102,6 +110,10 @@ def pre_save_id(proxy: Proxy, collection: T.bpy_prop_collection, key: str) -> T.
         use_curve_mapping = proxy.data("use_curve_mapping")
         if use_curve_mapping:
             target.use_curve_mapping = True
+    elif isinstance(target, bpy.types.World):
+        use_nodes = proxy.data("use_nodes")
+        if use_nodes:
+            target.use_nodes = True
     return target
 
 
@@ -138,6 +150,10 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
         return collection.add(
             target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
         )
+
+    if isinstance(collection.bl_rna, type(T.Nodes.bl_rna)):
+        node_type = proxy.data("bl_idname")
+        return collection.new(node_type)
 
     # try our best
     new_or_add = getattr(collection, "new", None)
