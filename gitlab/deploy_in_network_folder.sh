@@ -26,4 +26,5 @@ if [ -e $DEPLOY_PATH/mixer ]; then
 fi
 
 echo "Unzipping mixer installation"
-unzip $1 -d $DEPLOY_PATH
+unzip $1 -d tmp/
+cp -r tmp/mixer $DEPLOY_PATH

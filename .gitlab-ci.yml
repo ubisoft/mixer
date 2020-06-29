@@ -8,6 +8,7 @@ stages:
 flake8:
   tags:
     - linux
+    - docker
   image: python:3
   stage: pre_release
   script:
@@ -37,6 +38,7 @@ release:
     - zip
   tags:
     - linux
+    - docker
   image: python:3
   stage: release
   script:
@@ -65,31 +67,25 @@ unittest:
     paths:
       - gitlab/blender/cache
 
-.deploy_windows_git_bash: &tpl_windows_git_bash
+.deploy_network_folder: &tpl_deploy_network_folder
   <<: *tpl_on_version_tag
   stage: deploy
   tags:
-    - windows
-    - git_bash
-  dependencies:
-    - release
-  variables:
-    MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
-  when: manual
-
-.deploy_network_folder: &tpl_deploy_network_folder
-  <<: *tpl_windows_git_bash
-  tags:
+    - linux
     - uas_network_drive
   script:
-    - gitlab\deploy_in_network_folder.bat mixer-${CI_COMMIT_REF_NAME}.zip
+    - bash gitlab/deploy_in_network_folder.sh mixer-${CI_COMMIT_REF_NAME}.zip
+  when: manual
 
 .deploy_perforce_folder: &tpl_deploy_perforce_folder
-  <<: *tpl_windows_git_bash
+  <<: *tpl_on_version_tag
+  stage: deploy
   tags:
+    - linux
     - uas_perforce_client
   script:
-    - gitlab\deploy_in_perforce_folder.bat mixer-${CI_COMMIT_REF_NAME}.zip
+    - bash gitlab/deploy_in_perforce_folder.sh mixer-${CI_COMMIT_REF_NAME}.zip
+  when: manual
 
 deploy:incubator:
   <<: *tpl_deploy_network_folder
