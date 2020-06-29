@@ -211,22 +211,18 @@ default_exclusions = {
         NameFilterOut("groups")
     ],
     #
-    T.Node: [
-        NameFilterOut(
-            [
-                "internal_links",
-                # TODO temporary exclusions : saving sockest is required to save values for unconnected sockest
-                # but saving the sometimes crashes, maybe because we load an save too much
-                "inputs",
-                "outputs",
-            ]
-        )
-    ],
+    T.Node: [NameFilterOut(["internal_links",])],
     T.NodeLink: [
         # see NodeLinkProxy
         NameFilterOut(["from_node", "from_socket", "to_node", "to_socket", "is_hidden"])
     ],
-    T.NodeSocket: [NameFilterOut("node")],
+    T.NodeSocket: [
+        # Currently synchronize builtin shading node sockets only, so assume these attributes are
+        # managed only at the Node creation
+        NameFilterOut(
+            ["bl_idname", "identifier", "is_linked", "is_output", "link_limit", "name", "node", "type", "links"]
+        )
+    ],
     T.NodeTree: [
         NameFilterOut(
             [
