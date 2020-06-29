@@ -1,3 +1,9 @@
+# 0.6.2 (2020-06-29)
+
+## CI/CD
+
+- Adapt CI/CD scripts to new cloud based gitlab runner (#111)
+
 # 0.6.1 (2020-06-25)
 
 ## Bugfix
