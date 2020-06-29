@@ -41,7 +41,7 @@ if [ ! -e $DEPLOY_PATH ]; then
   exit 1
 fi
 
-p4 sync
+p4 sync -f
 
 if [ -e $DEPLOY_PATH/mixer ]; then
   echo "Deleting previous mixer installation"
@@ -56,7 +56,7 @@ if [ -e $DEPLOY_PATH/mixer ]; then
   rm -rf $DEPLOY_PATH/mixer
 
   p4 submit -d "Remove old mixer installation"
-  p4 sync
+  p4 sync -f
 fi
 
 echo "Unzipping mixer installation"
@@ -74,5 +74,5 @@ if [ -e $DEPLOY_PATH/mixer ]; then
   popd
 
   p4 submit -d "Update mixer to $CI_COMMIT_REF_NAME"
-  p4 sync
+  p4 sync -f
 fi
