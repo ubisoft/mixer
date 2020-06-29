@@ -68,20 +68,24 @@ unittest:
       - gitlab/blender/cache
 
 .deploy_network_folder: &tpl_deploy_network_folder
+  <<: *tpl_on_version_tag
   stage: deploy
   tags:
     - linux
     - uas_network_drive
   script:
     - bash gitlab/deploy_in_network_folder.sh mixer-${CI_COMMIT_REF_NAME}.zip
+  when: manual
 
 .deploy_perforce_folder: &tpl_deploy_perforce_folder
+  <<: *tpl_on_version_tag
   stage: deploy
   tags:
     - linux
     - uas_perforce_client
   script:
     - bash gitlab/deploy_in_perforce_folder.sh mixer-${CI_COMMIT_REF_NAME}.zip
+  when: manual
 
 deploy:incubator:
   <<: *tpl_deploy_network_folder
