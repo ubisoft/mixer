@@ -8,6 +8,7 @@ stages:
 flake8:
   tags:
     - linux
+    - docker
   image: python:3
   stage: pre_release
   script:
@@ -37,6 +38,7 @@ release:
     - zip
   tags:
     - linux
+    - docker
   image: python:3
   stage: release
   script:
