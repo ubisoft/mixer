@@ -5,7 +5,7 @@ import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data.blenddata import BlendData
-from mixer.blender_data.filter import Context
+from mixer.blender_data.filter import Context, skip_bpy_data_item
 from mixer.blender_data.proxy import (
     BpyBlendProxy,
     BpyIDProxy,
@@ -88,9 +88,6 @@ class BpyIDDiff(BpyStructDiff):
         super().diff(proxy, bl_id)
 
 
-excluded_names = ["__last_scene_to_be_removed__"]
-
-
 class BpyPropCollectionDiff(BpyDiff):
     """
     Diff for a bpy_prop_collection. May not work as is for bpy_prop_collection not in bpy.data
@@ -107,7 +104,7 @@ class BpyPropCollectionDiff(BpyDiff):
         bl_collection = getattr(bpy.data, collection_name)
         blender_items = {}
         for name, item in bl_collection.items():
-            if name in excluded_names:
+            if skip_bpy_data_item(collection_name, item):
                 continue
             # TODO dot it here or in Proxy ?
             ensure_uuid(item)

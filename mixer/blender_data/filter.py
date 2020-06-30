@@ -9,6 +9,18 @@ DEBUG = True
 logger = logging.getLogger(__name__)
 
 
+def skip_bpy_data_item(collection_name, item):
+    # Never want to consider these as updated, created, removed, ...
+    if collection_name == "scenes":
+        if item.name == "__last_scene_to_be_removed__":
+            return True
+    elif collection_name == "images":
+        if item.source == "VIEWER":
+            # "Render Result", "Viewer Node"
+            return True
+    return False
+
+
 class Filter:
     def is_active(self):
         return True

@@ -12,7 +12,7 @@ import bpy
 import bpy.types as T  # noqa
 import mathutils
 
-from mixer.blender_data.filter import Context, safe_depsgraph_updates, safe_context
+from mixer.blender_data.filter import Context, safe_depsgraph_updates, safe_context, skip_bpy_data_item
 from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import (
     BlendData,
@@ -952,6 +952,8 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         for name, item in bl_collection.items():
             collection_name = BlendData.instance().bl_collection_name_from_ID(item)
+            if skip_bpy_data_item(collection_name, item):
+                continue
             with visit_state.debug_context.enter(name, item):
                 ensure_uuid(item)
                 # # HACK: Skip objects with a mesh in order to process D.objects withtout processing D.meshes
