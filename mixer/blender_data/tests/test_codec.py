@@ -53,8 +53,8 @@ class TestCodec(unittest.TestCase):
 
         focus_object_proxy = cam_proxy_received.data("dof").data("focus_object")
         self.assertIsInstance(focus_object_proxy, BpyIDRefProxy)
-        self.assertEqual(focus_object_proxy.collection(), "objects")
-        self.assertEqual(focus_object_proxy.key(), "Cube")
+        self.assertEqual(focus_object_proxy.collection, "objects")
+        self.assertEqual(focus_object_proxy.key, "Cube")
 
         # save into blender
         cam_proxy_received.save(D.cameras, transmit_name)

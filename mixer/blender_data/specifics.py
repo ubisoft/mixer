@@ -2,35 +2,61 @@
 """
 import logging
 import traceback
-from typing import Any, ItemsView, List, TypeVar
+from typing import ItemsView, List, TypeVar, Union
 
 import bpy
 import bpy.types as T  # noqa N812
+from mixer.blender_data.blenddata import BlendData
 
 logger = logging.getLogger(__name__)
 Proxy = TypeVar("Proxy")
 BpyIDProxy = TypeVar("BpyIDProxy")
 
 
-def ctor_args(id_: T.ID, proxy: BpyIDProxy) -> List[Any]:
-    """Builds a list of arguments required to create an item in a bpy.data collection
+def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
+    collection = getattr(bpy.data, collection_name)
+    BlendData.instance().collection(collection_name).set_dirty
+    if collection_name == "images":
+        is_packed = proxy.data("packed_file") is not None
+        image = None
+        if is_packed:
+            name = proxy.data("name")
+            size = proxy.data("size")
+            width = size.data(0)
+            height = size.data(1)
+            image = collection.new(name, width, height)
+            # remaning attributes will be saved from the received proxy attributes
+        else:
+            path = proxy.data("filepath")
+            if path != "":
+                image = collection.load(path)
+        return image
 
-    For instance, bpy.data.objects.new() requires a string (the name) and a bpy.types.ID that
-    will be linked to its data attribute. The list only include arguments after the item name,
-    that is always required.
+    if collection_name == "objects":
+        name = proxy.data("name")
+        target_proxy = proxy.data("data")
+        if target_proxy is not None:
+            target = target_proxy.target()
+        else:
+            target = None
+        object_ = collection.new(name, target)
+        return object_
 
-    Args:
-        id_ : determines the bpy.data collection where the item will be created
-        proxy : the Proxy that contains the required argument value
+    if collection_name == "lights":
+        name = proxy.data("name")
+        light_type = proxy.data("type")
+        light = collection.new(name, light_type)
+        return light
 
-    """
+    name = proxy.data("name")
+    try:
+        id_ = collection.new(name)
+    except TypeError as e:
+        logger.error(f"Exception while calling : bpy.data.{collection_name}.new({name})")
+        logger.error(f"TypeError : {e}")
+        return None
 
-    if isinstance(id_, T.Object):
-        # a BpyIDProxy
-        return [proxy.data("data")]
-    if isinstance(id_, T.Light):
-        return [proxy.data("type")]
-    return None
+    return id_
 
 
 def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
@@ -69,6 +95,14 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
 
+    if isinstance(bpy_struct, T.Node):
+        if bpy_struct.hide:
+            return properties
+
+        # not hidden: saving width_hidden is ignored
+        filter_props = ["width_hidden"]
+        filtered = {k: v for k, v in properties if k not in filter_props}
+        return filtered.items()
     return properties
 
 
@@ -102,6 +136,10 @@ def pre_save_id(proxy: Proxy, collection: T.bpy_prop_collection, key: str) -> T.
         use_curve_mapping = proxy.data("use_curve_mapping")
         if use_curve_mapping:
             target.use_curve_mapping = True
+    elif isinstance(target, bpy.types.World):
+        use_nodes = proxy.data("use_nodes")
+        if use_nodes:
+            target.use_nodes = True
     return target
 
 
@@ -118,26 +156,32 @@ def pre_save_struct(proxy: Proxy, bpy_struct: T.Struct, attr_name: str):
 def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
     """Add an element to a bpy_prop_collection using the collection specific API
     """
-    if isinstance(collection.bl_rna, type(T.KeyingSets.bl_rna)):
-        idname = proxy.data("bl_idname")
-        return collection.new(name=key, idname=idname)
+    bl_rna = getattr(collection, "bl_rna", None)
+    if bl_rna is not None:
+        if isinstance(bl_rna, type(T.KeyingSets.bl_rna)):
+            idname = proxy.data("bl_idname")
+            return collection.new(name=key, idname=idname)
 
-    if isinstance(collection.bl_rna, type(T.KeyingSetPaths.bl_rna)):
-        # TODO current implementation fails
-        # All keying sets paths have an empty name, and insertion with add()à failes
-        # with an empty name
-        target_ref = proxy.data("id")
-        if target_ref is None:
-            target = None
-        else:
-            target = target_ref.target()
-        data_path = proxy.data("data_path")
-        index = proxy.data("array_index")
-        group_method = proxy.data("group_method")
-        group_name = proxy.data("group")
-        return collection.add(
-            target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
-        )
+        if isinstance(bl_rna, type(T.KeyingSetPaths.bl_rna)):
+            # TODO current implementation fails
+            # All keying sets paths have an empty name, and insertion with add()à failes
+            # with an empty name
+            target_ref = proxy.data("id")
+            if target_ref is None:
+                target = None
+            else:
+                target = target_ref.target()
+            data_path = proxy.data("data_path")
+            index = proxy.data("array_index")
+            group_method = proxy.data("group_method")
+            group_name = proxy.data("group")
+            return collection.add(
+                target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
+            )
+
+        if isinstance(bl_rna, type(T.Nodes.bl_rna)):
+            node_type = proxy.data("bl_idname")
+            return collection.new(node_type)
 
     # try our best
     new_or_add = getattr(collection, "new", None)
@@ -146,7 +190,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
     try:
         return new_or_add(key)
     except Exception:
-        logger.warning(f"Not implemented new or add for type {collection.bl_rna} for {collection}[{key}] ...")
+        logger.warning(f"Not implemented new or add for type {type(collection)} for {collection}[{key}] ...")
         for s in traceback.format_exc().splitlines():
             logger.warning(f"...{s}")
         return None

@@ -12,7 +12,7 @@ import bpy
 import bpy.types as T  # noqa
 import mathutils
 
-from mixer.blender_data.filter import Context, safe_depsgraph_updates, safe_context
+from mixer.blender_data.filter import Context, safe_depsgraph_updates, safe_context, skip_bpy_data_item
 from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import (
     BlendData,
@@ -20,7 +20,9 @@ from mixer.blender_data.blenddata import (
     rna_identifier_to_collection_name,
     bl_rna_to_type,
 )
-from mixer.blender_data.types import is_builtin, is_vector, is_matrix
+from mixer.blender_data.types import is_builtin, is_vector, is_matrix, is_pointer_to
+
+DEBUG = True
 
 BpyBlendDiff = TypeVar("BpyBlendDiff")
 BpyPropCollectionDiff = TypeVar("BpyPropCollectionDiff")
@@ -195,7 +197,7 @@ def read_attribute(attr: any, attr_property: any, visit_state: VisitState):
             # need to know for each element if it is a ref or id
             load_as = load_as_what(attr_property, attr, visit_state.root_ids)
             if load_as == LoadElementAs.STRUCT:
-                return BpyPropStructCollectionProxy().load(attr, attr_property, visit_state)
+                return BpyPropStructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
             elif load_as == LoadElementAs.ID_REF:
                 # References into Blenddata collection, for instance D.scenes[0].objects
                 return BpyPropDataCollectionProxy().load_as_IDref(attr, visit_state)
@@ -223,7 +225,7 @@ def read_attribute(attr: any, attr_property: any, visit_state: VisitState):
         elif load_as == LoadElementAs.ID_REF:
             return BpyIDRefProxy().load(attr, visit_state)
         elif load_as == LoadElementAs.ID_DEF:
-            return BpyIDProxy().load(attr, visit_state)
+            return BpyIDProxy.make(attr_property).load(attr, visit_state)
 
         # assert issubclass(attr_type, T.bpy_struct) == issubclass(attr_type, T.bpy_struct)
         raise AssertionError("unexpected code path")
@@ -303,7 +305,8 @@ class StructLikeProxy(Proxy):
         """
         self._data.clear()
         properties = visit_state.context.properties(bl_instance)
-        # this assumes that specifics.py apply only to ID, not Struct
+        # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
+        # that we do not want to load anyway
         properties = specifics.conditional_properties(bl_instance, properties)
         for name, bl_rna_property in properties:
             attr = getattr(bl_instance, name)
@@ -363,13 +366,17 @@ class BpyIDProxy(BpyStructProxy):
     # May be later extended to target "embedded" IDs not in bpy.data
     _blenddata_path: BlenddataPath = None
 
-    # Addtitional arguments for the BlendDataXxxx collections object addtition(.new(), .load(), ...), besides name
-    # For instance object_data in BlendDataObject.new(name, object_data)
-    _ctor_args: List[Any] = None
     _class_name = ""
 
     def __init__(self):
         super().__init__()
+
+    @classmethod
+    def make(cls, attr_property):
+
+        if is_pointer_to(attr_property, T.NodeTree):
+            return NodeTreeProxy()
+        return BpyIDProxy()
 
     def mixer_uuid(self) -> str:
         return self._data["mixer_uuid"]
@@ -391,10 +398,6 @@ class BpyIDProxy(BpyStructProxy):
         self._class_name = bl_instance.__class__.__name__
         if blenddata_path is not None:
             self._blenddata_path = blenddata_path
-
-        # Create the ctor arguments that save() will need on the receiver side to create this item in a
-        # bpy.data collectton
-        self._ctor_args = specifics.ctor_args(bl_instance, self)
 
         uuid = bl_instance.get("mixer_uuid")
         if uuid:
@@ -430,35 +433,6 @@ class BpyIDProxy(BpyStructProxy):
             t = getattr(bl_instance, attr_name)
         return t
 
-    def pre_save(self, bl_instance: any, attr_name: str):
-        """Process attributes that must be saved first and return a possibily updated reference to the target
-
-        Args:
-            bl_instance: The collection that contgains the ID
-            attr_name: Its key
-
-        Returns:
-            [bpy.types.ID]: a possibly new ID
-        """
-        # TODO move to specifics.py
-        target = self.target(bl_instance, attr_name)
-        if isinstance(target, bpy.types.Scene):
-            # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
-            use_nodes = self._data.get("use_nodes")
-            if use_nodes:
-                write_attribute(target, "use_nodes", True)
-            sequence_editor = self._data.get("sequence_editor")
-            if sequence_editor is not None and target.sequence_editor is None:
-                target.sequence_editor_create()
-        elif isinstance(target, bpy.types.Light):
-            # required first to have access to new light type attributes
-            light_type = self._data.get("type")
-            if light_type is not None and light_type != target.type:
-                write_attribute(target, "type", light_type)
-                # must reload the reference
-                target = self.target(bl_instance, attr_name)
-        return target
-
     def save(self, bl_instance: any = None, attr_name: str = None) -> T.ID:
         blenddata = BlendData.instance()
         if self._blenddata_path is None:
@@ -476,49 +450,17 @@ class BpyIDProxy(BpyStructProxy):
         # 2 cases
         # - ID in blenddata collection
         # - ID in ID
-        # TODO slow use BlendData, redundant with target
+        # TODO slow use BlendData
         id_ = bl_instance.get(attr_name)
         if id_ is None:
-            # assume we must create an ID in a bpy.data collection
-            # find the ctor arguments. For instance, creating an Object requires a T.ID
-            ctor_args = []
-            if self._ctor_args:
-                for arg in self._ctor_args:
-                    if isinstance(arg, BpyIDRefProxy):
-                        # Find the target ID. This supposes that is was already created, hence that we receive the
-                        # updates in creation order (deepmost first)
-                        data_collection_name, data_key = arg._blenddata_path
-                        collection = BlendData.instance().collection(data_collection_name)
-                        arg_id_ = collection.items.get(data_key)
-                        if arg_id_ is None:
-                            if data_collection_name != "meshes":
-                                logger.warning(f"Cannot create {collection_name}[{attr_name}] ...")
-                                logger.warning(f"   ... Ref ctor parameter is None: {data_collection_name}[{data_key}]")
-                            else:
-                                # HACK for meshes
-                                logger.info(f"Cannot create {collection_name}[{attr_name}] ...")
-                                logger.info(f"   ... Ref ctor parameter is None: {data_collection_name}[{data_key}]")
-                                logger.info("   ... not an error")
-                            return None
-                        ctor_args.append(arg_id_)
-                    elif isinstance(arg, Proxy):
-                        # an error on the sender side. Il we receive and BpyIDProxy, it may mean that the sender
-                        # misloaded an IDDef instead of an IDRef
-                        logger.error("Invalid ctor argument : %s", arg)
-                        ctor_args = None
-                        break
-                    else:
-                        # for instance the light type
-                        ctor_args.append(arg)
-            if ctor_args is not None:
-                blenddata.collection(collection_name).ctor(attr_name, ctor_args)
-                id_ = bl_instance.get(attr_name)
-                id_.mixer_uuid = self.mixer_uuid()
-                # TODO remove this line
-                id_ = bl_instance.get(attr_name)
-
-        if id_ is None:
-            return None
+            id_ = specifics.bpy_data_ctor(collection_name, self)
+            if id_ is None:
+                logger.warning(f"Cannot create bpy.data.{collection_name}[{attr_name}]")
+                return None
+            if DEBUG:
+                if bl_instance.get(attr_name) != id_:
+                    logger.warning(f"Name mismatch avec creation of bpy.data.{collection_name}[{attr_name}] ")
+            id_.mixer_uuid = self.mixer_uuid()
 
         target = specifics.pre_save_id(self, bl_instance, attr_name)
         if target is None:
@@ -537,6 +479,50 @@ class BpyIDProxy(BpyStructProxy):
         #
         # To perform differential updates in the future, we will need markers for removed attributes
         self._data = other._data
+
+
+class NodeLinksProxy(BpyStructProxy):
+    def __init__(self):
+        super().__init__()
+
+    def load(self, bl_instance, _, visit_state: VisitState):
+        # NodeLink contain pointers to Node and NodeSocket.
+        # Just keep the names to restore the links in ShaderNodeTreeProxy.save
+
+        seq = []
+        for link in bl_instance:
+            link_data = (
+                link.from_node.name,
+                link.from_socket.name,
+                link.to_node.name,
+                link.to_socket.name,
+            )
+            seq.append(link_data)
+        self._data[MIXER_SEQUENCE] = seq
+        return self
+
+
+class NodeTreeProxy(BpyIDProxy):
+    def __init__(self):
+        super().__init__()
+
+    def save(self, bl_instance: any, attr_name: str):
+        # see https://stackoverflow.com/questions/36185377/how-i-can-create-a-material-select-it-create-new-nodes-with-this-material-and
+        # Saving NodeTree.links require access to NodeTree.nodes, so we need an implementation at the NodeTree level
+
+        node_tree = getattr(bl_instance, attr_name)
+
+        # save links last
+        for k, v in self._data.items():
+            if k != "links":
+                write_attribute(node_tree, k, v)
+
+        node_tree.links.clear()
+        seq = self.data("links").data(MIXER_SEQUENCE)
+        for src_node, src_socket, dst_node, dst_socket in seq:
+            src_socket = node_tree.nodes[src_node].outputs[src_socket]
+            dst_socket = node_tree.nodes[dst_node].inputs[dst_socket]
+            node_tree.links.new(src_socket, dst_socket)
 
 
 class BpyIDRefProxy(Proxy):
@@ -830,6 +816,12 @@ class BpyPropStructCollectionProxy(Proxy):
     def __init__(self):
         self._data: Mapping[Union[str, int], BpyIDProxy] = {}
 
+    @classmethod
+    def make(cls, attr_property: T.Property):
+        if attr_property.srna == T.NodeLinks.bl_rna:
+            return NodeLinksProxy()
+        return BpyPropStructCollectionProxy()
+
     def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, visit_state: VisitState):
 
         if len(bl_collection) == 0:
@@ -921,6 +913,8 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         for name, item in bl_collection.items():
             collection_name = BlendData.instance().bl_collection_name_from_ID(item)
+            if skip_bpy_data_item(collection_name, item):
+                continue
             with visit_state.debug_context.enter(name, item):
                 ensure_uuid(item)
                 # # HACK: Skip objects with a mesh in order to process D.objects withtout processing D.meshes
@@ -983,11 +977,12 @@ class BpyPropDataCollectionProxy(Proxy):
             # the ID will have changed if the object has been morphed (change light type, for instance)
             uuid = proxy.mixer_uuid()
             existing_id = visit_state.ids[uuid]
-            new_id = existing_proxy.save()
-            if existing_id != new_id:
+            id_ = existing_proxy.save()
+            if existing_id != id_:
                 visit_state.root_ids.remove(existing_id)
-                visit_state.root_ids.add(new_id)
-                visit_state.ids[uuid] = new_id
+                visit_state.root_ids.add(id_)
+                visit_state.ids[uuid] = id_
+        return id_
 
     def remove_one(self, name, visit_state: VisitState):
         """Remove a bpy.data collection item and update the proxy structures
@@ -1170,19 +1165,26 @@ class BpyBlendProxy(Proxy):
             logger.info("Updating %s", id_)
             proxy = self.id_proxies.get(id_.mixer_uuid)
             if proxy is None:
-                logger.warning("BpyBlendProxy.update(): Ignoring %s (no proxy)", id_)
+                # Not an error for embedded IDs.
+                # For instance Scene.node_tree is not a reference to a bpy.data collection element
+                # but a "pointer" to a NodeTree owned by Scene. In such a case, the update list contains
+                # scene.node_tree, then scene. We can ignore the scene.node_tree update since the
+                # processing of scene will process scene.node_tree.
+                # However, it is not obvious to detect the safe cases and remove the message in such cases
+                logger.info("BpyBlendProxy.update(): Ignoring %s (no proxy)", id_)
                 continue
             proxy.load(id_, visit_state)
             updates.append(proxy)
 
         return updates, removals
 
-    def update_one(self, proxy: BpyIDProxy, context: Context = safe_context):
+    def update_one(self, proxy: BpyIDProxy, context: Context = safe_context) -> T.ID:
         """ Create or update a bpy.data collection item and update the proxy accordingly
         """
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
         collection_name, _ = proxy._blenddata_path[0:2]
-        self._data[collection_name].update_one(proxy, visit_state)
+        id_ = self._data[collection_name].update_one(proxy, visit_state)
+        return id_
 
     def remove_one(self, collection_name: str, key: str, context: Context = safe_context):
         """ Remove a bpy.data collection item and update the proxy accordingly
@@ -1228,12 +1230,12 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
     """
-    type_ = type(value)
+
     if bl_instance is None:
         logger.warning(f"unexpected write None attribute")
         return
 
-    if type_ not in proxy_classes:
+    if not isinstance(value, Proxy):
         if type(key) is not str:
             logging.warning(f"Unexpected type {type(key)} for {bl_instance}.{key} : skipped")
             return

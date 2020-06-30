@@ -76,26 +76,38 @@ def bl_equals(attr_a, attr_b, msg=None, skip_name=False, context=None):
         if attr_a != attr_b:
             raise failureException(f"Different values : {attr_a} and {attr_b}")
     elif type_a == T.bpy_prop_array:
-        if attr_a != attr_b:
+        if list(attr_a) != list(attr_b):
             raise failureException(f"Different values for array : {attr_a} and {attr_b}")
     elif issubclass(type_a, T.bpy_prop_collection):
         for key in attr_a.keys():
             attr_a_i = attr_a[key]
             attr_b_i = attr_b[key]
-            if not bl_equals(attr_a_i, attr_b_i, msg, skip_name=False, context=context):
+            try:
+                equal = bl_equals(attr_a_i, attr_b_i, msg, skip_name=False, context=context)
+            except failureException as e:
                 raise failureException(
-                    f"Different values for collection items at key {key} : {attr_a_i} and {attr_b_i}"
+                    f'{e}\nDifferent values for collection items at key "{key}" : {attr_a_i} and {attr_b_i}'
+                ) from None
+            if not equal:
+                raise failureException(
+                    f'Different values for collection items at key "{key}" : {attr_a_i} and {attr_b_i}'
                 )
+
     elif issubclass(type_a, T.bpy_struct):
         for name, _ in context.properties(attr_a.bl_rna):
-            if skip_name and name == "name":
-                return True
+            if skip_name and (name == "name" or name == "name_full"):
+                continue
             attr_a_i = getattr(attr_a, name)
             attr_b_i = getattr(attr_b, name)
-            if not bl_equals(attr_a_i, attr_b_i, msg, skip_name=False, context=context):
+            try:
+                equal = bl_equals(attr_a_i, attr_b_i, msg, skip_name=False, context=context)
+            except failureException as e:
                 raise failureException(
-                    f"Different values for collection items at key {name} : {attr_a_i} and {attr_b_i}"
-                )
+                    f'{e}\nDifferent values for struct items at key "{name}" : {attr_a_i} and {attr_b_i}'
+                ) from None
+            if not equal:
+                raise failureException(f'Different values for struct items at key "{name}" : {attr_a_i} and {attr_b_i}')
+
     else:
         raise NotImplementedError
 

@@ -9,12 +9,14 @@ from mixer.blender_data.proxy import (
     BpyPropStructCollectionProxy,
     BpyStructProxy,
     StructLikeProxy,
+    NodeLinksProxy,
+    NodeTreeProxy,
 )
 
 # https://stackoverflow.com/questions/38307068/make-a-dict-json-from-string-with-duplicate-keys-python/38307621#38307621
 # https://stackoverflow.com/questions/31085153/easiest-way-to-serialize-object-in-a-nested-dictionary
 
-struct_like_classes = [BpyIDProxy, BpyIDRefProxy, BpyStructProxy, BpyPropertyGroupProxy]
+struct_like_classes = [BpyIDProxy, BpyIDRefProxy, BpyStructProxy, BpyPropertyGroupProxy, NodeLinksProxy, NodeTreeProxy]
 collection_classes = [
     BpyPropStructCollectionProxy,
     BpyPropDataCollectionProxy,
@@ -22,7 +24,7 @@ collection_classes = [
 _classes = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
 
-options = ["_blenddata_path", "_ctor_args", "_class_name"]
+options = ["_blenddata_path", "_class_name"]
 
 
 def default_optional(obj, option_name: str) -> Mapping[str, Any]:

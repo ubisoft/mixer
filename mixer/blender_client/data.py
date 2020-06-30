@@ -11,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 # No explicit creations here.
 # The creations are perfomed as part of an update of an item that does not exist.
-# It is easier to manage ctor parameters beyond name that are sometimes required
-# and stored the serialized proxy (_ctor_args)
 
 
 def build_data_remove(buffer):

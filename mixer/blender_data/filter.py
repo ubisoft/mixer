@@ -9,6 +9,18 @@ DEBUG = True
 logger = logging.getLogger(__name__)
 
 
+def skip_bpy_data_item(collection_name, item):
+    # Never want to consider these as updated, created, removed, ...
+    if collection_name == "scenes":
+        if item.name == "__last_scene_to_be_removed__":
+            return True
+    elif collection_name == "images":
+        if item.source == "VIEWER":
+            # "Render Result", "Viewer Node"
+            return True
+    return False
+
+
 class Filter:
     def is_active(self):
         return True
@@ -205,13 +217,33 @@ default_exclusions = {
         # Seems to be a view of the master collection children
         NameFilterOut("children"),
     ],
-    T.MeshPolygon: [NameFilterOut("area"), NameFilterOut("edge_keys"), NameFilterOut("loop_indices")],
+    T.MeshPolygon: [NameFilterOut("area")],
     T.MeshVertex: [
         # MeshVertex.groups is updated via Object.vertex_groups
         NameFilterOut("groups")
     ],
-    T.Node: [NameFilterOut("internal_links")],
-    T.NodeSocket: [NameFilterOut("node")],
+    #
+    T.Node: [NameFilterOut(["internal_links"])],
+    T.NodeLink: [
+        # see NodeLinkProxy
+        NameFilterOut(["from_node", "from_socket", "to_node", "to_socket", "is_hidden"])
+    ],
+    T.NodeSocket: [
+        # Currently synchronize builtin shading node sockets only, so assume these attributes are
+        # managed only at the Node creation
+        NameFilterOut(
+            ["bl_idname", "identifier", "is_linked", "is_output", "link_limit", "name", "node", "type", "links"]
+        )
+    ],
+    T.NodeTree: [
+        NameFilterOut(
+            [
+                # read only
+                "view_center",
+                "name",
+            ]
+        )
+    ],
     T.Object: [
         # TODO triggers an error on metaballs
         #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
@@ -223,12 +255,17 @@ default_exclusions = {
     T.Scene: [
         NameFilterOut(
             [
+                # messy in tests because setting either may reset the other to frame_start or frame_end
+                # would require
+                "frame_preview_start",
+                "frame_preview_end",
+                # just a view into the scene objects
+                "objects",
                 # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
                 # it is unclear how to do it.
                 "tool_settings",
-                # just a view into the scene objects
-                "objects",
                 # TODO temporary, not implemented
+                "node_tree",
                 "collection",
                 "view_layers",
                 "rigidbody_world",
@@ -268,7 +305,7 @@ safe_exclusions = {}
 # Scene
 # Also do not blindly update what is already updated in VRtist code without checking that
 # they do not interfere
-safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall, T.Scene]
+safe_depsgraph_updates = [T.Camera, T.Light, T.MetaBall, T.NodeTree, T.Scene, T.World]
 # this also mostly works
 # safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall, T.Object, T.Scene]
 
@@ -276,7 +313,7 @@ safe_filter = FilterStack()
 # The collections in this list are tested by BpyBlendDiff collection update
 # they will be included in creation messages.
 # objects is needed to items not created by VRtsist
-safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]
+safe_blenddata_collections = ["cameras", "lights", "metaballs", "objects", "scenes", "worlds"]
 
 # mostly works
 # safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]

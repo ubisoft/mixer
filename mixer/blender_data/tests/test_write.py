@@ -12,13 +12,21 @@ from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 from mixer.blender_data.filter import test_context
 from mathutils import Matrix, Vector
 
+context = test_context
+
 
 class TestWriteAttribute(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+
+        # otherwise the loaded scene  way have curves despite use_curve_mapping==False and
+        # the new one will not have curves and will not receive them as they are not send
+        # use_curve_mapping == False
+        D.scenes["Scene_0"].view_settings.use_curve_mapping = True
+
         self.proxy = BpyBlendProxy()
-        self.proxy.load(test_context)
-        register_bl_equals(self, test_context)
+        self.proxy.load(context)
+        register_bl_equals(self, context)
 
     def test_write_simple_types(self):
         scene = D.scenes[0]
@@ -86,6 +94,16 @@ class TestWriteAttribute(unittest.TestCase):
         light_proxy.save(D.lights, clone_name)
         self.assertEqual(clone_light.energy, expected_energy)
 
+    def test_write_world(self):
+        # test_write.TestWriteAttribute.test_write_world
+        world_name = "World"
+        clone_name = f"Clone of {world_name}"
+        world_clone = D.worlds.new(clone_name)
+        world_proxy = self.proxy._data["worlds"]._data[world_name]
+        world_proxy._data["name"] = clone_name
+        world_proxy.save(D.worlds, clone_name)
+        self.assertEqual(world_clone, D.worlds[world_name])
+
     def test_write_array_curvemap(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
 
@@ -97,7 +115,7 @@ class TestWriteAttribute(unittest.TestCase):
             curve0.points[i].location = point
 
         self.proxy = BpyBlendProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(context)
         clone_name = f"Clone of {light_name}"
         light_proxy = self.proxy._data["lights"]._data[light_name]
         light_type = light_proxy._data["type"]
@@ -120,7 +138,7 @@ class TestWriteAttribute(unittest.TestCase):
         src_camera.dof.focus_object = focus_object
 
         self.proxy = BpyBlendProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(context)
         camera_proxy = self.proxy.data("cameras").data(src_camera_name)
 
         # Create a light then restore src_light into it
@@ -144,7 +162,7 @@ class TestWriteAttribute(unittest.TestCase):
             curve0.points[i].location = point
 
         self.proxy = BpyBlendProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(context)
         light_proxy = self.proxy.data("lights").data(src_light_name)
         light_type = light_proxy.data("type")
 
@@ -181,7 +199,7 @@ class TestWriteAttribute(unittest.TestCase):
             curve0.points[i].location = point
 
         self.proxy = BpyBlendProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(context)
         light_proxy = self.proxy.data("lights").data(src_light_name)
         light_type = light_proxy.data("type")
 
@@ -217,4 +235,4 @@ class TestWriteAttribute(unittest.TestCase):
         world_proxy = self.proxy._data["scenes"]._data[scene_name]._data["world"]
         clone = D.scenes.new(clone_name)
         world_proxy.save(clone, "world")
-        self.assertEqual(scene, clone)
+        self.assertEqual(scene.world, clone.world)

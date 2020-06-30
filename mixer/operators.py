@@ -943,7 +943,7 @@ def clear_scene_content():
             "metaballs",
             "meshes",
             "textures",
-            # "worlds",
+            "worlds",
             "sounds",
         ]
 

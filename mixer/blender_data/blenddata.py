@@ -2,7 +2,7 @@
 """
 import functools
 import logging
-from typing import Any, Iterable, List, Mapping, Union
+from typing import Iterable, Mapping
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -26,9 +26,6 @@ collection_name_to_type = {
 # e.g. "Object" -> "objects", "Light" -> "lights"
 rna_identifier_to_collection_name = {value.bl_rna.identifier: key for key, value in collection_name_to_type.items()}
 
-# TODO move this to specifics.py
-load_ctors = ["fonts", "movieclips", "sounds"]
-
 
 class BlendDataCollection:
     """
@@ -41,13 +38,6 @@ class BlendDataCollection:
         self._name = name
         self._dirty: bool = True
         self._items = {}
-
-        if self._name in load_ctors:
-            ctor_name = "load"
-        else:
-            ctor_name = "new"
-
-        self._ctor_name = ctor_name
 
     def __getitem__(self, key):
         item = self.items.get(key)
@@ -72,26 +62,6 @@ class BlendDataCollection:
     def _reload(self):
         self._items = {x.name_full: x for x in self.bpy_collection()}
         self._dirty = False
-
-    def ctor(self, name: str, ctor_args: List[Any] = ()) -> Union[T.ID, None]:
-        """
-        Create an instance in the BlendData collection using its ctor (new, load, ...)
-        """
-        collection = self.bpy_collection()
-        ctor = getattr(collection, self._ctor_name, None)
-        if ctor is None:
-            logger.warning("unexpected call to BlendDataCollection.ctor() for %s", self.bpy_collection())
-            return None
-        data = self.items.get(name)
-        if data is None:
-            try:
-                data = ctor(name, *ctor_args)
-            except TypeError:
-                logger.error(f"Exception while calling ctor {self.name()}.{self._ctor_name}({name}, {ctor_args})")
-            self._items[name] = data
-        else:
-            logger.error(f"ctor for existing {self.name()}.{self._ctor_name}({name}, {ctor_args})")
-        return data
 
     def remove(self, name_full):
         if self._name == "scenes":
