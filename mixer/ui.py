@@ -91,7 +91,6 @@ class SettingsPanel(bpy.types.Panel):
     bl_category = "Mixer"
 
     def draw(self, context):
-        logger.debug("SettingsPanel::draw()")
         layout = self.layout
 
         mixer_props = get_mixer_props()

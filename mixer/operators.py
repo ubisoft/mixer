@@ -736,8 +736,8 @@ def send_frame_changed(scene):
 def send_scene_data_to_server(scene, dummy):
     logger.debug(
         "send_scene_data_to_server(): receivedCommandProcessed %s, pending_test_update %s",
-        share_data.pending_test_update,
         share_data.client.receivedCommandsProcessed,
+        share_data.pending_test_update,
     )
 
     timer = share_data.current_stats_timer
