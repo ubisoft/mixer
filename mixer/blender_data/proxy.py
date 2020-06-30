@@ -22,6 +22,8 @@ from mixer.blender_data.blenddata import (
 )
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix, is_pointer_to
 
+DEBUG = True
+
 BpyBlendDiff = TypeVar("BpyBlendDiff")
 BpyPropCollectionDiff = TypeVar("BpyPropCollectionDiff")
 BpyIDProxy = TypeVar("BpyIDProxy")
@@ -364,9 +366,6 @@ class BpyIDProxy(BpyStructProxy):
     # May be later extended to target "embedded" IDs not in bpy.data
     _blenddata_path: BlenddataPath = None
 
-    # Addtitional arguments for the BlendDataXxxx collections object addtition(.new(), .load(), ...), besides name
-    # For instance object_data in BlendDataObject.new(name, object_data)
-    _ctor_args: List[Any] = None
     _class_name = ""
 
     def __init__(self):
@@ -399,10 +398,6 @@ class BpyIDProxy(BpyStructProxy):
         self._class_name = bl_instance.__class__.__name__
         if blenddata_path is not None:
             self._blenddata_path = blenddata_path
-
-        # Create the ctor arguments that save() will need on the receiver side to create this item in a
-        # bpy.data collectton
-        self._ctor_args = specifics.ctor_args(bl_instance, self)
 
         uuid = bl_instance.get("mixer_uuid")
         if uuid:
@@ -455,51 +450,17 @@ class BpyIDProxy(BpyStructProxy):
         # 2 cases
         # - ID in blenddata collection
         # - ID in ID
-        # TODO slow use BlendData, redundant with target
+        # TODO slow use BlendData
         id_ = bl_instance.get(attr_name)
         if id_ is None:
-            # assume we must create an ID in a bpy.data collection
-            # find the ctor arguments. For instance, creating an Object requires a T.ID
-            ctor_args = []
-            if self._ctor_args:
-                for arg in self._ctor_args:
-                    if isinstance(arg, BpyIDRefProxy):
-                        # Find the target ID. This supposes that is was already created, hence that we receive the
-                        # updates in creation order (deepmost first)
-                        data_collection_name, data_key = arg._blenddata_path
-                        collection = BlendData.instance().collection(data_collection_name)
-                        arg_id_ = collection.items.get(data_key)
-                        if arg_id_ is None:
-                            if data_collection_name != "meshes":
-                                logger.warning(f"Cannot create {collection_name}[{attr_name}] ...")
-                                logger.warning(f"   ... Ref ctor parameter is None: {data_collection_name}[{data_key}]")
-                            else:
-                                # HACK for meshes
-                                logger.info(f"Cannot create {collection_name}[{attr_name}] ...")
-                                logger.info(f"   ... Ref ctor parameter is None: {data_collection_name}[{data_key}]")
-                                logger.info("   ... not an error")
-                            return None
-                        ctor_args.append(arg_id_)
-                    elif isinstance(arg, Proxy):
-                        # an error on the sender side. Il we receive and BpyIDProxy, it may mean that the sender
-                        # misloaded an IDDef instead of an IDRef
-                        logger.error("Invalid ctor argument : %s", arg)
-                        ctor_args = None
-                        break
-                    else:
-                        # for instance the light type
-                        ctor_args.append(arg)
-            if ctor_args is not None:
-                id_ = specifics.ctor(collection_name, attr_name, ctor_args, self)
-                if id_ is None:
-                    logger.warning(f"Cannot create bpy.data.{collection_name}[{attr_name}]({ctor_args})")
-                    return None
-                id_.mixer_uuid = self.mixer_uuid()
-                # TODO remove this line
-                id_ = bl_instance.get(attr_name)
-
-        if id_ is None:
-            return None
+            id_ = specifics.bpy_data_ctor(collection_name, self)
+            if id_ is None:
+                logger.warning(f"Cannot create bpy.data.{collection_name}[{attr_name}]")
+                return None
+            if DEBUG:
+                if bl_instance.get(attr_name) != id_:
+                    logger.warning(f"Name mismatch avec creation of bpy.data.{collection_name}[{attr_name}] ")
+            id_.mixer_uuid = self.mixer_uuid()
 
         target = specifics.pre_save_id(self, bl_instance, attr_name)
         if target is None:

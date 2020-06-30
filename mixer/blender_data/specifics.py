@@ -2,41 +2,21 @@
 """
 import logging
 import traceback
-from typing import Any, ItemsView, List, TypeVar, Union
-from mixer.blender_data.blenddata import BlendData
+from typing import ItemsView, List, TypeVar, Union
 
 import bpy
 import bpy.types as T  # noqa N812
+from mixer.blender_data.blenddata import BlendData
 
 logger = logging.getLogger(__name__)
 Proxy = TypeVar("Proxy")
 BpyIDProxy = TypeVar("BpyIDProxy")
 
 
-def ctor_args(id_: T.ID, proxy: BpyIDProxy) -> List[Any]:
-    """Builds a list of arguments required to create an item in a bpy.data collection
-
-    For instance, bpy.data.objects.new() requires a string (the name) and a bpy.types.ID that
-    will be linked to its data attribute. The list only include arguments after the item name,
-    that is always required.
-
-    Args:
-        id_ : determines the bpy.data collection where the item will be created
-        proxy : the Proxy that contains the required argument value
-
-    """
-
-    if isinstance(id_, T.Object):
-        # a BpyIDProxy
-        return [proxy.data("data")]
-    if isinstance(id_, T.Light):
-        return [proxy.data("type")]
-    return None
-
-
-def ctor(collection_name: str, attr_name: str, ctor_args, proxy: BpyIDProxy) -> Union[T.ID, None]:
+def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
     collection = getattr(bpy.data, collection_name)
-    if isinstance(collection.bl_rna, type(bpy.data.images.bl_rna)):
+    BlendData.instance().collection(collection_name).set_dirty
+    if collection_name == "images":
         is_packed = proxy.data("packed_file") is not None
         image = None
         if is_packed:
@@ -45,13 +25,38 @@ def ctor(collection_name: str, attr_name: str, ctor_args, proxy: BpyIDProxy) -> 
             width = size.data(0)
             height = size.data(1)
             image = collection.new(name, width, height)
+            # remaning attributes will be saved from the received proxy attributes
         else:
             path = proxy.data("filepath")
             if path != "":
                 image = collection.load(path)
         return image
 
-    return BlendData.instance().collection(collection_name).ctor(attr_name, ctor_args)
+    if collection_name == "objects":
+        name = proxy.data("name")
+        target_proxy = proxy.data("data")
+        if target_proxy is not None:
+            target = target_proxy.target()
+        else:
+            target = None
+        object_ = collection.new(name, target)
+        return object_
+
+    if collection_name == "lights":
+        name = proxy.data("name")
+        light_type = proxy.data("type")
+        light = collection.new(name, light_type)
+        return light
+
+    name = proxy.data("name")
+    try:
+        id_ = collection.new(name)
+    except TypeError as e:
+        logger.error(f"Exception while calling : bpy.data.{collection_name}.new({name})")
+        logger.error(f"TypeError : {e}")
+        return None
+
+    return id_
 
 
 def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
