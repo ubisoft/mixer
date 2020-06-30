@@ -86,8 +86,9 @@ class BlendDataCollection:
         if data is None:
             try:
                 data = ctor(name, *ctor_args)
-            except TypeError:
+            except TypeError as e:
                 logger.error(f"Exception while calling ctor {self.name()}.{self._ctor_name}({name}, {ctor_args})")
+                logger.error(f"TypeError : {e}")
             self._items[name] = data
         else:
             logger.error(f"ctor for existing {self.name()}.{self._ctor_name}({name}, {ctor_args})")

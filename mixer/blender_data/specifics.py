@@ -2,7 +2,8 @@
 """
 import logging
 import traceback
-from typing import Any, ItemsView, List, TypeVar
+from typing import Any, ItemsView, List, TypeVar, Union
+from mixer.blender_data.blenddata import BlendData
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -31,6 +32,26 @@ def ctor_args(id_: T.ID, proxy: BpyIDProxy) -> List[Any]:
     if isinstance(id_, T.Light):
         return [proxy.data("type")]
     return None
+
+
+def ctor(collection_name: str, attr_name: str, ctor_args, proxy: BpyIDProxy) -> Union[T.ID, None]:
+    collection = getattr(bpy.data, collection_name)
+    if isinstance(collection.bl_rna, type(bpy.data.images.bl_rna)):
+        is_packed = proxy.data("packed_file") is not None
+        image = None
+        if is_packed:
+            name = proxy.data("name")
+            size = proxy.data("size")
+            width = size.data(0)
+            height = size.data(1)
+            image = collection.new(name, width, height)
+        else:
+            path = proxy.data("filepath")
+            if path != "":
+                image = collection.load(path)
+        return image
+
+    return BlendData.instance().collection(collection_name).ctor(attr_name, ctor_args)
 
 
 def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:

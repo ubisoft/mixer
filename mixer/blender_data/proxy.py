@@ -490,8 +490,10 @@ class BpyIDProxy(BpyStructProxy):
                         # for instance the light type
                         ctor_args.append(arg)
             if ctor_args is not None:
-                blenddata.collection(collection_name).ctor(attr_name, ctor_args)
-                id_ = bl_instance.get(attr_name)
+                id_ = specifics.ctor(collection_name, attr_name, ctor_args, self)
+                if id_ is None:
+                    logger.warning(f"Cannot create bpy.data.{collection_name}[{attr_name}]({ctor_args})")
+                    return None
                 id_.mixer_uuid = self.mixer_uuid()
                 # TODO remove this line
                 id_ = bl_instance.get(attr_name)
