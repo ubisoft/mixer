@@ -156,30 +156,32 @@ def pre_save_struct(proxy: Proxy, bpy_struct: T.Struct, attr_name: str):
 def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
     """Add an element to a bpy_prop_collection using the collection specific API
     """
-    if isinstance(collection.bl_rna, type(T.KeyingSets.bl_rna)):
-        idname = proxy.data("bl_idname")
-        return collection.new(name=key, idname=idname)
+    bl_rna = getattr(collection, "bl_rna", None)
+    if bl_rna is not None:
+        if isinstance(bl_rna, type(T.KeyingSets.bl_rna)):
+            idname = proxy.data("bl_idname")
+            return collection.new(name=key, idname=idname)
 
-    if isinstance(collection.bl_rna, type(T.KeyingSetPaths.bl_rna)):
-        # TODO current implementation fails
-        # All keying sets paths have an empty name, and insertion with add()à failes
-        # with an empty name
-        target_ref = proxy.data("id")
-        if target_ref is None:
-            target = None
-        else:
-            target = target_ref.target()
-        data_path = proxy.data("data_path")
-        index = proxy.data("array_index")
-        group_method = proxy.data("group_method")
-        group_name = proxy.data("group")
-        return collection.add(
-            target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
-        )
+        if isinstance(bl_rna, type(T.KeyingSetPaths.bl_rna)):
+            # TODO current implementation fails
+            # All keying sets paths have an empty name, and insertion with add()à failes
+            # with an empty name
+            target_ref = proxy.data("id")
+            if target_ref is None:
+                target = None
+            else:
+                target = target_ref.target()
+            data_path = proxy.data("data_path")
+            index = proxy.data("array_index")
+            group_method = proxy.data("group_method")
+            group_name = proxy.data("group")
+            return collection.add(
+                target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
+            )
 
-    if isinstance(collection.bl_rna, type(T.Nodes.bl_rna)):
-        node_type = proxy.data("bl_idname")
-        return collection.new(node_type)
+        if isinstance(bl_rna, type(T.Nodes.bl_rna)):
+            node_type = proxy.data("bl_idname")
+            return collection.new(node_type)
 
     # try our best
     new_or_add = getattr(collection, "new", None)
@@ -188,7 +190,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
     try:
         return new_or_add(key)
     except Exception:
-        logger.warning(f"Not implemented new or add for type {collection.bl_rna} for {collection}[{key}] ...")
+        logger.warning(f"Not implemented new or add for type {type(collection)} for {collection}[{key}] ...")
         for s in traceback.format_exc().splitlines():
             logger.warning(f"...{s}")
         return None
