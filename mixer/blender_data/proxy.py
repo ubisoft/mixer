@@ -977,11 +977,12 @@ class BpyPropDataCollectionProxy(Proxy):
             # the ID will have changed if the object has been morphed (change light type, for instance)
             uuid = proxy.mixer_uuid()
             existing_id = visit_state.ids[uuid]
-            new_id = existing_proxy.save()
-            if existing_id != new_id:
+            id_ = existing_proxy.save()
+            if existing_id != id_:
                 visit_state.root_ids.remove(existing_id)
-                visit_state.root_ids.add(new_id)
-                visit_state.ids[uuid] = new_id
+                visit_state.root_ids.add(id_)
+                visit_state.ids[uuid] = id_
+        return id_
 
     def remove_one(self, name, visit_state: VisitState):
         """Remove a bpy.data collection item and update the proxy structures
@@ -1177,12 +1178,13 @@ class BpyBlendProxy(Proxy):
 
         return updates, removals
 
-    def update_one(self, proxy: BpyIDProxy, context: Context = safe_context):
+    def update_one(self, proxy: BpyIDProxy, context: Context = safe_context) -> T.ID:
         """ Create or update a bpy.data collection item and update the proxy accordingly
         """
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
         collection_name, _ = proxy._blenddata_path[0:2]
-        self._data[collection_name].update_one(proxy, visit_state)
+        id_ = self._data[collection_name].update_one(proxy, visit_state)
+        return id_
 
     def remove_one(self, collection_name: str, key: str, context: Context = safe_context):
         """ Remove a bpy.data collection item and update the proxy accordingly
