@@ -21,7 +21,7 @@ class Client:
         self.receivedCommands = queue.Queue()
         self.pendingCommands = queue.Queue()
         self.applyTransformCallback = None
-        self.receivedCommandsProcessed = False
+        self._receivedCommandsProcessed = False
         self.blockSignals = False
         self._local_address = None
         self.socket = None
@@ -29,6 +29,15 @@ class Client:
     def __del__(self):
         if self.socket is not None:
             self.disconnect()
+
+    @property
+    def receivedCommandsProcessed(self):  # noqa N802
+        return self._receivedCommandsProcessed
+
+    @receivedCommandsProcessed.setter
+    def receivedCommandsProcessed(self, value):  # noqa N802
+        logger.debug("setting receivedCommandsProcessed to %s", value)
+        self._receivedCommandsProcessed = value
 
     def connect(self):
         if self.is_connected():
