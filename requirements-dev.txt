@@ -14,7 +14,8 @@ pep8-naming==0.10.0
 pycodestyle==2.5.0
 pyflakes==2.1.1
 regex==2020.4.4
+requests==2.23.0
 toml==0.10.0
 typed-ast==1.4.1
 typing==3.7.4.1
-requests==2.23.0
+unittest-xml-reporting==3.0.2

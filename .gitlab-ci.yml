@@ -61,11 +61,18 @@ unittest:
     MIXER_BLENDER_ZIP_BASENAME: blender-2.82a-windows64
     MIXER_BLENDER_VERSION_BASE: "2.82"
     MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
+    MIXER_TEST_OUTPUT: logs\tests
   script:
     - gitlab\run_unittest.bat
   cache:
     paths:
       - gitlab/blender/cache
+  artifacts:
+    paths:
+      - logs\tests\*.xml
+    reports:
+      junit:
+        - logs\tests\*.xml
 
 .deploy_network_folder: &tpl_deploy_network_folder
   <<: *tpl_on_version_tag
