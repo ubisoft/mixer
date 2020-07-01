@@ -45,14 +45,15 @@ REM install Mixer in local blender
 %MIXER_BLENDER_EXE_PATH% --background --python %CURRENT_DIR%\install_mixer.py
 
 REM These tests run within blender
+%PYTHON% -m pip install unittest-xml-reporting
 %MIXER_BLENDER_EXE_PATH% --background --python-exit-code 1 --python mixer\blender_data\tests\ci.py
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
 REM run unit tests. Theses tests launch 2 blender that communicate together
-%PYTHON% -m unittest discover --verbose tests.vrtist
+%PYTHON% -m xmlrunner discover --verbose tests.vrtist -o %MIXER_TEST_OUTPUT%
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
-%PYTHON% -m unittest discover --verbose tests.broadcaster
+%PYTHON% -m xmlrunner discover --verbose tests.broadcaster -o %MIXER_TEST_OUTPUT%
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
 
