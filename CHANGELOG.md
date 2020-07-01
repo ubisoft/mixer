@@ -1,3 +1,14 @@
+# 0.7.0 (2020-07-01)
+
+## Features
+
+- Synchronize World including its node_tree (without image files)
+
+## Bugfix
+
+- Fix broken synchronization after exception
+- Fix exception during remove from collection
+
 # 0.6.2 (2020-06-29)
 
 ## CI/CD
