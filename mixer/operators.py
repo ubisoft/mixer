@@ -804,11 +804,11 @@ def send_scene_data_to_server(scene, dummy):
 
         # send the VRtist transforms after full Blender protocol has the opportunity to create the object data
         # that is not handled by VRtist protocol, otherwise the receiver creates an empty when it receives a transform
+        changed |= update_transforms()
         changed |= add_collections_to_scenes()
         changed |= add_collections_to_collections()
         changed |= add_objects_to_collections()
         changed |= add_objects_to_scenes()
-        changed |= update_transforms()
         changed |= update_collections_parameters()
         changed |= create_vrtist_objects()
         changed |= delete_scene_objects()
