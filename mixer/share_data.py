@@ -8,6 +8,7 @@ from mixer.blender_data.proxy import BpyBlendProxy
 from mixer.blender_data.filter import test_context
 
 import bpy
+from mixer.shot_manager_data import ShotManager
 
 logger = logging.getLogger(__name__)
 ObjectVisibility = namedtuple("ObjectVisibility", ["hide_viewport", "hide_select", "hide_render", "hide_get"])
@@ -66,6 +67,7 @@ class ShareData:
         self.pending_test_update = False
 
         self.clear_room_data()
+        self.shot_manager = ShotManager()
 
     def clear_room_data(self):
         # equivalent to handlers set
@@ -138,6 +140,10 @@ class ShareData:
         self.blender_collection_temporary_visibility: Mapping[str, bool] = {}
 
         self.pending_parenting = set()
+
+        self.current_camera: str = ""
+        self.start_frame = 0
+        self.end_frame = 0
 
         self.proxy: BpyBlendProxy = None
 

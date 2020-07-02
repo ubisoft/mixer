@@ -21,6 +21,7 @@ from mixer.blender_client import material as material_api
 from mixer.blender_client import mesh as mesh_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
+import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
 
 _STILL_ACTIVE = 259
@@ -136,6 +137,7 @@ class ClientBlender(Client):
             new_obj.name = dst_name
             if hasattr(obj, "data"):
                 new_obj.data = obj.data.copy()
+                new_obj.data.name = dst_name
                 new_obj.animation_data_clear()
             for collection in obj.users_collection:
                 collection.objects.link(new_obj)
@@ -295,6 +297,21 @@ class ClientBlender(Client):
         name, index = common.decode_string(data, index)
         self.query_object_data(name)
 
+    def build_clear_animations(self, data):
+        index = 0
+        name, index = common.decode_string(data, index)
+        ob = share_data.blender_objects[name]
+        ob.animation_data_clear()
+        if ob.data:
+            ob.data.animation_data_clear()
+
+    def build_montage_mode(self, data):
+        index = 0
+        montage, index = common.decode_bool(data, index)
+        winman = bpy.data.window_managers["WinMan"]
+        if hasattr(winman, "UAS_shot_manager_handler_toggle"):
+            winman.UAS_shot_manager_handler_toggle = montage
+
     def send_group_begin(self):
         # The integer sent is for future use: the server might fill it with the group size once all messages
         # have been received, and give the opportunity to future clients to know how many messages they need to process
@@ -373,7 +390,7 @@ class ClientBlender(Client):
         for slot in obj.material_slots:
             material_name, index = common.decode_string(command_data, index)
             if slot.link == "OBJECT" and material_name != "":
-                slot.material = self.get_or_create_material(material_name)
+                slot.material = material_api.get_or_create_material(material_name)
 
     def send_set_current_scene(self, name):
         buffer = common.encode_string(name)
@@ -422,6 +439,10 @@ class ClientBlender(Client):
             + common.encode_float(obj.data.dof.focus_distance)
         )
         self.add_command(common.Command(common.MessageType.CAMERA_ATTRIBUTES, buffer, 0))
+
+    def send_current_camera(self, camera_name):
+        buffer = common.encode_string(camera_name)
+        self.add_command(common.Command(common.MessageType.CURRENT_CAMERA, buffer, 0))
 
     def send_deleted_object(self, obj_name):
         self.send_delete(obj_name)
@@ -663,6 +684,13 @@ class ClientBlender(Client):
                         elif command.type == common.MessageType.QUERY_OBJECT_DATA:
                             self.build_query_object_data(command.data)
 
+                        elif command.type == common.MessageType.CLEAR_ANIMATIONS:
+                            self.build_clear_animations(command.data)
+                        elif command.type == common.MessageType.SHOT_MANAGER_MONTAGE_MODE:
+                            self.build_montage_mode(command.data)
+                        elif command.type == common.MessageType.SHOT_MANAGER_ACTION:
+                            shot_manager.build_shot_manager_action(command.data)
+
                         elif command.type == common.MessageType.BLENDER_DATA_UPDATE:
                             data_api.build_data_update(command.data)
                         elif command.type == common.MessageType.BLENDER_DATA_REMOVE:
@@ -698,3 +726,5 @@ class ClientBlender(Client):
                         ob.parent = parent
                     parent = ob
             share_data.pending_parenting = remaining_parentings
+
+        self.blockSignals = False
