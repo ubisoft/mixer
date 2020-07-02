@@ -1,3 +1,14 @@
+# 0.8.0 (2020-07-02)
+
+## Features
+
+- Shot Manager synchronization with VRtist
+
+## Bugfix
+
+- Grease Pencil Animation issue (#86)
+- Minor fixes
+
 # 0.7.0 (2020-07-01)
 
 ## Features

@@ -78,7 +78,7 @@ class MixerProperties(bpy.types.PropertyGroup):
     env: bpy.props.StringProperty(name="Env", default=os.environ.get("MIXER_ENV", "production"))
 
     host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
-    port: bpy.props.IntProperty(name="Port", default=common.DEFAULT_PORT)
+    port: bpy.props.IntProperty(name="Port", default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)))
     room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", os.getlogin()))
     rooms: bpy.props.CollectionProperty(name="Rooms", type=RoomItem)
     room_index: bpy.props.IntProperty(update=on_room_selection_changed)  # index in the list of rooms

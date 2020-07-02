@@ -27,6 +27,8 @@ from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
 from mixer.blender_data.blenddata import BlendData
 
+import mixer.shot_manager as shot_manager
+
 logger = logging.getLogger(__name__)
 
 
@@ -140,6 +142,13 @@ def update_params(obj):
 
 def update_transform(obj):
     share_data.client.send_transform(obj)
+
+
+def update_frame_start_end():
+    if bpy.context.scene.frame_start != share_data.start_frame or bpy.context.scene.frame_end != share_data.end_frame:
+        share_data.client.send_frame_start_end(bpy.context.scene.frame_start, bpy.context.scene.frame_end)
+        share_data.start_frame = bpy.context.scene.frame_start
+        share_data.end_frame = bpy.context.scene.frame_end
 
 
 def join_room(room_name: str):
@@ -656,6 +665,10 @@ def update_objects_data():
         if typename == "Material":
             share_data.client.send_material(obj)
 
+        if typename == "Scene":
+            update_frame_start_end()
+            shot_manager.update_scene()
+
     # Send transforms
     for obj in transforms:
         update_transform(obj)
@@ -676,6 +689,7 @@ def send_animated_camera_data():
     for update in depsgraph.updates:
         obj = update.id.original
         typename = obj.bl_rna.name
+        camera_action_name = ""
         if typename == "Object":
             if obj.data and obj.data.bl_rna.name == "Camera" and obj.animation_data is not None:
                 camera_action_name = obj.animation_data.action.name_full
@@ -731,6 +745,18 @@ def send_frame_changed(scene):
         # please remove this when animation is managed
         with timer.child("send_animated_camera_data"):
             send_animated_camera_data()
+
+        with timer.child("send_current_camera"):
+            scene_camera_name = ""
+            if bpy.context.scene.camera is not None:
+                scene_camera_name = bpy.context.scene.camera.name_full
+
+            if share_data.current_camera != scene_camera_name:
+                share_data.current_camera = scene_camera_name
+                share_data.client.send_current_camera(share_data.current_camera)
+
+        with timer.child("send_shot_manager_current_shot"):
+            shot_manager.send_frame()
 
 
 @stats_timer(share_data)
@@ -818,6 +844,7 @@ def send_scene_data_to_server(scene, dummy):
         changed |= update_objects_visibility()
         changed |= update_objects_transforms()
         changed |= reparent_objects()
+        changed |= shot_manager.check_montage_mode()
 
     if not changed:
         with timer.child("update_objects_data"):
@@ -993,7 +1020,10 @@ def send_scene_content():
 
         send_scene_data_to_server(None, None)
 
+        shot_manager.send_scene()
         share_data.client.send_frame_start_end(bpy.context.scene.frame_start, bpy.context.scene.frame_end)
+        share_data.start_frame = bpy.context.scene.frame_start
+        share_data.end_frame = bpy.context.scene.frame_end
         share_data.client.send_frame(bpy.context.scene.frame_current)
 
         share_data.client.send_group_end()
@@ -1019,7 +1049,10 @@ def start_local_server():
         args = {}
 
     share_data.localServerProcess = subprocess.Popen(
-        [bpy.app.binary_path_python, "-m", "mixer.broadcaster.apps.server"], cwd=dir_path, shell=False, **args
+        [bpy.app.binary_path_python, "-m", "mixer.broadcaster.apps.server", "--port", str(get_mixer_props().port)],
+        cwd=dir_path,
+        shell=False,
+        **args,
     )
 
 
@@ -1285,6 +1318,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
         return True
 
     def execute(self, context):
+        bpy.data.window_managers["WinMan"].mixer.send_base_meshes = False
         mixer_props = get_mixer_props()
         if not share_data.current_room:
             if not connect():
