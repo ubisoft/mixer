@@ -100,8 +100,6 @@ class ClientBlender(Client):
         parent_invert_matrix, start = self.decode_matrix(data, start)
         basis_matrix, start = self.decode_matrix(data, start)
         local_matrix, start = self.decode_matrix(data, start)
-        visible, start = common.decode_bool(data, start)
-        temporary_visibility, start = common.decode_bool(data, start)
 
         try:
             obj = self.get_or_create_path(object_path)
@@ -110,8 +108,6 @@ class ClientBlender(Client):
             return
         if obj:
             self.set_transform(obj, parent_invert_matrix, basis_matrix, local_matrix)
-            obj.hide_viewport = not visible
-            obj.hide_set(not temporary_visibility)
 
     def build_rename(self, data):
         # Object rename, actually

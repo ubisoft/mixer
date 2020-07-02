@@ -1,3 +1,4 @@
+import itertools
 import logging
 import os
 import socket
@@ -575,7 +576,8 @@ def rename_objects():
 
 def update_objects_visibility():
     changed = False
-    for obj_name in share_data.objects_visibility_changed:
+    objects = itertools.chain(share_data.objects_added, share_data.objects_visibility_changed)
+    for obj_name in objects:
         if obj_name in share_data.blender_objects:
             obj = share_data.blender_objects[obj_name]
             update_transform(obj)
