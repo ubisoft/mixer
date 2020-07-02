@@ -646,7 +646,7 @@ def update_objects_data():
                     data_container[obj.data].append(obj)
                 else:
                     data_container[obj.data] = [obj]
-            if not obj.name_full in share_data.objects_transformed:
+            if obj.name_full not in share_data.objects_transformed:
                 transforms.add(obj)
 
         if (
