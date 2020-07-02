@@ -68,7 +68,7 @@ unittest:
   cache:
     paths:
       - gitlab/blender/cache
-  artifacts:
+  artefacts:
     paths:
       - logs
     expire_in: 1 week
