@@ -432,14 +432,14 @@ class Server:
             for room in self._rooms.values():
                 room.send_client_ids(client_ids=client_ids)
 
-    def run(self):
+    def run(self, port):
         global SHUTDOWN
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind((BINDING_HOST, common.DEFAULT_PORT))
+        sock.bind((BINDING_HOST, port))
         sock.setblocking(0)
         sock.listen(1000)
 
-        logger.info("Listening on port % s", common.DEFAULT_PORT)
+        logger.info("Listening on port % s", port)
         while not self._shutdown:
             try:
                 timeout = 0.1  # Check for a new client every 10th of a second
@@ -467,12 +467,13 @@ def main():
     cli_utils.init_logging(args)
 
     server = Server()
-    server.run()
+    server.run(args.port)
 
 
 def parse_cli_args():
     parser = argparse.ArgumentParser(description="Start broadcasting server for Mixer")
     cli_utils.add_logging_cli_args(parser)
+    parser.add_argument("--port", type=int, default=common.DEFAULT_PORT)
     return parser.parse_args(), parser
 
 

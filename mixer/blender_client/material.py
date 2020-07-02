@@ -115,8 +115,14 @@ def build_assign_material(data):
     material_name, index = common.decode_string(data, index)
     mesh = share_data.blender_objects[object_name]
     material = get_or_create_material(material_name)
-    for slot in mesh.material_slots:
-        slot.material = material
+
+    # If the mesh hasn't any material slot, just append the material (this will create the material)
+    if len(mesh.material_slots) == 0:
+        mesh.data.materials.append(material)
+    # Else assign the material to all slots
+    else:
+        for slot in mesh.material_slots:
+            slot.material = material
 
 
 def get_material_buffer(client: Client, material):
