@@ -1237,12 +1237,12 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
 
     if not isinstance(value, Proxy):
         if type(key) is not str:
-            logging.warning(f"Unexpected type {type(key)} for {bl_instance}.{key} : skipped")
+            logger.warning(f"Unexpected type {type(key)} for {bl_instance}.{key} : skipped")
             return
 
         prop = bl_instance.bl_rna.properties.get(key)
         if prop is None:
-            logging.warning(f"Attempt to write to non-existent attribute {bl_instance}.{key} : skipped")
+            logger.warning(f"Attempt to write to non-existent attribute {bl_instance}.{key} : skipped")
             return
 
         if not prop.is_readonly:
