@@ -231,9 +231,7 @@ default_exclusions = {
     T.NodeSocket: [
         # Currently synchronize builtin shading node sockets only, so assume these attributes are
         # managed only at the Node creation
-        NameFilterOut(
-            ["bl_idname", "identifier", "is_linked", "is_output", "link_limit", "name", "node", "type", "links"]
-        )
+        NameFilterOut(["bl_idname", "identifier", "is_linked", "is_output", "link_limit", "name", "node", "type"])
     ],
     T.NodeTree: [
         NameFilterOut(
