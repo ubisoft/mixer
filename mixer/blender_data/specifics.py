@@ -1,6 +1,7 @@
 """Type specific helpers for Proxy load and save
 """
 import logging
+from pathlib import Path
 import traceback
 from typing import ItemsView, List, TypeVar, Union
 
@@ -47,6 +48,12 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
         light_type = proxy.data("type")
         light = collection.new(name, light_type)
         return light
+
+    if collection_name == "sounds":
+        filepath = proxy.data("filepath")
+        # TODO what about "check_existing" ?
+        id_ = collection.load(filepath)
+        return id_
 
     name = proxy.data("name")
     try:
@@ -103,6 +110,20 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         filter_props = ["width_hidden"]
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
+
+    filter_crop_transform = [T.EffectSequence, T.ImageSequence]
+    filter_props = []
+    if any(isinstance(bpy_struct, t) for t in filter_crop_transform):
+        if not bpy_struct.use_crop:
+            filter_props.append("crop")
+        if not bpy_struct.use_translation:
+            filter_props.append("transform")
+
+    if not filter_props:
+        return properties
+    filtered = {k: v for k, v in properties if k not in filter_props}
+    return filtered.items()
+
     return properties
 
 
@@ -155,6 +176,27 @@ def pre_save_struct(proxy: Proxy, bpy_struct: T.Struct, attr_name: str):
             target.use_curve_mapping = True
 
 
+effect_types = [
+    "ADD",
+    "SUBTRACT",
+    "ALPHA_OVER",
+    "ALPHA_UNDER",
+    "GAMMA_CROSS",
+    "MULTIPLY",
+    "OVER_DROP",
+    "WIPE",
+    "GLOW",
+    "TRANSFORM",
+    "COLOR",
+    "SPEED",
+    "MULTICAM",
+    "ADJUSTMENT",
+    "GAUSSIAN_BLUR",
+    "TEXT",
+    "COLORMIX",
+]
+
+
 def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
     """Add an element to a bpy_prop_collection using the collection specific API
     """
@@ -185,10 +227,44 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
             node_type = proxy.data("bl_idname")
             return collection.new(node_type)
 
+        if isinstance(bl_rna, type(T.Sequences.bl_rna)):
+            type_ = proxy.data("type")
+            name = proxy.data("name")
+            channel = proxy.data("channel")
+            frame_start = proxy.data("frame_start")
+            if type_ in effect_types:
+                # overwritten anyway
+                frame_end = frame_start + 1
+                return collection.new_effect(name, type_, channel, frame_start, frame_end=frame_end)
+            if type_ == "SOUND":
+                sound = proxy.data("sound")
+                target = sound.target()
+                if not target:
+                    logger.warning(f"missing target ID block for bpy.data.{sound.collection}[{sound.key}] ")
+                    return None
+                filepath = target.filepath
+                return collection.new_sound(name, filepath, channel, frame_start)
+            if type_ == "MOVIE":
+                filepath = proxy.data("filepath")
+                return collection.new_movie(name, filepath, channel, frame_start)
+            if type_ == "IMAGE":
+                directory = proxy.data("directory")
+                filename = proxy.data("elements").data(0).data("filename")
+                filepath = str(Path(directory) / filename)
+                return collection.new_image(name, filepath, channel, frame_start)
+
+        if isinstance(bl_rna, type(T.SequenceModifiers.bl_rna)):
+            name = proxy.data("name")
+            type_ = proxy.data("type")
+            return collection.new(name, type_)
+
     # try our best
     new_or_add = getattr(collection, "new", None)
     if new_or_add is None:
         new_or_add = getattr(collection, "add", None)
+    if new_or_add is None:
+        logger.warning(f"Not implemented new or add for bpy.data.{collection}[{key}] ...")
+        return None
     try:
         return new_or_add(key)
     except Exception:
@@ -198,13 +274,25 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
         return None
 
 
+# order dependent, so always clear
+always_clear = [type(T.ObjectModifiers.bl_rna), type(T.SequenceModifiers.bl_rna)]
+
+
 def truncate_collection(target: T.bpy_prop_collection, incoming_keys: List[str]):
+    if not hasattr(target, "bl_rna"):
+        return
+
+    target_rna = target.bl_rna
+    if any(isinstance(target_rna, t) for t in always_clear):
+        target.clear()
+        return
+
     incoming_keys = set(incoming_keys)
     existing_keys = set(target.keys())
     truncate_keys = existing_keys - incoming_keys
     if not truncate_keys:
         return
-    if isinstance(target.bl_rna, type(T.KeyingSets.bl_rna)):
+    if isinstance(target_rna, type(T.KeyingSets.bl_rna)):
         for k in truncate_keys:
             target.active_index = target.find(k)
             bpy.ops.anim.keying_set_remove()
