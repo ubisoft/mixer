@@ -1,8 +1,9 @@
 import logging
-import time
+import os
 import sys
+import time
 
-from mixer.broadcaster.common import MessageType
+from mixer.broadcaster.common import MessageType, DEFAULT_PORT
 from tests.grabber import Grabber
 from tests.grabber import CommandStream
 from tests.mixer_testcase import MixerTestCase
@@ -51,7 +52,7 @@ class VRtistTestCase(MixerTestCase):
         # time.sleep(1)
 
         host = "127.0.0.1"
-        port = 12800
+        port = int(os.environ.get("VRTIST_PORT", DEFAULT_PORT))
         self._sender.connect_and_join_mixer("mixer_grab_sender")
         time.sleep(1)
         sender_grabber = Grabber()
