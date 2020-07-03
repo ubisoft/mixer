@@ -146,7 +146,9 @@ def pre_save_id(proxy: Proxy, collection: T.bpy_prop_collection, key: str) -> T.
 def pre_save_struct(proxy: Proxy, bpy_struct: T.Struct, attr_name: str):
     """Process attributes that must be saved first
     """
-    target = getattr(bpy_struct, attr_name)
+    target = getattr(bpy_struct, attr_name, None)
+    if target is None:
+        return None
     if isinstance(target, T.ColorManagedViewSettings):
         use_curve_mapping = proxy.data("use_curve_mapping")
         if use_curve_mapping:
