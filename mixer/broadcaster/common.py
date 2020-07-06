@@ -128,19 +128,36 @@ class SensorFitMode(IntEnum):
 
 class ClientMetadata:
     """
-    Some generic metadata that a client can send to the server with SET_CLIENT_METADATA message.
-    A client is free to send any json metadata, but the one defined here are considered to be shared among several
-    client type.
+    Metadata associated with a client by the server.
+    First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
+    Clients are free to define metadata they need, but some standard names are provided here to ease sync
+    between clients of different kind.
     """
 
     ID = "id"  # Send by server only, type = str, the id of the client which is unique for each connected client
     IP = "ip"  # Send by server only, type = str
     PORT = "port"  # Send by server only, type = int
     ROOM = "room"  # Send by server only, type = str
+
+    # Client to server metadata, not used by the server but clients are encouraged to use these keys for the same semantic
     USERNAME = "user_name"  # type = str
     USERCOLOR = "user_color"  # type = float3 (as list)
     USERSCENES = "user_scenes"  # type = dict(str, dict()) key = Scene name_full, value = a dictionnary for scene metadata relative to the user
     USERSCENES_FRAME = "frame"  # type = int, can be a field in a user_scenes dict
+
+
+class RoomMetadata:
+    """
+    Metadata associated with a room by the server.
+    First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
+    Clients are free to define metadata they need, but some standard names are provided here to ease sync
+    between clients of different kind.
+    """
+
+    NAME = "name"  # Send by server only, type = str, the name of the room which is unique for each room
+    KEEP_OPEN = (
+        "keep_open"  # Send by server only, type = bool, indicate if the room should be kept open after all clients left
+    )
 
 
 class ClientDisconnectedException(Exception):

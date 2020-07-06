@@ -476,7 +476,7 @@ class Server:
         with common.mutex:
             result_dict = {}
             for room, value in self._rooms.items():
-                result_dict[room] = {**value.metadata, "keep_open": value.keep_open}
+                result_dict[room] = {**value.metadata, common.RoomMetadata.KEEP_OPEN: value.keep_open}
             return common.Command(common.MessageType.LIST_ROOMS, common.encode_json(result_dict))
 
     def run(self, port):

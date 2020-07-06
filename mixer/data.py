@@ -8,7 +8,7 @@ from pathlib import Path
 import bpy
 
 from mixer.broadcaster import common
-from mixer.broadcaster.common import ClientMetadata
+from mixer.broadcaster.common import ClientMetadata, RoomMetadata
 from mixer.share_data import share_data
 from mixer.stats import get_stats_directory
 
@@ -22,8 +22,8 @@ class RoomItem(bpy.types.PropertyGroup):
         return False
 
     def is_kept_open(self):
-        if self.name in share_data.rooms_dict and "keep_open" in share_data.rooms_dict[self.name]:
-            return share_data.rooms_dict[self.name]["keep_open"]
+        if self.name in share_data.rooms_dict and RoomMetadata.KEEP_OPEN in share_data.rooms_dict[self.name]:
+            return share_data.rooms_dict[self.name][RoomMetadata.KEEP_OPEN]
         return False
 
     def on_keep_open_changed(self, value):
