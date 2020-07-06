@@ -7,6 +7,25 @@ class TestBpyProxy(TestGenericJoinBefore):
 
         self.end_test()
 
+    def test_duplicate_uuid(self):
+        action = f"""
+import bpy
+bpy.ops.object.light_add(type='POINT')
+bpy.context.active_object.name = "light0"
+"""
+        self.send_string(action)
+
+        action = f"""
+import bpy
+D = bpy.data
+bpy.ops.object.duplicate()
+bpy.context.active_object.name = "light1"
+assert D.objects["light0"].mixer_uuid == D.objects["light1"].mixer_uuid
+"""
+        self.send_string(action)
+
+        self.end_test()
+
 
 class TestBpyPropStructCollectionProxy(TestGenericJoinBefore):
     def test_light_falloff_curve_add_point(self):
