@@ -77,7 +77,7 @@ class BlendDataCollection:
             self.bpy_collection().remove(item)
         else:
             logger.info(
-                "BlendDataCollection.remove(): attempt to remove non-existent_object bpy.data.{self._name}[{name_full}]. Ignoring"
+                f"BlendDataCollection.remove(): attempt to remove non-existent_object bpy.data.{self._name}[{name_full}]. Ignoring"
             )
         self.set_dirty()
 
