@@ -231,9 +231,7 @@ default_exclusions = {
     T.NodeSocket: [
         # Currently synchronize builtin shading node sockets only, so assume these attributes are
         # managed only at the Node creation
-        NameFilterOut(
-            ["bl_idname", "identifier", "is_linked", "is_output", "link_limit", "name", "node", "type", "links"]
-        )
+        NameFilterOut(["bl_idname", "identifier", "is_linked", "is_output", "link_limit", "name", "node", "type"])
     ],
     T.NodeTree: [
         NameFilterOut(
@@ -245,6 +243,12 @@ default_exclusions = {
         )
     ],
     T.Object: [
+        NameFilterOut(
+            [
+                # bounding box, will be computed
+                "dimensions"
+            ]
+        ),
         # TODO triggers an error on metaballs
         #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
         #   looks like a bpy_prop_collection and the key is and empy string
@@ -280,6 +284,7 @@ default_exclusions = {
             ]
         )
     ],
+    T.SequenceEditor: [NameFilterOut(["active_strip", "sequences_all"])],
     T.ViewLayer: [
         # Not useful. Requires array insertion (to do shortly)
         NameFilterOut("freestyle_settings"),
@@ -305,15 +310,15 @@ safe_exclusions = {}
 # Scene
 # Also do not blindly update what is already updated in VRtist code without checking that
 # they do not interfere
-safe_depsgraph_updates = [T.Camera, T.Light, T.MetaBall, T.NodeTree, T.Scene, T.World]
+safe_depsgraph_updates = [T.Camera, T.Light, T.MetaBall, T.NodeTree, T.Scene, T.Sound, T.World]
 # this also mostly works
 # safe_depsgraph_updates = [T.Light, T.Camera, T.MetaBall, T.Object, T.Scene]
 
 safe_filter = FilterStack()
 # The collections in this list are tested by BpyBlendDiff collection update
 # they will be included in creation messages.
-# objects is needed to items not created by VRtsist
-safe_blenddata_collections = ["cameras", "lights", "metaballs", "objects", "scenes", "worlds"]
+# objects is needed to items not created by VRtist
+safe_blenddata_collections = ["cameras", "lights", "metaballs", "objects", "scenes", "sounds", "worlds"]
 
 # mostly works
 # safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]

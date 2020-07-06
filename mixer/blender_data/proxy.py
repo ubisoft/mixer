@@ -609,7 +609,7 @@ class BpyIDRefProxy(Proxy):
 
 def ensure_uuid(item: bpy.types.ID) -> str:
     uuid = item.get("mixer_uuid")
-    if uuid is None:
+    if not uuid:
         uuid = str(uuid4())
         item.mixer_uuid = uuid
     return uuid
