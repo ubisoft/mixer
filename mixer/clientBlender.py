@@ -345,6 +345,7 @@ class ClientBlender(Client):
 
     @stats_timer(share_data)
     def send_mesh(self, obj):
+        logger.info("send_mesh %s", obj.name_full)
         mesh = obj.data
         mesh_name = self.get_mesh_name(mesh)
         path = self.get_object_path(obj)
