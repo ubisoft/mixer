@@ -101,19 +101,28 @@ class BpyPropCollectionDiff(BpyDiff):
         self.items_added.clear()
         self.items_removed.clear()
         self.items_renamed.clear()
+        proxy_items = {item.mixer_uuid(): name for name, item in proxy._data.items()}
         bl_collection = getattr(bpy.data, collection_name)
         blender_items = {}
         for name, item in bl_collection.items():
             if skip_bpy_data_item(collection_name, item):
                 continue
-            # TODO dot it here or in Proxy ?
+
+            uuid = item.mixer_uuid
+            if uuid in blender_items.keys():
+                # duplicate uuid, from an object duplication
+                original_item = blender_items[uuid]
+                logger.info(f"Duplicate uuid {uuid} for {original_item[1]} and {item.name}...")
+                logger.info(f"... assuming object was duplicated. Resetting (not an error)")
+                # reset the uuid, ensure will regenerate
+                item.mixer_uuid = ""
+
             ensure_uuid(item)
             if item.mixer_uuid in blender_items.keys():
                 logger.error(f"Duplicate uuid found for {item}")
                 continue
 
             blender_items[item.mixer_uuid] = (name, collection_name)
-        proxy_items = {item.mixer_uuid(): name for name, item in proxy._data.items()}
         self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
         if not self.empty():
             BlendData.instance().collection(collection_name).set_dirty()

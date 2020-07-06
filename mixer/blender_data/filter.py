@@ -243,6 +243,12 @@ default_exclusions = {
         )
     ],
     T.Object: [
+        NameFilterOut(
+            [
+                # bounding box, will be computed
+                "dimensions"
+            ]
+        ),
         # TODO triggers an error on metaballs
         #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
         #   looks like a bpy_prop_collection and the key is and empy string
@@ -278,7 +284,7 @@ default_exclusions = {
             ]
         )
     ],
-    T.SequenceEditor: [NameFilterOut("active_strip")],
+    T.SequenceEditor: [NameFilterOut(["active_strip", "sequences_all"])],
     T.ViewLayer: [
         # Not useful. Requires array insertion (to do shortly)
         NameFilterOut("freestyle_settings"),
@@ -311,7 +317,7 @@ safe_depsgraph_updates = [T.Camera, T.Light, T.MetaBall, T.NodeTree, T.Scene, T.
 safe_filter = FilterStack()
 # The collections in this list are tested by BpyBlendDiff collection update
 # they will be included in creation messages.
-# objects is needed to items not created by VRtsist
+# objects is needed to items not created by VRtist
 safe_blenddata_collections = ["cameras", "lights", "metaballs", "objects", "scenes", "sounds", "worlds"]
 
 # mostly works

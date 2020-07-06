@@ -711,10 +711,10 @@ def send_animated_camera_data():
 
 @persistent
 def send_frame_changed(scene):
-    logger.info("send_frame_changed")
+    logger.debug("send_frame_changed")
 
     if not share_data.client:
-        logger.info("send_frame_changed cancelled (no client instance)")
+        logger.debug("send_frame_changed cancelled (no client instance)")
         return
 
     # We can arrive here because of scene deletion (bpy.ops.scene.delete({'scene': to_remove}) that happens during build_scene)
@@ -722,11 +722,11 @@ def send_frame_changed(scene):
     if share_data.client.skip_next_depsgraph_update:
         if not share_data.client.block_signals:
             share_data.client.skip_next_depsgraph_update = False
-        logger.info("send_frame_changed canceled (skip_next_depsgraph_update = True)")
+        logger.debug("send_frame_changed canceled (skip_next_depsgraph_update = True)")
         return
 
     if not is_in_object_mode():
-        logger.info("send_frame_changed canceled (not is_in_object_mode)")
+        logger.debug("send_frame_changed canceled (not is_in_object_mode)")
         return
 
     with StatsTimer(share_data, "send_frame_changed") as timer:
