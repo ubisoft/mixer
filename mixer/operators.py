@@ -20,11 +20,12 @@ from mixer.blender_client.camera import send_camera
 from mixer.blender_client.light import send_light
 from mixer import clientBlender
 from mixer import ui
-from mixer.data import get_mixer_props
+from mixer.data import get_mixer_props, get_mixer_prefs
 from mixer.stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
 from mixer.blender_data.blenddata import BlendData
+from mixer.broadcaster.common import ClientMetadata
 
 import mixer.shot_manager as shot_manager
 
@@ -150,29 +151,38 @@ def update_frame_start_end():
         share_data.end_frame = bpy.context.scene.frame_end
 
 
+def set_client_metadata():
+    prefs = get_mixer_prefs()
+    username = prefs.user
+    usercolor = prefs.color
+    share_data.client.set_client_metadata(
+        {ClientMetadata.USERNAME: username, ClientMetadata.USERCOLOR: list(usercolor)}
+    )
+
+
 def join_room(room_name: str):
     logger.info("join_room")
 
     assert share_data.current_room is None
     BlendData.instance().reset()
-    user = get_mixer_props().user
     share_data.session_id += 1
     share_data.current_room = room_name
+    set_client_metadata()
     share_data.client.join_room(room_name)
-    share_data.client.set_client_name(user)
     share_data.client.send_set_current_scene(bpy.context.scene.name_full)
 
     share_data.current_statistics = {
         "session_id": share_data.session_id,
         "blendfile": bpy.data.filepath,
         "statsfile": get_stats_filename(share_data.runId, share_data.session_id),
-        "user": user,
+        "user": get_mixer_prefs().user,
         "room": room_name,
         "children": {},
     }
-    share_data.auto_save_statistics = get_mixer_props().auto_save_statistics
-    share_data.statistics_directory = get_mixer_props().statistics_directory
-    share_data.set_experimental_sync(get_mixer_props().experimental_sync)
+    prefs = get_mixer_prefs()
+    share_data.auto_save_statistics = prefs.auto_save_statistics
+    share_data.statistics_directory = prefs.statistics_directory
+    share_data.set_experimental_sync(prefs.experimental_sync)
     share_data.pending_test_update = False
 
     # join a room <==> want to track local changes
@@ -709,10 +719,10 @@ def send_frame_changed(scene):
 
     # We can arrive here because of scene deletion (bpy.ops.scene.delete({'scene': to_remove}) that happens during build_scene)
     # so we need to prevent processing self events
-    if share_data.client.receivedCommandsProcessed:
-        if not share_data.client.blockSignals:
-            share_data.client.receivedCommandsProcessed = False
-        logger.debug("send_frame_changed canceled (receivedCommandsProcessed = True)")
+    if share_data.client.skip_next_depsgraph_update:
+        if not share_data.client.block_signals:
+            share_data.client.skip_next_depsgraph_update = False
+        logger.debug("send_frame_changed canceled (skip_next_depsgraph_update = True)")
         return
 
     if not is_in_object_mode():
@@ -721,7 +731,7 @@ def send_frame_changed(scene):
 
     with StatsTimer(share_data, "send_frame_changed") as timer:
         with timer.child("setFrame"):
-            if not share_data.client.blockSignals:
+            if not share_data.client.block_signals:
                 share_data.client.send_frame(scene.frame_current)
 
         with timer.child("clear_lists"):
@@ -763,7 +773,7 @@ def send_scene_data_to_server(scene, dummy):
     logger.debug(
         "send_scene_data_to_server(): receivedCommandProcessed %s, pending_test_update %s",
         share_data.pending_test_update,
-        share_data.client.receivedCommandsProcessed,
+        share_data.client.skip_next_depsgraph_update,
     )
 
     timer = share_data.current_stats_timer
@@ -783,10 +793,12 @@ def send_scene_data_to_server(scene, dummy):
             logger.debug(" ......%s", update.id.original)
 
     # prevent processing self events, but always process test updates
-    if not share_data.pending_test_update and share_data.client.receivedCommandsProcessed:
-        if not share_data.client.blockSignals:
-            share_data.client.receivedCommandsProcessed = False
-        logger.debug("send_scene_data_to_server canceled (receivedCommandsProcessed = True) ...")
+    if not share_data.pending_test_update and share_data.client.skip_next_depsgraph_update:
+        if (
+            not share_data.client.block_signals
+        ):  # Here we know we are not triggered from inside the network_consumer timer function
+            share_data.client.skip_next_depsgraph_update = False
+        logger.debug("send_scene_data_to_server canceled (skip_next_depsgraph_update = True) ...")
         return
 
     share_data.pending_test_update = False
@@ -951,10 +963,6 @@ def on_undo_redo_post(scene, dummy):
     share_data.update_current_data()
 
 
-def update_list_users(client_ids: Mapping[str, str] = None):
-    share_data.client_ids = client_ids
-
-
 def clear_scene_content():
     with HandlerManager(False):
 
@@ -1001,7 +1009,7 @@ def is_parent_in_collection(collection, obj):
 
 @stats_timer(share_data)
 def send_scene_content():
-    if get_mixer_props().no_send_scene_content:
+    if get_mixer_prefs().no_send_scene_content:
         return
 
     with HandlerManager(False):
@@ -1041,13 +1049,13 @@ def start_local_server():
 
     dir_path = Path(mixer.__file__).parent.parent  # broadcaster is submodule of mixer
 
-    if get_mixer_props().show_server_console:
+    if get_mixer_prefs().show_server_console:
         args = {"creationflags": subprocess.CREATE_NEW_CONSOLE}
     else:
         args = {}
 
     share_data.localServerProcess = subprocess.Popen(
-        [bpy.app.binary_path_python, "-m", "mixer.broadcaster.apps.server", "--port", str(get_mixer_props().port)],
+        [bpy.app.binary_path_python, "-m", "mixer.broadcaster.apps.server", "--port", str(get_mixer_prefs().port)],
         cwd=dir_path,
         shell=False,
         **args,
@@ -1067,20 +1075,20 @@ def connect():
         logger.debug("connect: share_data.client is not None")
         share_data.client = None
 
-    props = get_mixer_props()
-    if not create_main_client(props.host, props.port):
-        if is_localhost(props.host):
+    prefs = get_mixer_prefs()
+    if not create_main_client(prefs.host, prefs.port):
+        if is_localhost(prefs.host):
             start_local_server()
-            if not wait_for_server(props.host, props.port):
+            if not wait_for_server(prefs.host, prefs.port):
                 logger.error("Unable to start local server")
                 return False
         else:
-            logger.error("Unable to connect to remote server %s:%s", props.host, props.port)
+            logger.error("Unable to connect to remote server %s:%s", prefs.host, prefs.port)
             return False
 
     assert is_client_connected()
 
-    share_data.client.set_client_name(props.user)
+    set_client_metadata()
 
     return True
 
@@ -1101,6 +1109,7 @@ def disconnect():
         share_data.client = None
 
     share_data.client_ids = None
+    share_data.rooms_dict = None
     share_data.current_room = None
 
     ui.update_ui_lists()
@@ -1131,7 +1140,7 @@ def network_consumer_timer():
     if not share_data.client.is_connected():
         error_msg = "Timer still registered but client disconnected."
         logger.error(error_msg)
-        if get_mixer_props().env != "production":
+        if get_mixer_prefs().env != "production":
             raise RuntimeError(error_msg)
         # Returning None from a timer unregister it
         return None
@@ -1172,21 +1181,20 @@ class CreateRoomOperator(bpy.types.Operator):
     """Create a new room on Mixer server"""
 
     bl_idname = "mixer.create_room"
-    bl_label = "Mixer Create Room"
+    bl_label = "Create Room"
     bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
-        props = get_mixer_props()
-        return is_client_connected() and not share_data.current_room and bool(props.room)
+        return is_client_connected() and not share_data.current_room and bool(get_mixer_prefs().room)
 
     def execute(self, context):
         assert share_data.current_room is None
         if not is_client_connected():
             return {"CANCELLED"}
 
-        props = get_mixer_props()
-        join_room(props.room)
+        join_room(get_mixer_prefs().room)
+
         return {"FINISHED"}
 
 
@@ -1194,32 +1202,63 @@ class JoinRoomOperator(bpy.types.Operator):
     """Join a room"""
 
     bl_idname = "mixer.join_room"
-    bl_label = "Mixer Join Room"
+    bl_label = "Join Room"
     bl_options = {"REGISTER"}
 
     @classmethod
     def poll(cls, context):
         room_index = get_mixer_props().room_index
-        return is_client_connected() and room_index < len(get_mixer_props().rooms)
+        return (
+            is_client_connected()
+            and room_index < len(get_mixer_props().rooms)
+            and share_data.current_room is None
+            and get_mixer_prefs().experimental_sync
+            == share_data.rooms_dict[get_mixer_props().rooms[room_index].name]["experimental_sync"]
+        )
 
     def execute(self, context):
         assert not share_data.current_room
         share_data.set_dirty()
         share_data.current_room = None
 
-        share_data.isLocal = False
         props = get_mixer_props()
         room_index = props.room_index
         room = props.rooms[room_index].name
         join_room(room)
+
+        return {"FINISHED"}
+
+
+class DeleteRoomOperator(bpy.types.Operator):
+    """Delete an empty room"""
+
+    bl_idname = "mixer.delete_room"
+    bl_label = "Delete Room"
+    bl_options = {"REGISTER"}
+
+    @classmethod
+    def poll(cls, context):
+        room_index = get_mixer_props().room_index
+        return (
+            is_client_connected()
+            and room_index < len(get_mixer_props().rooms)
+            and (get_mixer_props().rooms[room_index].users_count == 0)
+        )
+
+    def execute(self, context):
+        props = get_mixer_props()
+        room_index = props.room_index
+        room = props.rooms[room_index].name
+        share_data.client.delete_room(room)
+
         return {"FINISHED"}
 
 
 class LeaveRoomOperator(bpy.types.Operator):
-    """Reave the current room"""
+    """Leave the current room"""
 
     bl_idname = "mixer.leave_room"
-    bl_label = "Mixer Leave Room"
+    bl_label = "Leave Room"
     bl_options = {"REGISTER"}
 
     @classmethod
@@ -1244,19 +1283,23 @@ class ConnectOperator(bpy.types.Operator):
         return not is_client_connected()
 
     def execute(self, context):
-        props = get_mixer_props()
+        prefs = get_mixer_prefs()
         try:
-            self.report({"INFO"}, f'Connecting to "{props.host}:{props.port}" ...')
+            self.report({"INFO"}, f'Connecting to "{prefs.host}:{prefs.port}" ...')
             if not connect():
                 self.report({"ERROR"}, "unknown error")
                 return {"CANCELLED"}
 
-            self.report({"INFO"}, f'Connected to "{props.host}:{props.port}" ...')
-        except socket.gaierror:
-            msg = f'Cannot connect to "{props.host}": invalid host name or address'
+            self.report({"INFO"}, f'Connected to "{prefs.host}:{prefs.port}" ...')
+        except socket.gaierror as e:
+            msg = f'Cannot connect to "{prefs.host}": invalid host name or address'
             self.report({"ERROR"}, msg)
+            if prefs.env != "production":
+                raise e
         except Exception as e:
             self.report({"ERROR"}, repr(e))
+            if prefs.env != "production":
+                raise e
             return {"CANCELLED"}
 
         return {"FINISHED"}
@@ -1313,29 +1356,24 @@ class LaunchVRtistOperator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return True
+        return os.path.isfile(get_mixer_prefs().VRtist)
 
     def execute(self, context):
         bpy.data.window_managers["WinMan"].mixer.send_base_meshes = False
-        mixer_props = get_mixer_props()
+        mixer_prefs = get_mixer_prefs()
         if not share_data.current_room:
             if not connect():
                 return {"CANCELLED"}
+            join_room(mixer_prefs.room)
 
-            props = get_mixer_props()
-            join_room(props.room)
-
-        hostname = "localhost"
-        if not share_data.isLocal:
-            hostname = mixer_props.host
         args = [
-            mixer_props.VRtist,
+            mixer_prefs.VRtist,
             "--room",
             share_data.current_room,
             "--hostname",
-            hostname,
+            mixer_prefs.host,
             "--port",
-            str(mixer_props.port),
+            str(mixer_prefs.port),
         ]
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
         return {"FINISHED"}
@@ -1362,7 +1400,7 @@ class OpenStatsDirOperator(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     def execute(self, context):
-        os.startfile(get_mixer_props().statistics_directory)
+        os.startfile(get_mixer_prefs().statistics_directory)
         return {"FINISHED"}
 
 
@@ -1373,6 +1411,7 @@ classes = (
     DisconnectOperator,
     SendSelectionOperator,
     JoinRoomOperator,
+    DeleteRoomOperator,
     LeaveRoomOperator,
     WriteStatisticsOperator,
     OpenStatsDirOperator,

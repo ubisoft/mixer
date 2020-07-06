@@ -9,6 +9,7 @@ from mathutils import Matrix, Quaternion
 import mixer
 from mixer import ui
 from mixer import data
+from mixer.data import get_mixer_props
 from mixer.share_data import share_data
 from mixer.broadcaster import common
 from mixer.broadcaster.client import Client
@@ -37,10 +38,17 @@ class ClientBlender(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(host, port)
 
+        self.client_id = None  # Will be filled with a unique string identifying this client
+
         self.textures: Set[str] = set()
         self.callbacks = {}
 
-        self.blenderPID = os.getpid()
+        self.skip_next_depsgraph_update = False
+        # skip_next_depsgraph_update is set to True in the main timer function when a received command
+        # affect blender data and will trigger a depsgraph update; in that case we want to ignore it
+        # because it will produce some kind of infinite recursive update
+        self.block_signals = False
+        # block_signals is set to True when our timer transforms received commands into scene updates
 
     def add_callback(self, name, func):
         self.callbacks[name] = func
@@ -337,6 +345,7 @@ class ClientBlender(Client):
 
     @stats_timer(share_data)
     def send_mesh(self, obj):
+        logger.info("send_mesh %s", obj.name_full)
         mesh = obj.data
         mesh_name = self.get_mesh_name(mesh)
         path = self.get_object_path(obj)
@@ -344,7 +353,7 @@ class ClientBlender(Client):
         binary_buffer = common.encode_string(path) + common.encode_string(mesh_name)
 
         binary_buffer += mesh_api.encode_mesh(
-            obj, data.get_mixer_props().send_base_meshes, data.get_mixer_props().send_baked_meshes
+            obj, data.get_mixer_prefs().send_base_meshes, data.get_mixer_prefs().send_baked_meshes
         )
 
         # For now include material slots in the same message, but maybe it should be a separated message
@@ -475,15 +484,16 @@ class ClientBlender(Client):
         logger.info("send_delate %s", obj_name)
         self.add_command(common.Command(common.MessageType.DELETE, self.get_delete_buffer(obj_name), 0))
 
-    def send_list_rooms(self):
-        self.add_command(common.Command(common.MessageType.LIST_ROOMS))
-
     def on_connection_lost(self):
         if "Disconnect" in self.callbacks:
             self.callbacks["Disconnect"]()
 
     def build_list_all_clients(self, client_ids):
         share_data.client_ids = client_ids
+        ui.update_ui_lists()
+
+    def build_list_rooms(self, rooms_dict: dict):
+        share_data.rooms_dict = rooms_dict
         ui.update_ui_lists()
 
     def send_scene_content(self):
@@ -494,10 +504,10 @@ class ClientBlender(Client):
         start = 0
         frame, start = common.decode_int(data, start)
         if bpy.context.scene.frame_current != frame:
-            previous_value = share_data.client.receivedCommandsProcessed
-            share_data.client.receivedCommandsProcessed = False
+            previous_value = share_data.client.skip_next_depsgraph_update
+            share_data.client.skip_next_depsgraph_update = False
             bpy.context.scene.frame_set(frame)
-            share_data.client.receivedCommandsProcessed = previous_value
+            share_data.client.skip_next_depsgraph_update = previous_value
 
     def send_frame(self, frame):
         self.add_command(common.Command(common.MessageType.FRAME, common.encode_int(frame), 0))
@@ -535,24 +545,50 @@ class ClientBlender(Client):
             self.callbacks["ClearContent"]()
 
     def query_object_data(self, object_name):
-        previous_value = share_data.client.receivedCommandsProcessed
-        share_data.client.receivedCommandsProcessed = False
+        previous_value = share_data.client.skip_next_depsgraph_update
+        share_data.client.skip_next_depsgraph_update = False
         if "QueryObjectData" in self.callbacks:
             self.callbacks["QueryObjectData"](object_name)
-        share_data.client.receivedCommandsProcessed = previous_value
+        share_data.client.skip_next_depsgraph_update = previous_value
 
     def query_current_frame(self):
         share_data.client.send_frame(bpy.context.scene.frame_current)
+
+    def compute_client_metadata(self):
+        # Send information about opened windows and 3d areas
+        # Will server later to display view frustums of users
+        windows = []
+        for wm in bpy.data.window_managers:
+            for window in wm.windows:
+                scene = window.scene.name_full
+                view_layer = window.view_layer.name
+                screen = window.screen.name_full
+                areas_3d_count = 0
+                for area in window.screen.areas:
+                    if area.type == "VIEW_3D":
+                        areas_3d_count += 1
+                windows.append(
+                    {"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d_count": areas_3d_count}
+                )
+        scene_metadata = {}
+        for scene in bpy.data.scenes:
+            scene_metadata[scene.name_full] = {common.ClientMetadata.USERSCENES_FRAME: scene.frame_current}
+
+        return {"blender_windows": windows, common.ClientMetadata.USERSCENES: scene_metadata}
 
     @stats_timer(share_data)
     def network_consumer(self):
         assert self.is_connected()
 
-        group_count = 0
+        # Ask for room list
+        self.send_list_rooms()
 
         # Loop remains infinite while we have GROUP_BEGIN commands without their corresponding GROUP_END received
+        # todo Change this -> probably not a good idea because the sending client might disconnect before GROUP_END occurs
+        # or it needs to be guaranteed by the server
+        group_count = 0
         while True:
-            self.fetch_commands()
+            self.fetch_commands(commands_send_interval=get_mixer_props().commands_send_interval)
 
             set_dirty = True
             # Process all received commands
@@ -574,31 +610,45 @@ class ClientBlender(Client):
                     clients, _ = common.decode_json(command.data, 0)
                     self.build_list_all_clients(clients)
                     processed = True
+                elif command.type == common.MessageType.LIST_ROOMS:
+                    rooms_dict, _ = common.decode_json(command.data, 0)
+                    self.build_list_rooms(rooms_dict)
+                    processed = True
+                elif command.type == common.MessageType.CLIENT_ID:
+                    self.client_id = command.data.decode()
+                    processed = True
                 elif command.type == common.MessageType.CONNECTION_LOST:
                     self.on_connection_lost()
                     break
 
-                if set_dirty:
+                if not processed and set_dirty:
                     share_data.set_dirty()
                     set_dirty = False
 
-                self.blockSignals = True
-                self.receivedCommandsProcessed = True
-                if processed:
-                    # this was a room protocol command that was processed
-                    self.receivedCommandsProcessed = False
-                else:
+                self.block_signals = True
+
+                if not processed:
                     try:
                         if command.type == common.MessageType.CONTENT:
                             # The server asks for scene content (at room creation)
-                            self.receivedCommandsProcessed = False
                             try:
+                                assert share_data.current_room is not None
+                                self.set_room_metadata(
+                                    share_data.current_room,
+                                    {"experimental_sync": data.get_mixer_prefs().experimental_sync},
+                                )
                                 self.send_scene_content()
                             except Exception as e:
                                 self.on_connection_lost()
                                 raise SendSceneContentFailed() from e
+                            continue
 
-                        elif command.type == common.MessageType.GREASE_PENCIL_MESH:
+                        # Put this to true by default
+                        # todo Check build commands that do not trigger depsgraph update
+                        # because it can lead to ignoring real updates when a false positive is encountered
+                        command_triggers_depsgraph_update = True
+
+                        if command.type == common.MessageType.GREASE_PENCIL_MESH:
                             grease_pencil_api.build_grease_pencil_mesh(command.data)
                         elif command.type == common.MessageType.GREASE_PENCIL_MATERIAL:
                             grease_pencil_api.build_grease_pencil_material(command.data)
@@ -695,15 +745,21 @@ class ClientBlender(Client):
                             data_api.build_data_update(command.data)
                         elif command.type == common.MessageType.BLENDER_DATA_REMOVE:
                             data_api.build_data_remove(command.data)
+                        else:
+                            # Command is ignored, so no depsgraph update can be triggered
+                            command_triggers_depsgraph_update = False
+
+                        if command_triggers_depsgraph_update:
+                            self.skip_next_depsgraph_update = True
+
                     except Exception as e:
                         logger.warning(
                             f"Exception during processing of message {str(command.type)} ...\n" + traceback.format_exc()
                         )
                         if isinstance(e, SendSceneContentFailed):
                             raise
-                    finally:
-                        self.receivedCommands.task_done()
-                        self.blockSignals = False
+
+                self.block_signals = False
 
             if group_count == 0:
                 break
@@ -711,6 +767,10 @@ class ClientBlender(Client):
         if not set_dirty:
             share_data.update_current_data()
 
+        # Some objects may have been obtained before their parent
+        # In that case we resolve parenting here
+        # todo Parenting strategy should be changed: we should store the name of the parent in the command instead of
+        # having a path as name
         if len(share_data.pending_parenting) > 0:
             remaining_parentings = set()
             for path in share_data.pending_parenting:
@@ -727,4 +787,4 @@ class ClientBlender(Client):
                     parent = ob
             share_data.pending_parenting = remaining_parentings
 
-        self.blockSignals = False
+        self.set_client_metadata(self.compute_client_metadata())

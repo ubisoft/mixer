@@ -84,17 +84,17 @@ class BlenderTestCase(MixerTestCase):
 
         host = "127.0.0.1"
         port = 12800
-        self._sender.connect_and_join_mixer("mixer_grab_sender")
+        self._sender.connect_and_join_mixer("mixer_grab_sender", keep_room_open=True)
         time.sleep(1)
+        self._sender.disconnect_mixer()
         sender_grabber = Grabber()
         sender_grabber.grab(host, port, "mixer_grab_sender")
-        self._sender.disconnect_mixer()
 
-        self._receiver.connect_and_join_mixer("mixer_grab_receiver")
+        self._receiver.connect_and_join_mixer("mixer_grab_receiver", keep_room_open=True)
         time.sleep(1)
+        self._receiver.disconnect_mixer()
         receiver_grabber = Grabber()
         receiver_grabber.grab(host, port, "mixer_grab_receiver")
-        self._receiver.disconnect_mixer()
 
         # TODO_ timing error : sometimes succeeds
         # TODO_ enhance comparison : check # elements, understandable comparison

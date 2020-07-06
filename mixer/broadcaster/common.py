@@ -24,6 +24,7 @@ class MessageType(IntEnum):
     CLEAR_CONTENT = 6
     DELETE_ROOM = 7
     CLEAR_ROOM = 8
+
     # All clients that have joined a room
     LIST_ROOM_CLIENTS = 9
     # All joined clients for all rooms
@@ -33,6 +34,10 @@ class MessageType(IntEnum):
     CONNECTION_LOST = 13
     # All all joined and un joined clients
     LIST_ALL_CLIENTS = 14
+    SET_CLIENT_METADATA = 15
+    SET_ROOM_METADATA = 16
+    SET_ROOM_KEEP_OPEN = 17
+    CLIENT_ID = 18  # Allow a client to know its own id, a unique string
 
     COMMAND = 100
     DELETE = 101
@@ -119,6 +124,40 @@ class SensorFitMode(IntEnum):
     AUTO = 0
     VERTICAL = 1
     HORIZONTAL = 2
+
+
+class ClientMetadata:
+    """
+    Metadata associated with a client by the server.
+    First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
+    Clients are free to define metadata they need, but some standard names are provided here to ease sync
+    between clients of different kind.
+    """
+
+    ID = "id"  # Send by server only, type = str, the id of the client which is unique for each connected client
+    IP = "ip"  # Send by server only, type = str
+    PORT = "port"  # Send by server only, type = int
+    ROOM = "room"  # Send by server only, type = str
+
+    # Client to server metadata, not used by the server but clients are encouraged to use these keys for the same semantic
+    USERNAME = "user_name"  # type = str
+    USERCOLOR = "user_color"  # type = float3 (as list)
+    USERSCENES = "user_scenes"  # type = dict(str, dict()) key = Scene name_full, value = a dictionnary for scene metadata relative to the user
+    USERSCENES_FRAME = "frame"  # type = int, can be a field in a user_scenes dict
+
+
+class RoomMetadata:
+    """
+    Metadata associated with a room by the server.
+    First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
+    Clients are free to define metadata they need, but some standard names are provided here to ease sync
+    between clients of different kind.
+    """
+
+    NAME = "name"  # Send by server only, type = str, the name of the room which is unique for each room
+    KEEP_OPEN = (
+        "keep_open"  # Send by server only, type = bool, indicate if the room should be kept open after all clients left
+    )
 
 
 class ClientDisconnectedException(Exception):
@@ -326,7 +365,7 @@ class CommandFormatter:
     def format_clients(self, clients):
         s = ""
         for c in clients:
-            s += f'   - {c["ip"]}:{c["port"]} name = "{c["name"]}" room = "{c["room"]}"\n'
+            s += f'   - {c[ClientMetadata.IP]}:{c[ClientMetadata.PORT]} name = "{c[ClientMetadata.USERNAME]}" room = "{c[ClientMetadata.ROOM]}"\n'
         return s
 
     def format(self, command: Command):

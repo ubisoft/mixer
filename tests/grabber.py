@@ -1,6 +1,7 @@
 from mixer.broadcaster.common import MessageType
 from mixer.broadcaster.common import Command
 from mixer.broadcaster.common import ClientDisconnectedException
+from mixer.broadcaster.common import encode_string, encode_bool
 from mixer.broadcaster.client import Client
 from typing import Mapping, List
 import time
@@ -54,6 +55,10 @@ class Grabber:
                 self.streams.data[command.type].append(command.data)
         except ClientDisconnectedException:
             pass
+
+        client.add_command(Command(MessageType.SET_ROOM_KEEP_OPEN, encode_string(room_name) + encode_bool(False)))
+        client.add_command(Command(MessageType.LEAVE_ROOM, room_name.encode("utf8")))
+
         client.threadAlive = False
 
     def sort(self):

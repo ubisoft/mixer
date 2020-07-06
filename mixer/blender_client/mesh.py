@@ -419,6 +419,7 @@ def encode_mesh(obj, do_encode_base_mesh, do_encode_baked_mesh):
     binary_buffer = bytes()
 
     if do_encode_base_mesh:
+        logger.info("encode_base_mesh %s", obj.name_full)
         mesh_buffer = encode_base_mesh(obj)
         binary_buffer += common.encode_int(len(mesh_buffer))
         binary_buffer += mesh_buffer
@@ -426,6 +427,7 @@ def encode_mesh(obj, do_encode_base_mesh, do_encode_baked_mesh):
         binary_buffer += common.encode_int(0)
 
     if do_encode_baked_mesh:
+        logger.info("encode_baked_mesh %s", obj.name_full)
         mesh_buffer = encode_baked_mesh(obj)
         binary_buffer += common.encode_int(len(mesh_buffer))
         binary_buffer += mesh_buffer

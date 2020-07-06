@@ -34,3 +34,9 @@ def join_room(room_name: str = "mixer_unittest"):
     import mixer
 
     mixer.operators.join_room(room_name)
+
+
+def keep_room_open(room_name: str = "mixer_unittest", keep_open: bool = False):
+    from mixer.share_data import share_data
+
+    share_data.client.set_room_keep_open(room_name, keep_open)
