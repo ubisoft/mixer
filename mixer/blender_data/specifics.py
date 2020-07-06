@@ -66,6 +66,17 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
     return id_
 
 
+filter_crop_transform = [
+    T.EffectSequence,
+    T.ImageSequence,
+    T.MaskSequence,
+    T.MetaSequence,
+    T.MovieClipSequence,
+    T.MovieSequence,
+    T.SceneSequence,
+]
+
+
 def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     """Filter properties list according to a specific property value in the same ID
 
@@ -111,7 +122,6 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
 
-    filter_crop_transform = [T.EffectSequence, T.ImageSequence]
     filter_props = []
     if any(isinstance(bpy_struct, t) for t in filter_crop_transform):
         if not bpy_struct.use_crop:
