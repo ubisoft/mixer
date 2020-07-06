@@ -1,3 +1,22 @@
+# wip
+
+## Features
+
+- Sequencer synchronization (#124, #126)
+- World synchronization, including node_tree (#104)
+
+## Bugfix
+
+- Fix visibility synchronization (#108)
+- Fix a synchronization error after object duplication (#120)
+- Cleanup log messages (#117)
+- Fix synchronization error when a plugin is not installed on all Blender in a room (#107)
+
+## CI/CD
+
+- Fix random test failure on Gitlab runners (#123)
+- Add XML test reports (#114)
+
 # 0.8.0 (2020-07-02)
 
 ## Features
