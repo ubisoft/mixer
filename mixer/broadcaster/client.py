@@ -57,34 +57,51 @@ class Client:
     def add_command(self, command):
         self.pending_commands.put(command)
 
+    def handle_connection_lost(self):
+        logger.info("Connection lost for %s:%s", self.host, self.port)
+        # Set socket to None before putting CONNECTION_LIST message to avoid sending/reading new messages
+        self.socket = None
+        command = common.Command(common.MessageType.CONNECTION_LOST)
+        self.received_commands.put(command)
+
+    def safe_write_message(self, command: common.Command):
+        try:
+            common.write_message(self.socket, command)
+            return True
+        except common.ClientDisconnectedException:
+            self.handle_connection_lost()
+            return False
+
     def join_room(self, room_name):
-        common.write_message(self.socket, common.Command(common.MessageType.JOIN_ROOM, room_name.encode("utf8"), 0))
+        return self.safe_write_message(common.Command(common.MessageType.JOIN_ROOM, room_name.encode("utf8"), 0))
 
     def leave_room(self, room_name):
-        common.write_message(self.socket, common.Command(common.MessageType.LEAVE_ROOM, room_name.encode("utf8"), 0))
+        return self.safe_write_message(common.Command(common.MessageType.LEAVE_ROOM, room_name.encode("utf8"), 0))
 
     def delete_room(self, room_name):
-        common.write_message(self.socket, common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
+        return self.safe_write_message(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
 
     def set_client_metadata(self, metadata: dict):
-        common.write_message(
-            self.socket, common.Command(common.MessageType.SET_CLIENT_METADATA, common.encode_json(metadata), 0)
+        return self.safe_write_message(
+            common.Command(common.MessageType.SET_CLIENT_METADATA, common.encode_json(metadata), 0)
         )
 
     def set_room_metadata(self, room_name: str, metadata: dict):
-        command = common.Command(
-            common.MessageType.SET_ROOM_METADATA, common.encode_string(room_name) + common.encode_json(metadata), 0
+        return self.safe_write_message(
+            common.Command(
+                common.MessageType.SET_ROOM_METADATA, common.encode_string(room_name) + common.encode_json(metadata)
+            )
         )
-        common.write_message(self.socket, command)
 
     def send_list_rooms(self):
-        common.write_message(self.socket, common.Command(common.MessageType.LIST_ROOMS))
+        return self.safe_write_message(common.Command(common.MessageType.LIST_ROOMS))
 
     def set_room_keep_open(self, room_name: str, value: bool):
-        command = common.Command(
-            common.MessageType.SET_ROOM_KEEP_OPEN, common.encode_string(room_name) + common.encode_bool(value), 0
+        return self.safe_write_message(
+            common.Command(
+                common.MessageType.SET_ROOM_KEEP_OPEN, common.encode_string(room_name) + common.encode_bool(value), 0
+            )
         )
-        common.write_message(self.socket, command)
 
     def fetch_incoming_commands(self):
         """
@@ -117,9 +134,11 @@ class Client:
                 break
 
             logger.debug("Send %s (queue size = %d)", command.type, self.pending_commands.qsize())
-            common.write_message(self.socket, command)
-            self.pending_commands.task_done()
 
+            if not self.safe_write_message(command):
+                break
+
+            self.pending_commands.task_done()
             if commands_send_interval > 0:
                 time.sleep(commands_send_interval)
 
