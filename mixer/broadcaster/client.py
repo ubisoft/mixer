@@ -1,6 +1,7 @@
 import queue
 import socket
 import logging
+import time
 
 import mixer.broadcaster.common as common
 
@@ -18,26 +19,13 @@ class Client:
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         self.host = host
         self.port = port
-        self.receivedCommands = queue.Queue()
-        self.pendingCommands = queue.Queue()
-        self.applyTransformCallback = None
-        self._receivedCommandsProcessed = False
-        self.blockSignals = False
-        self._local_address = None
+        self.received_commands = queue.Queue()
+        self.pending_commands = queue.Queue()  # todo: does not need to be a queue anymore, at least for Blender client
         self.socket = None
 
     def __del__(self):
         if self.socket is not None:
             self.disconnect()
-
-    @property
-    def receivedCommandsProcessed(self):  # noqa N802
-        return self._receivedCommandsProcessed
-
-    @receivedCommandsProcessed.setter
-    def receivedCommandsProcessed(self, value):  # noqa N802
-        logger.debug("setting receivedCommandsProcessed to %s", value)
-        self._receivedCommandsProcessed = value
 
     def connect(self):
         if self.is_connected():
@@ -46,16 +34,15 @@ class Client:
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.host, self.port))
-            self._local_address = self.socket.getsockname()
+            local_address = self.socket.getsockname()
             logger.info(
-                "Connecting from local %s:%s to %s:%s",
-                self._local_address[0],
-                self._local_address[1],
-                self.host,
-                self.port,
+                "Connecting from local %s:%s to %s:%s", local_address[0], local_address[1], self.host, self.port,
             )
+            self.safe_write_message(common.Command(common.MessageType.CLIENT_ID))
         except ConnectionRefusedError:
             self.socket = None
+        except common.ClientDisconnectedException:
+            self.handle_connection_lost()
         except Exception as e:
             logger.error("Connection error %s", e, exc_info=True)
             self.socket = None
@@ -71,61 +58,102 @@ class Client:
         return self.socket is not None
 
     def add_command(self, command):
-        self.pendingCommands.put(command)
+        self.pending_commands.put(command)
+
+    def handle_connection_lost(self):
+        logger.info("Connection lost for %s:%s", self.host, self.port)
+        # Set socket to None before putting CONNECTION_LIST message to avoid sending/reading new messages
+        self.socket = None
+        command = common.Command(common.MessageType.CONNECTION_LOST)
+        self.received_commands.put(command)
+
+    def safe_write_message(self, command: common.Command):
+        try:
+            common.write_message(self.socket, command)
+            return True
+        except common.ClientDisconnectedException:
+            self.handle_connection_lost()
+            return False
 
     def join_room(self, room_name):
-        common.write_message(self.socket, common.Command(common.MessageType.JOIN_ROOM, room_name.encode("utf8"), 0))
+        return self.safe_write_message(common.Command(common.MessageType.JOIN_ROOM, room_name.encode("utf8"), 0))
 
     def leave_room(self, room_name):
-        common.write_message(self.socket, common.Command(common.MessageType.LEAVE_ROOM, room_name.encode("utf8"), 0))
+        return self.safe_write_message(common.Command(common.MessageType.LEAVE_ROOM, room_name.encode("utf8"), 0))
 
-    def set_client_name(self, user_name):
-        common.write_message(
-            self.socket, common.Command(common.MessageType.SET_CLIENT_NAME, user_name.encode("utf8"), 0)
+    def delete_room(self, room_name):
+        return self.safe_write_message(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
+
+    def set_client_metadata(self, metadata: dict):
+        return self.safe_write_message(
+            common.Command(common.MessageType.SET_CLIENT_METADATA, common.encode_json(metadata), 0)
+        )
+
+    def set_room_metadata(self, room_name: str, metadata: dict):
+        return self.safe_write_message(
+            common.Command(
+                common.MessageType.SET_ROOM_METADATA, common.encode_string(room_name) + common.encode_json(metadata)
+            )
+        )
+
+    def send_list_rooms(self):
+        return self.safe_write_message(common.Command(common.MessageType.LIST_ROOMS))
+
+    def set_room_keep_open(self, room_name: str, value: bool):
+        return self.safe_write_message(
+            common.Command(
+                common.MessageType.SET_ROOM_KEEP_OPEN, common.encode_string(room_name) + common.encode_bool(value), 0
+            )
         )
 
     def fetch_incoming_commands(self):
         """
-        Gather incoming commands in receivedCommands queue.
+        Gather incoming commands in received_commands queue.
         """
         while True:
             try:
                 command = common.read_message(self.socket)
             except common.ClientDisconnectedException:
-                logger.info("Connection lost for %s:%s", self.host, self.port)
-                # Set socket to None before putting CONNECTION_LIST message to avoid sending/reading new messages
-                self.socket = None
-                command = common.Command(common.MessageType.CONNECTION_LOST)
-                self.receivedCommands.put(command)
+                self.handle_connection_lost()
                 break
 
             if command is None:
                 break
 
-            self.receivedCommands.put(command)
+            self.received_commands.put(command)
 
-    def fetch_outgoing_commands(self):
+    def fetch_outgoing_commands(self, commands_send_interval=0):
         """
-        Send commands in pendingCommands queue to the server.
+        Send commands in pending_commands queue to the server.
         """
         while True:
             try:
-                command = self.pendingCommands.get_nowait()
+                command = self.pending_commands.get_nowait()
             except queue.Empty:
                 break
 
-            logger.debug("Send %s (queue size = %d)", command.type, self.pendingCommands.qsize())
-            common.write_message(self.socket, command)
-            self.pendingCommands.task_done()
+            logger.debug("Send %s (queue size = %d)", command.type, self.pending_commands.qsize())
 
-    def fetch_commands(self):
+            if not self.safe_write_message(command):
+                break
+
+            self.pending_commands.task_done()
+            if commands_send_interval > 0:
+                time.sleep(commands_send_interval)
+
+    def fetch_commands(self, commands_send_interval=0):
+        """
+        commands_send_interval is used for debug, to test stability
+        """
         self.fetch_incoming_commands()
-        self.fetch_outgoing_commands()
+        self.fetch_outgoing_commands(commands_send_interval)
 
     def get_next_received_command(self):
         try:
-            command = self.receivedCommands.get_nowait()
-            logger.debug("Receive %s (queue size = %d)", command.type, self.receivedCommands.qsize())
+            command = self.received_commands.get_nowait()
+            self.received_commands.task_done()
+            if command.type not in (common.MessageType.LIST_ALL_CLIENTS, common.MessageType.LIST_ROOMS,):
+                logger.debug("Receive %s (queue size = %d)", command.type, self.received_commands.qsize())
             return command
         except queue.Empty:
             return None

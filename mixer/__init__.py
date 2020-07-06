@@ -17,6 +17,7 @@ bl_info = {
 }
 
 logger = logging.getLogger(__name__)
+logger.propagate = False
 MODULE_PATH = Path(__file__).parent.parent
 _disable_fault_handler = False
 

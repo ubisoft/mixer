@@ -53,9 +53,9 @@ class ShareData:
         self.client = None
 
         # as received fom LIST_ALL_CLIENTS
-        self.client_ids: List[Mapping[str, str]] = None
+        self.client_ids: Mapping[str, dict] = None
+        self.rooms_dict: Mapping[str, dict] = None
 
-        self.isLocal = False
         self.localServerProcess = None
         self.selected_objects_names = []
 
@@ -184,6 +184,7 @@ class ShareData:
     def blender_objects(self):
         if not self.blender_objects_dirty:
             return self._blender_objects
+        logger.debug("Updating blender_objects")
         self._blender_objects = {x.name_full: x for x in bpy.data.objects}
         self.blender_objects_dirty = False
         return self._blender_objects

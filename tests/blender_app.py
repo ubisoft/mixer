@@ -27,11 +27,12 @@ class BlenderApp:
         self._blender.start(blender_args)
         self._blender.connect()
 
-    def connect_and_join_mixer(self, room_name="mixer_unittest"):
+    def connect_and_join_mixer(self, room_name="mixer_unittest", keep_room_open=False):
         if self._log_level is not None:
             self._blender.send_function(mixer_lib.set_log_level, self._log_level)
         self._blender.send_function(mixer_lib.connect)
         self._blender.send_function(mixer_lib.join_room, room_name)
+        self._blender.send_function(mixer_lib.keep_room_open, room_name, keep_room_open)
 
     def disconnect_mixer(self):
         self._blender.send_function(mixer_lib.disconnect)
