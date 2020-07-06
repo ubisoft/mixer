@@ -187,15 +187,11 @@ class ClientBlender(Client):
 
     def get_transform_buffer(self, obj):
         path = self.get_object_path(obj)
-        visible = not obj.hide_viewport
-        temporary_visibility = not obj.hide_get()
         return (
             common.encode_string(path)
             + common.encode_matrix(obj.matrix_parent_inverse)
             + common.encode_matrix(obj.matrix_basis)
             + common.encode_matrix(obj.matrix_local)
-            + common.encode_bool(visible)
-            + common.encode_bool(temporary_visibility)
         )
 
     def send_transform(self, obj):
