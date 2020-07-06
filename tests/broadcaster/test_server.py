@@ -25,7 +25,7 @@ class Delegate:
         if clients is None:
             self.name_room = None
         else:
-            self.name_room = [(c["name"], c["room"]) for c in clients]
+            self.name_room = [(c[common.ClientMetadata.USERNAME], c[common.ClientMetadata.ROOM]) for c in clients]
         return None
 
     def on_connection_lost(self):
@@ -121,7 +121,7 @@ class TestServer(unittest.TestCase):
         delay()
         self.assertEqual(server.client_count(), (0, 1))
 
-        c0.set_client_name(c0_name)
+        c0.set_client_metadata({common.ClientMetadata.USERNAME: c0_name})
         c0.join_room(c0_room)
         delay()
         network_consumer(c0, self._delegate)
@@ -143,12 +143,12 @@ class TestServer(unittest.TestCase):
         d0 = Delegate()
         c0 = Client()
         c0.join_room(c0_room)
-        c0.set_client_name(c0_name)
+        c0.set_client_metadata({common.ClientMetadata.USERNAME: c0_name})
 
         d1 = Delegate()
         c1 = Client()
         c1.join_room(c1_room)
-        c1.set_client_name(c1_name)
+        c1.set_client_metadata({common.ClientMetadata.USERNAME: c1_name})
 
         delay()
 
@@ -174,12 +174,12 @@ class TestServer(unittest.TestCase):
         d0 = Delegate()
         c0 = Client()
         c0.join_room(c0_room)
-        c0.set_client_name(c0_name)
+        c0.set_client_metadata({common.ClientMetadata.USERNAME: c0_name})
 
         d1 = Delegate()
         c1 = Client()
         c1.join_room(c1_room)
-        c1.set_client_name(c1_name)
+        c1.set_client_metadata({common.ClientMetadata.USERNAME: c1_name})
 
         c1.leave_room(c1_room)
 
