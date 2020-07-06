@@ -10,8 +10,10 @@ class TestBpyProxy(TestGenericJoinBefore):
     def test_duplicate_uuid(self):
         action = f"""
 import bpy
-bpy.ops.object.light_add(type='POINT')
-bpy.context.active_object.name = "light0"
+bpy.ops.object.light_add(type='AREA')
+light = bpy.context.active_object
+light.name = "light0"
+light.shape = "ELLIPSE"
 """
         self.send_string(action)
 
