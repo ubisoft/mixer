@@ -1,8 +1,8 @@
 import logging
 import argparse
-import socket
 import select
 import threading
+import socket
 from typing import Tuple, List, Mapping, Union, ValuesView
 
 import mixer.broadcaster.cli_utils as cli_utils
@@ -17,7 +17,7 @@ logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__
 class Connection:
     """ Represent a connection with a client """
 
-    def __init__(self, server: "Server", socket: socket.socket, address):
+    def __init__(self, server: "Server", socket, address):
         self.socket = socket
         self.address = address
         self.metadata = {}  # metadata are used between clients, but not by the server
