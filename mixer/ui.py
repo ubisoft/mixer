@@ -37,9 +37,9 @@ def update_user_list(do_redraw=True):
         redraw_if(do_redraw)
         return
 
-    for client in share_data.client_ids:
+    for client_id, client in share_data.client_ids.items():
         item = props.users.add()
-        item.is_me = client[ClientMetadata.IS_ME]
+        item.is_me = client_id == share_data.client.client_id
         item.name = (
             client[ClientMetadata.USERNAME]
             if (ClientMetadata.USERNAME in client and client[ClientMetadata.USERNAME])
@@ -77,7 +77,9 @@ def update_room_list(do_redraw=True):
     for room_name, _ in share_data.rooms_dict.items():
         item = props.rooms.add()
         item.name = room_name
-        item.users_count = len([id for id in share_data.client_ids if id[ClientMetadata.ROOM] == room_name])
+        item.users_count = len(
+            [client for client in share_data.client_ids.values() if client[ClientMetadata.ROOM] == room_name]
+        )
 
     redraw_if(do_redraw)
 
@@ -215,7 +217,9 @@ class MixerSettingsPanel(bpy.types.Panel):
             layout.operator(operators.ConnectOperator.bl_idname, text="Connect")
             self.draw_advanced_options(layout)
         else:
-            layout.label(text=f"Connected to {mixer_prefs.host}:{mixer_prefs.port}")
+            layout.label(
+                text=f"Connected to {mixer_prefs.host}:{mixer_prefs.port} with ID {share_data.client.client_id}"
+            )
             layout.operator(operators.DisconnectOperator.bl_idname, text="Disconnect")
             self.draw_advanced_options(layout)
 

@@ -38,6 +38,8 @@ class ClientBlender(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(host, port)
 
+        self.client_id = None  # Will be filled with a unique string identifying this client
+
         self.textures: Set[str] = set()
         self.callbacks = {}
 
@@ -610,6 +612,9 @@ class ClientBlender(Client):
                 elif command.type == common.MessageType.LIST_ROOMS:
                     rooms_dict, _ = common.decode_json(command.data, 0)
                     self.build_list_rooms(rooms_dict)
+                    processed = True
+                elif command.type == common.MessageType.CLIENT_ID:
+                    self.client_id = command.data.decode()
                     processed = True
                 elif command.type == common.MessageType.CONNECTION_LOST:
                     self.on_connection_lost()

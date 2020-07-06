@@ -123,16 +123,15 @@ class Connection:
 
     def get_list_all_clients_command(self):
         client_ids = self._server.client_ids()
-        for client in client_ids:
-            if (client[common.ClientMetadata.IP], client[common.ClientMetadata.PORT]) == self.address:
-                client[common.ClientMetadata.IS_ME] = True
-                break
         return common.Command(common.MessageType.LIST_ALL_CLIENTS, common.encode_json(client_ids))
+
+    def get_unique_id(self) -> str:
+        return f"{self.address[0]}:{self.address[1]}"
 
     def client_id(self) -> Mapping[str, str]:
         return {
             **self.metadata,
-            common.ClientMetadata.IS_ME: False,  # Will be changed before sending in self.send_client_ids()
+            common.ClientMetadata.ID: f"{self.get_unique_id()}",
             common.ClientMetadata.IP: self.address[0],
             common.ClientMetadata.PORT: self.address[1],
             common.ClientMetadata.ROOM: self.room.name if self.room is not None else None,
@@ -203,6 +202,13 @@ class Connection:
                     room_name, offset = common.decode_string(command.data, 0)
                     value, _ = common.decode_bool(command.data, offset)
                     self._server.set_room_keep_open(room_name, value)
+
+                elif command.type == common.MessageType.CLIENT_ID:
+                    self.add_command(
+                        common.Command(
+                            common.MessageType.CLIENT_ID, f"{self.address[0]}:{self.address[1]}".encode("utf8")
+                        )
+                    )
 
                 # Other commands
                 elif command.type.value > common.MessageType.COMMAND.value:
@@ -421,13 +427,9 @@ class Server:
     def client_ids(self) -> List[Mapping]:
         with common.mutex:
             # gather all client ids
-            client_ids = []
-            for connection in self._unjoined_connections.values():
-                client_ids.append(connection.client_id())
-            for room in self._rooms.values():
-                ids = room.client_ids()
-                if ids is not None:
-                    client_ids.extend(ids)
+            client_ids = {}
+            for connection in self.all_connections():
+                client_ids[connection.get_unique_id()] = connection.client_id()
             return client_ids
 
     def all_connections(self) -> List[Connection]:

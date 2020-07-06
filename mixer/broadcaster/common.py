@@ -37,6 +37,7 @@ class MessageType(IntEnum):
     SET_CLIENT_METADATA = 15
     SET_ROOM_METADATA = 16
     SET_ROOM_KEEP_OPEN = 17
+    CLIENT_ID = 18  # Allow a client to know its own id, a unique string
 
     COMMAND = 100
     DELETE = 101
@@ -132,7 +133,7 @@ class ClientMetadata:
     client type.
     """
 
-    IS_ME = "is_me"  # Send by server only, type = bool, allow a client to know its own metadata
+    ID = "id"  # Send by server only, type = str, the id of the client which is unique for each connected client
     IP = "ip"  # Send by server only, type = str
     PORT = "port"  # Send by server only, type = int
     ROOM = "room"  # Send by server only, type = str

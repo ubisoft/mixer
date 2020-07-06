@@ -38,8 +38,11 @@ class Client:
             logger.info(
                 "Connecting from local %s:%s to %s:%s", local_address[0], local_address[1], self.host, self.port,
             )
+            self.safe_write_message(common.Command(common.MessageType.CLIENT_ID))
         except ConnectionRefusedError:
             self.socket = None
+        except common.ClientDisconnectedException:
+            self.handle_connection_lost()
         except Exception as e:
             logger.error("Connection error %s", e, exc_info=True)
             self.socket = None
@@ -111,11 +114,7 @@ class Client:
             try:
                 command = common.read_message(self.socket)
             except common.ClientDisconnectedException:
-                logger.info("Connection lost for %s:%s", self.host, self.port)
-                # Set socket to None before putting CONNECTION_LIST message to avoid sending/reading new messages
-                self.socket = None
-                command = common.Command(common.MessageType.CONNECTION_LOST)
-                self.received_commands.put(command)
+                self.handle_connection_lost()
                 break
 
             if command is None:

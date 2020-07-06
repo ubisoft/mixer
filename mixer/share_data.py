@@ -53,7 +53,7 @@ class ShareData:
         self.client = None
 
         # as received fom LIST_ALL_CLIENTS
-        self.client_ids: List[dict] = None
+        self.client_ids: Mapping[str, dict] = None
         self.rooms_dict: Mapping[str, dict] = None
 
         self.localServerProcess = None
