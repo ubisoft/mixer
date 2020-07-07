@@ -1,3 +1,20 @@
+# 0.9.0 (2020-07-07)
+
+## Features
+
+- Overhaul of panels UI (#80)
+- Prototyping video sequencer synchronization (#124, #126)
+ 
+## Bugfix
+
+- Ignore properties from other enabled addons (#107)
+- Object UUIDs duplication (#120)
+- Partial fix for flickering during collaboration (#127, WIP)
+
+## Documentation
+
+- Cleanup README a bit for Open Sourcing (#129, WIP)
+
 # 0.8.0 (2020-07-02)
 
 ## Features

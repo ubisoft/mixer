@@ -1,6 +1,6 @@
 # Mixer
 
-**Disclaimer**: This project is in experimental state and actively developped. Do not use it to edit your production assets without a backup or you might break them.
+**Disclaimer**: This project is in alpha state and actively developped. Do not use it to edit your production assets without a backup or you might break them. In the code you might see references to VRtist or Shot Manager, which are other technologies/addons that are developped in our studio. Don't pay too much attention to related code since we plan to extract it in some kind of plugin mechanism.
 
 ## Introduction
 
