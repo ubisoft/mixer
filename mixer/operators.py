@@ -104,6 +104,11 @@ def handler_send_frame_changed(scene):
 @persistent
 def handler_send_scene_data_to_server(scene, dummy):
     logger.debug("handler_send_scene_data_to_server")
+
+    # Ensure we will rebuild accessors when a depsgraph update happens
+    # todo investigate why we need this...
+    share_data.set_dirty()
+
     if share_data.client.block_signals:
         logger.debug("handler_send_scene_data_to_server canceled (block_signals = True)")
         return

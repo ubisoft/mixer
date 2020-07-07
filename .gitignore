@@ -63,3 +63,4 @@ $RECYCLE.BIN/
 
 # Blender for unit tests
 gitlab/blender
+logs/
