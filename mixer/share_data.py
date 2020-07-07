@@ -163,6 +163,7 @@ class ShareData:
         self.scenes_info = {}
 
     def set_dirty(self):
+        logging.debug("share_data.set_dirty")
         self.blender_objects_dirty = True
         self.blender_materials_dirty = True
         self.blender_meshes_dirty = True
@@ -258,6 +259,7 @@ class ShareData:
     def blender_scenes(self):
         if not self.blender_scenes_dirty:
             return self._blender_scenes
+        logger.debug("Updating blender_scenes")
         self._blender_scenes = {x.name_full: x for x in bpy.data.scenes}
         self.blender_scenes_dirty = False
         return self._blender_scenes
@@ -291,6 +293,7 @@ class ShareData:
         self.clear_changed_frame_related_lists()
 
     def update_scenes_info(self):
+        logging.debug("update_scenes_info")
         self.scenes_info = {scene.name_full: SceneInfo(scene) for scene in self.blender_scenes.values()}
 
     # apply temporary visibility to layerCollection

@@ -66,8 +66,8 @@ class HandlerManager:
     def _set_handlers(cls, connect: bool):
         try:
             if connect:
-                bpy.app.handlers.frame_change_post.append(send_frame_changed)
-                bpy.app.handlers.depsgraph_update_post.append(send_scene_data_to_server)
+                bpy.app.handlers.frame_change_post.append(handler_send_frame_changed)
+                bpy.app.handlers.depsgraph_update_post.append(handler_send_scene_data_to_server)
                 bpy.app.handlers.undo_pre.append(on_undo_redo_pre)
                 bpy.app.handlers.redo_pre.append(on_undo_redo_pre)
                 bpy.app.handlers.undo_post.append(on_undo_redo_post)
@@ -75,8 +75,8 @@ class HandlerManager:
                 bpy.app.handlers.load_post.append(on_load)
             else:
                 bpy.app.handlers.load_post.remove(on_load)
-                bpy.app.handlers.frame_change_post.remove(send_frame_changed)
-                bpy.app.handlers.depsgraph_update_post.remove(send_scene_data_to_server)
+                bpy.app.handlers.frame_change_post.remove(handler_send_frame_changed)
+                bpy.app.handlers.depsgraph_update_post.remove(handler_send_scene_data_to_server)
                 bpy.app.handlers.undo_pre.remove(on_undo_redo_pre)
                 bpy.app.handlers.redo_pre.remove(on_undo_redo_pre)
                 bpy.app.handlers.undo_post.remove(on_undo_redo_post)
@@ -89,6 +89,31 @@ class HandlerManager:
         if wanted_state != cls._current_state:
             cls._set_handlers(wanted_state)
             cls._current_state = wanted_state
+
+
+@persistent
+def handler_send_frame_changed(scene):
+    logger.debug("handler_send_frame_changed")
+    if share_data.client.block_signals:
+        logger.debug("handler_send_frame_changed canceled (block_signals = True)")
+        return
+
+    send_frame_changed(scene)
+
+
+@persistent
+def handler_send_scene_data_to_server(scene, dummy):
+    logger.debug("handler_send_scene_data_to_server")
+
+    # Ensure we will rebuild accessors when a depsgraph update happens
+    # todo investigate why we need this...
+    share_data.set_dirty()
+
+    if share_data.client.block_signals:
+        logger.debug("handler_send_scene_data_to_server canceled (block_signals = True)")
+        return
+
+    send_scene_data_to_server(scene, dummy)
 
 
 class TransformStruct:
@@ -709,7 +734,6 @@ def send_animated_camera_data():
         share_data.client.send_camera_attributes(camera)
 
 
-@persistent
 def send_frame_changed(scene):
     logger.debug("send_frame_changed")
 
@@ -720,8 +744,7 @@ def send_frame_changed(scene):
     # We can arrive here because of scene deletion (bpy.ops.scene.delete({'scene': to_remove}) that happens during build_scene)
     # so we need to prevent processing self events
     if share_data.client.skip_next_depsgraph_update:
-        if not share_data.client.block_signals:
-            share_data.client.skip_next_depsgraph_update = False
+        share_data.client.skip_next_depsgraph_update = False
         logger.debug("send_frame_changed canceled (skip_next_depsgraph_update = True)")
         return
 
@@ -768,10 +791,9 @@ def send_frame_changed(scene):
 
 
 @stats_timer(share_data)
-@persistent
 def send_scene_data_to_server(scene, dummy):
     logger.debug(
-        "send_scene_data_to_server(): receivedCommandProcessed %s, pending_test_update %s",
+        "send_scene_data_to_server(): pending_test_update %s, skip_next_depsgraph_update %s",
         share_data.pending_test_update,
         share_data.client.skip_next_depsgraph_update,
     )
@@ -794,10 +816,7 @@ def send_scene_data_to_server(scene, dummy):
 
     # prevent processing self events, but always process test updates
     if not share_data.pending_test_update and share_data.client.skip_next_depsgraph_update:
-        if (
-            not share_data.client.block_signals
-        ):  # Here we know we are not triggered from inside the network_consumer timer function
-            share_data.client.skip_next_depsgraph_update = False
+        share_data.client.skip_next_depsgraph_update = False
         logger.debug("send_scene_data_to_server canceled (skip_next_depsgraph_update = True) ...")
         return
 
@@ -1212,6 +1231,7 @@ class JoinRoomOperator(bpy.types.Operator):
             is_client_connected()
             and room_index < len(get_mixer_props().rooms)
             and share_data.current_room is None
+            and "experimental_sync" in share_data.rooms_dict[get_mixer_props().rooms[room_index].name]
             and get_mixer_prefs().experimental_sync
             == share_data.rooms_dict[get_mixer_props().rooms[room_index].name]["experimental_sync"]
         )
