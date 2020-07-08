@@ -1,7 +1,6 @@
 from mixer.broadcaster.common import MessageType, encode_json
 from mixer.broadcaster.common import Command
 from mixer.broadcaster.common import ClientDisconnectedException
-from mixer.broadcaster.common import command_to_byte_buffer
 from mixer.broadcaster.client import Client
 from typing import List, Tuple
 import time
@@ -72,7 +71,7 @@ def save_room(room_metadata: dict, commands: List[Command], file_path: str):
     with open(file_path, "wb") as f:
         f.write(encode_json(room_metadata))
         for c in commands:
-            f.write(command_to_byte_buffer(c))
+            f.write(c.to_byte_buffer())
 
 
 def load_room(file_path: str) -> Tuple[dict, List[Command]]:
