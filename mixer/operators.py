@@ -1236,14 +1236,21 @@ class JoinRoomOperator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        room_index = get_mixer_props().room_index
+        props = get_mixer_props()
+        room_index = props.room_index
+        valid_selection = room_index < len(props.rooms)
+        room_dict = share_data.rooms_dict[props.rooms[room_index].name] if valid_selection else None
         return (
             is_client_connected()
-            and room_index < len(get_mixer_props().rooms)
+            and valid_selection
             and share_data.current_room is None
-            and "experimental_sync" in share_data.rooms_dict[get_mixer_props().rooms[room_index].name]
-            and get_mixer_prefs().experimental_sync
-            == share_data.rooms_dict[get_mixer_props().rooms[room_index].name]["experimental_sync"]
+            and (
+                ("experimental_sync" not in room_dict and not get_mixer_prefs().experimental_sync)
+                or (
+                    "experimental_sync" in room_dict
+                    and get_mixer_prefs().experimental_sync == room_dict["experimental_sync"]
+                )
+            )
         )
 
     def execute(self, context):
@@ -1280,6 +1287,70 @@ class DeleteRoomOperator(bpy.types.Operator):
         room_index = props.room_index
         room = props.rooms[room_index].name
         share_data.client.delete_room(room)
+
+        return {"FINISHED"}
+
+
+class DownloadRoomOperator(bpy.types.Operator):
+    """Download content of an empty room"""
+
+    bl_idname = "mixer.download_room"
+    bl_label = "Download Room"
+    bl_options = {"REGISTER"}
+
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+
+    @classmethod
+    def poll(cls, context):
+        room_index = get_mixer_props().room_index
+        return (
+            is_client_connected()
+            and room_index < len(get_mixer_props().rooms)
+            and (get_mixer_props().rooms[room_index].users_count == 0)
+        )
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {"RUNNING_MODAL"}
+
+    def execute(self, context):
+        from mixer.broadcaster.room_bake import download_room, save_room
+
+        prefs = get_mixer_prefs()
+        props = get_mixer_props()
+        room_index = props.room_index
+        room = props.rooms[room_index].name
+        metadata, commands = download_room(prefs.host, prefs.port, room)
+        save_room(metadata, commands, self.filepath)
+
+        return {"FINISHED"}
+
+
+class UploadRoomOperator(bpy.types.Operator):
+    """Upload content of an empty room"""
+
+    bl_idname = "mixer.upload_room"
+    bl_label = "Upload Room"
+    bl_options = {"REGISTER"}
+
+    @classmethod
+    def poll(cls, context):
+        mixer_props = get_mixer_props()
+        return (
+            is_client_connected()
+            and share_data.rooms_dict is not None
+            and os.path.exists(mixer_props.upload_room_filepath)
+            and mixer_props.upload_room_name not in share_data.rooms_dict
+        )
+
+    def execute(self, context):
+        from mixer.broadcaster.room_bake import load_room, upload_room
+
+        prefs = get_mixer_prefs()
+        props = get_mixer_props()
+
+        metadata, commands = load_room(props.upload_room_filepath)
+        upload_room(prefs.host, prefs.port, props.upload_room_name, metadata, commands)
 
         return {"FINISHED"}
 
@@ -1445,6 +1516,8 @@ classes = (
     LeaveRoomOperator,
     WriteStatisticsOperator,
     OpenStatsDirOperator,
+    DownloadRoomOperator,
+    UploadRoomOperator,
 )
 
 

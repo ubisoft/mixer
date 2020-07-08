@@ -252,7 +252,24 @@ class MixerSettingsPanel(bpy.types.Panel):
                     "ROOM_UL_ItemRenderer", "", mixer_props, "rooms", mixer_props, "room_index", rows=2
                 )
                 layout.operator(operators.JoinRoomOperator.bl_idname)
-                layout.operator(operators.DeleteRoomOperator.bl_idname)
+                row = layout.row()
+                collapsable_panel(row, mixer_props, "display_advanced_room_control")
+                row.label(text="Advanced room controls")
+                if mixer_props.display_advanced_room_control:
+                    box = layout.box()
+                    col = box.column()
+                    col.operator(operators.DeleteRoomOperator.bl_idname)
+                    col.operator(operators.DownloadRoomOperator.bl_idname)
+                    subbox = col.box()
+                    subbox.row().operator(operators.UploadRoomOperator.bl_idname)
+                    row = subbox.row()
+                    row.prop(mixer_props, "upload_room_name", text="Name")
+                    row.prop(
+                        mixer_props,
+                        "upload_room_filepath",
+                        text="File",
+                        icon=("ERROR" if not os.path.exists(mixer_props.upload_room_filepath) else "NONE"),
+                    )
 
             self.draw_users(layout)
 

@@ -282,6 +282,10 @@ class MixerProperties(bpy.types.PropertyGroup):
         items=get_snap_view_users, name="Snap Time User",
     )
 
+    display_advanced_room_control: bpy.props.BoolProperty(default=False)
+    upload_room_name: bpy.props.StringProperty(default=f"{os.getlogin()}_uploaded_room", name="Upload Room Name")
+    upload_room_filepath: bpy.props.StringProperty(default=f"", subtype="FILE_PATH", name="Upload Room File")
+
 
 def get_mixer_props() -> MixerProperties:
     return bpy.context.window_manager.mixer
