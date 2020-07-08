@@ -1,3 +1,9 @@
+# 0.9.1 (2020-07-08)
+
+## Documentation
+
+- Add LICENSE file to repository and to output zipped addon
+
 # 0.9.0 (2020-07-07)
 
 ## Features

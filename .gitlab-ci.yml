@@ -20,7 +20,7 @@ zip:
     - linux
   stage: pre_release
   script:
-    - cp CHANGELOG.md README.md mixer/
+    - cp CHANGELOG.md README.md LICENSE mixer/
   artifacts:
     name: "${CI_PROJECT_NAME}_${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}"
     paths:
