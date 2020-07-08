@@ -1,21 +1,25 @@
-# wip
+# 0.9.1 (2020-07-08)
+
+## Documentation
+
+- Add LICENSE file to repository and to output zipped addon
+
+# 0.9.0 (2020-07-07)
 
 ## Features
 
-- Sequencer synchronization (#124, #126)
-- World synchronization, including node_tree (#104)
+- Overhaul of panels UI (#80)
+- Prototyping video sequencer synchronization (#124, #126)
 
 ## Bugfix
 
-- Fix visibility synchronization (#108)
-- Fix a synchronization error after object duplication (#120)
-- Cleanup log messages (#117)
-- Fix synchronization error when a plugin is not installed on all Blender in a room (#107)
+- Ignore properties from other enabled addons (#107)
+- Object UUIDs duplication (#120)
+- Partial fix for flickering during collaboration (#127, WIP)
 
-## CI/CD
+## Documentation
 
-- Fix random test failure on Gitlab runners (#123)
-- Add XML test reports (#114)
+- Cleanup README a bit for Open Sourcing (#129, WIP)
 
 # 0.8.0 (2020-07-02)
 
