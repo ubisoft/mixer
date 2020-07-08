@@ -846,15 +846,25 @@ def send_scene_data_to_server(scene, dummy):
         changed |= add_collections()
         changed |= add_objects()
 
+        # Updates from the VRtist protocol and from the full Blender protocol must be cafully intermixed
+        # This is an unfortunate requirements from the current coexistence status of
+        # both protocols
+
         # After creation of meshes : meshes are not yet supported by full Blender protocol,
         # but needed to properly create objects
         # Before creation of objects :  the VRtint protocol  will implicitely create objects with
         # unappropriate default values (e.g. transform creates an object with no data)
         if share_data.use_experimental_sync():
+            # Compute the difference between the proxy state and the Blender state
+            # It is a coarse difference at the ID level(created, removed, renamed)
             diff = BpyBlendDiff()
             diff.diff(share_data.proxy, safe_context)
+
+            # Ask the proxy to compute the list of elements to synchronize and update itself
             depsgraph = bpy.context.evaluated_depsgraph_get()
             updates, removals = share_data.proxy.update(diff, safe_context, depsgraph.updates)
+
+            # Send the data update messages (includes serialization)
             data_api.send_data_removals(removals)
             data_api.send_data_updates(updates)
             share_data.proxy.debug_check_id_proxies()

@@ -99,7 +99,8 @@ def send_data_updates(updates: List[BpyIDProxy]):
         return
     codec = Codec()
     for proxy in updates:
-
+        # We send an ID, so we need to make sure that it includes a bp.data collection name
+        # and the associated key
         try:
             collection_name, key = blenddata_path(proxy)
         except InvalidPath:
