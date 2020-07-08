@@ -416,6 +416,8 @@ class Server:
             peer = connection.address
             assert peer not in self._unjoined_connections
             self._unjoined_connections[peer] = connection
+            # Inform client that he has left the room
+            connection.add_command(common.Command(common.MessageType.LEAVE_ROOM))
             self.broadcast_user_list()
 
     def rooms_names(self) -> List[str]:

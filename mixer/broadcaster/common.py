@@ -450,16 +450,20 @@ def read_message(socket: socket.socket) -> Command:
         raise
 
 
+def command_to_byte_buffer(command: Command):
+    size = int_to_bytes(len(command.data), 8)
+    command_id = int_to_bytes(command.id, 4)
+    mtype = int_to_bytes(command.type.value, 2)
+
+    return size + command_id + mtype + command.data
+
+
 def write_message(sock: socket.socket, command: Command):
     if not sock:
         logger.warning("write_message called with no socket")
         return
 
-    size = int_to_bytes(len(command.data), 8)
-    command_id = int_to_bytes(command.id, 4)
-    mtype = int_to_bytes(command.type.value, 2)
-
-    buffer = size + command_id + mtype + command.data
+    buffer = command_to_byte_buffer(command)
 
     try:
         _, w, _ = select.select([], [sock], [])
@@ -468,3 +472,8 @@ def write_message(sock: socket.socket, command: Command):
     except (ConnectionAbortedError, ConnectionResetError) as e:
         logger.warning(e)
         raise ClientDisconnectedException()
+
+
+def make_set_room_metadata_command(room_name: str, metadata: dict):
+    return Command(MessageType.SET_ROOM_METADATA, encode_string(room_name) + encode_json(metadata))
+
