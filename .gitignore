@@ -1,6 +1,7 @@
 # UNITY ##################################
 
 **/__pycache__
+.mypy_cache
 
 # Visual Studio cache directory
 .vs/
