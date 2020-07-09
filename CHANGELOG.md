@@ -1,3 +1,14 @@
+# 0.10.0 (2020-07-09)
+
+## Features
+
+- Add options to download and upload room contents (#59)
+
+## Documentation
+
+- Move some documentation from the README.md file to dedicated `doc/` folder
+- Add synchronization documentation
+
 # 0.9.1 (2020-07-08)
 
 ## Documentation
