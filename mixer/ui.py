@@ -84,15 +84,24 @@ def update_room_list(do_redraw=True):
     redraw_if(do_redraw)
 
 
-def collapsable_panel(layout: bpy.types.UILayout, data: bpy.types.AnyType, property: str):
-    layout.prop(
+def collapsable_panel(
+    layout: bpy.types.UILayout, data: bpy.types.AnyType, property: str, alert: bool = False, **kwargs
+):
+    row = layout.row()
+    row.prop(
         data, property, icon="TRIA_DOWN" if getattr(data, property) else "TRIA_RIGHT", icon_only=True, emboss=False,
     )
+    if alert:
+        row.alert = True
+    row.label(**kwargs)
+    return getattr(data, property)
 
 
 class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
     @classmethod
     def draw_header(cls, layout):
+        row = layout.row()
+        row.prop(get_mixer_props(), "display_rooms_details")
         box = layout.box()
         split = box.split()
         split.alignment = "CENTER"
@@ -100,6 +109,9 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         split.label(text="Users")
         split.label(text="Experimental Sync")
         split.label(text="Keep Open")
+        if get_mixer_props().display_rooms_details:
+            split.label(text="Command Count")
+            split.label(text="Size (MB)")
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.split()
@@ -107,6 +119,9 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         split.label(text=f"{item.users_count} users")
         split.prop(item, "experimental_sync", text="")
         split.prop(item, "keep_open", text="")
+        if get_mixer_props().display_rooms_details:
+            split.prop(item, "command_count", text="")
+            split.prop(item, "mega_byte_size", text="")
 
 
 class MixerSettingsPanel(bpy.types.Panel):
@@ -131,9 +146,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                     return user.room == mixer_props.rooms[mixer_props.room_index].name
                 return user.room == ""
 
-        row = layout.row()
-        collapsable_panel(row, mixer_props, "display_users")
-        row.label(text="Server Users")
+        collapsable_panel(layout, mixer_props, "display_users", text="Server Users")
         if mixer_props.display_users:
             box = layout.box()
             box.row().prop(mixer_props, "display_users_details")
@@ -151,7 +164,6 @@ class MixerSettingsPanel(bpy.types.Panel):
                     window_count = len(user.windows)
                     row.label(text=f"{window_count} window{'s' if window_count > 1 else ''}")
 
-                if mixer_props.display_users_details:
                     frame_of_scene = {}
                     for scene in user.scenes:
                         frame_of_scene[scene.scene] = scene.frame
@@ -167,35 +179,20 @@ class MixerSettingsPanel(bpy.types.Panel):
                         split.scale_y = 0.5
                     user_layout.separator(factor=0.2)
 
-            row = layout.row()
-            collapsable_panel(row, mixer_props, "display_snapping_options")
-            row.alert = True
-            row.label(text=f"Snapping - Not implemented yet")
-            if mixer_props.display_snapping_options:
-                box = layout.box()
-                if share_data.current_room is None:
-                    box.label(text="You must join a room to snap")
-                else:
-                    row = box.row()
-                    row.prop(mixer_props, "snap_view_user_enabled", text="3D View: ")
-                    row.prop(mixer_props, "snap_view_user", text="", icon="USER")
-                    row.prop(mixer_props, "snap_view_area", text="", icon="VIEW_CAMERA")
-                    row = box.row()
-                    row.prop(mixer_props, "snap_time_user_enabled", text="Time: ")
-                    row.prop(mixer_props, "snap_time_user", text="", icon="USER")
-
-    def draw_advanced_options(self, layout):
-        mixer_props = get_mixer_props()
-        mixer_prefs = get_mixer_prefs()
-        row = layout.row()
-        collapsable_panel(row, mixer_props, "display_advanced_options")
-        row.label(text="Advanced options")
-        if mixer_props.display_advanced_options:
+        if collapsable_panel(
+            layout, mixer_props, "display_snapping_options", alert=True, text=f"Snapping - Not implemented yet"
+        ):
             box = layout.box()
-            box.prop(mixer_prefs, "log_level", text="Log Level")
-            box.prop(mixer_prefs, "env", text="Execution Environment")
-            if not self.connected():
-                box.prop(mixer_prefs, "show_server_console", text="Show server console (self hosting only)")
+            if share_data.current_room is None:
+                box.label(text="You must join a room to snap")
+            else:
+                row = box.row()
+                row.prop(mixer_props, "snap_view_user_enabled", text="3D View: ")
+                row.prop(mixer_props, "snap_view_user", text="", icon="USER")
+                row.prop(mixer_props, "snap_view_area", text="", icon="VIEW_CAMERA")
+                row = box.row()
+                row.prop(mixer_props, "snap_time_user_enabled", text="Time: ")
+                row.prop(mixer_props, "snap_time_user", text="", icon="USER")
 
     def connected(self):
         return share_data.client is not None and share_data.client.is_connected()
@@ -203,7 +200,6 @@ class MixerSettingsPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout.column()
 
-        mixer_props = get_mixer_props()
         mixer_prefs = get_mixer_prefs()
 
         row = layout.row()
@@ -215,21 +211,16 @@ class MixerSettingsPanel(bpy.types.Panel):
             row.prop(mixer_prefs, "host", text="Host")
             row.prop(mixer_prefs, "port", text="Port")
             layout.operator(operators.ConnectOperator.bl_idname, text="Connect")
-            self.draw_advanced_options(layout)
         else:
             layout.label(
                 text=f"Connected to {mixer_prefs.host}:{mixer_prefs.port} with ID {share_data.client.client_id}"
             )
             layout.operator(operators.DisconnectOperator.bl_idname, text="Disconnect")
-            self.draw_advanced_options(layout)
 
             if not operators.share_data.current_room:
                 split = layout.split(factor=0.6)
                 split.prop(mixer_prefs, "room", text="Room")
-                if mixer_prefs.room in {r.name for r in mixer_props.rooms}:
-                    split.operator(operators.JoinRoomOperator.bl_idname)
-                else:
-                    split.operator(operators.CreateRoomOperator.bl_idname)
+                split.operator(operators.CreateRoomOperator.bl_idname)
                 row = layout.row()
                 row.prop(
                     mixer_prefs,
@@ -243,48 +234,62 @@ class MixerSettingsPanel(bpy.types.Panel):
                 )
                 split.operator(operators.LeaveRoomOperator.bl_idname, text=f"Leave Room")
 
-            row = layout.row()
-            collapsable_panel(row, mixer_props, "display_rooms")
-            row.label(text="Server Rooms")
-            if mixer_props.display_rooms:
-                ROOM_UL_ItemRenderer.draw_header(layout)
-                layout.template_list(
-                    "ROOM_UL_ItemRenderer", "", mixer_props, "rooms", mixer_props, "room_index", rows=2
-                )
-                layout.operator(operators.JoinRoomOperator.bl_idname)
-                row = layout.row()
-                collapsable_panel(row, mixer_props, "display_advanced_room_control")
-                row.label(text="Advanced room controls")
-                if mixer_props.display_advanced_room_control:
-                    box = layout.box()
-                    col = box.column()
-                    col.operator(operators.DeleteRoomOperator.bl_idname)
-                    col.operator(operators.DownloadRoomOperator.bl_idname)
-                    subbox = col.box()
-                    subbox.row().operator(operators.UploadRoomOperator.bl_idname)
-                    row = subbox.row()
-                    row.prop(mixer_props, "upload_room_name", text="Name")
-                    row.prop(
-                        mixer_props,
-                        "upload_room_filepath",
-                        text="File",
-                        icon=("ERROR" if not os.path.exists(mixer_props.upload_room_filepath) else "NONE"),
-                    )
-
+            self.draw_rooms(layout)
             self.draw_users(layout)
 
-        row = layout.row()
-        collapsable_panel(row, mixer_props, "display_developer_options")
-        row.label(text="Developer options")
-        if mixer_props.display_developer_options:
-            layout.prop(mixer_prefs, "statistics_directory", text="Stats Directory")
-            layout.operator(operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
-            layout.operator(operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
-            layout.prop(mixer_prefs, "auto_save_statistics", text="Auto Save Statistics")
-            layout.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
-            layout.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
-            layout.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
-            layout.prop(mixer_props, "commands_send_interval")
+        self.draw_advanced_options(layout)
+        self.draw_developer_options(layout)
+
+    def draw_rooms(self, layout):
+        mixer_props = get_mixer_props()
+        if collapsable_panel(layout, mixer_props, "display_rooms", text="Server Rooms"):
+            layout = layout.box().column()
+            ROOM_UL_ItemRenderer.draw_header(layout)
+            layout.template_list("ROOM_UL_ItemRenderer", "", mixer_props, "rooms", mixer_props, "room_index", rows=2)
+            if share_data.current_room is None:
+                layout.operator(operators.JoinRoomOperator.bl_idname)
+            else:
+                layout.operator(operators.LeaveRoomOperator.bl_idname)
+            if collapsable_panel(layout, mixer_props, "display_advanced_room_control", text="Advanced room controls"):
+                box = layout.box()
+                col = box.column()
+                col.operator(operators.DeleteRoomOperator.bl_idname)
+                col.operator(operators.DownloadRoomOperator.bl_idname)
+                subbox = col.box()
+                subbox.row().operator(operators.UploadRoomOperator.bl_idname)
+                row = subbox.row()
+                row.prop(mixer_props, "upload_room_name", text="Name")
+                row.prop(
+                    mixer_props,
+                    "upload_room_filepath",
+                    text="File",
+                    icon=("ERROR" if not os.path.exists(mixer_props.upload_room_filepath) else "NONE"),
+                )
+
+    def draw_advanced_options(self, layout):
+        mixer_props = get_mixer_props()
+        mixer_prefs = get_mixer_prefs()
+        collapsable_panel(layout, mixer_props, "display_advanced_options", text="Advanced options")
+        if mixer_props.display_advanced_options:
+            col = layout.box().column()
+            col.prop(mixer_prefs, "log_level", text="Log Level")
+            col.prop(mixer_prefs, "env", text="Execution Environment")
+            if not self.connected():
+                col.prop(mixer_prefs, "show_server_console", text="Show server console (self hosting only)")
+
+    def draw_developer_options(self, layout):
+        mixer_props = get_mixer_props()
+        mixer_prefs = get_mixer_prefs()
+        if collapsable_panel(layout, mixer_props, "display_developer_options", text="Developer options"):
+            col = layout.box().column()
+            col.prop(mixer_prefs, "statistics_directory", text="Stats Directory")
+            col.operator(operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
+            col.operator(operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
+            col.prop(mixer_prefs, "auto_save_statistics", text="Auto Save Statistics")
+            col.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
+            col.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
+            col.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
+            col.prop(mixer_props, "commands_send_interval")
 
 
 class VRtistSettingsPanel(bpy.types.Panel):

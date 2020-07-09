@@ -30,10 +30,22 @@ class RoomItem(bpy.types.PropertyGroup):
         share_data.client.set_room_keep_open(self.name, value)
         return None
 
+    def get_command_count(self):
+        if self.name in share_data.rooms_dict and RoomMetadata.COMMAND_COUNT in share_data.rooms_dict[self.name]:
+            return share_data.rooms_dict[self.name][RoomMetadata.COMMAND_COUNT]
+        return 0
+
+    def get_mega_byte_size(self):
+        if self.name in share_data.rooms_dict and RoomMetadata.BYTE_SIZE in share_data.rooms_dict[self.name]:
+            return share_data.rooms_dict[self.name][RoomMetadata.BYTE_SIZE] * 1e-6
+        return 0
+
     name: bpy.props.StringProperty(name="Name")
     users_count: bpy.props.IntProperty(name="Users Count")
     experimental_sync: bpy.props.BoolProperty(name="Experimental Sync", get=is_room_experimental)
     keep_open: bpy.props.BoolProperty(name="Keep Open", default=False, get=is_kept_open, set=on_keep_open_changed)
+    command_count: bpy.props.IntProperty(name="Command Count", get=get_command_count)
+    mega_byte_size: bpy.props.FloatProperty(name="Mega Byte Size", get=get_mega_byte_size)
 
 
 class UserWindowItem(bpy.types.PropertyGroup):
@@ -203,6 +215,7 @@ class MixerProperties(bpy.types.PropertyGroup):
     display_advanced_options: bpy.props.BoolProperty(default=False)
     display_developer_options: bpy.props.BoolProperty(default=False)
     display_rooms: bpy.props.BoolProperty(default=True)
+    display_rooms_details: bpy.props.BoolProperty(default=False, name="Display Rooms Details")
     display_users: bpy.props.BoolProperty(default=True)
 
     display_users_filter: bpy.props.EnumProperty(
