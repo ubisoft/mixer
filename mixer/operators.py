@@ -1206,6 +1206,27 @@ def create_main_client(host: str, port: int):
     return True
 
 
+poll_is_client_connected = (lambda: is_client_connected(), "Client not connected")
+poll_rooms_received_from_server = (lambda: share_data.rooms_dict is not None, "Rooms not received from server")
+poll_already_in_a_room = (lambda: not share_data.current_room, "Already in a room")
+
+
+def generic_poll(cls, context):
+    for func, _reason in cls.poll_functors(context):
+        if not func():
+            return False
+    return True
+
+
+def generic_description(cls, context, properties):
+    result = cls.__doc__
+    for func, reason in cls.poll_functors(context):
+        if not func():
+            result += f" (Error: {reason})"
+            break
+    return result
+
+
 class CreateRoomOperator(bpy.types.Operator):
     """Create a new room on Mixer server"""
 
@@ -1214,8 +1235,22 @@ class CreateRoomOperator(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     @classmethod
+    def poll_functors(cls, context):
+        return [
+            poll_is_client_connected,
+            poll_rooms_received_from_server,
+            poll_already_in_a_room,
+            (lambda: get_mixer_prefs().room != "", "Room name cannot be empty"),
+            (lambda: get_mixer_prefs().room not in share_data.rooms_dict, "Room already exists"),
+        ]
+
+    @classmethod
     def poll(cls, context):
-        return is_client_connected() and not share_data.current_room and bool(get_mixer_prefs().room)
+        return generic_poll(cls, context)
+
+    @classmethod
+    def description(cls, context, properties):
+        return generic_description(cls, context, properties)
 
     def execute(self, context):
         assert share_data.current_room is None
@@ -1227,6 +1262,12 @@ class CreateRoomOperator(bpy.types.Operator):
         return {"FINISHED"}
 
 
+def get_selected_room_dict():
+    room_index = get_mixer_props().room_index
+    assert room_index < len(get_mixer_props().rooms)
+    return share_data.rooms_dict[get_mixer_props().rooms[room_index].name]
+
+
 class JoinRoomOperator(bpy.types.Operator):
     """Join a room"""
 
@@ -1235,23 +1276,31 @@ class JoinRoomOperator(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     @classmethod
+    def poll_functors(cls, context):
+        return [
+            poll_is_client_connected,
+            poll_rooms_received_from_server,
+            poll_already_in_a_room,
+            (lambda: get_mixer_props().room_index < len(get_mixer_props().rooms), "Invalid room selection"),
+            (
+                lambda: (
+                    ("experimental_sync" not in get_selected_room_dict() and not get_mixer_prefs().experimental_sync)
+                    or (
+                        "experimental_sync" in get_selected_room_dict()
+                        and get_mixer_prefs().experimental_sync == get_selected_room_dict()["experimental_sync"]
+                    )
+                ),
+                "Experimental flag does not match selected room",
+            ),
+        ]
+
+    @classmethod
     def poll(cls, context):
-        props = get_mixer_props()
-        room_index = props.room_index
-        valid_selection = room_index < len(props.rooms)
-        room_dict = share_data.rooms_dict[props.rooms[room_index].name] if valid_selection else None
-        return (
-            is_client_connected()
-            and valid_selection
-            and share_data.current_room is None
-            and (
-                ("experimental_sync" not in room_dict and not get_mixer_prefs().experimental_sync)
-                or (
-                    "experimental_sync" in room_dict
-                    and get_mixer_prefs().experimental_sync == room_dict["experimental_sync"]
-                )
-            )
-        )
+        return generic_poll(cls, context)
+
+    @classmethod
+    def description(cls, context, properties):
+        return generic_description(cls, context, properties)
 
     def execute(self, context):
         assert not share_data.current_room
