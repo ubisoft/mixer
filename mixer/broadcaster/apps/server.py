@@ -273,11 +273,15 @@ class Room:
         self.keep_open = False  # Should the room remain open when no more clients are inside ?
         self._connections: List["Connection"] = []
         self.commands = []
+        self.byte_size = 0
         self.metadata = {}  # metadata are used between clients, but not by the server
         self._server: "Server" = server
 
     def client_count(self):
         return len(self._connections)
+
+    def command_count(self):
+        return len(self.commands)
 
     def add_client(self, connection: Connection, first_client: bool):
         logger.info(f"Add Client {connection.address} to Room {self.name}")
@@ -326,7 +330,9 @@ class Room:
                     and command_path == common.decode_string(stored_command.data, 0)[0]
                 ):
                     self.commands.pop()
+                    self.byte_size -= stored_command.byte_size()
         self.commands.append(command)
+        self.byte_size += command.byte_size()
 
     def add_command(self, command, sender):
         with common.mutex:
@@ -416,6 +422,8 @@ class Server:
             peer = connection.address
             assert peer not in self._unjoined_connections
             self._unjoined_connections[peer] = connection
+            # Inform client that he has left the room
+            connection.add_command(common.Command(common.MessageType.LEAVE_ROOM))
             self.broadcast_user_list()
 
     def rooms_names(self) -> List[str]:
@@ -476,7 +484,12 @@ class Server:
         with common.mutex:
             result_dict = {}
             for room, value in self._rooms.items():
-                result_dict[room] = {**value.metadata, common.RoomMetadata.KEEP_OPEN: value.keep_open}
+                result_dict[room] = {
+                    **value.metadata,
+                    common.RoomMetadata.KEEP_OPEN: value.keep_open,
+                    common.RoomMetadata.COMMAND_COUNT: value.command_count(),
+                    common.RoomMetadata.BYTE_SIZE: value.byte_size,
+                }
             return common.Command(common.MessageType.LIST_ROOMS, common.encode_json(result_dict))
 
     def run(self, port):

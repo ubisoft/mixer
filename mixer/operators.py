@@ -1206,6 +1206,27 @@ def create_main_client(host: str, port: int):
     return True
 
 
+poll_is_client_connected = (lambda: is_client_connected(), "Client not connected")
+poll_rooms_received_from_server = (lambda: share_data.rooms_dict is not None, "Rooms not received from server")
+poll_already_in_a_room = (lambda: not share_data.current_room, "Already in a room")
+
+
+def generic_poll(cls, context):
+    for func, _reason in cls.poll_functors(context):
+        if not func():
+            return False
+    return True
+
+
+def generic_description(cls, context, properties):
+    result = cls.__doc__
+    for func, reason in cls.poll_functors(context):
+        if not func():
+            result += f" (Error: {reason})"
+            break
+    return result
+
+
 class CreateRoomOperator(bpy.types.Operator):
     """Create a new room on Mixer server"""
 
@@ -1214,8 +1235,22 @@ class CreateRoomOperator(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     @classmethod
+    def poll_functors(cls, context):
+        return [
+            poll_is_client_connected,
+            poll_rooms_received_from_server,
+            poll_already_in_a_room,
+            (lambda: get_mixer_prefs().room != "", "Room name cannot be empty"),
+            (lambda: get_mixer_prefs().room not in share_data.rooms_dict, "Room already exists"),
+        ]
+
+    @classmethod
     def poll(cls, context):
-        return is_client_connected() and not share_data.current_room and bool(get_mixer_prefs().room)
+        return generic_poll(cls, context)
+
+    @classmethod
+    def description(cls, context, properties):
+        return generic_description(cls, context, properties)
 
     def execute(self, context):
         assert share_data.current_room is None
@@ -1227,6 +1262,12 @@ class CreateRoomOperator(bpy.types.Operator):
         return {"FINISHED"}
 
 
+def get_selected_room_dict():
+    room_index = get_mixer_props().room_index
+    assert room_index < len(get_mixer_props().rooms)
+    return share_data.rooms_dict[get_mixer_props().rooms[room_index].name]
+
+
 class JoinRoomOperator(bpy.types.Operator):
     """Join a room"""
 
@@ -1235,16 +1276,31 @@ class JoinRoomOperator(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     @classmethod
+    def poll_functors(cls, context):
+        return [
+            poll_is_client_connected,
+            poll_rooms_received_from_server,
+            poll_already_in_a_room,
+            (lambda: get_mixer_props().room_index < len(get_mixer_props().rooms), "Invalid room selection"),
+            (
+                lambda: (
+                    ("experimental_sync" not in get_selected_room_dict() and not get_mixer_prefs().experimental_sync)
+                    or (
+                        "experimental_sync" in get_selected_room_dict()
+                        and get_mixer_prefs().experimental_sync == get_selected_room_dict()["experimental_sync"]
+                    )
+                ),
+                "Experimental flag does not match selected room",
+            ),
+        ]
+
+    @classmethod
     def poll(cls, context):
-        room_index = get_mixer_props().room_index
-        return (
-            is_client_connected()
-            and room_index < len(get_mixer_props().rooms)
-            and share_data.current_room is None
-            and "experimental_sync" in share_data.rooms_dict[get_mixer_props().rooms[room_index].name]
-            and get_mixer_prefs().experimental_sync
-            == share_data.rooms_dict[get_mixer_props().rooms[room_index].name]["experimental_sync"]
-        )
+        return generic_poll(cls, context)
+
+    @classmethod
+    def description(cls, context, properties):
+        return generic_description(cls, context, properties)
 
     def execute(self, context):
         assert not share_data.current_room
@@ -1280,6 +1336,70 @@ class DeleteRoomOperator(bpy.types.Operator):
         room_index = props.room_index
         room = props.rooms[room_index].name
         share_data.client.delete_room(room)
+
+        return {"FINISHED"}
+
+
+class DownloadRoomOperator(bpy.types.Operator):
+    """Download content of an empty room"""
+
+    bl_idname = "mixer.download_room"
+    bl_label = "Download Room"
+    bl_options = {"REGISTER"}
+
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+
+    @classmethod
+    def poll(cls, context):
+        room_index = get_mixer_props().room_index
+        return (
+            is_client_connected()
+            and room_index < len(get_mixer_props().rooms)
+            and (get_mixer_props().rooms[room_index].users_count == 0)
+        )
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {"RUNNING_MODAL"}
+
+    def execute(self, context):
+        from mixer.broadcaster.room_bake import download_room, save_room
+
+        prefs = get_mixer_prefs()
+        props = get_mixer_props()
+        room_index = props.room_index
+        room = props.rooms[room_index].name
+        metadata, commands = download_room(prefs.host, prefs.port, room)
+        save_room(metadata, commands, self.filepath)
+
+        return {"FINISHED"}
+
+
+class UploadRoomOperator(bpy.types.Operator):
+    """Upload content of an empty room"""
+
+    bl_idname = "mixer.upload_room"
+    bl_label = "Upload Room"
+    bl_options = {"REGISTER"}
+
+    @classmethod
+    def poll(cls, context):
+        mixer_props = get_mixer_props()
+        return (
+            is_client_connected()
+            and share_data.rooms_dict is not None
+            and os.path.exists(mixer_props.upload_room_filepath)
+            and mixer_props.upload_room_name not in share_data.rooms_dict
+        )
+
+    def execute(self, context):
+        from mixer.broadcaster.room_bake import load_room, upload_room
+
+        prefs = get_mixer_prefs()
+        props = get_mixer_props()
+
+        metadata, commands = load_room(props.upload_room_filepath)
+        upload_room(prefs.host, prefs.port, props.upload_room_name, metadata, commands)
 
         return {"FINISHED"}
 
@@ -1445,6 +1565,8 @@ classes = (
     LeaveRoomOperator,
     WriteStatisticsOperator,
     OpenStatsDirOperator,
+    DownloadRoomOperator,
+    UploadRoomOperator,
 )
 
 
