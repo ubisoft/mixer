@@ -1,6 +1,7 @@
 import atexit
 import faulthandler
 import logging
+import os
 from pathlib import Path
 
 bl_info = {
@@ -50,7 +51,7 @@ class Formatter(logging.Formatter):
         """
         s = super().format(record)
         pathname = Path(record.pathname).relative_to(MODULE_PATH)
-        s += f" [.\\{pathname}:{record.lineno}]"
+        s += f" [{os.curdir}{os.sep}{pathname}:{record.lineno}]"
         return s
 
 
