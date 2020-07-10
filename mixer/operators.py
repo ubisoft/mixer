@@ -629,12 +629,12 @@ def update_objects_visibility():
 
 
 def update_objects_transforms():
-    changed = False
+    # changed = False
     for obj_name in share_data.objects_transformed:
         if obj_name in share_data.blender_objects:
             update_transform(share_data.blender_objects[obj_name])
-            changed = True
-    return changed
+            # changed = True
+    return False  # To allow mesh sending after "apply transform"
 
 
 def reparent_objects():
@@ -681,7 +681,8 @@ def update_objects_data():
                     data_container[obj.data].append(obj)
                 else:
                     data_container[obj.data] = [obj]
-            transforms.add(obj)
+            if obj.name_full not in share_data.objects_transformed:
+                transforms.add(obj)
 
         if (
             typename == "Camera"
