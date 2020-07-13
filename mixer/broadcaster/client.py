@@ -4,6 +4,7 @@ import logging
 import time
 
 import mixer.broadcaster.common as common
+from mixer.broadcaster.common import MessageType
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
 
@@ -25,6 +26,14 @@ class Client:
 
     def __del__(self):
         if self.socket is not None:
+            self.disconnect()
+
+    def __enter__(self):
+        self.connect()
+        return self
+
+    def __exit__(self, *args):
+        if self.is_connected():
             self.disconnect()
 
     def connect(self):
@@ -81,6 +90,18 @@ class Client:
     def leave_room(self, room_name):
         return self.safe_write_message(common.Command(common.MessageType.LEAVE_ROOM, room_name.encode("utf8"), 0))
 
+    def wait_for(self, message_type: MessageType):
+        while self.is_connected():
+            self.fetch_commands()
+            while self.is_connected():
+                command = self.get_next_received_command()
+                if command is None:
+                    break
+                if command.type == message_type:
+                    return True
+        # was disconnected before getting the message
+        return False
+
     def delete_room(self, room_name):
         return self.safe_write_message(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
 
@@ -90,11 +111,7 @@ class Client:
         )
 
     def set_room_metadata(self, room_name: str, metadata: dict):
-        return self.safe_write_message(
-            common.Command(
-                common.MessageType.SET_ROOM_METADATA, common.encode_string(room_name) + common.encode_json(metadata)
-            )
-        )
+        return self.safe_write_message(common.make_set_room_metadata_command(room_name, metadata))
 
     def send_list_rooms(self):
         return self.safe_write_message(common.Command(common.MessageType.LIST_ROOMS))

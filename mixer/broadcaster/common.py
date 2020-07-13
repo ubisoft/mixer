@@ -134,10 +134,10 @@ class ClientMetadata:
     between clients of different kind.
     """
 
-    ID = "id"  # Send by server only, type = str, the id of the client which is unique for each connected client
-    IP = "ip"  # Send by server only, type = str
-    PORT = "port"  # Send by server only, type = int
-    ROOM = "room"  # Send by server only, type = str
+    ID = "id"  # Sent by server only, type = str, the id of the client which is unique for each connected client
+    IP = "ip"  # Sent by server only, type = str
+    PORT = "port"  # Sent by server only, type = int
+    ROOM = "room"  # Sent by server only, type = str
 
     # Client to server metadata, not used by the server but clients are encouraged to use these keys for the same semantic
     USERNAME = "user_name"  # type = str
@@ -154,10 +154,12 @@ class RoomMetadata:
     between clients of different kind.
     """
 
-    NAME = "name"  # Send by server only, type = str, the name of the room which is unique for each room
+    NAME = "name"  # Sent by server only, type = str, the name of the room which is unique for each room
     KEEP_OPEN = (
-        "keep_open"  # Send by server only, type = bool, indicate if the room should be kept open after all clients left
+        "keep_open"  # Sent by server only, type = bool, indicate if the room should be kept open after all clients left
     )
+    COMMAND_COUNT = "command_count"  # Sent by server only, type = bool, indicate how many commands the room contains
+    BYTE_SIZE = "byte_size"  # Sent by server only, type = int, indicate the size in byte of the room
 
 
 class ClientDisconnectedException(Exception):
@@ -360,6 +362,16 @@ class Command:
             self.id = Command._id
             Command._id += 1
 
+    def byte_size(self):
+        return 8 + 4 + 2 + len(self.data)
+
+    def to_byte_buffer(self):
+        size = int_to_bytes(len(self.data), 8)
+        command_id = int_to_bytes(self.id, 4)
+        mtype = int_to_bytes(self.type.value, 2)
+
+        return size + command_id + mtype + self.data
+
 
 class CommandFormatter:
     def format_clients(self, clients):
@@ -455,11 +467,7 @@ def write_message(sock: socket.socket, command: Command):
         logger.warning("write_message called with no socket")
         return
 
-    size = int_to_bytes(len(command.data), 8)
-    command_id = int_to_bytes(command.id, 4)
-    mtype = int_to_bytes(command.type.value, 2)
-
-    buffer = size + command_id + mtype + command.data
+    buffer = command.to_byte_buffer()
 
     try:
         _, w, _ = select.select([], [sock], [])
@@ -468,3 +476,7 @@ def write_message(sock: socket.socket, command: Command):
     except (ConnectionAbortedError, ConnectionResetError) as e:
         logger.warning(e)
         raise ClientDisconnectedException()
+
+
+def make_set_room_metadata_command(room_name: str, metadata: dict):
+    return Command(MessageType.SET_ROOM_METADATA, encode_string(room_name) + encode_json(metadata))

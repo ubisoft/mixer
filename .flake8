@@ -8,3 +8,4 @@ exclude =
   .venv
   .vscode
   __pycache__
+  gitlab/blender
