@@ -965,8 +965,9 @@ class BpyPropDataCollectionProxy(Proxy):
         collection_name, name = proxy._blenddata_path[0:2]
         existing_proxy = self._data.get(name)
         if existing_proxy is None:
-            self._data[name] = proxy
+            # only change other state after save, in case of exception
             id_ = proxy.save()
+            self._data[name] = proxy
             uuid = proxy.mixer_uuid()
             visit_state.root_ids.add(id_)
             visit_state.ids[uuid] = id_

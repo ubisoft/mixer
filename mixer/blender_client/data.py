@@ -79,6 +79,7 @@ def build_data_update(buffer):
             + "\n...\n"
             + buffer[-200:0]
         )
+        logger.error(f"Creation or update of bpy.data.{collection_name}[{key}] was ignored")
 
 
 def send_data_removals(removals: List[Tuple[str, str]]):
