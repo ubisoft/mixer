@@ -460,7 +460,7 @@ class BpyIDProxy(BpyStructProxy):
                 return None
             if DEBUG:
                 if bl_instance.get(attr_name) != id_:
-                    logger.warning(f"Name mismatch avec creation of bpy.data.{collection_name}[{attr_name}] ")
+                    logger.warning(f"Name mismatch after creation of bpy.data.{collection_name}[{attr_name}] ")
             id_.mixer_uuid = self.mixer_uuid()
 
         target = specifics.pre_save_id(self, bl_instance, attr_name)
@@ -897,7 +897,6 @@ class BpyPropStructCollectionProxy(Proxy):
                 write_attribute(target, k, v)
 
 
-# TODO derive from BpyIDProxy
 class BpyPropDataCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of ID in bpy.data. May not work as is for bpy_prop_collection on non-ID
@@ -938,7 +937,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 self._data[name] = BpyIDRefProxy().load(item, visit_state)
         return self
 
-    def save(self, bl_instance: any, attr_name: str):
+    def save(self, bl_instance: Any, attr_name: str):
         """
         Load a Blender object into this proxy
         """
