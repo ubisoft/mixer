@@ -7,6 +7,8 @@ from typing import ItemsView, List, TypeVar, Union
 
 import bpy
 import bpy.types as T  # noqa N812
+import bpy.path
+
 from mixer.blender_data.blenddata import BlendData
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,8 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
             path = proxy.data("filepath")
             if path != "":
                 image = collection.load(path)
+                # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
+                image.name = proxy.data("name")
         return image
 
     if collection_name == "objects":
@@ -53,6 +57,9 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
         filepath = proxy.data("filepath")
         # TODO what about "check_existing" ?
         id_ = collection.load(filepath)
+        # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
+        id_.name = proxy.data("name")
+
         return id_
 
     name = proxy.data("name")
@@ -186,25 +193,26 @@ def pre_save_struct(proxy: Proxy, bpy_struct: T.Struct, attr_name: str):
             target.use_curve_mapping = True
 
 
-effect_types = [
-    "ADD",
-    "SUBTRACT",
-    "ALPHA_OVER",
-    "ALPHA_UNDER",
-    "GAMMA_CROSS",
-    "MULTIPLY",
-    "OVER_DROP",
-    "WIPE",
-    "GLOW",
-    "TRANSFORM",
-    "COLOR",
-    "SPEED",
-    "MULTICAM",
-    "ADJUSTMENT",
-    "GAUSSIAN_BLUR",
-    "TEXT",
-    "COLORMIX",
-]
+def post_save_id(proxy: Proxy, bpy_id: T.ID):
+    """Apply type specific patches after loading bpy_struct into proxy
+    """
+    if isinstance(bpy_id, T.Image):
+        # So far, the receiver has no valid "current file", so he cannot load relative files
+        for attr_name in ("filepath", "filepath_raw"):
+            path = proxy._data[attr_name]
+            if path:
+                proxy._data[attr_name] = bpy.path.abspath(path)
+
+    if isinstance(bpy_id, T.Sound):
+        # So far, the receiver has no valid "current file", so he cannot load relative files
+        attr_name = "filepath"
+        path = proxy._data[attr_name]
+        if path:
+            proxy._data[attr_name] = bpy.path.abspath(path)
+
+
+non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}
+effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - non_effect_sequences
 
 
 def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
@@ -242,7 +250,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
             name = proxy.data("name")
             channel = proxy.data("channel")
             frame_start = proxy.data("frame_start")
-            if type_ in effect_types:
+            if type_ in effect_sequences:
                 # overwritten anyway
                 frame_end = frame_start + 1
                 return collection.new_effect(name, type_, channel, frame_start, frame_end=frame_end)
@@ -262,6 +270,12 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
                 filename = proxy.data("elements").data(0).data("filename")
                 filepath = str(Path(directory) / filename)
                 return collection.new_image(name, filepath, channel, frame_start)
+
+            logger.warning(f"Sequence type not implemented: {type_}")
+            # SCENE may be harder than it seems, since we cannot order scene creations.
+            # Currently the creation order is the "deepmost" order as listed in proxy.py:_creation_order
+            # but it does not work for this case
+            return None
 
         if isinstance(bl_rna, type(T.SequenceModifiers.bl_rna)):
             name = proxy.data("name")

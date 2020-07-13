@@ -395,6 +395,7 @@ class BpyIDProxy(BpyStructProxy):
             # Also write None values to reset attributes like Camera.dof.focus_object
             self._data[name] = attr_value
 
+        specifics.post_save_id(self, bl_instance)
         self._class_name = bl_instance.__class__.__name__
         if blenddata_path is not None:
             self._blenddata_path = blenddata_path
@@ -459,7 +460,7 @@ class BpyIDProxy(BpyStructProxy):
                 return None
             if DEBUG:
                 if bl_instance.get(attr_name) != id_:
-                    logger.warning(f"Name mismatch avec creation of bpy.data.{collection_name}[{attr_name}] ")
+                    logger.warning(f"Name mismatch after creation of bpy.data.{collection_name}[{attr_name}] ")
             id_.mixer_uuid = self.mixer_uuid()
 
         target = specifics.pre_save_id(self, bl_instance, attr_name)
@@ -896,7 +897,6 @@ class BpyPropStructCollectionProxy(Proxy):
                 write_attribute(target, k, v)
 
 
-# TODO derive from BpyIDProxy
 class BpyPropDataCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of ID in bpy.data. May not work as is for bpy_prop_collection on non-ID
@@ -937,7 +937,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 self._data[name] = BpyIDRefProxy().load(item, visit_state)
         return self
 
-    def save(self, bl_instance: any, attr_name: str):
+    def save(self, bl_instance: Any, attr_name: str):
         """
         Load a Blender object into this proxy
         """
@@ -965,8 +965,9 @@ class BpyPropDataCollectionProxy(Proxy):
         collection_name, name = proxy._blenddata_path[0:2]
         existing_proxy = self._data.get(name)
         if existing_proxy is None:
-            self._data[name] = proxy
+            # only change other state after save, in case of exception
             id_ = proxy.save()
+            self._data[name] = proxy
             uuid = proxy.mixer_uuid()
             visit_state.root_ids.add(id_)
             visit_state.ids[uuid] = id_
