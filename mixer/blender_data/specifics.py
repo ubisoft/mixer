@@ -33,6 +33,8 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
             path = proxy.data("filepath")
             if path != "":
                 image = collection.load(path)
+                # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
+                image.name = proxy.data("name")
         return image
 
     if collection_name == "objects":
@@ -55,6 +57,9 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
         filepath = proxy.data("filepath")
         # TODO what about "check_existing" ?
         id_ = collection.load(filepath)
+        # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
+        id_.name = proxy.data("name")
+
         return id_
 
     name = proxy.data("name")
