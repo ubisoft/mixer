@@ -395,6 +395,7 @@ class BpyIDProxy(BpyStructProxy):
             # Also write None values to reset attributes like Camera.dof.focus_object
             self._data[name] = attr_value
 
+        specifics.post_save_id(self, bl_instance)
         self._class_name = bl_instance.__class__.__name__
         if blenddata_path is not None:
             self._blenddata_path = blenddata_path

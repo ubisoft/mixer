@@ -7,6 +7,8 @@ from typing import ItemsView, List, TypeVar, Union
 
 import bpy
 import bpy.types as T  # noqa N812
+import bpy.path
+
 from mixer.blender_data.blenddata import BlendData
 
 logger = logging.getLogger(__name__)
@@ -184,6 +186,24 @@ def pre_save_struct(proxy: Proxy, bpy_struct: T.Struct, attr_name: str):
         use_curve_mapping = proxy.data("use_curve_mapping")
         if use_curve_mapping:
             target.use_curve_mapping = True
+
+
+def post_save_id(proxy: Proxy, bpy_id: T.ID):
+    """Apply type specific patches after loading bpy_struct into proxy
+    """
+    if isinstance(bpy_id, T.Image):
+        # So far, the receiver has no valid "current file", so he cannot load relative files
+        for attr_name in ("filepath", "filepath_raw"):
+            path = proxy._data[attr_name]
+            if path:
+                proxy._data[attr_name] = bpy.path.abspath(path)
+
+    if isinstance(bpy_id, T.Sound):
+        # So far, the receiver has no valid "current file", so he cannot load relative files
+        attr_name = "filepath"
+        path = proxy._data[attr_name]
+        if path:
+            proxy._data[attr_name] = bpy.path.abspath(path)
 
 
 effect_types = [
