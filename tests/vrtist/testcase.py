@@ -31,7 +31,6 @@ class VRtistTestCase(MixerTestCase):
         for k in a.keys():
             message_type = str(MessageType(k))
             message_count = len(a[k])
-            self.assertEqual(message_count, len(b[k]), f"len mismatch for {message_type}")
             if message_count != 0:
                 logger.info(f"Message count for {message_type:16} : {message_count}")
             if k not in ignore:
