@@ -5,8 +5,7 @@
 	"recommendations": [
 		"JacquesLucke.blender-development",
 		"ms-python.python",
-		"vivaxy.vscode-conventional-commits",
-		"matangover.mypy"
+		"vivaxy.vscode-conventional-commits"
 	],
 	// List of extensions recommended by VS Code that should not be recommended for users of this workspace.
 	"unwantedRecommendations": []
