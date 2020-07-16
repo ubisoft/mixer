@@ -308,16 +308,23 @@ def get_mixer_prefs() -> MixerPreferences:
     return bpy.context.preferences.addons[__package__].preferences
 
 
-classes = (RoomItem, UserWindowItem, UserSceneItem, UserItem, MixerProperties, MixerPreferences)
+classes = (
+    RoomItem,
+    UserWindowItem,
+    UserSceneItem,
+    UserItem,
+    MixerProperties,
+    MixerPreferences,
+)
+
+register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)
 
 
 def register():
-    for _ in classes:
-        bpy.utils.register_class(_)
+    register_factory()
     bpy.types.WindowManager.mixer = bpy.props.PointerProperty(type=MixerProperties)
 
 
 def unregister():
-    for _ in classes:
-        bpy.utils.unregister_class(_)
     del bpy.types.WindowManager.mixer
+    unregister_factory()
