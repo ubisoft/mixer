@@ -69,7 +69,7 @@ class ShareData:
         self.clear_room_data()
         self.shot_manager = ShotManager()
 
-        self.users_frustums_draw_handler = None
+        self.users_frustums_draw_handler: Callable[(), None] = None
 
     def clear_room_data(self):
         # equivalent to handlers set

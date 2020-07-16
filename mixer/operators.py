@@ -95,7 +95,7 @@ class HandlerManager:
 
 def remove_draw_handlers():
     if share_data.users_frustums_draw_handler is not None:
-        bpy.types.SpaceView3D.draw_handler_remove(share_data.users_frustums_draw_handler)
+        bpy.types.SpaceView3D.draw_handler_remove(share_data.users_frustums_draw_handler, "WINDOW")
         share_data.users_frustums_draw_handler = None
 
 
