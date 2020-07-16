@@ -284,7 +284,17 @@ default_exclusions = {
             ]
         )
     ],
-    T.SequenceEditor: [NameFilterOut(["active_strip", "sequences_all"])],
+    T.SequenceEditor: [
+        NameFilterOut(
+            [
+                "active_strip",
+                "sequences_all",
+                # Can produce a segmentation fault when multiple scenes are created
+                "proxy_storage",
+                "proxy_dir",
+            ]
+        )
+    ],
     T.ViewLayer: [
         # Not useful. Requires array insertion (to do shortly)
         NameFilterOut("freestyle_settings"),
