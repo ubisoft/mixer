@@ -30,32 +30,13 @@ _STILL_ACTIVE = 259
 logger = logging.getLogger(__name__)
 
 
-def users_frustrum_draw(window: bpy.types.Window, area: bpy.types.Area, space: bpy.types.SpaceView3D):
+def users_frustrum_draw():
+    if share_data.current_room is None:
+        return
+
     import bgl
     import gpu
     from gpu_extras.batch import batch_for_shader
-
-    def remove_handler():
-        space.draw_handler_remove(share_data.draw_handlers[space], "WINDOW")
-        del share_data.draw_handlers[space]
-
-    found_window = False
-    for wm in bpy.data.window_managers:
-        if window in wm.windows[:]:
-            found_window = True
-            break
-    if not found_window:
-        remove_handler()
-        return
-
-    found_active_space = False
-    for a in window.screen.areas:
-        if a == area and space == area.spaces.active:
-            found_active_space = True
-
-    if not found_active_space:
-        remove_handler()
-        return
 
     shader = gpu.shader.from_builtin("3D_UNIFORM_COLOR")
     shader.bind()
@@ -74,24 +55,13 @@ def users_frustrum_draw(window: bpy.types.Window, area: bpy.types.Area, space: b
             continue  # don't draw my own frustums or frustums from users outside my room
 
         for window_dict in user_dict["blender_windows"]:
-            if window_dict["scene"] == window.scene.name_full:
+            if window_dict["scene"] == bpy.context.scene.name_full:
                 shader.uniform_float("color", (*user_dict[common.ClientMetadata.USERCOLOR], 1))
                 for _area_3d_id, area_3d in window_dict["areas_3d"].items():
                     frustum = area_3d["view_frustum"]
                     position = [tuple(coord) for coord in frustum]
                     batch = batch_for_shader(shader, "LINES", {"pos": position}, indices=indices)
                     batch.draw(shader)
-
-
-def add_frustum_draw_handlers():
-    for wm in bpy.data.window_managers:
-        for window in wm.windows:
-            for area in window.screen.areas:
-                if area.type == "VIEW_3D":
-                    if area.spaces.active not in share_data.draw_handlers:
-                        share_data.draw_handlers[area.spaces.active] = area.spaces.active.draw_handler_add(
-                            users_frustrum_draw, (window, area, area.spaces.active), "WINDOW", "POST_VIEW"
-                        )
 
 
 def get_target(
@@ -677,8 +647,10 @@ class ClientBlender(Client):
     def network_consumer(self):
         assert self.is_connected()
 
-        if share_data.current_room is not None:
-            add_frustum_draw_handlers()
+        if share_data.users_frustums_draw_handler is None:
+            share_data.users_frustums_draw_handler = bpy.types.SpaceView3D.draw_handler_add(
+                users_frustrum_draw, (), "WINDOW", "POST_VIEW"
+            )
 
         # Ask for room list
         self.send_list_rooms()

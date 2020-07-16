@@ -94,9 +94,9 @@ class HandlerManager:
 
 
 def remove_draw_handlers():
-    for space, handler in share_data.draw_handlers.items():
-        space.draw_handler_remove(handler, "WINDOW")
-    share_data.draw_handlers = dict()
+    if share_data.users_frustums_draw_handler is not None:
+        bpy.types.SpaceView3D.draw_handler_remove(share_data.users_frustums_draw_handler)
+        share_data.users_frustums_draw_handler = None
 
 
 @persistent
