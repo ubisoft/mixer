@@ -2,7 +2,7 @@ import logging
 import os
 import struct
 import traceback
-from typing import Set
+from typing import Set, Tuple
 
 import bpy
 from mathutils import Matrix, Quaternion
@@ -30,33 +30,57 @@ _STILL_ACTIVE = 259
 logger = logging.getLogger(__name__)
 
 
-def users_frustrum_draw(window: bpy.types.Window, space: bpy.types.SpaceView3D):
+def users_frustrum_draw(window: bpy.types.Window, area: bpy.types.Area, space: bpy.types.SpaceView3D):
+    import bgl
+    import gpu
+    from gpu_extras.batch import batch_for_shader
+
     def remove_handler():
         space.draw_handler_remove(share_data.draw_handlers[space], "WINDOW")
         del share_data.draw_handlers[space]
 
-    found = False
+    found_window = False
     for wm in bpy.data.window_managers:
         if window in wm.windows[:]:
-            found = True
-    if not found:
+            found_window = True
+            break
+    if not found_window:
         remove_handler()
         return
 
-    if space not in (area.spaces.active for area in window.screen.areas):
+    found_active_space = False
+    for a in window.screen.areas:
+        if a == area and space == area.spaces.active:
+            found_active_space = True
+
+    if not found_active_space:
         remove_handler()
         return
 
-    count = dict()
+    shader = gpu.shader.from_builtin("3D_UNIFORM_COLOR")
+    shader.bind()
+
+    bgl.glLineWidth(1.5)
+    bgl.glEnable(bgl.GL_DEPTH_TEST)
+    bgl.glEnable(bgl.GL_BLEND)
+    bgl.glEnable(bgl.GL_LINE_SMOOTH)
+
+    indices = ((1, 2), (2, 3), (3, 4), (4, 1), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5))
+
     for user_dict in share_data.client_ids.values():
+        user_id = user_dict[common.ClientMetadata.ID]
+        user_room = user_dict[common.ClientMetadata.ROOM]
+        if share_data.client.client_id == user_id or share_data.current_room != user_room:
+            continue  # don't draw my own frustums or frustums from users outside my room
+
         for window_dict in user_dict["blender_windows"]:
             if window_dict["scene"] == window.scene.name_full:
-                name = user_dict[common.ClientMetadata.USERNAME]
-                if name not in count:
-                    count[name] = 0
-                count[name] += window_dict["areas_3d_count"]
-
-    print(f"I should draw {count} frustums in space {space} for user {user_dict[common.ClientMetadata.USERNAME]}")
+                shader.uniform_float("color", (*user_dict[common.ClientMetadata.USERCOLOR], 1))
+                for _area_3d_id, area_3d in window_dict["areas_3d"].items():
+                    frustum = area_3d["view_frustum"]
+                    position = [tuple(coord) for coord in frustum]
+                    batch = batch_for_shader(shader, "LINES", {"pos": position}, indices=indices)
+                    batch.draw(shader)
 
 
 def add_frustum_draw_handlers():
@@ -66,8 +90,40 @@ def add_frustum_draw_handlers():
                 if area.type == "VIEW_3D":
                     if area.spaces.active not in share_data.draw_handlers:
                         share_data.draw_handlers[area.spaces.active] = area.spaces.active.draw_handler_add(
-                            users_frustrum_draw, (window, area.spaces.active), "WINDOW", "POST_VIEW"
+                            users_frustrum_draw, (window, area, area.spaces.active), "WINDOW", "POST_VIEW"
                         )
+
+
+def get_target(
+    region: bpy.types.Region, region_3d: bpy.types.RegionView3D, pixel_coords: Tuple[float, float], dist: float = 1.0
+):
+    from bpy_extras import view3d_utils
+
+    target = [0, 0, 0]
+
+    view_vector = view3d_utils.region_2d_to_vector_3d(region, region_3d, pixel_coords)
+    ray_origin = view3d_utils.region_2d_to_origin_3d(region, region_3d, pixel_coords)
+    target = ray_origin + view_vector * dist
+
+    return [target.x, target.y, target.z]
+
+
+def get_view_frustum_corners(region: bpy.types.Region, region_3d: bpy.types.RegionView3D):
+    width = region.width
+    height = region.height
+
+    v0 = get_target(region, region_3d, (width / 2, height / 2), dist=-1)  # view origin
+
+    v1 = get_target(region, region_3d, (0, 0))  # bottom left
+    v2 = get_target(region, region_3d, (width, 0))  # bottom right
+    v3 = get_target(region, region_3d, (width, height))  # top right
+    v4 = get_target(region, region_3d, (0, height))  # top left
+
+    v5 = list(region_3d.view_location)  # view target
+
+    coords = [v0, v1, v2, v3, v4, v5]
+
+    return coords
 
 
 class SendSceneContentFailed(Exception):
@@ -600,16 +656,17 @@ class ClientBlender(Client):
         windows = []
         for wm in bpy.data.window_managers:
             for window in wm.windows:
+                areas_3d = dict()
                 scene = window.scene.name_full
                 view_layer = window.view_layer.name
                 screen = window.screen.name_full
-                areas_3d_count = 0
                 for area in window.screen.areas:
                     if area.type == "VIEW_3D":
-                        areas_3d_count += 1
-                windows.append(
-                    {"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d_count": areas_3d_count}
-                )
+                        for region in area.regions:
+                            if region.type == "WINDOW":
+                                view_frustum = get_view_frustum_corners(region, area.spaces.active.region_3d)
+                                areas_3d[area.as_pointer()] = {"view_frustum": view_frustum}
+                windows.append({"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d": areas_3d})
         scene_metadata = {}
         for scene in bpy.data.scenes:
             scene_metadata[scene.name_full] = {common.ClientMetadata.USERSCENES_FRAME: scene.frame_current}
@@ -620,7 +677,8 @@ class ClientBlender(Client):
     def network_consumer(self):
         assert self.is_connected()
 
-        add_frustum_draw_handlers()
+        if share_data.current_room is not None:
+            add_frustum_draw_handlers()
 
         # Ask for room list
         self.send_list_rooms()

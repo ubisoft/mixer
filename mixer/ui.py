@@ -56,7 +56,7 @@ def update_user_list(do_redraw=True):
                 window_item.scene = window["scene"]
                 window_item.view_layer = window["view_layer"]
                 window_item.screen = window["screen"]
-                window_item.areas_3d_count = window["areas_3d_count"]
+                window_item.areas_3d_count = len(window["areas_3d"])
         if ClientMetadata.USERSCENES in client:
             for scene_name, scene_dict in client[ClientMetadata.USERSCENES].items():
                 scene_item = item.scenes.add()

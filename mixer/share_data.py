@@ -70,7 +70,7 @@ class ShareData:
         self.shot_manager = ShotManager()
 
         self.draw_handlers: Mapping[
-            bpy.types.SpaceView3D, Callable[[bpy.types.Window, bpy.types.SpaceView3D], None]
+            bpy.types.SpaceView3D, Callable[[bpy.types.Window, bpy.types.Area, bpy.types.SpaceView3D], None]
         ] = dict()
 
     def clear_room_data(self):
