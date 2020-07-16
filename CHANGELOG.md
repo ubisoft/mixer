@@ -27,7 +27,7 @@
 
 - Overhaul of panels UI (#80)
 - Prototyping video sequencer synchronization (#124, #126)
- 
+
 ## Bugfix
 
 - Ignore properties from other enabled addons (#107)

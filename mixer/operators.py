@@ -1,3 +1,4 @@
+import itertools
 import logging
 import os
 import socket
@@ -627,7 +628,8 @@ def rename_objects():
 
 def update_objects_visibility():
     changed = False
-    for obj_name in share_data.objects_visibility_changed:
+    objects = itertools.chain(share_data.objects_added, share_data.objects_visibility_changed)
+    for obj_name in objects:
         if obj_name in share_data.blender_objects:
             obj = share_data.blender_objects[obj_name]
             update_transform(obj)
@@ -802,9 +804,9 @@ def send_frame_changed(scene):
 @stats_timer(share_data)
 def send_scene_data_to_server(scene, dummy):
     logger.debug(
-        "send_scene_data_to_server(): pending_test_update %s, skip_next_depsgraph_update %s",
-        share_data.pending_test_update,
+        "send_scene_data_to_server(): skip_next_depsgraph_update %s, pending_test_update %s",
         share_data.client.skip_next_depsgraph_update,
+        share_data.pending_test_update,
     )
 
     timer = share_data.current_stats_timer
