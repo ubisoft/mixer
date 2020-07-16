@@ -30,6 +30,46 @@ _STILL_ACTIVE = 259
 logger = logging.getLogger(__name__)
 
 
+def users_frustrum_draw(window: bpy.types.Window, space: bpy.types.SpaceView3D):
+    def remove_handler():
+        space.draw_handler_remove(share_data.draw_handlers[space], "WINDOW")
+        del share_data.draw_handlers[space]
+
+    found = False
+    for wm in bpy.data.window_managers:
+        if window in wm.windows[:]:
+            found = True
+    if not found:
+        remove_handler()
+        return
+
+    if space not in (area.spaces.active for area in window.screen.areas):
+        remove_handler()
+        return
+
+    count = dict()
+    for user_dict in share_data.client_ids.values():
+        for window_dict in user_dict["blender_windows"]:
+            if window_dict["scene"] == window.scene.name_full:
+                name = user_dict[common.ClientMetadata.USERNAME]
+                if name not in count:
+                    count[name] = 0
+                count[name] += window_dict["areas_3d_count"]
+
+    print(f"I should draw {count} frustums in space {space} for user {user_dict[common.ClientMetadata.USERNAME]}")
+
+
+def add_frustum_draw_handlers():
+    for wm in bpy.data.window_managers:
+        for window in wm.windows:
+            for area in window.screen.areas:
+                if area.type == "VIEW_3D":
+                    if area.spaces.active not in share_data.draw_handlers:
+                        share_data.draw_handlers[area.spaces.active] = area.spaces.active.draw_handler_add(
+                            users_frustrum_draw, (window, area.spaces.active), "WINDOW", "POST_VIEW"
+                        )
+
+
 class SendSceneContentFailed(Exception):
     pass
 
@@ -579,6 +619,8 @@ class ClientBlender(Client):
     @stats_timer(share_data)
     def network_consumer(self):
         assert self.is_connected()
+
+        add_frustum_draw_handlers()
 
         # Ask for room list
         self.send_list_rooms()

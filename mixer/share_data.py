@@ -1,7 +1,7 @@
 from collections import namedtuple
 from datetime import datetime
 import logging
-from typing import List, Mapping, Set
+from typing import List, Mapping, Set, Callable
 from uuid import uuid4
 
 from mixer.blender_data.proxy import BpyBlendProxy
@@ -68,6 +68,10 @@ class ShareData:
 
         self.clear_room_data()
         self.shot_manager = ShotManager()
+
+        self.draw_handlers: Mapping[
+            bpy.types.SpaceView3D, Callable[[bpy.types.Window, bpy.types.SpaceView3D], None]
+        ] = dict()
 
     def clear_room_data(self):
         # equivalent to handlers set
