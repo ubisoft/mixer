@@ -17,12 +17,20 @@ logger = logging.getLogger(__name__)
 
 class RoomItem(bpy.types.PropertyGroup):
     def is_room_experimental(self):
-        if self.name in share_data.rooms_dict and "experimental_sync" in share_data.rooms_dict[self.name]:
+        if (
+            share_data.rooms_dict is not None
+            and self.name in share_data.rooms_dict
+            and "experimental_sync" in share_data.rooms_dict[self.name]
+        ):
             return share_data.rooms_dict[self.name]["experimental_sync"]
         return False
 
     def is_kept_open(self):
-        if self.name in share_data.rooms_dict and RoomMetadata.KEEP_OPEN in share_data.rooms_dict[self.name]:
+        if (
+            share_data.rooms_dict is not None
+            and self.name in share_data.rooms_dict
+            and RoomMetadata.KEEP_OPEN in share_data.rooms_dict[self.name]
+        ):
             return share_data.rooms_dict[self.name][RoomMetadata.KEEP_OPEN]
         return False
 
@@ -31,12 +39,20 @@ class RoomItem(bpy.types.PropertyGroup):
         return None
 
     def get_command_count(self):
-        if self.name in share_data.rooms_dict and RoomMetadata.COMMAND_COUNT in share_data.rooms_dict[self.name]:
+        if (
+            share_data.rooms_dict is not None
+            and self.name in share_data.rooms_dict
+            and RoomMetadata.COMMAND_COUNT in share_data.rooms_dict[self.name]
+        ):
             return share_data.rooms_dict[self.name][RoomMetadata.COMMAND_COUNT]
         return 0
 
     def get_mega_byte_size(self):
-        if self.name in share_data.rooms_dict and RoomMetadata.BYTE_SIZE in share_data.rooms_dict[self.name]:
+        if (
+            share_data.rooms_dict is not None
+            and self.name in share_data.rooms_dict
+            and RoomMetadata.BYTE_SIZE in share_data.rooms_dict[self.name]
+        ):
             return share_data.rooms_dict[self.name][RoomMetadata.BYTE_SIZE] * 1e-6
         return 0
 

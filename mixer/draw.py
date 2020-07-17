@@ -42,14 +42,18 @@ def set_draw_handlers():
 
 
 def remove_draw_handlers():
-    bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.users_frustums_draw_handler, "WINDOW")
-    _draw_handlers.users_frustums_draw_handler = None
-    bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.users_frustum_name_draw_handler, "WINDOW")
-    _draw_handlers.users_frustum_name_draw_handler = None
-    bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.users_selection_draw_handler, "WINDOW")
-    _draw_handlers.users_selection_draw_handler = None
-    bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.users_selection_name_draw_handler, "WINDOW")
-    _draw_handlers.users_selection_name_draw_handler = None
+    if _draw_handlers.users_frustums_draw_handler:
+        bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.users_frustums_draw_handler, "WINDOW")
+        _draw_handlers.users_frustums_draw_handler = None
+    if _draw_handlers.users_frustum_name_draw_handler:
+        bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.users_frustum_name_draw_handler, "WINDOW")
+        _draw_handlers.users_frustum_name_draw_handler = None
+    if _draw_handlers.users_selection_draw_handler:
+        bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.users_selection_draw_handler, "WINDOW")
+        _draw_handlers.users_selection_draw_handler = None
+    if _draw_handlers.users_selection_name_draw_handler:
+        bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.users_selection_name_draw_handler, "WINDOW")
+        _draw_handlers.users_selection_name_draw_handler = None
 
 
 def users_frustrum_draw():
@@ -109,9 +113,8 @@ def users_frustrum_draw_iteration(per_user_callback, per_frustum_callback):
     prefs = get_mixer_prefs()
 
     for user_dict in share_data.client_ids.values():
-        blender_windows = user_dict.get("blender_windows", None)
-
-        if blender_windows is None:
+        scenes = user_dict.get(ClientMetadata.USERSCENES, None)
+        if not scenes:
             continue
 
         user_id = user_dict[ClientMetadata.ID]
@@ -124,13 +127,24 @@ def users_frustrum_draw_iteration(per_user_callback, per_frustum_callback):
         if not per_user_callback(user_dict):
             continue
 
-        for window_dict in blender_windows:
-            if window_dict["scene"] == bpy.context.scene.name_full:
-                for area_3d_id, area_3d in window_dict["areas_3d"].items():
-                    if area_3d_id == str(bpy.context.area.as_pointer()):
-                        continue  # only occurs when display_own_gizmos == True
+        for scene_name, scene_dict in scenes.items():
+            if scene_name != bpy.context.scene.name_full:
+                continue
 
-                    per_frustum_callback(user_dict, area_3d["view_frustum"])
+            views = scene_dict.get(ClientMetadata.USERSCENES_VIEWS, None)
+            if views is None:
+                continue
+
+            for view_id, view_dict in views.items():
+                if share_data.client.client_id == user_id and view_id == str(bpy.context.area.as_pointer()):
+                    continue  # Only occurs when drawing my own frustum
+
+                frustum = [
+                    view_dict[ClientMetadata.USERSCENES_VIEWS_EYE],
+                    *view_dict[ClientMetadata.USERSCENES_VIEWS_SCREEN_CORNERS],
+                    view_dict[ClientMetadata.USERSCENES_VIEWS_TARGET],
+                ]
+                per_frustum_callback(user_dict, frustum)
 
 
 def users_selection_draw():
@@ -206,7 +220,11 @@ def users_selection_draw_iteration(per_user_callback, per_object_callback):
             if scene_name != bpy.context.scene.name_full:
                 continue
 
-            for object_full_name in scene_dict[ClientMetadata.USERSCENES_SELECTED_OBJECTS]:
+            selected_objects = scene_dict.get(ClientMetadata.USERSCENES_SELECTED_OBJECTS, None)
+            if selected_objects is None:
+                continue
+
+            for object_full_name in selected_objects:
                 if object_full_name not in bpy.data.objects:
                     logger.warning(f"{object_full_name} not in bpy.data")
                     continue

@@ -12,6 +12,7 @@ from mixer import data
 from mixer.data import get_mixer_props
 from mixer.share_data import share_data
 from mixer.broadcaster import common
+from mixer.broadcaster.common import ClientMetadata
 from mixer.broadcaster.client import Client
 from mixer.blender_client import camera as camera_api
 from mixer.blender_client import collection as collection_api
@@ -31,34 +32,33 @@ _STILL_ACTIVE = 259
 logger = logging.getLogger(__name__)
 
 
-def get_target(
-    region: bpy.types.Region, region_3d: bpy.types.RegionView3D, pixel_coords: Tuple[float, float], dist: float = 1.0
-):
+def get_target(region: bpy.types.Region, region_3d: bpy.types.RegionView3D, pixel_coords: Tuple[float, float]):
     from bpy_extras import view3d_utils
 
     view_vector = view3d_utils.region_2d_to_vector_3d(region, region_3d, pixel_coords)
     ray_origin = view3d_utils.region_2d_to_origin_3d(region, region_3d, pixel_coords)
-    target = ray_origin + view_vector * dist
+    target = ray_origin + view_vector
 
     return [target.x, target.y, target.z]
 
 
-def get_view_frustum_corners(region: bpy.types.Region, region_3d: bpy.types.RegionView3D):
+def get_view_dict(region: bpy.types.Region, region_3d: bpy.types.RegionView3D):
+    from bpy_extras import view3d_utils
+
     width = region.width
     height = region.height
 
-    v0 = get_target(region, region_3d, (width * 0.5, height * 0.5), dist=0.0)  # view origin
-
+    eye = view3d_utils.region_2d_to_origin_3d(region, region_3d, (width * 0.5, height * 0.5))
     v1 = get_target(region, region_3d, (0, 0))  # bottom left
     v2 = get_target(region, region_3d, (width, 0))  # bottom right
     v3 = get_target(region, region_3d, (width, height))  # top right
     v4 = get_target(region, region_3d, (0, height))  # top left
 
-    v5 = list(region_3d.view_location)  # view target
-
-    coords = [v0, v1, v2, v3, v4, v5]
-
-    return coords
+    return {
+        ClientMetadata.USERSCENES_VIEWS_EYE: list(eye),
+        ClientMetadata.USERSCENES_VIEWS_TARGET: list(region_3d.view_location),
+        ClientMetadata.USERSCENES_VIEWS_SCREEN_CORNERS: [v1, v2, v3, v4],
+    }
 
 
 class SendSceneContentFailed(Exception):
@@ -578,12 +578,23 @@ class ClientBlender(Client):
         share_data.client.send_frame(bpy.context.scene.frame_current)
 
     def compute_client_metadata(self):
+        scene_metadata = {}
+        for scene in bpy.data.scenes:
+            scene_metadata[scene.name_full] = {ClientMetadata.USERSCENES_FRAME: scene.frame_current}
+            scene_selection = set()
+            for obj in scene.objects:
+                for view_layer in scene.view_layers:
+                    if obj.select_get(view_layer=view_layer):
+                        scene_selection.add(obj.name_full)
+            scene_metadata[scene.name_full][ClientMetadata.USERSCENES_SELECTED_OBJECTS] = list(scene_selection)
+            scene_metadata[scene.name_full][ClientMetadata.USERSCENES_VIEWS] = dict()
+
         # Send information about opened windows and 3d areas
         # Will server later to display view frustums of users
         windows = []
         for wm in bpy.data.window_managers:
             for window in wm.windows:
-                areas_3d = dict()
+                areas_3d = []
                 scene = window.scene.name_full
                 view_layer = window.view_layer.name
                 screen = window.screen.name_full
@@ -591,19 +602,11 @@ class ClientBlender(Client):
                     if area.type == "VIEW_3D":
                         for region in area.regions:
                             if region.type == "WINDOW":
-                                view_frustum = get_view_frustum_corners(region, area.spaces.active.region_3d)
-                                areas_3d[area.as_pointer()] = {"view_frustum": view_frustum}
+                                view_id = str(area.as_pointer())
+                                view_dict = get_view_dict(region, area.spaces.active.region_3d)
+                                scene_metadata[scene][ClientMetadata.USERSCENES_VIEWS][view_id] = view_dict
+                                areas_3d.append(view_id)
                 windows.append({"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d": areas_3d})
-
-        scene_metadata = {}
-        for scene in bpy.data.scenes:
-            scene_metadata[scene.name_full] = {common.ClientMetadata.USERSCENES_FRAME: scene.frame_current}
-            scene_selection = set()
-            for obj in scene.objects:
-                for view_layer in scene.view_layers:
-                    if obj.select_get(view_layer=view_layer):
-                        scene_selection.add(obj.name_full)
-            scene_metadata[scene.name_full][common.ClientMetadata.USERSCENES_SELECTED_OBJECTS] = list(scene_selection)
 
         return {"blender_windows": windows, common.ClientMetadata.USERSCENES: scene_metadata}
 
