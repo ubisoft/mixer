@@ -301,6 +301,11 @@ class MixerProperties(bpy.types.PropertyGroup):
         items=get_snap_view_users, name="Snap Time User",
     )
 
+    snap_3d_cursor_user_enabled: bpy.props.BoolProperty(default=False)
+    snap_3d_cursor_user: bpy.props.EnumProperty(
+        items=get_snap_view_users, name="Snap 3D Cursor User",
+    )
+
     display_advanced_room_control: bpy.props.BoolProperty(default=False)
     upload_room_name: bpy.props.StringProperty(default=f"{os.getlogin()}_uploaded_room", name="Upload Room Name")
     upload_room_filepath: bpy.props.StringProperty(default=f"", subtype="FILE_PATH", name="Upload Room File")
