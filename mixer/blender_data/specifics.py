@@ -218,6 +218,16 @@ effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.key
 def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
     """Add an element to a bpy_prop_collection using the collection specific API
     """
+
+    if isinstance(collection, T.bpy_prop_collection):
+        try:
+            return collection.add()
+        except Exception:
+            logger.warning(f"Failed collection.add() for type {type(collection)}, value{collection} ...")
+            for s in traceback.format_exc().splitlines():
+                logger.warning(f"...{s}")
+            return None
+
     bl_rna = getattr(collection, "bl_rna", None)
     if bl_rna is not None:
         if isinstance(bl_rna, type(T.KeyingSets.bl_rna)):
