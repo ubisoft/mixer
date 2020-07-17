@@ -83,10 +83,6 @@ def users_frustrum_draw():
     indices = ((1, 2), (2, 3), (3, 4), (4, 1), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5))
 
     def per_user_callback(user_dict):
-        blender_windows = user_dict.get("blender_windows", None)
-        if blender_windows is None:
-            return False
-
         user_color = user_dict.get(common.ClientMetadata.USERCOLOR, DEFAULT_COLOR)
         shader.uniform_float("color", (*user_color, 1))
         return True
@@ -102,40 +98,39 @@ def users_frustrum_draw():
     users_frustrum_draw_iteration(per_user_callback, per_frustum_callback)
 
 
-def users_name_draw():
+def draw_user_name(user_dict, coord_3d):
+    prefs = get_mixer_prefs()
+
+    import blf
+    from bpy_extras import view3d_utils
+
+    text_coords = view3d_utils.location_3d_to_region_2d(bpy.context.region, bpy.context.region_data, tuple(coord_3d))
+    if text_coords is None:
+        return  # Sometimes happen, maybe due to mathematical precision issues or incoherencies
+    blf.position(0, text_coords[0], text_coords[1] + 10, 0)
+    blf.size(0, 16, 72)
+    user_color = user_dict.get(common.ClientMetadata.USERCOLOR, DEFAULT_COLOR)
+    blf.color(0, user_color[0], user_color[1], user_color[2], 1.0)
+
+    text = user_dict.get(common.ClientMetadata.USERNAME, None)
+    if prefs.display_ids_gizmos:
+        text += f" ({user_dict[common.ClientMetadata.ID]})"
+
+    blf.draw(0, text)
+
+
+def users_frustum_name_draw():
     prefs = get_mixer_prefs()
 
     if not prefs.display_names_gizmos or share_data.current_room is None:
         return
 
-    import blf
-    from bpy_extras import view3d_utils
-
     def per_user_callback(user_dict):
         user_name = user_dict.get(common.ClientMetadata.USERNAME, None)
-        blender_windows = user_dict.get("blender_windows", None)
-
-        if user_name is None or blender_windows is None:
-            return False
-
-        return True
+        return user_name is not None
 
     def per_frustum_callback(user_dict, frustum):
-        text_coords = view3d_utils.location_3d_to_region_2d(
-            bpy.context.region, bpy.context.region_data, tuple(frustum[0])
-        )
-        if text_coords is None:
-            return  # Sometimes happen, maybe due to mathematical precision issues or incoherencies
-        blf.position(0, text_coords[0], text_coords[1] + 10, 0)
-        blf.size(0, 16, 72)
-        user_color = user_dict.get(common.ClientMetadata.USERCOLOR, DEFAULT_COLOR)
-        blf.color(0, user_color[0], user_color[1], user_color[2], 1.0)
-
-        text = user_dict.get(common.ClientMetadata.USERNAME, None)
-        if prefs.display_ids_gizmos:
-            text += f" ({user_dict[common.ClientMetadata.ID]})"
-
-        blf.draw(0, text)
+        draw_user_name(user_dict, frustum[0])
 
     users_frustrum_draw_iteration(per_user_callback, per_frustum_callback)
 
@@ -164,6 +159,53 @@ BBOX_SCALE_MATRIX = Matrix.Scale(1.05, 4)
 IDENTITY_MATRIX = Matrix()
 
 
+def users_selection_draw_iteration(per_user_callback, per_object_callback):
+    prefs = get_mixer_prefs()
+
+    for user_dict in share_data.client_ids.values():
+        scenes = user_dict.get(common.ClientMetadata.USERSCENES, None)
+        if not scenes:
+            continue
+
+        user_id = user_dict[common.ClientMetadata.ID]
+        user_room = user_dict[common.ClientMetadata.ROOM]
+        if (
+            not prefs.display_own_gizmos and share_data.client.client_id == user_id
+        ) or share_data.current_room != user_room:
+            continue  # don't draw my own selection or selection from users outside my room
+
+        if not per_user_callback(user_dict):
+            continue
+
+        for scene_name, scene_dict in scenes.items():
+            if scene_name != bpy.context.scene.name_full:
+                continue
+
+            for object_full_name in scene_dict[common.ClientMetadata.USERSCENES_SELECTED_OBJECTS]:
+                if object_full_name not in bpy.data.objects:
+                    logger.warning(f"{object_full_name} not in bpy.data")
+                    continue
+
+                obj = bpy.data.objects[object_full_name]
+                objects = [obj]
+                parent_matrix = IDENTITY_MATRIX
+
+                if obj.type == "EMPTY" and obj.instance_collection is not None:
+                    objects = obj.instance_collection.objects
+                    parent_matrix = obj.matrix_world
+
+                    per_object_callback(user_dict, obj, obj.matrix_world @ BBOX_SCALE_MATRIX, DEFAULT_BBOX)
+
+                for obj in objects:
+                    bbox = obj.bound_box
+
+                    diag = Vector(bbox[2]) - Vector(bbox[4])
+                    if diag.length_squared == 0:
+                        bbox = DEFAULT_BBOX
+
+                    per_object_callback(user_dict, obj, parent_matrix @ obj.matrix_world @ BBOX_SCALE_MATRIX, bbox)
+
+
 def users_selection_draw():
     import bgl
     import gpu
@@ -184,56 +226,35 @@ def users_selection_draw():
 
     indices = ((0, 1), (1, 2), (2, 3), (0, 3), (4, 5), (5, 6), (6, 7), (4, 7), (0, 4), (1, 5), (2, 6), (3, 7))
 
-    for user_dict in share_data.client_ids.values():
-        scenes = user_dict.get(common.ClientMetadata.USERSCENES, None)
-        if not scenes:
-            continue
-
-        user_id = user_dict[common.ClientMetadata.ID]
-        user_room = user_dict[common.ClientMetadata.ROOM]
-        if (
-            not prefs.display_own_gizmos and share_data.client.client_id == user_id
-        ) or share_data.current_room != user_room:
-            continue  # don't draw my own frustums or frustums from users outside my room
-
+    def per_user_callback(user_dict):
         user_color = user_dict.get(common.ClientMetadata.USERCOLOR, DEFAULT_COLOR)
         shader.uniform_float("color", (*user_color, 1))
+        return True
 
-        for scene_name, scene_dict in scenes.items():
-            if scene_name != bpy.context.scene.name_full:
-                continue
+    def per_object_callback(user_dict, object, matrix, local_bbox):
+        bbox_corners = [matrix @ Vector(corner) for corner in local_bbox]
 
-            for object_full_name in scene_dict[common.ClientMetadata.USERSCENES_SELECTED_OBJECTS]:
-                if object_full_name not in bpy.data.objects:
-                    logger.warning(f"{object_full_name} not in bpy.data")
-                    continue
-                obj = bpy.data.objects[object_full_name]
-                objects = [obj]
-                parent_matrix = IDENTITY_MATRIX
+        batch = batch_for_shader(shader, "LINES", {"pos": bbox_corners}, indices=indices)
+        batch.draw(shader)
 
-                if obj.type == "EMPTY" and obj.instance_collection is not None:
-                    objects = obj.instance_collection.objects
-                    parent_matrix = obj.matrix_world
+    users_selection_draw_iteration(per_user_callback, per_object_callback)
 
-                    bbox_corners = [(obj.matrix_world @ BBOX_SCALE_MATRIX) @ Vector(corner) for corner in DEFAULT_BBOX]
 
-                    batch = batch_for_shader(shader, "LINES", {"pos": bbox_corners}, indices=indices)
-                    batch.draw(shader)
+def users_selection_name_draw():
+    prefs = get_mixer_prefs()
 
-                for obj in objects:
-                    bbox = obj.bound_box
+    if not prefs.display_names_gizmos or share_data.current_room is None:
+        return
 
-                    diag = Vector(bbox[2]) - Vector(bbox[4])
-                    if diag.length_squared == 0:
-                        bbox = DEFAULT_BBOX
+    def per_user_callback(user_dict):
+        user_name = user_dict.get(common.ClientMetadata.USERNAME, None)
+        return user_name is not None
 
-                    bbox_corners = [
-                        (parent_matrix @ obj.matrix_world @ BBOX_SCALE_MATRIX) @ Vector(corner) for corner in bbox
-                    ]
+    def per_object_callback(user_dict, object, matrix, local_bbox):
+        bbox_corner = matrix @ Vector(local_bbox[1])
+        draw_user_name(user_dict, bbox_corner)
 
-                    # position = [tuple(coord) for coord in bbox_corners]
-                    batch = batch_for_shader(shader, "LINES", {"pos": bbox_corners}, indices=indices)
-                    batch.draw(shader)
+    users_selection_draw_iteration(per_user_callback, per_object_callback)
 
 
 def get_target(
@@ -269,8 +290,9 @@ def get_view_frustum_corners(region: bpy.types.Region, region_3d: bpy.types.Regi
 def set_draw_handlers():
     for attr, draw_type, func in (
         ("users_frustums_draw_handler", "POST_VIEW", users_frustrum_draw),
-        ("users_name_draw_handler", "POST_PIXEL", users_name_draw),
+        ("users_frustum_name_draw_handler", "POST_PIXEL", users_frustum_name_draw),
         ("users_selection_draw_handler", "POST_VIEW", users_selection_draw),
+        ("users_selection_name_draw_handler", "POST_PIXEL", users_selection_name_draw),
     ):
         attr_value = getattr(share_data, attr)
         if attr_value is None:
