@@ -2,7 +2,7 @@ import logging
 import os
 import struct
 import traceback
-from typing import Set
+from typing import Set, Tuple
 
 import bpy
 from mathutils import Matrix, Quaternion
@@ -12,6 +12,7 @@ from mixer import data
 from mixer.data import get_mixer_props
 from mixer.share_data import share_data
 from mixer.broadcaster import common
+from mixer.broadcaster.common import ClientMetadata
 from mixer.broadcaster.client import Client
 from mixer.blender_client import camera as camera_api
 from mixer.blender_client import collection as collection_api
@@ -24,10 +25,40 @@ from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
 import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
+from mixer.draw import set_draw_handlers
 
 _STILL_ACTIVE = 259
 
 logger = logging.getLogger(__name__)
+
+
+def get_target(region: bpy.types.Region, region_3d: bpy.types.RegionView3D, pixel_coords: Tuple[float, float]):
+    from bpy_extras import view3d_utils
+
+    view_vector = view3d_utils.region_2d_to_vector_3d(region, region_3d, pixel_coords)
+    ray_origin = view3d_utils.region_2d_to_origin_3d(region, region_3d, pixel_coords)
+    target = ray_origin + view_vector
+
+    return [target.x, target.y, target.z]
+
+
+def get_view_dict(region: bpy.types.Region, region_3d: bpy.types.RegionView3D):
+    from bpy_extras import view3d_utils
+
+    width = region.width
+    height = region.height
+
+    eye = view3d_utils.region_2d_to_origin_3d(region, region_3d, (width * 0.5, height * 0.5))
+    v1 = get_target(region, region_3d, (0, 0))  # bottom left
+    v2 = get_target(region, region_3d, (width, 0))  # bottom right
+    v3 = get_target(region, region_3d, (width, height))  # top right
+    v4 = get_target(region, region_3d, (0, height))  # top left
+
+    return {
+        ClientMetadata.USERSCENES_VIEWS_EYE: list(eye),
+        ClientMetadata.USERSCENES_VIEWS_TARGET: list(region_3d.view_location),
+        ClientMetadata.USERSCENES_VIEWS_SCREEN_CORNERS: [v1, v2, v3, v4],
+    }
 
 
 class SendSceneContentFailed(Exception):
@@ -547,30 +578,43 @@ class ClientBlender(Client):
         share_data.client.send_frame(bpy.context.scene.frame_current)
 
     def compute_client_metadata(self):
+        scene_metadata = {}
+        for scene in bpy.data.scenes:
+            scene_metadata[scene.name_full] = {ClientMetadata.USERSCENES_FRAME: scene.frame_current}
+            scene_selection = set()
+            for obj in scene.objects:
+                for view_layer in scene.view_layers:
+                    if obj.select_get(view_layer=view_layer):
+                        scene_selection.add(obj.name_full)
+            scene_metadata[scene.name_full][ClientMetadata.USERSCENES_SELECTED_OBJECTS] = list(scene_selection)
+            scene_metadata[scene.name_full][ClientMetadata.USERSCENES_VIEWS] = dict()
+
         # Send information about opened windows and 3d areas
         # Will server later to display view frustums of users
         windows = []
         for wm in bpy.data.window_managers:
             for window in wm.windows:
+                areas_3d = []
                 scene = window.scene.name_full
                 view_layer = window.view_layer.name
                 screen = window.screen.name_full
-                areas_3d_count = 0
                 for area in window.screen.areas:
                     if area.type == "VIEW_3D":
-                        areas_3d_count += 1
-                windows.append(
-                    {"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d_count": areas_3d_count}
-                )
-        scene_metadata = {}
-        for scene in bpy.data.scenes:
-            scene_metadata[scene.name_full] = {common.ClientMetadata.USERSCENES_FRAME: scene.frame_current}
+                        for region in area.regions:
+                            if region.type == "WINDOW":
+                                view_id = str(area.as_pointer())
+                                view_dict = get_view_dict(region, area.spaces.active.region_3d)
+                                scene_metadata[scene][ClientMetadata.USERSCENES_VIEWS][view_id] = view_dict
+                                areas_3d.append(view_id)
+                windows.append({"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d": areas_3d})
 
         return {"blender_windows": windows, common.ClientMetadata.USERSCENES: scene_metadata}
 
     @stats_timer(share_data)
     def network_consumer(self):
         assert self.is_connected()
+
+        set_draw_handlers()
 
         # Ask for room list
         self.send_list_rooms()

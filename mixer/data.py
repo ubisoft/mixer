@@ -17,12 +17,20 @@ logger = logging.getLogger(__name__)
 
 class RoomItem(bpy.types.PropertyGroup):
     def is_room_experimental(self):
-        if self.name in share_data.rooms_dict and "experimental_sync" in share_data.rooms_dict[self.name]:
+        if (
+            share_data.rooms_dict is not None
+            and self.name in share_data.rooms_dict
+            and "experimental_sync" in share_data.rooms_dict[self.name]
+        ):
             return share_data.rooms_dict[self.name]["experimental_sync"]
         return False
 
     def is_kept_open(self):
-        if self.name in share_data.rooms_dict and RoomMetadata.KEEP_OPEN in share_data.rooms_dict[self.name]:
+        if (
+            share_data.rooms_dict is not None
+            and self.name in share_data.rooms_dict
+            and RoomMetadata.KEEP_OPEN in share_data.rooms_dict[self.name]
+        ):
             return share_data.rooms_dict[self.name][RoomMetadata.KEEP_OPEN]
         return False
 
@@ -31,12 +39,20 @@ class RoomItem(bpy.types.PropertyGroup):
         return None
 
     def get_command_count(self):
-        if self.name in share_data.rooms_dict and RoomMetadata.COMMAND_COUNT in share_data.rooms_dict[self.name]:
+        if (
+            share_data.rooms_dict is not None
+            and self.name in share_data.rooms_dict
+            and RoomMetadata.COMMAND_COUNT in share_data.rooms_dict[self.name]
+        ):
             return share_data.rooms_dict[self.name][RoomMetadata.COMMAND_COUNT]
         return 0
 
     def get_mega_byte_size(self):
-        if self.name in share_data.rooms_dict and RoomMetadata.BYTE_SIZE in share_data.rooms_dict[self.name]:
+        if (
+            share_data.rooms_dict is not None
+            and self.name in share_data.rooms_dict
+            and RoomMetadata.BYTE_SIZE in share_data.rooms_dict[self.name]
+        ):
             return share_data.rooms_dict[self.name][RoomMetadata.BYTE_SIZE] * 1e-6
         return 0
 
@@ -185,6 +201,12 @@ class MixerPreferences(bpy.types.AddonPreferences):
     send_base_meshes: bpy.props.BoolProperty(default=True)
     send_baked_meshes: bpy.props.BoolProperty(default=True)
 
+    display_own_gizmos: bpy.props.BoolProperty(default=False, name="Display Own Gizmos")
+    display_frustums_gizmos: bpy.props.BoolProperty(default=True, name="Display Frustums Gizmos")
+    display_names_gizmos: bpy.props.BoolProperty(default=True, name="Display Name Gizmos")
+    display_ids_gizmos: bpy.props.BoolProperty(default=False, name="Display ID Gizmos")
+    display_selections_gizmos: bpy.props.BoolProperty(default=True, name="Display Selection Gizmos")
+
     def draw(self, context):
         layout = self.layout
         layout.label(text="This is a preferences view for our add-on")
@@ -295,6 +317,11 @@ class MixerProperties(bpy.types.PropertyGroup):
         items=get_snap_view_users, name="Snap Time User",
     )
 
+    snap_3d_cursor_user_enabled: bpy.props.BoolProperty(default=False)
+    snap_3d_cursor_user: bpy.props.EnumProperty(
+        items=get_snap_view_users, name="Snap 3D Cursor User",
+    )
+
     display_advanced_room_control: bpy.props.BoolProperty(default=False)
     upload_room_name: bpy.props.StringProperty(default=f"{os.getlogin()}_uploaded_room", name="Upload Room Name")
     upload_room_filepath: bpy.props.StringProperty(default=f"", subtype="FILE_PATH", name="Upload Room File")
@@ -308,16 +335,23 @@ def get_mixer_prefs() -> MixerPreferences:
     return bpy.context.preferences.addons[__package__].preferences
 
 
-classes = (RoomItem, UserWindowItem, UserSceneItem, UserItem, MixerProperties, MixerPreferences)
+classes = (
+    RoomItem,
+    UserWindowItem,
+    UserSceneItem,
+    UserItem,
+    MixerProperties,
+    MixerPreferences,
+)
+
+register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)
 
 
 def register():
-    for _ in classes:
-        bpy.utils.register_class(_)
+    register_factory()
     bpy.types.WindowManager.mixer = bpy.props.PointerProperty(type=MixerProperties)
 
 
 def unregister():
-    for _ in classes:
-        bpy.utils.unregister_class(_)
     del bpy.types.WindowManager.mixer
+    unregister_factory()

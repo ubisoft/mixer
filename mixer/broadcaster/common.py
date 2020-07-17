@@ -142,8 +142,17 @@ class ClientMetadata:
     # Client to server metadata, not used by the server but clients are encouraged to use these keys for the same semantic
     USERNAME = "user_name"  # type = str
     USERCOLOR = "user_color"  # type = float3 (as list)
-    USERSCENES = "user_scenes"  # type = dict(str, dict()) key = Scene name_full, value = a dictionnary for scene metadata relative to the user
+    USERSCENES = "user_scenes"  # type = dict(str, dict) key = Scene name_full, value = a dictionnary for scene metadata relative to the user
     USERSCENES_FRAME = "frame"  # type = int, can be a field in a user_scenes dict
+    USERSCENES_SELECTED_OBJECTS = "selected_objects"  # type = list[string], can be a field in a user_scenes dict
+    USERSCENES_VIEWS = (
+        "views"  # type dict(str, dict), can be a field in a user_scenes dict; keys are unique ids for the views
+    )
+    USERSCENES_VIEWS_EYE = "eye"  # type = float3 (as list)
+    USERSCENES_VIEWS_TARGET = "target"  # type = float3 (as list)
+    USERSCENES_VIEWS_SCREEN_CORNERS = (
+        "screen_corners"  # type = list[float3], 4 elements, bottom_left, bottom_right, top_right, top_left
+    )
 
 
 class RoomMetadata:

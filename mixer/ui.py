@@ -56,7 +56,7 @@ def update_user_list(do_redraw=True):
                 window_item.scene = window["scene"]
                 window_item.view_layer = window["view_layer"]
                 window_item.screen = window["screen"]
-                window_item.areas_3d_count = window["areas_3d_count"]
+                window_item.areas_3d_count = len(window["areas_3d"])
         if ClientMetadata.USERSCENES in client:
             for scene_name, scene_dict in client[ClientMetadata.USERSCENES].items():
                 scene_item = item.scenes.add()
@@ -180,11 +180,11 @@ class MixerSettingsPanel(bpy.types.Panel):
                     user_layout.separator(factor=0.2)
 
         if collapsable_panel(
-            layout, mixer_props, "display_snapping_options", alert=True, text=f"Snapping - Not implemented yet"
+            layout, mixer_props, "display_snapping_options", alert=True, text=f"Sync Options - Not implemented yet"
         ):
-            box = layout.box()
+            box = layout.box().column()
             if share_data.current_room is None:
-                box.label(text="You must join a room to snap")
+                box.label(text="You must join a room to select sync options")
             else:
                 row = box.row()
                 row.prop(mixer_props, "snap_view_user_enabled", text="3D View: ")
@@ -193,6 +193,9 @@ class MixerSettingsPanel(bpy.types.Panel):
                 row = box.row()
                 row.prop(mixer_props, "snap_time_user_enabled", text="Time: ")
                 row.prop(mixer_props, "snap_time_user", text="", icon="USER")
+                row = box.row()
+                row.prop(mixer_props, "snap_3d_cursor_user_enabled", text="3D Cursor: ")
+                row.prop(mixer_props, "snap_3d_cursor_user", text="", icon="USER")
 
     def connected(self):
         return share_data.client is not None and share_data.client.is_connected()
@@ -290,6 +293,14 @@ class MixerSettingsPanel(bpy.types.Panel):
             col.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
             col.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
             col.prop(mixer_props, "commands_send_interval")
+
+            box = col.box().column()
+            box.label(text="Gizmos")
+            box.prop(mixer_prefs, "display_own_gizmos")
+            box.prop(mixer_prefs, "display_frustums_gizmos")
+            box.prop(mixer_prefs, "display_names_gizmos")
+            box.prop(mixer_prefs, "display_ids_gizmos")
+            box.prop(mixer_prefs, "display_selections_gizmos")
 
 
 class VRtistSettingsPanel(bpy.types.Panel):
