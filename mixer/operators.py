@@ -27,6 +27,7 @@ from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
 from mixer.blender_data.blenddata import BlendData
 from mixer.broadcaster.common import ClientMetadata
+from mixer.draw import remove_draw_handlers
 
 import mixer.shot_manager as shot_manager
 
@@ -83,7 +84,7 @@ class HandlerManager:
                 bpy.app.handlers.undo_post.remove(on_undo_redo_post)
                 bpy.app.handlers.redo_post.remove(on_undo_redo_post)
 
-                share_data.remove_draw_handlers()
+                remove_draw_handlers()
         except Exception as e:
             logger.error("Exception during set_handlers(%s) : %s", connect, e)
 
@@ -1133,7 +1134,7 @@ def disconnect():
     leave_current_room()
     BlendData.instance().reset()
 
-    share_data.remove_draw_handlers()
+    remove_draw_handlers()
 
     if bpy.app.timers.is_registered(network_consumer_timer):
         bpy.app.timers.unregister(network_consumer_timer)

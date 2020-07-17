@@ -69,23 +69,6 @@ class ShareData:
         self.clear_room_data()
         self.shot_manager = ShotManager()
 
-        self.users_frustums_draw_handler = None
-        self.users_frustum_name_draw_handler = None
-        self.users_selection_draw_handler = None
-        self.users_selection_name_draw_handler = None
-
-    def remove_draw_handlers(self):
-        for attr in (
-            "users_frustums_draw_handler",
-            "users_frustum_name_draw_handler",
-            "users_selection_draw_handler",
-            "users_selection_name_draw_handler",
-        ):
-            attr_value = getattr(self, attr)
-            if attr_value is not None:
-                bpy.types.SpaceView3D.draw_handler_remove(attr_value, "WINDOW")
-                setattr(self, attr, None)
-
     def clear_room_data(self):
         # equivalent to handlers set
         self.current_room: str = None
