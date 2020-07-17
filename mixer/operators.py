@@ -83,7 +83,7 @@ class HandlerManager:
                 bpy.app.handlers.undo_post.remove(on_undo_redo_post)
                 bpy.app.handlers.redo_post.remove(on_undo_redo_post)
 
-                remove_draw_handlers()
+                share_data.remove_draw_handlers()
         except Exception as e:
             logger.error("Exception during set_handlers(%s) : %s", connect, e)
 
@@ -92,12 +92,6 @@ class HandlerManager:
         if wanted_state != cls._current_state:
             cls._set_handlers(wanted_state)
             cls._current_state = wanted_state
-
-
-def remove_draw_handlers():
-    if share_data.users_frustums_draw_handler is not None:
-        bpy.types.SpaceView3D.draw_handler_remove(share_data.users_frustums_draw_handler, "WINDOW")
-        share_data.users_frustums_draw_handler = None
 
 
 @persistent
@@ -1139,7 +1133,7 @@ def disconnect():
     leave_current_room()
     BlendData.instance().reset()
 
-    remove_draw_handlers()
+    share_data.remove_draw_handlers()
 
     if bpy.app.timers.is_registered(network_consumer_timer):
         bpy.app.timers.unregister(network_consumer_timer)

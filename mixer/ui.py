@@ -291,6 +291,14 @@ class MixerSettingsPanel(bpy.types.Panel):
             col.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
             col.prop(mixer_props, "commands_send_interval")
 
+            box = col.box().column()
+            box.label(text="Gizmos")
+            box.prop(mixer_prefs, "display_own_gizmos")
+            box.prop(mixer_prefs, "display_frustums_gizmos")
+            box.prop(mixer_prefs, "display_names_gizmos")
+            box.prop(mixer_prefs, "display_ids_gizmos")
+            box.prop(mixer_prefs, "display_selections_gizmos")
+
 
 class VRtistSettingsPanel(bpy.types.Panel):
     bl_label = "VRtist"

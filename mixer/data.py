@@ -185,6 +185,12 @@ class MixerPreferences(bpy.types.AddonPreferences):
     send_base_meshes: bpy.props.BoolProperty(default=True)
     send_baked_meshes: bpy.props.BoolProperty(default=True)
 
+    display_own_gizmos: bpy.props.BoolProperty(default=False, name="Display Own Gizmos")
+    display_frustums_gizmos: bpy.props.BoolProperty(default=True, name="Display Frustums Gizmos")
+    display_names_gizmos: bpy.props.BoolProperty(default=True, name="Display Name Gizmos")
+    display_ids_gizmos: bpy.props.BoolProperty(default=False, name="Display ID Gizmos")
+    display_selections_gizmos: bpy.props.BoolProperty(default=True, name="Display Selection Gizmos")
+
     def draw(self, context):
         layout = self.layout
         layout.label(text="This is a preferences view for our add-on")

@@ -9,7 +9,7 @@ from mathutils import Matrix, Quaternion
 import mixer
 from mixer import ui
 from mixer import data
-from mixer.data import get_mixer_props
+from mixer.data import get_mixer_props, get_mixer_prefs
 from mixer.share_data import share_data
 from mixer.broadcaster import common
 from mixer.broadcaster.client import Client
@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
 
 
 def users_frustrum_draw():
-    if share_data.current_room is None:
+    prefs = get_mixer_prefs()
+
+    if not prefs.display_frustums_gizmos or share_data.current_room is None:
         return
 
     import bgl
@@ -49,19 +51,76 @@ def users_frustrum_draw():
     indices = ((1, 2), (2, 3), (3, 4), (4, 1), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5))
 
     for user_dict in share_data.client_ids.values():
+        blender_windows = user_dict.get("blender_windows", None)
+
+        if blender_windows is None:
+            continue
+
         user_id = user_dict[common.ClientMetadata.ID]
         user_room = user_dict[common.ClientMetadata.ROOM]
-        if share_data.client.client_id == user_id or share_data.current_room != user_room:
+        if (
+            not prefs.display_own_gizmos and share_data.client.client_id == user_id
+        ) or share_data.current_room != user_room:
             continue  # don't draw my own frustums or frustums from users outside my room
 
-        for window_dict in user_dict["blender_windows"]:
+        shader.uniform_float("color", (*user_dict[common.ClientMetadata.USERCOLOR], 1))
+
+        for window_dict in blender_windows:
             if window_dict["scene"] == bpy.context.scene.name_full:
-                shader.uniform_float("color", (*user_dict[common.ClientMetadata.USERCOLOR], 1))
-                for _area_3d_id, area_3d in window_dict["areas_3d"].items():
+                for area_3d_id, area_3d in window_dict["areas_3d"].items():
+                    if area_3d_id == str(bpy.context.area.as_pointer()):
+                        continue  # only occurs when display_own_gizmos == True
+
                     frustum = area_3d["view_frustum"]
                     position = [tuple(coord) for coord in frustum]
                     batch = batch_for_shader(shader, "LINES", {"pos": position}, indices=indices)
                     batch.draw(shader)
+
+
+def users_name_draw():
+    prefs = get_mixer_prefs()
+
+    if not prefs.display_names_gizmos or share_data.current_room is None:
+        return
+
+    import blf
+    from bpy_extras import view3d_utils
+
+    for user_dict in share_data.client_ids.values():
+        user_name = user_dict.get(common.ClientMetadata.USERNAME, None)
+        blender_windows = user_dict.get("blender_windows", None)
+
+        if user_name is None or blender_windows is None:
+            continue
+
+        user_id = user_dict[common.ClientMetadata.ID]
+        user_room = user_dict[common.ClientMetadata.ROOM]
+        if (
+            not prefs.display_own_gizmos and share_data.client.client_id == user_id
+        ) or share_data.current_room != user_room:
+            continue  # don't draw my own name of names from users outside my room
+
+        user_color = user_dict[common.ClientMetadata.USERCOLOR]
+
+        for window_dict in user_dict["blender_windows"]:
+            if window_dict["scene"] == bpy.context.scene.name_full:
+                for area_3d_id, area_3d in window_dict["areas_3d"].items():
+                    if area_3d_id == str(bpy.context.area.as_pointer()):
+                        continue  # only occurs when display_own_gizmos == True
+
+                    frustum = area_3d["view_frustum"]
+                    text_coords = view3d_utils.location_3d_to_region_2d(
+                        bpy.context.region, bpy.context.region_data, tuple(frustum[0])
+                    )
+                    blf.position(0, text_coords[0], text_coords[1] + 10, 0)
+                    blf.size(0, 16, 72)
+                    blf.color(0, user_color[0], user_color[1], user_color[2], 1.0)
+
+                    text = user_name
+                    if prefs.display_ids_gizmos:
+                        text += f" ({user_id})"
+
+                    blf.draw(0, text)
 
 
 def get_target(
@@ -94,6 +153,16 @@ def get_view_frustum_corners(region: bpy.types.Region, region_3d: bpy.types.Regi
     coords = [v0, v1, v2, v3, v4, v5]
 
     return coords
+
+
+def set_draw_handlers():
+    for attr, draw_type, func in (
+        ("users_frustums_draw_handler", "POST_VIEW", users_frustrum_draw),
+        ("users_name_draw_handler", "POST_PIXEL", users_name_draw),
+    ):
+        attr_value = getattr(share_data, attr)
+        if attr_value is None:
+            setattr(share_data, attr, bpy.types.SpaceView3D.draw_handler_add(func, (), "WINDOW", draw_type))
 
 
 class SendSceneContentFailed(Exception):
@@ -639,10 +708,7 @@ class ClientBlender(Client):
     def network_consumer(self):
         assert self.is_connected()
 
-        if share_data.users_frustums_draw_handler is None:
-            share_data.users_frustums_draw_handler = bpy.types.SpaceView3D.draw_handler_add(
-                users_frustrum_draw, (), "WINDOW", "POST_VIEW"
-            )
+        set_draw_handlers()
 
         # Ask for room list
         self.send_list_rooms()
