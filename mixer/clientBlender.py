@@ -47,6 +47,7 @@ def users_frustrum_draw():
     bgl.glEnable(bgl.GL_DEPTH_TEST)
     bgl.glEnable(bgl.GL_BLEND)
     bgl.glEnable(bgl.GL_LINE_SMOOTH)
+    bgl.glPointSize(4)
 
     indices = ((1, 2), (2, 3), (3, 4), (4, 1), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5))
 
@@ -74,6 +75,9 @@ def users_frustrum_draw():
                     frustum = area_3d["view_frustum"]
                     position = [tuple(coord) for coord in frustum]
                     batch = batch_for_shader(shader, "LINES", {"pos": position}, indices=indices)
+                    batch.draw(shader)
+
+                    batch = batch_for_shader(shader, "POINTS", {"pos": position}, indices=(5,))
                     batch.draw(shader)
 
 
@@ -130,8 +134,6 @@ def get_target(
 ):
     from bpy_extras import view3d_utils
 
-    target = [0, 0, 0]
-
     view_vector = view3d_utils.region_2d_to_vector_3d(region, region_3d, pixel_coords)
     ray_origin = view3d_utils.region_2d_to_origin_3d(region, region_3d, pixel_coords)
     target = ray_origin + view_vector * dist
@@ -143,7 +145,7 @@ def get_view_frustum_corners(region: bpy.types.Region, region_3d: bpy.types.Regi
     width = region.width
     height = region.height
 
-    v0 = get_target(region, region_3d, (width / 2, height / 2), dist=-1)  # view origin
+    v0 = get_target(region, region_3d, (width * 0.5, height * 0.5), dist=0.0)  # view origin
 
     v1 = get_target(region, region_3d, (0, 0))  # bottom left
     v2 = get_target(region, region_3d, (width, 0))  # bottom right
