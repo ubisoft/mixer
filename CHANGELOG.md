@@ -1,3 +1,19 @@
+# 0.11.0 (2020-07-17)
+
+## Features
+
+- Display view frustums, names and object selections of other users (#3)
+- Image support for Env Texture Node (#128)
+
+## Bugfix
+
+- RuntimeError: Error: Object 'Cylinder' can't be hidden because it is not in View Layer 'View Layer' (#100)
+- VSE sync fixes (#133)
+- Catch exceptions in write_attribute/save (#134)
+- Disable VSE properties that cause hard crash on multi scenes files (#146)
+- TypeError: add() takes no arguments (1 given) (#148)
+- KeyingSet related error (#152)
+
 # 0.10.1 (2020-07-09)
 
 ## Bugfix
