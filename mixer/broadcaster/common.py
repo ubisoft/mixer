@@ -144,6 +144,7 @@ class ClientMetadata:
     USERCOLOR = "user_color"  # type = float3 (as list)
     USERSCENES = "user_scenes"  # type = dict(str, dict()) key = Scene name_full, value = a dictionnary for scene metadata relative to the user
     USERSCENES_FRAME = "frame"  # type = int, can be a field in a user_scenes dict
+    USERSCENES_SELECTED_OBJECTS = "selected_objects"  # type = list[string], can be a field in a user_scenes dict
 
 
 class RoomMetadata:

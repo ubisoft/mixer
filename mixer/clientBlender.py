@@ -5,7 +5,7 @@ import traceback
 from typing import Set, Tuple
 
 import bpy
-from mathutils import Matrix, Quaternion
+from mathutils import Vector, Matrix, Quaternion
 import mixer
 from mixer import ui
 from mixer import data
@@ -58,6 +58,9 @@ def users_frustrum_draw_iteration(per_user_callback, per_frustum_callback):
                     per_frustum_callback(user_dict, area_3d["view_frustum"])
 
 
+DEFAULT_COLOR = (1, 0, 1)
+
+
 def users_frustrum_draw():
     prefs = get_mixer_prefs()
 
@@ -84,7 +87,8 @@ def users_frustrum_draw():
         if blender_windows is None:
             return False
 
-        shader.uniform_float("color", (*user_dict[common.ClientMetadata.USERCOLOR], 1))
+        user_color = user_dict.get(common.ClientMetadata.USERCOLOR, DEFAULT_COLOR)
+        shader.uniform_float("color", (*user_color, 1))
         return True
 
     def per_frustum_callback(user_dict, frustum):
@@ -124,7 +128,7 @@ def users_name_draw():
             return  # Sometimes happen, maybe due to mathematical precision issues or incoherencies
         blf.position(0, text_coords[0], text_coords[1] + 10, 0)
         blf.size(0, 16, 72)
-        user_color = user_dict[common.ClientMetadata.USERCOLOR]
+        user_color = user_dict.get(common.ClientMetadata.USERCOLOR, DEFAULT_COLOR)
         blf.color(0, user_color[0], user_color[1], user_color[2], 1.0)
 
         text = user_dict.get(common.ClientMetadata.USERNAME, None)
@@ -134,6 +138,102 @@ def users_name_draw():
         blf.draw(0, text)
 
     users_frustrum_draw_iteration(per_user_callback, per_frustum_callback)
+
+
+# Order of points returned by Blender's bound_box:
+# -X -Y -Z
+# -X -Y +Z
+# -X +Y +Z
+# -X +Y -Z
+# +X -Y -Z
+# +X -Y +Z
+# +X +Y +Z
+# +X +Y -Z
+DEFAULT_BBOX = [
+    (-1, -1, -1),
+    (-1, -1, +1),
+    (-1, +1, +1),
+    (-1, +1, -1),
+    (+1, -1, -1),
+    (+1, -1, +1),
+    (+1, +1, +1),
+    (+1, +1, -1),
+]
+
+BBOX_SCALE_MATRIX = Matrix.Scale(1.05, 4)
+IDENTITY_MATRIX = Matrix()
+
+
+def users_selection_draw():
+    import bgl
+    import gpu
+    from gpu_extras.batch import batch_for_shader
+
+    prefs = get_mixer_prefs()
+
+    if not prefs.display_selections_gizmos or share_data.current_room is None:
+        return
+
+    shader = gpu.shader.from_builtin("3D_UNIFORM_COLOR")
+    shader.bind()
+
+    bgl.glLineWidth(1.5)
+    bgl.glEnable(bgl.GL_DEPTH_TEST)
+    bgl.glEnable(bgl.GL_BLEND)
+    bgl.glEnable(bgl.GL_LINE_SMOOTH)
+
+    indices = ((0, 1), (1, 2), (2, 3), (0, 3), (4, 5), (5, 6), (6, 7), (4, 7), (0, 4), (1, 5), (2, 6), (3, 7))
+
+    for user_dict in share_data.client_ids.values():
+        scenes = user_dict.get(common.ClientMetadata.USERSCENES, None)
+        if not scenes:
+            continue
+
+        user_id = user_dict[common.ClientMetadata.ID]
+        user_room = user_dict[common.ClientMetadata.ROOM]
+        if (
+            not prefs.display_own_gizmos and share_data.client.client_id == user_id
+        ) or share_data.current_room != user_room:
+            continue  # don't draw my own frustums or frustums from users outside my room
+
+        user_color = user_dict.get(common.ClientMetadata.USERCOLOR, DEFAULT_COLOR)
+        shader.uniform_float("color", (*user_color, 1))
+
+        for scene_name, scene_dict in scenes.items():
+            if scene_name != bpy.context.scene.name_full:
+                continue
+
+            for object_full_name in scene_dict[common.ClientMetadata.USERSCENES_SELECTED_OBJECTS]:
+                if object_full_name not in bpy.data.objects:
+                    logger.warning(f"{object_full_name} not in bpy.data")
+                    continue
+                obj = bpy.data.objects[object_full_name]
+                objects = [obj]
+                parent_matrix = IDENTITY_MATRIX
+
+                if obj.type == "EMPTY" and obj.instance_collection is not None:
+                    objects = obj.instance_collection.objects
+                    parent_matrix = obj.matrix_world
+
+                    bbox_corners = [(obj.matrix_world @ BBOX_SCALE_MATRIX) @ Vector(corner) for corner in DEFAULT_BBOX]
+
+                    batch = batch_for_shader(shader, "LINES", {"pos": bbox_corners}, indices=indices)
+                    batch.draw(shader)
+
+                for obj in objects:
+                    bbox = obj.bound_box
+
+                    diag = Vector(bbox[2]) - Vector(bbox[4])
+                    if diag.length_squared == 0:
+                        bbox = DEFAULT_BBOX
+
+                    bbox_corners = [
+                        (parent_matrix @ obj.matrix_world @ BBOX_SCALE_MATRIX) @ Vector(corner) for corner in bbox
+                    ]
+
+                    # position = [tuple(coord) for coord in bbox_corners]
+                    batch = batch_for_shader(shader, "LINES", {"pos": bbox_corners}, indices=indices)
+                    batch.draw(shader)
 
 
 def get_target(
@@ -170,6 +270,7 @@ def set_draw_handlers():
     for attr, draw_type, func in (
         ("users_frustums_draw_handler", "POST_VIEW", users_frustrum_draw),
         ("users_name_draw_handler", "POST_PIXEL", users_name_draw),
+        ("users_selection_draw_handler", "POST_VIEW", users_selection_draw),
     ):
         attr_value = getattr(share_data, attr)
         if attr_value is None:
@@ -709,9 +810,16 @@ class ClientBlender(Client):
                                 view_frustum = get_view_frustum_corners(region, area.spaces.active.region_3d)
                                 areas_3d[area.as_pointer()] = {"view_frustum": view_frustum}
                 windows.append({"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d": areas_3d})
+
         scene_metadata = {}
         for scene in bpy.data.scenes:
             scene_metadata[scene.name_full] = {common.ClientMetadata.USERSCENES_FRAME: scene.frame_current}
+            scene_selection = set()
+            for obj in scene.objects:
+                for view_layer in scene.view_layers:
+                    if obj.select_get(view_layer=view_layer):
+                        scene_selection.add(obj.name_full)
+            scene_metadata[scene.name_full][common.ClientMetadata.USERSCENES_SELECTED_OBJECTS] = list(scene_selection)
 
         return {"blender_windows": windows, common.ClientMetadata.USERSCENES: scene_metadata}
 
