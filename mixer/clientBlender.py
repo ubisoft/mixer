@@ -30,6 +30,34 @@ _STILL_ACTIVE = 259
 logger = logging.getLogger(__name__)
 
 
+def users_frustrum_draw_iteration(per_user_callback, per_frustum_callback):
+    prefs = get_mixer_prefs()
+
+    for user_dict in share_data.client_ids.values():
+        blender_windows = user_dict.get("blender_windows", None)
+
+        if blender_windows is None:
+            continue
+
+        user_id = user_dict[common.ClientMetadata.ID]
+        user_room = user_dict[common.ClientMetadata.ROOM]
+        if (
+            not prefs.display_own_gizmos and share_data.client.client_id == user_id
+        ) or share_data.current_room != user_room:
+            continue  # don't draw my own frustums or frustums from users outside my room
+
+        if not per_user_callback(user_dict):
+            continue
+
+        for window_dict in blender_windows:
+            if window_dict["scene"] == bpy.context.scene.name_full:
+                for area_3d_id, area_3d in window_dict["areas_3d"].items():
+                    if area_3d_id == str(bpy.context.area.as_pointer()):
+                        continue  # only occurs when display_own_gizmos == True
+
+                    per_frustum_callback(user_dict, area_3d["view_frustum"])
+
+
 def users_frustrum_draw():
     prefs = get_mixer_prefs()
 
@@ -51,34 +79,23 @@ def users_frustrum_draw():
 
     indices = ((1, 2), (2, 3), (3, 4), (4, 1), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5))
 
-    for user_dict in share_data.client_ids.values():
+    def per_user_callback(user_dict):
         blender_windows = user_dict.get("blender_windows", None)
-
         if blender_windows is None:
-            continue
-
-        user_id = user_dict[common.ClientMetadata.ID]
-        user_room = user_dict[common.ClientMetadata.ROOM]
-        if (
-            not prefs.display_own_gizmos and share_data.client.client_id == user_id
-        ) or share_data.current_room != user_room:
-            continue  # don't draw my own frustums or frustums from users outside my room
+            return False
 
         shader.uniform_float("color", (*user_dict[common.ClientMetadata.USERCOLOR], 1))
+        return True
 
-        for window_dict in blender_windows:
-            if window_dict["scene"] == bpy.context.scene.name_full:
-                for area_3d_id, area_3d in window_dict["areas_3d"].items():
-                    if area_3d_id == str(bpy.context.area.as_pointer()):
-                        continue  # only occurs when display_own_gizmos == True
+    def per_frustum_callback(user_dict, frustum):
+        position = [tuple(coord) for coord in frustum]
+        batch = batch_for_shader(shader, "LINES", {"pos": position}, indices=indices)
+        batch.draw(shader)
 
-                    frustum = area_3d["view_frustum"]
-                    position = [tuple(coord) for coord in frustum]
-                    batch = batch_for_shader(shader, "LINES", {"pos": position}, indices=indices)
-                    batch.draw(shader)
+        batch = batch_for_shader(shader, "POINTS", {"pos": position}, indices=(5,))
+        batch.draw(shader)
 
-                    batch = batch_for_shader(shader, "POINTS", {"pos": position}, indices=(5,))
-                    batch.draw(shader)
+    users_frustrum_draw_iteration(per_user_callback, per_frustum_callback)
 
 
 def users_name_draw():
@@ -90,43 +107,33 @@ def users_name_draw():
     import blf
     from bpy_extras import view3d_utils
 
-    for user_dict in share_data.client_ids.values():
+    def per_user_callback(user_dict):
         user_name = user_dict.get(common.ClientMetadata.USERNAME, None)
         blender_windows = user_dict.get("blender_windows", None)
 
         if user_name is None or blender_windows is None:
-            continue
+            return False
 
-        user_id = user_dict[common.ClientMetadata.ID]
-        user_room = user_dict[common.ClientMetadata.ROOM]
-        if (
-            not prefs.display_own_gizmos and share_data.client.client_id == user_id
-        ) or share_data.current_room != user_room:
-            continue  # don't draw my own name of names from users outside my room
+        return True
 
+    def per_frustum_callback(user_dict, frustum):
+        text_coords = view3d_utils.location_3d_to_region_2d(
+            bpy.context.region, bpy.context.region_data, tuple(frustum[0])
+        )
+        if text_coords is None:
+            return  # Sometimes happen, maybe due to mathematical precision issues or incoherencies
+        blf.position(0, text_coords[0], text_coords[1] + 10, 0)
+        blf.size(0, 16, 72)
         user_color = user_dict[common.ClientMetadata.USERCOLOR]
+        blf.color(0, user_color[0], user_color[1], user_color[2], 1.0)
 
-        for window_dict in user_dict["blender_windows"]:
-            if window_dict["scene"] == bpy.context.scene.name_full:
-                for area_3d_id, area_3d in window_dict["areas_3d"].items():
-                    if area_3d_id == str(bpy.context.area.as_pointer()):
-                        continue  # only occurs when display_own_gizmos == True
+        text = user_dict.get(common.ClientMetadata.USERNAME, None)
+        if prefs.display_ids_gizmos:
+            text += f" ({user_dict[common.ClientMetadata.ID]})"
 
-                    frustum = area_3d["view_frustum"]
-                    text_coords = view3d_utils.location_3d_to_region_2d(
-                        bpy.context.region, bpy.context.region_data, tuple(frustum[0])
-                    )
-                    if text_coords is None:
-                        continue  # Sometimes happen, maybe due to mathematical precision issues or incoherencies
-                    blf.position(0, text_coords[0], text_coords[1] + 10, 0)
-                    blf.size(0, 16, 72)
-                    blf.color(0, user_color[0], user_color[1], user_color[2], 1.0)
+        blf.draw(0, text)
 
-                    text = user_name
-                    if prefs.display_ids_gizmos:
-                        text += f" ({user_id})"
-
-                    blf.draw(0, text)
+    users_frustrum_draw_iteration(per_user_callback, per_frustum_callback)
 
 
 def get_target(
