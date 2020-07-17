@@ -112,6 +112,8 @@ def users_name_draw():
                     text_coords = view3d_utils.location_3d_to_region_2d(
                         bpy.context.region, bpy.context.region_data, tuple(frustum[0])
                     )
+                    if text_coords is None:
+                        continue  # Sometimes happen, maybe due to mathematical precision issues or incoherencies
                     blf.position(0, text_coords[0], text_coords[1] + 10, 0)
                     blf.size(0, 16, 72)
                     blf.color(0, user_color[0], user_color[1], user_color[2], 1.0)
