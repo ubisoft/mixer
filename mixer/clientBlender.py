@@ -529,7 +529,10 @@ class ClientBlender(Client):
         if bpy.context.scene.frame_current != frame:
             previous_value = share_data.client.skip_next_depsgraph_update
             share_data.client.skip_next_depsgraph_update = False
+            # bs = self.block_signals
+            # self.block_signals = False
             bpy.context.scene.frame_set(frame)
+            # self.block_signals = bs
             share_data.client.skip_next_depsgraph_update = previous_value
 
     def send_frame(self, frame):
