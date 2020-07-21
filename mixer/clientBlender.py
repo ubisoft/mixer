@@ -8,7 +8,7 @@ import bpy
 from mathutils import Matrix, Quaternion
 import mixer
 from mixer import ui
-from mixer.bl_utils import get_mixer_prefs, get_mixer_props
+from mixer.bl_utils import get_mixer_prefs
 from mixer.share_data import share_data
 from mixer.broadcaster import common
 from mixer.broadcaster.common import ClientMetadata
