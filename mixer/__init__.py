@@ -76,7 +76,7 @@ def get_logs_directory():
 
 
 def get_log_file():
-    from share_data import share_data
+    from mixer.share_data import share_data
 
     return os.path.join(get_logs_directory(), f"mixer_logs_{share_data.runId}.log")
 
