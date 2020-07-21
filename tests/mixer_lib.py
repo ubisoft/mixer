@@ -27,7 +27,7 @@ def create_room():
 def set_log_level(log_level):
     import mixer
 
-    mixer.data.set_log_level(None, log_level)
+    mixer.bl_preferences.set_log_level(None, log_level)
 
 
 def join_room(room_name: str = "mixer_unittest"):

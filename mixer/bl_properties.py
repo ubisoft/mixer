@@ -1,16 +1,10 @@
 import os
 import logging
-import tempfile
-import random
-from datetime import datetime
-from pathlib import Path
 
 import bpy
 
-from mixer.broadcaster import common
-from mixer.broadcaster.common import ClientMetadata, RoomMetadata
+from mixer.broadcaster.common import RoomMetadata
 from mixer.share_data import share_data
-from mixer.stats import get_stats_directory
 
 logger = logging.getLogger(__name__)
 
@@ -88,128 +82,6 @@ class UserItem(bpy.types.PropertyGroup):
     windows: bpy.props.CollectionProperty(name="Windows", type=UserWindowItem)
     selected_window_index: bpy.props.IntProperty(name="Window Index")
     scenes: bpy.props.CollectionProperty(name="Scenes", type=UserSceneItem)
-
-
-def stats_file_path_suffix():
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
-
-def get_logs_directory():
-    def _get_logs_directory():
-        if "MIXER_USER_LOGS_DIR" in os.environ:
-            username = os.getlogin()
-            base_shared_path = Path(os.environ["MIXER_USER_LOGS_DIR"])
-            if os.path.exists(base_shared_path):
-                return os.path.join(os.fspath(base_shared_path), username)
-            logger.error(
-                f"MIXER_USER_LOGS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location."
-            )
-        return os.path.join(os.fspath(tempfile.gettempdir()), "mixer")
-
-    dir = _get_logs_directory()
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    return dir
-
-
-def get_log_file():
-    return os.path.join(get_logs_directory(), f"mixer_logs_{share_data.runId}.log")
-
-
-def gen_random_color():
-    r = random.random()
-    g = random.random()
-    b = random.random()
-    return [r, g, b]
-
-
-def set_log_level(self, value):
-    logging.getLogger(__package__).setLevel(value)
-    logger.log(value, "Logging level changed")
-
-
-class MixerPreferences(bpy.types.AddonPreferences):
-    bl_idname = __package__
-
-    def on_user_changed(self, context):
-        client = share_data.client
-        if client and client.is_connected():
-            client.set_client_metadata({ClientMetadata.USERNAME: self.user})
-
-    def on_user_color_changed(self, context):
-        client = share_data.client
-        if client and client.is_connected():
-            client.set_client_metadata({ClientMetadata.USERCOLOR: list(self.color)})
-
-    # Allows to change behavior according to environment: production or development
-    env: bpy.props.EnumProperty(
-        name="Execution Environment",
-        description="Execution environment: production, development or testing",
-        items=[
-            ("production", "production", "", 0),
-            ("development", "development", "", 1),
-            ("testing", "testing", "", 2),
-        ],
-        default=os.environ.get("MIXER_ENV", "production"),
-    )
-
-    host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
-    port: bpy.props.IntProperty(name="Port", default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)))
-    room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", os.getlogin()))
-
-    # User name as displayed in peers user list
-    user: bpy.props.StringProperty(name="User", default=os.getlogin(), update=on_user_changed)
-    color: bpy.props.FloatVectorProperty(
-        name="Color", subtype="COLOR", default=gen_random_color(), update=on_user_color_changed
-    )
-
-    def get_log_level(self):
-        return logging.getLogger(__package__).level
-
-    log_level: bpy.props.EnumProperty(
-        name="Log Level",
-        description="Logging level to use",
-        items=[
-            ("ERROR", "Error", "", logging.ERROR),
-            ("WARNING", "Warning", "", logging.WARNING),
-            ("INFO", "Info", "", logging.INFO),
-            ("DEBUG", "Debug", "", logging.DEBUG),
-        ],
-        set=set_log_level,
-        get=get_log_level,
-    )
-
-    experimental_sync: bpy.props.BoolProperty(
-        name="Experimental sync", default=os.environ.get("MIXER_EXPERIMENTAL_SYNC") is not None
-    )
-
-    show_server_console: bpy.props.BoolProperty(default=False)
-
-    VRtist: bpy.props.StringProperty(
-        name="VRtist", default=os.environ.get("VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe"), subtype="FILE_PATH"
-    )
-    statistics_directory: bpy.props.StringProperty(
-        name="Stats Directory", default=os.environ.get("MIXER_STATS_DIR", get_stats_directory()), subtype="FILE_PATH"
-    )
-    auto_save_statistics: bpy.props.BoolProperty(default=True)
-
-    # Developer option to avoid sending scene content to server at the first connexion
-    # Allow to quickly iterate debugging/test on large scenes with only one client in room
-    # Main usage: optimization of client timers to check if updates are required
-    no_send_scene_content: bpy.props.BoolProperty(default=False)
-
-    send_base_meshes: bpy.props.BoolProperty(default=True)
-    send_baked_meshes: bpy.props.BoolProperty(default=True)
-
-    display_own_gizmos: bpy.props.BoolProperty(default=False, name="Display Own Gizmos")
-    display_frustums_gizmos: bpy.props.BoolProperty(default=True, name="Display Frustums Gizmos")
-    display_names_gizmos: bpy.props.BoolProperty(default=True, name="Display Name Gizmos")
-    display_ids_gizmos: bpy.props.BoolProperty(default=False, name="Display ID Gizmos")
-    display_selections_gizmos: bpy.props.BoolProperty(default=True, name="Display Selection Gizmos")
-
-    def draw(self, context):
-        layout = self.layout
-        layout.label(text="This is a preferences view for our add-on")
 
 
 # This should probably be handled elsewhere, for now it is here
@@ -327,21 +199,12 @@ class MixerProperties(bpy.types.PropertyGroup):
     upload_room_filepath: bpy.props.StringProperty(default=f"", subtype="FILE_PATH", name="Upload Room File")
 
 
-def get_mixer_props() -> MixerProperties:
-    return bpy.context.window_manager.mixer
-
-
-def get_mixer_prefs() -> MixerPreferences:
-    return bpy.context.preferences.addons[__package__].preferences
-
-
 classes = (
     RoomItem,
     UserWindowItem,
     UserSceneItem,
     UserItem,
     MixerProperties,
-    MixerPreferences,
 )
 
 register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)

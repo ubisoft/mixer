@@ -1,7 +1,8 @@
 import bpy
 import os
 from mixer import operators
-from mixer.data import get_mixer_props, get_mixer_prefs, UserItem
+from mixer.bl_utils import get_mixer_props, get_mixer_prefs
+from mixer.bl_properties import UserItem
 from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientMetadata
 

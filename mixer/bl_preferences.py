@@ -1,119 +1,15 @@
 import os
 import logging
-import tempfile
 import random
-from datetime import datetime
-from pathlib import Path
 
 import bpy
 
 from mixer.broadcaster import common
-from mixer.broadcaster.common import ClientMetadata, RoomMetadata
+from mixer.broadcaster.common import ClientMetadata
 from mixer.share_data import share_data
 from mixer.stats import get_stats_directory
 
 logger = logging.getLogger(__name__)
-
-
-class RoomItem(bpy.types.PropertyGroup):
-    def is_room_experimental(self):
-        if (
-            share_data.rooms_dict is not None
-            and self.name in share_data.rooms_dict
-            and "experimental_sync" in share_data.rooms_dict[self.name]
-        ):
-            return share_data.rooms_dict[self.name]["experimental_sync"]
-        return False
-
-    def is_kept_open(self):
-        if (
-            share_data.rooms_dict is not None
-            and self.name in share_data.rooms_dict
-            and RoomMetadata.KEEP_OPEN in share_data.rooms_dict[self.name]
-        ):
-            return share_data.rooms_dict[self.name][RoomMetadata.KEEP_OPEN]
-        return False
-
-    def on_keep_open_changed(self, value):
-        share_data.client.set_room_keep_open(self.name, value)
-        return None
-
-    def get_command_count(self):
-        if (
-            share_data.rooms_dict is not None
-            and self.name in share_data.rooms_dict
-            and RoomMetadata.COMMAND_COUNT in share_data.rooms_dict[self.name]
-        ):
-            return share_data.rooms_dict[self.name][RoomMetadata.COMMAND_COUNT]
-        return 0
-
-    def get_mega_byte_size(self):
-        if (
-            share_data.rooms_dict is not None
-            and self.name in share_data.rooms_dict
-            and RoomMetadata.BYTE_SIZE in share_data.rooms_dict[self.name]
-        ):
-            return share_data.rooms_dict[self.name][RoomMetadata.BYTE_SIZE] * 1e-6
-        return 0
-
-    name: bpy.props.StringProperty(name="Name")
-    users_count: bpy.props.IntProperty(name="Users Count")
-    experimental_sync: bpy.props.BoolProperty(name="Experimental Sync", get=is_room_experimental)
-    keep_open: bpy.props.BoolProperty(name="Keep Open", default=False, get=is_kept_open, set=on_keep_open_changed)
-    command_count: bpy.props.IntProperty(name="Command Count", get=get_command_count)
-    mega_byte_size: bpy.props.FloatProperty(name="Mega Byte Size", get=get_mega_byte_size)
-
-
-class UserWindowItem(bpy.types.PropertyGroup):
-    scene: bpy.props.StringProperty(name="Scene")
-    view_layer: bpy.props.StringProperty(name="View Layer")
-    screen: bpy.props.StringProperty(name="Screen")
-    areas_3d_count: bpy.props.IntProperty(name="3D Areas Count")
-
-
-class UserSceneItem(bpy.types.PropertyGroup):
-    scene: bpy.props.StringProperty(name="Scene")
-    frame: bpy.props.IntProperty(name="Frame")
-
-
-class UserItem(bpy.types.PropertyGroup):
-    is_me: bpy.props.BoolProperty(name="Is Me")
-    name: bpy.props.StringProperty(name="Name")
-    ip: bpy.props.StringProperty(name="IP")
-    port: bpy.props.IntProperty(name="Port")
-    ip_port: bpy.props.StringProperty(name="IP:Port")
-    room: bpy.props.StringProperty(name="Room")
-    internal_color: bpy.props.FloatVectorProperty(name="Color", subtype="COLOR")
-    color: bpy.props.FloatVectorProperty(name="Color", subtype="COLOR", get=lambda self: self.internal_color)
-    windows: bpy.props.CollectionProperty(name="Windows", type=UserWindowItem)
-    selected_window_index: bpy.props.IntProperty(name="Window Index")
-    scenes: bpy.props.CollectionProperty(name="Scenes", type=UserSceneItem)
-
-
-def stats_file_path_suffix():
-    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
-
-def get_logs_directory():
-    def _get_logs_directory():
-        if "MIXER_USER_LOGS_DIR" in os.environ:
-            username = os.getlogin()
-            base_shared_path = Path(os.environ["MIXER_USER_LOGS_DIR"])
-            if os.path.exists(base_shared_path):
-                return os.path.join(os.fspath(base_shared_path), username)
-            logger.error(
-                f"MIXER_USER_LOGS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location."
-            )
-        return os.path.join(os.fspath(tempfile.gettempdir()), "mixer")
-
-    dir = _get_logs_directory()
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-    return dir
-
-
-def get_log_file():
-    return os.path.join(get_logs_directory(), f"mixer_logs_{share_data.runId}.log")
 
 
 def gen_random_color():
@@ -212,146 +108,14 @@ class MixerPreferences(bpy.types.AddonPreferences):
         layout.label(text="This is a preferences view for our add-on")
 
 
-# This should probably be handled elsewhere, for now it is here
-# We need a unique index for each user in snap_view_user and snap_time_user
-# dropdown list otherwise the selection "pops" when a user leave room or
-# disconnect
-user_to_unique_index = {}
-next_user_unique_index = 0
-
-
-class MixerProperties(bpy.types.PropertyGroup):
-    commands_send_interval: bpy.props.FloatProperty(
-        name="Command Send Interval",
-        description="Debug tool to specify a number of seconds to wait between each command emission toward the server.",
-        default=0,
-    )
-
-    rooms: bpy.props.CollectionProperty(name="Rooms", type=RoomItem)
-    room_index: bpy.props.IntProperty()  # index in the list of rooms
-
-    # user list of the selected or connected room, according to status
-    users: bpy.props.CollectionProperty(name="Users", type=UserItem)
-    user_index: bpy.props.IntProperty()  # index in the list of users
-
-    display_advanced_options: bpy.props.BoolProperty(default=False)
-    display_developer_options: bpy.props.BoolProperty(default=False)
-    display_rooms: bpy.props.BoolProperty(default=True)
-    display_rooms_details: bpy.props.BoolProperty(default=False, name="Display Rooms Details")
-    display_users: bpy.props.BoolProperty(default=True)
-
-    display_users_filter: bpy.props.EnumProperty(
-        name="Display Users Filter",
-        description="Display users filter",
-        items=[
-            ("all", "All", "", 0),
-            ("current_room", "Current Room", "", 1),
-            ("selected_room", "Selected Room", "", 2),
-            ("no_room", "No Room", "", 3),
-        ],
-        default="all",
-    )
-    display_users_details: bpy.props.BoolProperty(default=False, name="Display Users Details")
-
-    display_snapping_options: bpy.props.BoolProperty(default=False)
-    snap_view_user_enabled: bpy.props.BoolProperty(default=False)
-
-    def update_user_to_unique_index_dict(self):
-        global user_to_unique_index
-        global next_user_unique_index
-        for user in self.users:
-            if user.ip_port not in user_to_unique_index:
-                user_to_unique_index[user.ip_port] = next_user_unique_index
-                next_user_unique_index += 1
-
-    def get_snap_view_users(self, context):
-        global user_to_unique_index
-
-        self.update_user_to_unique_index_dict()
-
-        # According to documentation:
-        # There is a known bug with using a callback, Python must keep a reference
-        # to the strings returned by the callback or Blender will misbehave or even crash.
-        self.snap_view_users_values = [
-            (user.ip_port, f"{user.name} ({user.ip_port})", "", user_to_unique_index[user.ip_port])
-            for index, user in enumerate(self.users)
-            if user.room == share_data.current_room  # and not user.is_me
-        ]
-        return self.snap_view_users_values
-
-    def get_snap_view_area(self, context):
-        # quick patch, see below todo for explanation
-        self.snap_view_users_values = [("id", "", "")]
-        return self.snap_view_users_values
-
-        if self.snap_view_user == "":
-            self.snap_view_areas_values = []
-            return self.snap_view_areas_values
-
-        scene = context.scene
-
-        for user in self.users:
-            if user.ip_port == self.snap_view_user:
-                self.snap_view_areas_values = [
-                    (f"window_{index}", f"Window {index} (Scene {window.scene})", "", index)
-                    for index, window in enumerate(user.windows)
-                    if window.scene == scene.name_full
-                ]
-                return self.snap_view_areas_values
-
-        # According to documentation:
-        # There is a known bug with using a callback, Python must keep a reference
-        # to the strings returned by the callback or Blender will misbehave or even crash.
-        self.snap_view_areas_values = []
-        return self.snap_view_areas_values
-
-    snap_view_user: bpy.props.EnumProperty(
-        items=get_snap_view_users, name="Snap View User",
-    )
-    # todo: this cannot work, it depends on the 3d view panel
-    # todo: so it should be a property of bpy.types.SpaceView3D probably.
-    snap_view_area: bpy.props.EnumProperty(items=get_snap_view_area, name="Snap View 3D Area")
-
-    snap_time_user_enabled: bpy.props.BoolProperty(default=False)
-    snap_time_user: bpy.props.EnumProperty(
-        items=get_snap_view_users, name="Snap Time User",
-    )
-
-    snap_3d_cursor_user_enabled: bpy.props.BoolProperty(default=False)
-    snap_3d_cursor_user: bpy.props.EnumProperty(
-        items=get_snap_view_users, name="Snap 3D Cursor User",
-    )
-
-    display_advanced_room_control: bpy.props.BoolProperty(default=False)
-    upload_room_name: bpy.props.StringProperty(default=f"{os.getlogin()}_uploaded_room", name="Upload Room Name")
-    upload_room_filepath: bpy.props.StringProperty(default=f"", subtype="FILE_PATH", name="Upload Room File")
-
-
-def get_mixer_props() -> MixerProperties:
-    return bpy.context.window_manager.mixer
-
-
-def get_mixer_prefs() -> MixerPreferences:
-    return bpy.context.preferences.addons[__package__].preferences
-
-
-classes = (
-    RoomItem,
-    UserWindowItem,
-    UserSceneItem,
-    UserItem,
-    MixerProperties,
-    MixerPreferences,
-)
+classes = (MixerPreferences,)
 
 register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)
 
 
 def register():
     register_factory()
-    bpy.types.WindowManager.mixer = bpy.props.PointerProperty(type=MixerProperties)
 
 
 def unregister():
-    del bpy.types.WindowManager.mixer
     unregister_factory()

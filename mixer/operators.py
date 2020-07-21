@@ -21,7 +21,7 @@ from mixer.blender_client.camera import send_camera
 from mixer.blender_client.light import send_light
 from mixer import clientBlender
 from mixer import ui
-from mixer.data import get_mixer_props, get_mixer_prefs
+from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context

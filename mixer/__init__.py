@@ -55,10 +55,36 @@ class Formatter(logging.Formatter):
         return s
 
 
+def get_logs_directory():
+    def _get_logs_directory():
+        import tempfile
+
+        if "MIXER_USER_LOGS_DIR" in os.environ:
+            username = os.getlogin()
+            base_shared_path = Path(os.environ["MIXER_USER_LOGS_DIR"])
+            if os.path.exists(base_shared_path):
+                return os.path.join(os.fspath(base_shared_path), username)
+            logger.error(
+                f"MIXER_USER_LOGS_DIR env var set to {base_shared_path}, but directory does not exists. Falling back to default location."
+            )
+        return os.path.join(os.fspath(tempfile.gettempdir()), "mixer")
+
+    dir = _get_logs_directory()
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    return dir
+
+
+def get_log_file():
+    from share_data import share_data
+
+    return os.path.join(get_logs_directory(), f"mixer_logs_{share_data.runId}.log")
+
+
 def register():
     from mixer import ui
     from mixer import operators
-    from mixer import data
+    from mixer import bl_properties, bl_preferences
     from mixer.blender_data import debug_addon
 
     if len(logger.handlers) == 0:
@@ -68,7 +94,7 @@ def register():
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-        handler = logging.FileHandler(data.get_log_file())
+        handler = logging.FileHandler(get_log_file())
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
@@ -79,22 +105,23 @@ def register():
 
     operators.register()
     ui.register()
-    data.register()
+    bl_properties.register()
+    bl_preferences.register()
     debug_addon.register()
-
     atexit.register(cleanup)
 
 
 def unregister():
     from mixer import ui
     from mixer import operators
-    from mixer import data
+    from mixer import bl_properties, bl_preferences
     from mixer.blender_data import debug_addon
 
-    operators.unregister()
-    ui.unregister()
-    data.unregister()
-    debug_addon.unregister()
-
     cleanup()
+
     atexit.unregister(cleanup)
+    debug_addon.unregister()
+    bl_preferences.register()
+    bl_properties.register()
+    ui.unregister()
+    operators.unregister()
