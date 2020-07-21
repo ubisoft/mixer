@@ -9,6 +9,7 @@ from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.bl_properties import UserItem
 from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientMetadata
+from mixer.blender_data.debug_addon import DebugDataPanel
 
 if TYPE_CHECKING:
     from mixer.bl_preferences import MixerPreferences
@@ -170,6 +171,8 @@ def draw_developer_settings_ui(layout: bpy.types.UILayout):
 
 
 def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Context):
+    mixer_prefs.layout.prop(mixer_prefs, "category")
+
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Connection Settings")
     draw_user_settings_ui(layout.row())
@@ -358,14 +361,36 @@ class VRtistSettingsPanel(bpy.types.Panel):
         layout.operator(operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
 
 
+panels = (
+    MixerSettingsPanel,
+    VRtistSettingsPanel,
+    DebugDataPanel,
+)
+
+
+def update_panels_category(self, context):
+    mixer_prefs = get_mixer_prefs()
+    try:
+        for panel in panels:
+            if "bl_rna" in panel.__dict__:
+                bpy.utils.unregister_class(panel)
+
+        for panel in panels:
+            panel.bl_category = mixer_prefs.category
+            bpy.utils.register_class(panel)
+
+    except Exception as e:
+        logger.error(f"Updating Panel category has failed {e}")
+
+
 classes = (ROOM_UL_ItemRenderer, MixerSettingsPanel, VRtistSettingsPanel)
+register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)
 
 
 def register():
-    for _ in classes:
-        bpy.utils.register_class(_)
+    register_factory()
+    update_panels_category(None, None)
 
 
 def unregister():
-    for _ in classes:
-        bpy.utils.unregister_class(_)
+    unregister_factory()

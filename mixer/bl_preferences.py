@@ -8,7 +8,7 @@ from mixer.broadcaster import common
 from mixer.broadcaster.common import ClientMetadata
 from mixer.share_data import share_data
 from mixer.stats import get_stats_directory
-from mixer.ui import draw_preferences_ui
+from mixer.ui import draw_preferences_ui, update_panels_category
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,13 @@ class MixerPreferences(bpy.types.AddonPreferences):
         client = share_data.client
         if client and client.is_connected():
             client.set_client_metadata({ClientMetadata.USERCOLOR: list(self.color)})
+
+    category: bpy.props.StringProperty(
+        name="Tab Category",
+        description="Choose a name for the category of the panel.",
+        default=os.environ.get("MIXER_CATEGORY", "Mixer"),
+        update=update_panels_category,
+    )
 
     # Allows to change behavior according to environment: production or development
     env: bpy.props.EnumProperty(

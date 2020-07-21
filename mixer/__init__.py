@@ -103,11 +103,13 @@ def register():
         global _disable_fault_handler
         _disable_fault_handler = True
 
-    bl_properties.register()
+    debug_addon.register()
+
     bl_preferences.register()
+    bl_properties.register()
     ui.register()
     operators.register()
-    debug_addon.register()
+
     atexit.register(cleanup)
 
 
@@ -120,8 +122,10 @@ def unregister():
     cleanup()
 
     atexit.unregister(cleanup)
-    debug_addon.unregister()
+
     operators.unregister()
     ui.unregister()
-    bl_preferences.unregister()
     bl_properties.unregister()
+    bl_preferences.unregister()
+
+    debug_addon.unregister()
