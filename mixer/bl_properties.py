@@ -93,12 +93,6 @@ next_user_unique_index = 0
 
 
 class MixerProperties(bpy.types.PropertyGroup):
-    commands_send_interval: bpy.props.FloatProperty(
-        name="Command Send Interval",
-        description="Debug tool to specify a number of seconds to wait between each command emission toward the server.",
-        default=0,
-    )
-
     rooms: bpy.props.CollectionProperty(name="Rooms", type=RoomItem)
     room_index: bpy.props.IntProperty()  # index in the list of rooms
 

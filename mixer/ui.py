@@ -1,12 +1,17 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import bpy
 import os
+import logging
 from mixer import operators
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.bl_properties import UserItem
 from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientMetadata
 
-import logging
+if TYPE_CHECKING:
+    from mixer.bl_preferences import MixerPreferences
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +130,65 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
             split.prop(item, "mega_byte_size", text="")
 
 
+def draw_user_settings_ui(layout: bpy.types.UILayout):
+    mixer_prefs = get_mixer_prefs()
+    layout.prop(mixer_prefs, "user")
+    layout.prop(mixer_prefs, "color", text="")
+
+
+def draw_connection_settings_ui(layout: bpy.types.UILayout):
+    mixer_prefs = get_mixer_prefs()
+    layout.prop(mixer_prefs, "host")
+    layout.prop(mixer_prefs, "port")
+
+
+def draw_advanced_settings_ui(layout: bpy.types.UILayout):
+    mixer_prefs = get_mixer_prefs()
+    layout.prop(mixer_prefs, "log_level")
+    layout.prop(mixer_prefs, "env")
+    layout.prop(mixer_prefs, "show_server_console")
+
+
+def draw_developer_settings_ui(layout: bpy.types.UILayout):
+    mixer_prefs = get_mixer_prefs()
+    layout.prop(mixer_prefs, "statistics_directory", text="Stats Directory")
+    layout.operator(operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
+    layout.operator(operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
+    layout.prop(mixer_prefs, "auto_save_statistics", text="Auto Save Statistics")
+    layout.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
+    layout.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
+    layout.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
+    layout.prop(mixer_prefs, "commands_send_interval")
+
+    box = layout.box().column()
+    box.label(text="Gizmos")
+    box.prop(mixer_prefs, "display_own_gizmos")
+    box.prop(mixer_prefs, "display_frustums_gizmos")
+    box.prop(mixer_prefs, "display_names_gizmos")
+    box.prop(mixer_prefs, "display_ids_gizmos")
+    box.prop(mixer_prefs, "display_selections_gizmos")
+
+
+def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Context):
+    layout = mixer_prefs.layout.box().column()
+    layout.label(text="Connection Settings")
+    draw_user_settings_ui(layout.row())
+    draw_connection_settings_ui(layout.row())
+
+    layout = mixer_prefs.layout.box().column()
+    layout.label(text="Room Settings")
+    layout.prop(mixer_prefs, "room", text="Default Room Name")
+    layout.prop(mixer_prefs, "experimental_sync")
+
+    layout = mixer_prefs.layout.box().column()
+    layout.label(text="Advanced Settings")
+    draw_advanced_settings_ui(layout)
+
+    layout = mixer_prefs.layout.box().column()
+    layout.label(text="Developer Settings")
+    draw_developer_settings_ui(layout)
+
+
 class MixerSettingsPanel(bpy.types.Panel):
     bl_label = "Mixer"
     bl_idname = "MIXER_PT_mixer_settings"
@@ -206,14 +270,10 @@ class MixerSettingsPanel(bpy.types.Panel):
 
         mixer_prefs = get_mixer_prefs()
 
-        row = layout.row()
-        row.prop(mixer_prefs, "user", text="User")
-        row.prop(mixer_prefs, "color", text="")
+        draw_user_settings_ui(layout.row())
 
         if not self.connected():
-            row = layout.row()
-            row.prop(mixer_prefs, "host", text="Host")
-            row.prop(mixer_prefs, "port", text="Port")
+            draw_connection_settings_ui(layout.row())
             layout.operator(operators.ConnectOperator.bl_idname, text="Connect")
         else:
             layout.label(
@@ -272,36 +332,14 @@ class MixerSettingsPanel(bpy.types.Panel):
 
     def draw_advanced_options(self, layout):
         mixer_props = get_mixer_props()
-        mixer_prefs = get_mixer_prefs()
         collapsable_panel(layout, mixer_props, "display_advanced_options", text="Advanced options")
         if mixer_props.display_advanced_options:
-            col = layout.box().column()
-            col.prop(mixer_prefs, "log_level", text="Log Level")
-            col.prop(mixer_prefs, "env", text="Execution Environment")
-            if not self.connected():
-                col.prop(mixer_prefs, "show_server_console", text="Show server console (self hosting only)")
+            draw_advanced_settings_ui(layout.box().column())
 
     def draw_developer_options(self, layout):
         mixer_props = get_mixer_props()
-        mixer_prefs = get_mixer_prefs()
         if collapsable_panel(layout, mixer_props, "display_developer_options", text="Developer options"):
-            col = layout.box().column()
-            col.prop(mixer_prefs, "statistics_directory", text="Stats Directory")
-            col.operator(operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
-            col.operator(operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
-            col.prop(mixer_prefs, "auto_save_statistics", text="Auto Save Statistics")
-            col.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
-            col.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
-            col.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
-            col.prop(mixer_props, "commands_send_interval")
-
-            box = col.box().column()
-            box.label(text="Gizmos")
-            box.prop(mixer_prefs, "display_own_gizmos")
-            box.prop(mixer_prefs, "display_frustums_gizmos")
-            box.prop(mixer_prefs, "display_names_gizmos")
-            box.prop(mixer_prefs, "display_ids_gizmos")
-            box.prop(mixer_prefs, "display_selections_gizmos")
+            draw_developer_settings_ui(layout.box().column())
 
 
 class VRtistSettingsPanel(bpy.types.Panel):

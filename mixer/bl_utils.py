@@ -1,6 +1,6 @@
 from __future__ import annotations
-import bpy
 from typing import TYPE_CHECKING
+import bpy
 
 if TYPE_CHECKING:
     from mixer.bl_properties import MixerProperties

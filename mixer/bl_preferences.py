@@ -8,6 +8,7 @@ from mixer.broadcaster import common
 from mixer.broadcaster.common import ClientMetadata
 from mixer.share_data import share_data
 from mixer.stats import get_stats_directory
+from mixer.ui import draw_preferences_ui
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
         name="Experimental sync", default=os.environ.get("MIXER_EXPERIMENTAL_SYNC") is not None
     )
 
-    show_server_console: bpy.props.BoolProperty(default=False)
+    show_server_console: bpy.props.BoolProperty(name="Show Server Console", default=False)
 
     VRtist: bpy.props.StringProperty(
         name="VRtist", default=os.environ.get("VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe"), subtype="FILE_PATH"
@@ -103,9 +104,14 @@ class MixerPreferences(bpy.types.AddonPreferences):
     display_ids_gizmos: bpy.props.BoolProperty(default=False, name="Display ID Gizmos")
     display_selections_gizmos: bpy.props.BoolProperty(default=True, name="Display Selection Gizmos")
 
+    commands_send_interval: bpy.props.FloatProperty(
+        name="Command Send Interval",
+        description="Debug tool to specify a number of seconds to wait between each command emission toward the server.",
+        default=0,
+    )
+
     def draw(self, context):
-        layout = self.layout
-        layout.label(text="This is a preferences view for our add-on")
+        draw_preferences_ui(self, context)
 
 
 classes = (MixerPreferences,)
