@@ -1,7 +1,10 @@
+from __future__ import annotations
 import bpy
+from typing import TYPE_CHECKING
 
-from mixer.bl_properties import MixerProperties
-from mixer.bl_preferences import MixerPreferences
+if TYPE_CHECKING:
+    from mixer.bl_properties import MixerProperties
+    from mixer.bl_preferences import MixerPreferences
 
 
 def get_mixer_props() -> MixerProperties:
