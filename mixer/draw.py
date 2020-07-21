@@ -1,5 +1,5 @@
 from mixer.share_data import share_data
-from mixer.data import get_mixer_prefs
+from mixer.bl_utils import get_mixer_prefs
 from mixer.broadcaster.common import ClientMetadata
 
 import bpy

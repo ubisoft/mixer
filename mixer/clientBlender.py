@@ -8,8 +8,7 @@ import bpy
 from mathutils import Matrix, Quaternion
 import mixer
 from mixer import ui
-from mixer import data
-from mixer.data import get_mixer_props
+from mixer.bl_utils import get_mixer_prefs
 from mixer.share_data import share_data
 from mixer.broadcaster import common
 from mixer.broadcaster.common import ClientMetadata
@@ -376,7 +375,7 @@ class ClientBlender(Client):
         binary_buffer = common.encode_string(path) + common.encode_string(mesh_name)
 
         binary_buffer += mesh_api.encode_mesh(
-            obj, data.get_mixer_prefs().send_base_meshes, data.get_mixer_prefs().send_baked_meshes
+            obj, get_mixer_prefs().send_base_meshes, get_mixer_prefs().send_baked_meshes
         )
 
         # For now include material slots in the same message, but maybe it should be a separated message
@@ -624,7 +623,7 @@ class ClientBlender(Client):
         # or it needs to be guaranteed by the server
         group_count = 0
         while True:
-            self.fetch_commands(commands_send_interval=get_mixer_props().commands_send_interval)
+            self.fetch_commands(commands_send_interval=get_mixer_prefs().commands_send_interval)
 
             set_dirty = True
             # Process all received commands
@@ -670,8 +669,7 @@ class ClientBlender(Client):
                             try:
                                 assert share_data.current_room is not None
                                 self.set_room_metadata(
-                                    share_data.current_room,
-                                    {"experimental_sync": data.get_mixer_prefs().experimental_sync},
+                                    share_data.current_room, {"experimental_sync": get_mixer_prefs().experimental_sync},
                                 )
                                 self.send_scene_content()
                             except Exception as e:
