@@ -25,15 +25,15 @@ def create_room():
 
 
 def set_log_level(log_level):
-    import mixer
+    from mixer.bl_preferences import set_log_level
 
-    mixer.bl_preferences.set_log_level(None, log_level)
+    set_log_level(None, log_level)
 
 
 def join_room(room_name: str = "mixer_unittest"):
-    import mixer
+    from mixer.operators import join_room
 
-    mixer.operators.join_room(room_name)
+    join_room(room_name)
 
 
 def keep_room_open(room_name: str = "mixer_unittest", keep_open: bool = False):

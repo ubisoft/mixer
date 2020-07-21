@@ -623,7 +623,7 @@ class ClientBlender(Client):
         # or it needs to be guaranteed by the server
         group_count = 0
         while True:
-            self.fetch_commands(commands_send_interval=get_mixer_props().commands_send_interval)
+            self.fetch_commands(commands_send_interval=get_mixer_prefs().commands_send_interval)
 
             set_dirty = True
             # Process all received commands
