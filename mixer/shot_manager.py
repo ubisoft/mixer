@@ -127,9 +127,6 @@ def send_frame():
 
 
 def get_state():
-    if not hasattr(bpy.context.scene, "UAS_shot_manager_props"):
-        return
-
     sm_props = shot_manager.get_shot_manager(bpy.context.scene)
     if sm_props is None:
         return
