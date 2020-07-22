@@ -1,3 +1,9 @@
+# 0.12.0 (2020-07-22)
+
+## Features
+
+- Add preferences UI (#63)
+
 # 0.11.0 (2020-07-17)
 
 ## Features
