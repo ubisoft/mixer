@@ -214,6 +214,7 @@ class Room:
         self.metadata = {}  # metadata are used between clients, but not by the server
         self._server: "Server" = server
         self.commands_mutex: threading.RLock = threading.RLock()
+        self.join_flag = False
 
     def client_count(self):
         return len(self._connections)
@@ -221,17 +222,9 @@ class Room:
     def command_count(self):
         return len(self.commands)
 
-    def add_client(self, connection: Connection, first_client: bool):
+    def add_client(self, connection: Connection):
         logger.info(f"Add Client {connection.address} to Room {self.name}")
         self._connections.append(connection)
-        connection.room = self
-        if first_client:
-            connection.add_command(common.Command(common.MessageType.CONTENT))
-        else:
-            connection.add_command(common.Command(common.MessageType.CLEAR_CONTENT))
-
-            for command in self.commands:
-                connection.add_command(command)
 
     def remove_client(self, connection: Connection):
         logger.info("Remove Client % s from Room % s", connection.address, self.name)
@@ -307,16 +300,6 @@ class Server:
     def get_room(self, room_name: str) -> Room:
         return self._rooms.get(room_name)
 
-    def add_room(self, room_name: str) -> Room:
-        with _mutex:
-            if room_name in self._rooms:
-                raise ValueError(f"add_room: room with name {room_name} already exists")
-            room = Room(self, room_name)
-            self._rooms[room_name] = room
-            logger.info(f"Room {room_name} added")
-            self.broadcast_room_list()
-            return room
-
     def delete_room(self, room_name: str):
         with _mutex:
             if room_name not in self._rooms:
@@ -325,28 +308,48 @@ class Server:
             if self._rooms[room_name].client_count() > 0:
                 logger.warning("Room %s is not empty.", room_name)
                 return
+            if self._rooms[room_name].join_flag:
+                logger.warning("Room %s is being joined.", room_name)
+                return
             del self._rooms[room_name]
             logger.info(f"Room {room_name} deleted")
 
             self.broadcast_room_list()
 
     def join_room(self, connection: Connection, room_name: str):
-        with _mutex:
-            assert connection.room is None
-            room = self.get_room(room_name)
-            first_client = False
-            if room is None:
-                logger.info(f"Room {room_name} does not exist. Creating it.")
-                room = self.add_room(room_name)
-                first_client = True
+        assert connection.room is None
 
+        with _mutex:
             peer = connection.address
             if peer in self._unjoined_connections:
                 logger.debug("Reusing connection %s", peer)
                 del self._unjoined_connections[peer]
 
-            room.add_client(connection, first_client)
-            self.broadcast_user_list()
+            room = self.get_room(room_name)
+            if room:
+                room.join_flag = True  # Room cannot be deleted from here
+
+        if room is None:
+            logger.info(f"Room {room_name} does not exist. Creating it.")
+            room = Room(self, room_name)
+            room.add_client(connection)
+            connection.room = room
+            connection.add_command(common.Command(common.MessageType.CONTENT))
+
+            with _mutex:
+                self._rooms[room_name] = room
+                logger.info(f"Room {room_name} added")
+        else:
+            connection.room = room
+            connection.add_command(common.Command(common.MessageType.CLEAR_CONTENT))
+            with room.commands_mutex:
+                for command in room.commands:
+                    connection.add_command(command)
+            room.add_client(connection)
+            room.join_flag = False  # Room can be delete from here
+
+        self.broadcast_room_list()
+        self.broadcast_user_list()
 
     def leave_room(self, connection: Connection, room_name: str):
         with _mutex:
