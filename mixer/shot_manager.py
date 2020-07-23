@@ -28,6 +28,8 @@ def get_or_set_current_take(sm_props):
 
 def build_shot_manager_action(data):
     sm_props = shot_manager.get_shot_manager(bpy.context.scene)
+    if sm_props is None:
+        return
     get_or_set_current_take(sm_props)
 
     index = 0
