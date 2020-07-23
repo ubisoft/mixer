@@ -1,5 +1,4 @@
 from enum import IntEnum
-import threading
 import select
 import socket
 import struct
