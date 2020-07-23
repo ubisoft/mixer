@@ -68,10 +68,6 @@ class Connection:
     def send_client_ids(self):
         self.list_all_clients_flag = True
 
-    def get_list_all_clients_command(self):
-        client_ids = self._server.client_ids()
-        return common.Command(common.MessageType.LIST_ALL_CLIENTS, common.encode_json(client_ids))
-
     def get_unique_id(self) -> str:
         return f"{self.address[0]}:{self.address[1]}"
 
@@ -170,7 +166,7 @@ class Connection:
                     self.commands.task_done()
 
                 if self.list_all_clients_flag:
-                    common.write_message(self.socket, self.get_list_all_clients_command())
+                    common.write_message(self.socket, self._server.get_list_all_clients_command())
                     self.list_all_clients_flag = False
 
                 if self.list_rooms_flag:
@@ -258,11 +254,6 @@ class Server:
         self._rooms: Mapping[str, Room] = {}
         # Connections not joined to any room
         self._unjoined_connections: Mapping[Address, Connection] = {}
-        self._shutdown = False
-
-    def shutdown(self):
-        # mostly for tests
-        self._shutdown = True
 
     def client_count(self):
         """
@@ -416,6 +407,9 @@ class Server:
                 }
             return common.Command(common.MessageType.LIST_ROOMS, common.encode_json(result_dict))
 
+    def get_list_all_clients_command(self) -> common.Command:
+        return common.Command(common.MessageType.LIST_ALL_CLIENTS, common.encode_json(self.client_ids()))
+
     def handle_client_disconnect(self, connection: Connection):
         if connection.room is not None:
             self.leave_room(connection, connection.room.name)
@@ -439,7 +433,7 @@ class Server:
         sock.listen(1000)
 
         logger.info("Listening on port % s", port)
-        while not self._shutdown:
+        while True:
             try:
                 timeout = 0.1  # Check for a new client every 10th of a second
                 readable, _, _ = select.select([sock], [], [], timeout)
@@ -454,7 +448,7 @@ class Server:
                     # Let the new client know the room and user lists
                     self.broadcast_user_list()
             except KeyboardInterrupt:
-                self.shutdown()
+                break
 
         logger.info("Shutting down server")
         SHUTDOWN = True
