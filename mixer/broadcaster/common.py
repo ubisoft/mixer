@@ -7,8 +7,6 @@ import json
 import logging
 
 
-mutex = threading.RLock()
-
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12800
 

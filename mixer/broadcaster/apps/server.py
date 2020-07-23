@@ -13,6 +13,8 @@ SHUTDOWN = False
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
 
+_mutex = threading.RLock()
+
 
 class Connection:
     """ Represent a connection with a client """
@@ -42,7 +44,7 @@ class Connection:
             self.send_error(error)
             return
 
-        with common.mutex:
+        with _mutex:
             self._server.join_room(self, room_name)
 
     def leave_room(self, room_name: str):
@@ -56,7 +58,7 @@ class Connection:
             self.send_error(error)
             return
 
-        with common.mutex:
+        with _mutex:
             self._server.leave_room(self, room_name)
 
     def clear_room(self, room_name: str):
@@ -70,7 +72,7 @@ class Connection:
             self.send_error(error)
             return
 
-        with common.mutex:
+        with _mutex:
             room = self._server.get_room(room_name)
             if room is not None:
                 room.clear()
@@ -86,7 +88,7 @@ class Connection:
     # todo check if still useful, and remove + refactor cli.py if not
     def send_list_room_clients(self, room_name: str = None, client_ids: Union[Mapping, List[Mapping]] = None):
         logger.debug("send_list_room_clients")
-        with common.mutex:
+        with _mutex:
             # ensure we use only one since each message ovewrites the previous one
             # on the client
             assert bool(room_name is not None) != bool(client_ids is not None)
@@ -114,7 +116,7 @@ class Connection:
         """
         Joined clients for all rooms
         """
-        with common.mutex:
+        with _mutex:
             clients = []
             for room in self._server.rooms():
                 clients.extend(room.client_ids())
@@ -145,7 +147,7 @@ class Connection:
     def send_error(self, s: str):
         logger.debug("Sending error %s", s)
         command = common.Command(common.MessageType.SEND_ERROR, common.encode_string(s))
-        with common.mutex:
+        with _mutex:
             self.commands.append(command)
 
     def on_client_disconnected(self):
@@ -224,7 +226,7 @@ class Connection:
 
             try:
                 if len(self.commands) > 0:
-                    with common.mutex:
+                    with _mutex:
                         for command in self.commands:
                             if command.type not in (common.MessageType.LIST_ALL_CLIENTS,):
                                 logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
@@ -335,7 +337,7 @@ class Room:
         self.byte_size += command.byte_size()
 
     def add_command(self, command, sender):
-        with common.mutex:
+        with _mutex:
             self.merge_commands(command)
             for connection in self._connections:
                 if connection != sender:
@@ -365,7 +367,7 @@ class Server:
         return (joined, unjoined)
 
     def remove_unjoined_client(self, connection: Connection):
-        with common.mutex:
+        with _mutex:
             logger.debug("Server : removing unjoined client %s", connection.address)
             del self._unjoined_connections[connection.address]
 
@@ -373,7 +375,7 @@ class Server:
         return self._rooms.get(room_name)
 
     def add_room(self, room_name: str) -> Room:
-        with common.mutex:
+        with _mutex:
             if room_name in self._rooms:
                 raise ValueError(f"add_room: room with name {room_name} already exists")
             room = Room(self, room_name)
@@ -383,7 +385,7 @@ class Server:
             return room
 
     def delete_room(self, room_name: str):
-        with common.mutex:
+        with _mutex:
             if room_name not in self._rooms:
                 logger.warning("Room %s does not exist.", room_name)
                 return
@@ -396,7 +398,7 @@ class Server:
             self.broadcast_room_list()
 
     def join_room(self, connection: Connection, room_name: str):
-        with common.mutex:
+        with _mutex:
             assert connection.room is None
             room = self.get_room(room_name)
             first_client = False
@@ -414,7 +416,7 @@ class Server:
             self.broadcast_user_list()
 
     def leave_room(self, connection: Connection, room_name: str):
-        with common.mutex:
+        with _mutex:
             room = self.get_room(room_name)
             if room is None:
                 raise ValueError(f"Room not found {room_name})")
@@ -433,7 +435,7 @@ class Server:
         return self._rooms.values()
 
     def client_ids(self) -> List[Mapping]:
-        with common.mutex:
+        with _mutex:
             # gather all client ids
             client_ids = {}
             for connection in self.all_connections():
@@ -441,7 +443,7 @@ class Server:
             return client_ids
 
     def all_connections(self) -> List[Connection]:
-        with common.mutex:
+        with _mutex:
             connections = list(self._unjoined_connections.values())
             for room in self._rooms.values():
                 connections += room._connections
@@ -454,17 +456,17 @@ class Server:
 
         This is called for every connection/join/client name change
         """
-        with common.mutex:
+        with _mutex:
             for connection in self.all_connections():
                 connection.send_client_ids()
 
     def broadcast_room_list(self):
-        with common.mutex:
+        with _mutex:
             for connection in self.all_connections():
                 connection.send_list_rooms()
 
     def set_room_metadata(self, room_name: str, metadata: dict):
-        with common.mutex:
+        with _mutex:
             if room_name not in self._rooms:
                 logger.warning("Room %s does not exist.", room_name)
                 return
@@ -473,7 +475,7 @@ class Server:
             self.broadcast_room_list()
 
     def set_room_keep_open(self, room_name: str, value: bool):
-        with common.mutex:
+        with _mutex:
             if room_name not in self._rooms:
                 logger.warning("Room %s does not exist.", room_name)
                 return
@@ -481,7 +483,7 @@ class Server:
             self.broadcast_room_list()
 
     def get_list_rooms_command(self) -> common.Command:
-        with common.mutex:
+        with _mutex:
             result_dict = {}
             for room, value in self._rooms.items():
                 result_dict[room] = {
