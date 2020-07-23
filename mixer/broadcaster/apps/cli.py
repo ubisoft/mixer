@@ -29,10 +29,6 @@ class CliClient(client.Client):
         command = common.Command(common.MessageType.DELETE_ROOM, name.encode())
         self.add_and_process_command(command)
 
-    def clear_room(self, name):
-        command = common.Command(common.MessageType.CLEAR_ROOM, name.encode())
-        self.add_and_process_command(command)
-
     def list_all_clients(self):
         command = common.Command(common.MessageType.LIST_ALL_CLIENTS)
         self.add_and_process_command(command, common.MessageType.LIST_ALL_CLIENTS)
@@ -73,15 +69,6 @@ def process_room_command(args):
                 client = CliClient(args)
                 for name in args.name:
                     client.delete_room(name)
-            else:
-                print("Expected one or more room names")
-
-        elif args.command == "clear":
-            count = len(args.name)
-            if count:
-                client = CliClient(args)
-                for name in args.name:
-                    client.clear_room(name)
             else:
                 print("Expected one or more room names")
     except ServerError as e:

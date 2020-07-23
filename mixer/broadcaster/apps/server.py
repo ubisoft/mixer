@@ -62,20 +62,6 @@ class Connection:
 
         self._server.leave_room(self, room_name)
 
-    def clear_room(self, room_name: str):
-        error = None
-        if self.room is None:
-            error = f"Received clear_room({room_name}) but no room is joined"
-        elif room_name != self.room.name:
-            error = f"Received clear_room({room_name}) but room {self.room.name} is joined instead"
-
-        if error:
-            logger.warning(error)
-            self.send_error(error)
-            return
-
-        self._server.clear_room(self, room_name)
-
     def send_list_rooms(self):
         self.list_rooms_flag = True
 
@@ -134,9 +120,6 @@ class Connection:
 
                 elif command.type == common.MessageType.DELETE_ROOM:
                     self._server.delete_room(command.data.decode())
-
-                elif command.type == common.MessageType.CLEAR_ROOM:
-                    self.clear_room(command.data.decode())
 
                 elif command.type == common.MessageType.SET_CLIENT_NAME:
                     self.set_client_metadata({common.ClientMetadata.USERNAME: command.data.decode()})
@@ -377,13 +360,6 @@ class Server:
             # Inform client that he has left the room
             connection.add_command(common.Command(common.MessageType.LEAVE_ROOM))
             self.broadcast_user_list()
-
-    def clear_room(self, connection: Connection, room_name: str):
-        with _mutex:
-            room = self._server.get_room(room_name)
-            if room is None:
-                raise ValueError(f"Room not found {room_name})")
-            room.clear()
 
     def rooms_names(self) -> List[str]:
         return self._rooms.keys()

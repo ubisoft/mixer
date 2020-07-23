@@ -20,7 +20,6 @@ class MessageType(IntEnum):
     CONTENT = 5
     CLEAR_CONTENT = 6
     DELETE_ROOM = 7
-    CLEAR_ROOM = 8
 
     # All joined clients for all rooms
     SET_CLIENT_NAME = 11
