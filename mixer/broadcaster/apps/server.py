@@ -94,9 +94,6 @@ class Connection:
         command = common.Command(common.MessageType.SEND_ERROR, common.encode_string(s))
         self.commands.append(command)
 
-    def on_client_disconnected(self):
-        self._server.broadcast_user_list()
-
     def run(self):
         global SHUTDOWN
         while not SHUTDOWN:
@@ -177,24 +174,10 @@ class Connection:
             except common.ClientDisconnectedException:
                 break
 
-        self.close()
-        self.on_client_disconnected()
+        self._server.handle_client_disconnect(self)
 
     def add_command(self, command):
         self.commands.append(command)
-
-    def close(self):
-        # called on disconnection
-        if self.room is not None:
-            self.room.remove_client(self)
-        else:
-            self._server.remove_unjoined_client(self)
-
-        try:
-            self.socket.close()
-        except Exception:
-            pass
-        logger.info("%s closed", self.address)
 
 
 class Room:
@@ -229,12 +212,6 @@ class Room:
     def remove_client(self, connection: Connection):
         logger.info("Remove Client % s from Room % s", connection.address, self.name)
         self._connections.remove(connection)
-        connection.room = None
-        if self.client_count() == 0 and not self.keep_open:
-            self._server.delete_room(self.name)
-            logger.info('No more clients in room "%s". Room deleted', self.name)
-        else:
-            logger.info(f"Connections left : {self.client_count()}.")
 
     def client_ids(self):
         if not self._connections:
@@ -354,6 +331,14 @@ class Server:
             if room is None:
                 raise ValueError(f"Room not found {room_name})")
             room.remove_client(connection)
+
+            connection.room = None
+            if room.client_count() == 0 and not room.keep_open:
+                self.delete_room(room.name)
+                logger.info('No more clients in room "%s". Room deleted', self.name)
+            else:
+                logger.info(f"Connections left : {room.client_count()}.")
+
             peer = connection.address
             assert peer not in self._unjoined_connections
             self._unjoined_connections[peer] = connection
@@ -426,6 +411,20 @@ class Server:
                     common.RoomMetadata.BYTE_SIZE: value.byte_size,
                 }
             return common.Command(common.MessageType.LIST_ROOMS, common.encode_json(result_dict))
+
+    def handle_client_disconnect(self, connection: Connection):
+        if connection.room is not None:
+            self.leave_room(connection, connection.room.name)
+
+        self.remove_unjoined_client(connection)
+
+        try:
+            connection.socket.close()
+        except Exception:
+            pass
+        logger.info("%s closed", connection.address)
+
+        self.broadcast_user_list()
 
     def run(self, port):
         global SHUTDOWN
