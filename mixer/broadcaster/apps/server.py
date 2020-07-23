@@ -5,6 +5,7 @@ import argparse
 import select
 import threading
 import socket
+import queue
 from typing import Tuple, List, Mapping, ValuesView, Optional
 
 from mixer.broadcaster.cli_utils import init_logging, add_logging_cli_args
@@ -25,8 +26,7 @@ class Connection:
         self.address = address
         self.metadata = {}  # metadata are used between clients, but not by the server
         self.room: Optional[Room] = None
-        # TODO use a Queue and drop the mutex ?
-        self.commands: List[common.Command] = []  # Pending commands to send to the client
+        self.commands: queue.Queue = queue.Queue()  # Pending commands to send to the client
         self._server = server
         # optimization to avoid too much messages when broadcasting client/room metadata updates
         self.list_all_clients_flag = False
@@ -92,7 +92,7 @@ class Connection:
     def send_error(self, s: str):
         logger.debug("Sending error %s", s)
         command = common.Command(common.MessageType.SEND_ERROR, common.encode_string(s))
-        self.commands.append(command)
+        self.commands.put(command)
 
     def run(self):
         global SHUTDOWN
@@ -157,13 +157,18 @@ class Connection:
                         )
 
             try:
-                if len(self.commands) > 0:
-                    with _mutex:
-                        for command in self.commands:
-                            if command.type not in (common.MessageType.LIST_ALL_CLIENTS,):
-                                logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
-                            common.write_message(self.socket, command)
-                        self.commands = []
+                while True:
+                    try:
+                        command = self.commands.get_nowait()
+                    except queue.Empty:
+                        break
+
+                    if command.type not in (common.MessageType.LIST_ALL_CLIENTS,):
+                        logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
+                    common.write_message(self.socket, command)
+
+                    self.commands.task_done()
+
                 if self.list_all_clients_flag:
                     common.write_message(self.socket, self.get_list_all_clients_command())
                     self.list_all_clients_flag = False
@@ -177,7 +182,7 @@ class Connection:
         self._server.handle_client_disconnect(self)
 
     def add_command(self, command):
-        self.commands.append(command)
+        self.commands.put(command)
 
 
 class Room:
@@ -216,7 +221,12 @@ class Room:
     def client_ids(self):
         return [c.client_id() for c in self._connections]
 
-    def add_command(self, command, sender):
+    def broadcast_commands(self, connection: Connection):
+        with self.commands_mutex:
+            for command in self.commands:
+                connection.add_command(command)
+
+    def add_command(self, command, sender: Connection):
         def merge_command():
             """
             Add the command to the room list, possibly merge with the previous command.
@@ -280,6 +290,7 @@ class Server:
             if self._rooms[room_name].join_flag:
                 logger.warning("Room %s is being joined.", room_name)
                 return
+
             del self._rooms[room_name]
             logger.info(f"Room {room_name} deleted")
 
@@ -311,9 +322,7 @@ class Server:
         else:
             connection.room = room
             connection.add_command(common.Command(common.MessageType.CLEAR_CONTENT))
-            with room.commands_mutex:
-                for command in room.commands:
-                    connection.add_command(command)
+            room.broadcast_commands(connection)
             room.add_client(connection)
             room.join_flag = False  # Room can be delete from here
 
@@ -329,10 +338,10 @@ class Server:
 
             connection.room = None
             if room.client_count() == 0 and not room.keep_open:
+                logger.info('No more clients in room "%s" and not keep_open', room.name)
                 self.delete_room(room.name)
-                logger.info('No more clients in room "%s". Room deleted', self.name)
             else:
-                logger.info(f"Connections left : {room.client_count()}.")
+                logger.info(f"Connections left in room {room.name}: {room.client_count()}.")
 
             peer = connection.address
             assert peer not in self._unjoined_connections
