@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import logging
 import argparse
 import select
 import threading
 import socket
-from typing import Tuple, List, Mapping, Union, ValuesView
+from typing import Tuple, List, Mapping, Union, ValuesView, Optional
 
 import mixer.broadcaster.cli_utils as cli_utils
 import mixer.broadcaster.common as common
@@ -19,13 +21,13 @@ _mutex = threading.RLock()
 class Connection:
     """ Represent a connection with a client """
 
-    def __init__(self, server: "Server", socket, address):
+    def __init__(self, server: Server, socket, address):
         self.socket = socket
         self.address = address
         self.metadata = {}  # metadata are used between clients, but not by the server
-        self.room: "Room" = None
+        self.room: Optional[Room] = None
         # TODO use a Queue and drop the mutex ?
-        self.commands = []  # Pending commands to send to the client
+        self.commands: List[common.Command] = []  # Pending commands to send to the client
         self._server = server
         # optimization to avoid too much messages when broadcasting client/room metadata updates
         self.list_all_clients_flag = False
@@ -39,13 +41,13 @@ class Connection:
         error = None
         if self.room is not None:
             error = f"Received join_room({room_name}) but room {self.room.name} is already joined"
+
         if error:
             logger.warning(error)
             self.send_error(error)
             return
 
-        with _mutex:
-            self._server.join_room(self, room_name)
+        self._server.join_room(self, room_name)
 
     def leave_room(self, room_name: str):
         error = None
@@ -53,13 +55,13 @@ class Connection:
             error = f"Received leave_room({room_name}) but no room is joined"
         elif room_name != self.room.name:
             error = f"Received leave_room({room_name}) but room {self.room.name} is joined instead"
+
         if error:
             logger.warning(error)
             self.send_error(error)
             return
 
-        with _mutex:
-            self._server.leave_room(self, room_name)
+        self._server.leave_room(self, room_name)
 
     def clear_room(self, room_name: str):
         error = None
@@ -67,23 +69,19 @@ class Connection:
             error = f"Received clear_room({room_name}) but no room is joined"
         elif room_name != self.room.name:
             error = f"Received clear_room({room_name}) but room {self.room.name} is joined instead"
+
         if error:
             logger.warning(error)
             self.send_error(error)
             return
 
-        with _mutex:
-            room = self._server.get_room(room_name)
-            if room is not None:
-                room.clear()
+        self._server.clear_room(self, room_name)
 
     def send_list_rooms(self):
         self.list_rooms_flag = True
-        return
 
     def send_client_ids(self):
         self.list_all_clients_flag = True
-        return
 
     # todo check if still useful, and remove + refactor cli.py if not
     def send_list_room_clients(self, room_name: str = None, client_ids: Union[Mapping, List[Mapping]] = None):
@@ -147,8 +145,7 @@ class Connection:
     def send_error(self, s: str):
         logger.debug("Sending error %s", s)
         command = common.Command(common.MessageType.SEND_ERROR, common.encode_string(s))
-        with _mutex:
-            self.commands.append(command)
+        self.commands.append(command)
 
     def on_client_disconnected(self):
         self._server.broadcast_user_list()
@@ -270,7 +267,7 @@ class Room:
     - dispatch added commands to already clients already in the room
     """
 
-    def __init__(self, server: "Server", room_name: str):
+    def __init__(self, server: Server, room_name: str):
         self.name = room_name
         self.keep_open = False  # Should the room remain open when no more clients are inside ?
         self._connections: List["Connection"] = []
@@ -278,6 +275,7 @@ class Room:
         self.byte_size = 0
         self.metadata = {}  # metadata are used between clients, but not by the server
         self._server: "Server" = server
+        self.commands_mutex: threading.RLock = threading.RLock()
 
     def client_count(self):
         return len(self._connections)
@@ -297,20 +295,6 @@ class Room:
             for command in self.commands:
                 connection.add_command(command)
 
-    def client_ids(self):
-        if not self._connections:
-            return None
-        return [c.client_id() for c in self._connections]
-
-    def close(self):
-        command = common.Command(common.MessageType.LEAVE_ROOM, common.encode_string(self.name))
-        self.add_command(command, None)
-        self._connections = []
-        self._server.delete_room(self.name)
-
-    def clear(self):
-        self.commands = []
-
     def remove_client(self, connection: Connection):
         logger.info("Remove Client % s from Room % s", connection.address, self.name)
         self._connections.remove(connection)
@@ -321,24 +305,35 @@ class Room:
         else:
             logger.info(f"Connections left : {self.client_count()}.")
 
-    def merge_commands(self, command):
-        command_type = command.type
-        if command_type.value > common.MessageType.OPTIMIZED_COMMANDS.value:
-            command_path = common.decode_string(command.data, 0)[0]
-            if len(self.commands) > 0:
-                stored_command = self.commands[-1]
-                if (
-                    command_type == stored_command.type
-                    and command_path == common.decode_string(stored_command.data, 0)[0]
-                ):
-                    self.commands.pop()
-                    self.byte_size -= stored_command.byte_size()
-        self.commands.append(command)
-        self.byte_size += command.byte_size()
+    def client_ids(self):
+        if not self._connections:
+            return None
+        return [c.client_id() for c in self._connections]
+
+    def clear(self):
+        self.commands = []
 
     def add_command(self, command, sender):
-        with _mutex:
-            self.merge_commands(command)
+        def merge_command():
+            """
+            Add the command to the room list, possibly merge with the previous command.
+            """
+            command_type = command.type
+            if command_type.value > common.MessageType.OPTIMIZED_COMMANDS.value:
+                command_path = common.decode_string(command.data, 0)[0]
+                if len(self.commands) > 0:
+                    stored_command = self.commands[-1]
+                    if (
+                        command_type == stored_command.type
+                        and command_path == common.decode_string(stored_command.data, 0)[0]
+                    ):
+                        self.commands.pop()
+                        self.byte_size -= stored_command.byte_size()
+            self.commands.append(command)
+            self.byte_size += command.byte_size()
+
+        with self.commands_mutex:
+            merge_command()
             for connection in self._connections:
                 if connection != sender:
                     connection.add_command(command)
@@ -427,6 +422,13 @@ class Server:
             # Inform client that he has left the room
             connection.add_command(common.Command(common.MessageType.LEAVE_ROOM))
             self.broadcast_user_list()
+
+    def clear_room(self, connection: Connection, room_name: str):
+        with _mutex:
+            room = self._server.get_room(room_name)
+            if room is None:
+                raise ValueError(f"Room not found {room_name})")
+            room.clear()
 
     def rooms_names(self) -> List[str]:
         return self._rooms.keys()
