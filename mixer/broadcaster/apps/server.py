@@ -191,7 +191,7 @@ class Room:
     def __init__(self, server: Server, room_name: str):
         self.name = room_name
         self.keep_open = False  # Should the room remain open when no more clients are inside ?
-        self._connections: List["Connection"] = []
+        self._connections: List[Connection] = []
         self.commands = []
         self.byte_size = 0
         self.metadata = {}  # metadata are used between clients, but not by the server
@@ -214,12 +214,7 @@ class Room:
         self._connections.remove(connection)
 
     def client_ids(self):
-        if not self._connections:
-            return None
         return [c.client_id() for c in self._connections]
-
-    def clear(self):
-        self.commands = []
 
     def add_command(self, command, sender):
         def merge_command():
