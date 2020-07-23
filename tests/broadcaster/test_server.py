@@ -1,7 +1,6 @@
 import unittest
 import threading
 import time
-import logging
 
 from mixer.broadcaster.apps.server import Server
 from mixer.broadcaster.client import Client
