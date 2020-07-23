@@ -5,12 +5,11 @@ import argparse
 import select
 import threading
 import socket
-from typing import Tuple, List, Mapping, Union, ValuesView, Optional
+from typing import Tuple, List, Mapping, ValuesView, Optional
 
 import mixer.broadcaster.cli_utils as cli_utils
 import mixer.broadcaster.common as common
 
-BINDING_HOST = ""
 SHUTDOWN = False
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
@@ -455,7 +454,8 @@ class Server:
     def run(self, port):
         global SHUTDOWN
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind((BINDING_HOST, port))
+        binding_host = ""
+        sock.bind((binding_host, port))
         sock.setblocking(0)
         sock.listen(1000)
 
