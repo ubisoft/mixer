@@ -6,9 +6,12 @@ from mixer.shot_manager_data import Shot
 
 import mixer.broadcaster.common as common
 
-from shotmanager.api import shot_manager
-from shotmanager.api import shot
-from shotmanager.api import take
+try:
+    from shotmanager.api import shot_manager
+    from shotmanager.api import shot
+    from shotmanager.api import take
+except Exception:
+    pass
 
 
 class SMAction(IntEnum):
@@ -19,6 +22,15 @@ class SMAction(IntEnum):
     UPDATE_SHOT = 4
 
 
+def get_shot_manager():
+    sm_props = None
+    try:
+        sm_props = shot_manager.get_shot_manager(bpy.context.scene)
+    except Exception:
+        pass
+    return sm_props
+
+
 def get_or_set_current_take(sm_props):
     current_take = shot_manager.get_current_take(sm_props)
     if not current_take:
@@ -27,7 +39,7 @@ def get_or_set_current_take(sm_props):
 
 
 def build_shot_manager_action(data):
-    sm_props = shot_manager.get_shot_manager(bpy.context.scene)
+    sm_props = get_shot_manager()
     if sm_props is None:
         return
     get_or_set_current_take(sm_props)
@@ -117,7 +129,7 @@ def check_montage_mode():
 
 
 def send_frame():
-    sm_props = shot_manager.get_shot_manager(bpy.context.scene)
+    sm_props = get_shot_manager()
     if sm_props is None:
         return
     current_shot_index = shot_manager.get_current_shot_index(sm_props)
@@ -129,7 +141,7 @@ def send_frame():
 
 
 def get_state():
-    sm_props = shot_manager.get_shot_manager(bpy.context.scene)
+    sm_props = get_shot_manager()
     if sm_props is None:
         return
 
@@ -167,7 +179,7 @@ def send_scene():
 
 
 def update_scene():
-    sm_props = shot_manager.get_shot_manager(bpy.context.scene)
+    sm_props = get_shot_manager()
     if sm_props is None:
         return
 
