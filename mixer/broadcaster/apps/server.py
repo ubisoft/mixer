@@ -297,9 +297,6 @@ class Server:
             logger.debug("Server : removing unjoined client %s", connection.address)
             del self._unjoined_connections[connection.address]
 
-    def get_room(self, room_name: str) -> Room:
-        return self._rooms.get(room_name)
-
     def delete_room(self, room_name: str):
         with _mutex:
             if room_name not in self._rooms:
@@ -325,7 +322,7 @@ class Server:
                 logger.debug("Reusing connection %s", peer)
                 del self._unjoined_connections[peer]
 
-            room = self.get_room(room_name)
+            room = self._rooms.get(room_name)
             if room:
                 room.join_flag = True  # Room cannot be deleted from here
 
@@ -353,7 +350,7 @@ class Server:
 
     def leave_room(self, connection: Connection, room_name: str):
         with _mutex:
-            room = self.get_room(room_name)
+            room = self._rooms.get(room_name)
             if room is None:
                 raise ValueError(f"Room not found {room_name})")
             room.remove_client(connection)
