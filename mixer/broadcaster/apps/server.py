@@ -84,32 +84,6 @@ class Connection:
         self.list_all_clients_flag = True
 
     # todo check if still useful, and remove + refactor cli.py if not
-    def send_list_room_clients(self, room_name: str = None, client_ids: Union[Mapping, List[Mapping]] = None):
-        logger.debug("send_list_room_clients")
-        with _mutex:
-            # ensure we use only one since each message ovewrites the previous one
-            # on the client
-            assert bool(room_name is not None) != bool(client_ids is not None)
-            command = None
-
-            if client_ids is not None:
-                client_ids = client_ids if isinstance(client_ids, list) else [client_ids]
-                ids = common.encode_json(client_ids)
-                command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, ids)
-
-            if room_name is not None:
-                room = self._server.get_room(room_name)
-                if room is not None:
-                    ids = common.encode_json(room.client_ids())
-                    command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, ids)
-                else:
-                    command = common.Command(
-                        common.MessageType.SEND_ERROR, common.encode_string(f"No room named {room_name}.")
-                    )
-            if command:
-                self.commands.append(command)
-
-    # todo check if still useful, and remove + refactor cli.py if not
     def send_list_clients(self):
         """
         Joined clients for all rooms
@@ -179,9 +153,6 @@ class Connection:
 
                 elif command.type == common.MessageType.SET_CLIENT_NAME:
                     self.set_client_metadata({common.ClientMetadata.USERNAME: command.data.decode()})
-
-                elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
-                    self.send_list_room_clients(room_name=command.data.decode())
 
                 elif command.type == common.MessageType.LIST_ALL_CLIENTS:
                     self.send_client_ids()

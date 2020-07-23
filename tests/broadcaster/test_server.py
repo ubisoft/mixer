@@ -19,15 +19,6 @@ class Delegate:
     def build_list_rooms(self, data):
         return None
 
-    def build_list_room_clients(self, clients):
-        logging.info("xxx %s", clients)
-        self.clients = clients
-        if clients is None:
-            self.name_room = None
-        else:
-            self.name_room = [(c[common.ClientMetadata.USERNAME], c[common.ClientMetadata.ROOM]) for c in clients]
-        return None
-
     def on_connection_lost(self):
         return None
 
@@ -42,9 +33,6 @@ def network_consumer(client, delegate):
 
         if command.type == common.MessageType.LIST_ROOMS:
             delegate.build_list_rooms(command.data)
-        elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
-            clients, _ = common.decode_json(command.data, 0)
-            delegate.build_list_room_clients(clients)
         elif command.type == common.MessageType.LIST_ALL_CLIENTS:
             clients, _ = common.decode_json(command.data, 0)
             delegate.build_list_all_clients(clients)

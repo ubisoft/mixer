@@ -33,10 +33,6 @@ class CliClient(client.Client):
         command = common.Command(common.MessageType.CLEAR_ROOM, name.encode())
         self.add_and_process_command(command)
 
-    def list_room_clients(self, name):
-        command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, name.encode())
-        self.add_and_process_command(command, common.MessageType.LIST_ROOM_CLIENTS)
-
     def list_clients(self):
         command = common.Command(common.MessageType.LIST_CLIENTS)
         self.add_and_process_command(command, common.MessageType.LIST_CLIENTS)
@@ -90,15 +86,6 @@ def process_room_command(args):
                 client = CliClient(args)
                 for name in args.name:
                     client.clear_room(name)
-            else:
-                print("Expected one or more room names")
-
-        elif args.command == "clients":
-            count = len(args.name)
-            if count:
-                client = CliClient(args)
-                for name in args.name:
-                    client.list_room_clients(name)
             else:
                 print("Expected one or more room names")
     except ServerError as e:
@@ -183,8 +170,6 @@ def interactive_loop(args):
                     raise RuntimeError('Not connected, use "connect" first')
                 if command == "listrooms":
                     client.list_rooms()
-                elif command == "listroomclients":
-                    client.list_room_clients(command_args[0])
                 elif command == "listjoinedclients":
                     client.list_clients()
                 elif command == "listallclients":
