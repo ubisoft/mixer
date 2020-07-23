@@ -83,18 +83,6 @@ class Connection:
     def send_client_ids(self):
         self.list_all_clients_flag = True
 
-    # todo check if still useful, and remove + refactor cli.py if not
-    def send_list_clients(self):
-        """
-        Joined clients for all rooms
-        """
-        with _mutex:
-            clients = []
-            for room in self._server.rooms():
-                clients.extend(room.client_ids())
-            command = common.Command(common.MessageType.LIST_CLIENTS, common.encode_json(clients))
-            self.commands.append(command)
-
     def get_list_all_clients_command(self):
         client_ids = self._server.client_ids()
         return common.Command(common.MessageType.LIST_ALL_CLIENTS, common.encode_json(client_ids))
@@ -156,9 +144,6 @@ class Connection:
 
                 elif command.type == common.MessageType.LIST_ALL_CLIENTS:
                     self.send_client_ids()
-
-                elif command.type == common.MessageType.LIST_CLIENTS:
-                    self.send_list_clients()
 
                 elif command.type == common.MessageType.SET_CLIENT_METADATA:
                     self.set_client_metadata(common.decode_json(command.data, 0)[0])

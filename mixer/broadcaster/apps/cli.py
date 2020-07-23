@@ -33,10 +33,6 @@ class CliClient(client.Client):
         command = common.Command(common.MessageType.CLEAR_ROOM, name.encode())
         self.add_and_process_command(command)
 
-    def list_clients(self):
-        command = common.Command(common.MessageType.LIST_CLIENTS)
-        self.add_and_process_command(command, common.MessageType.LIST_CLIENTS)
-
     def list_all_clients(self):
         command = common.Command(common.MessageType.LIST_ALL_CLIENTS)
         self.add_and_process_command(command, common.MessageType.LIST_ALL_CLIENTS)

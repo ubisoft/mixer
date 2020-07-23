@@ -23,7 +23,6 @@ class MessageType(IntEnum):
     CLEAR_ROOM = 8
 
     # All joined clients for all rooms
-    LIST_CLIENTS = 10
     SET_CLIENT_NAME = 11
     SEND_ERROR = 12
     CONNECTION_LOST = 13
@@ -395,7 +394,7 @@ class CommandFormatter:
                 s += "  No rooms"
             else:
                 s += f" {len(rooms)} room(s) : {rooms}"
-        elif command.type == MessageType.LIST_CLIENTS or command.type == MessageType.LIST_ALL_CLIENTS:
+        elif command.type == MessageType.LIST_ALL_CLIENTS:
             clients, _ = decode_json(command.data, 0)
             if len(clients) == 0:
                 s += "  No clients\n"
