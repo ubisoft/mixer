@@ -7,7 +7,7 @@ import threading
 import socket
 from typing import Tuple, List, Mapping, ValuesView, Optional
 
-import mixer.broadcaster.cli_utils as cli_utils
+from mixer.broadcaster.cli_utils import init_logging, add_logging_cli_args
 import mixer.broadcaster.common as common
 
 SHUTDOWN = False
@@ -484,7 +484,7 @@ class Server:
 
 def main():
     args, args_parser = parse_cli_args()
-    cli_utils.init_logging(args)
+    init_logging(args)
 
     server = Server()
     server.run(args.port)
@@ -492,7 +492,7 @@ def main():
 
 def parse_cli_args():
     parser = argparse.ArgumentParser(description="Start broadcasting server for Mixer")
-    cli_utils.add_logging_cli_args(parser)
+    add_logging_cli_args(parser)
     parser.add_argument("--port", type=int, default=common.DEFAULT_PORT)
     return parser.parse_args(), parser
 
