@@ -6,7 +6,7 @@ import select
 import threading
 import socket
 import queue
-from typing import Tuple, List, Mapping, ValuesView, Optional
+from typing import Tuple, List, Mapping, Dict, Optional
 
 from mixer.broadcaster.cli_utils import init_logging, add_logging_cli_args
 import mixer.broadcaster.common as common
@@ -24,7 +24,7 @@ class Connection:
         self.address = address
         self.room: Optional[Room] = None
 
-        self.metadata = {}  # metadata are used between clients, but not by the server
+        self.metadata: Dict[str, Optional[str]] = {}  # metadata are used between clients, but not by the server
 
         self._command_queue: queue.Queue = queue.Queue()  # Pending commands to send to the client
         self._server = server
@@ -71,7 +71,7 @@ class Connection:
     def get_unique_id(self) -> str:
         return f"{self.address[0]}:{self.address[1]}"
 
-    def client_id(self) -> Mapping[str, str]:
+    def client_id(self) -> Dict[str, Optional[str]]:
         return {
             **self.metadata,
             common.ClientMetadata.ID: f"{self.get_unique_id()}",
@@ -80,7 +80,7 @@ class Connection:
             common.ClientMetadata.ROOM: self.room.name if self.room is not None else None,
         }
 
-    def set_client_metadata(self, metadata: dict):
+    def set_client_metadata(self, metadata: Mapping[str, Optional[str]]):
         for key, value in metadata.items():
             self.metadata[key] = value
         self._server.broadcast_user_list()
@@ -193,9 +193,9 @@ class Room:
         self.keep_open = False  # Should the room remain open when no more clients are inside ?
         self.byte_size = 0
 
-        self.metadata = {}  # metadata are used between clients, but not by the server
+        self.metadata: Dict[str, Optional[str]] = {}  # metadata are used between clients, but not by the server
 
-        self._commands = []
+        self._commands: List[common.Command] = []
 
         self.join_flag = False
 
@@ -253,9 +253,9 @@ class Room:
 class Server:
     def __init__(self):
         Address = Tuple[str, str]  # noqa
-        self._rooms: Mapping[str, Room] = {}
+        self._rooms: Dict[str, Room] = {}
         # Connections not joined to any room
-        self._unjoined_connections: Mapping[Address, Connection] = {}
+        self._unjoined_connections: Dict[Address, Connection] = {}
         self._mutex = threading.RLock()
 
     def client_count(self):
@@ -344,13 +344,7 @@ class Server:
             connection.add_command(common.Command(common.MessageType.LEAVE_ROOM))
             self.broadcast_user_list()
 
-    def rooms_names(self) -> List[str]:
-        return self._rooms.keys()
-
-    def rooms(self) -> ValuesView[Room]:
-        return self._rooms.values()
-
-    def client_ids(self) -> List[Mapping]:
+    def client_ids(self) -> Dict[str, Dict[str, Optional[str]]]:
         with self._mutex:
             # gather all client ids
             client_ids = {}
