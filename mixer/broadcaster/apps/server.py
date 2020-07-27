@@ -78,9 +78,8 @@ class Connection:
         self._server.broadcast_client_update(self, diff)
 
     def send_error(self, s: str):
-        logger.debug("Sending error %s", s)
-        command = common.Command(common.MessageType.SEND_ERROR, common.encode_string(s))
-        self.add_command(command)
+        logger.warning("Sending error %s", s)
+        self.send_command(common.Command(common.MessageType.SEND_ERROR, common.encode_string(s)))
 
     def run(self):
         global SHUTDOWN
@@ -125,7 +124,7 @@ class Connection:
                     self._server.set_room_keep_open(room_name, value)
 
                 elif command.type == common.MessageType.CLIENT_ID:
-                    self.add_command(
+                    self.send_command(
                         common.Command(
                             common.MessageType.CLIENT_ID, f"{self.address[0]}:{self.address[1]}".encode("utf8")
                         )
@@ -177,7 +176,7 @@ class Room:
     Room class is responsible for:
     - handling its list of clients (as Connection instances)
     - keep a list of commands, to be dispatched to new clients
-    - dispatch added commands to already clients already in the room
+    - dispatch added commands to clients already in the room
     """
 
     def __init__(self, server: Server, room_name: str):
@@ -305,7 +304,7 @@ class Server:
         room = Room(self, room_name)
         room.add_client(connection)
         connection.room = room
-        connection.add_command(common.Command(common.MessageType.CONTENT))
+        connection.send_command(common.Command(common.MessageType.CONTENT))
 
         with self._mutex:
             self._rooms[room_name] = room
@@ -333,7 +332,7 @@ class Server:
 
         try:
             connection.room = room
-            connection.add_command(common.Command(common.MessageType.CLEAR_CONTENT))
+            connection.send_command(common.Command(common.MessageType.CLEAR_CONTENT))
             room.broadcast_commands(connection)
             room.add_client(connection)
         except Exception as e:
@@ -356,7 +355,7 @@ class Server:
             self._unjoined_connections[peer] = connection
             connection.room = None
 
-            connection.add_command(common.Command(common.MessageType.LEAVE_ROOM))
+            connection.send_command(common.Command(common.MessageType.LEAVE_ROOM))
             self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: None})
 
             if room.client_count() == 0 and not room.keep_open:
