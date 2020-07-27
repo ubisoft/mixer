@@ -402,7 +402,8 @@ class Server:
         if connection.room is not None:
             self.leave_room(connection)
 
-        del self._connections[connection.get_unique_id()]
+        with self._mutex:
+            del self._connections[connection.get_unique_id()]
 
         try:
             connection.socket.close()
@@ -430,7 +431,8 @@ class Server:
                 if len(readable) > 0:
                     client_socket, client_address = sock.accept()
                     connection = Connection(self, client_socket, client_address)
-                    self._connections[connection.get_unique_id()] = connection
+                    with self._mutex:
+                        self._connections[connection.get_unique_id()] = connection
                     connection.start()
                     logger.info(f"New connection from {client_address}")
                     self.broadcast_client_update(connection, connection.client_id())
