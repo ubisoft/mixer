@@ -20,8 +20,8 @@ logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__
 class Connection:
     """ Represent a connection with a client """
 
-    def __init__(self, server: Server, socket, address):
-        self.socket = socket
+    def __init__(self, server: Server, sock: socket.socket, address):
+        self.socket: socket.socket = sock
         self.address = address
         self.room: Optional[Room] = None
 
@@ -29,12 +29,10 @@ class Connection:
 
         self._command_queue: queue.Queue = queue.Queue()  # Pending commands to send to the client
         self._server = server
-        # optimization to avoid too much messages when broadcasting client/room metadata updates
-        self._list_all_clients_flag = False
-        self._list_rooms_flag = False
+
+        self.thread: threading.Thread = threading.Thread(None, self.run)
 
     def start(self):
-        self.thread = threading.Thread(None, self.run)
         self.thread.start()
 
     def join_room(self, room_name: str):
@@ -62,12 +60,6 @@ class Connection:
             return
 
         self._server.leave_room(self, room_name)
-
-    def send_list_rooms(self):
-        self._list_rooms_flag = True
-
-    def send_client_ids(self):
-        self._list_all_clients_flag = True
 
     def get_unique_id(self) -> str:
         return f"{self.address[0]}:{self.address[1]}"
@@ -108,7 +100,7 @@ class Connection:
                     self.leave_room(command.data.decode())
 
                 elif command.type == common.MessageType.LIST_ROOMS:
-                    self.send_list_rooms()
+                    self.send_command(self._server.get_list_rooms_command())
 
                 elif command.type == common.MessageType.DELETE_ROOM:
                     self._server.delete_room(command.data.decode())
@@ -117,7 +109,7 @@ class Connection:
                     self.set_client_metadata({common.ClientMetadata.USERNAME: command.data.decode()})
 
                 elif command.type == common.MessageType.LIST_ALL_CLIENTS:
-                    self.send_client_ids()
+                    self.send_command(self._server.get_list_all_clients_command())
 
                 elif command.type == common.MessageType.SET_CLIENT_METADATA:
                     self.set_client_metadata(common.decode_json(command.data, 0)[0])
@@ -161,21 +153,23 @@ class Connection:
                     common.write_message(self.socket, command)
 
                     self._command_queue.task_done()
-
-                if self._list_all_clients_flag:
-                    common.write_message(self.socket, self._server.get_list_all_clients_command())
-                    self._list_all_clients_flag = False
-
-                if self._list_rooms_flag:
-                    common.write_message(self.socket, self._server.get_list_rooms_command())
-                    self._list_rooms_flag = False
             except common.ClientDisconnectedException:
                 break
 
         self._server.handle_client_disconnect(self)
 
-    def add_command(self, command):
+    def add_command(self, command: common.Command):
+        """
+        Add command to be consumed later. Meant to be used by other threads.
+        """
         self._command_queue.put(command)
+
+    def send_command(self, command: common.Command):
+        """
+        Directly send a command to the socket. Meant to be used by this thread.
+        """
+        assert threading.current_thread() is self.thread
+        common.write_message(self.socket, command)
 
 
 class Room:
@@ -213,9 +207,6 @@ class Room:
     def remove_client(self, connection: Connection):
         logger.info("Remove Client % s from Room % s", connection.address, self.name)
         self._connections.remove(connection)
-
-    def client_ids(self):
-        return [c.client_id() for c in self._connections]
 
     def room_dict(self):
         return {
