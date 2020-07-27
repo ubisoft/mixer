@@ -27,7 +27,7 @@ class Connection:
 
         self.unique_id = f"{address[0]}:{address[1]}"
 
-        self.attributes: Dict[str, Any] = {}  # attributes are used between clients, but not by the server
+        self.custom_attributes: Dict[str, Any] = {}  # custom attributes are used between clients, but not by the server
 
         self._command_queue: queue.Queue = queue.Queue()  # Pending commands to send to the client
         self._server = server
@@ -64,17 +64,17 @@ class Connection:
 
         self._server.leave_room(self)
 
-    def client_dict(self) -> Dict[str, Any]:
+    def client_attributes(self) -> Dict[str, Any]:
         return {
-            **self.attributes,
+            **self.custom_attributes,
             common.ClientAttributes.ID: f"{self.unique_id}",
             common.ClientAttributes.IP: self.address[0],
             common.ClientAttributes.PORT: self.address[1],
             common.ClientAttributes.ROOM: self.room.name if self.room is not None else None,
         }
 
-    def set_client_attributes(self, attributes: Mapping[str, Any]):
-        diff = update_dict_and_get_diff(self.attributes, attributes)
+    def set_custom_attributes(self, custom_attributes: Mapping[str, Any]):
+        diff = update_dict_and_get_diff(self.custom_attributes, custom_attributes)
         self._server.broadcast_client_update(self, diff)
 
     def send_error(self, s: str):
@@ -109,18 +109,18 @@ class Connection:
             self._server.delete_room(command.data.decode())
 
         def _set_client_name(command: common.Command):
-            self.set_client_attributes({common.ClientAttributes.USERNAME: command.data.decode()})
+            self.set_custom_attributes({common.ClientAttributes.USERNAME: command.data.decode()})
 
         def _list_clients(command: common.Command):
             self.send_command(self._server.get_list_clients_command())
 
-        def _set_client_attributes(command: common.Command):
-            self.set_client_attributes(common.decode_json(command.data, 0)[0])
+        def _set_client_custom_attributes(command: common.Command):
+            self.set_custom_attributes(common.decode_json(command.data, 0)[0])
 
-        def _set_room_attributes(command: common.Command):
+        def _set_room_custom_attributes(command: common.Command):
             room_name, offset = common.decode_string(command.data, 0)
-            attributes, _ = common.decode_json(command.data, offset)
-            self._server.set_room_attributes(room_name, attributes)
+            custom_attributes, _ = common.decode_json(command.data, offset)
+            self._server.set_room_custom_attributes(room_name, custom_attributes)
 
         def _set_room_keepopen(command: common.Command):
             room_name, offset = common.decode_string(command.data, 0)
@@ -140,11 +140,11 @@ class Connection:
             common.MessageType.LEAVE_ROOM: _leave_room,
             common.MessageType.LIST_ROOMS: _list_rooms,
             common.MessageType.DELETE_ROOM: _delete_room,
-            common.MessageType.SET_ROOM_CUSTOM_ATTRIBUTES: _set_room_attributes,
+            common.MessageType.SET_ROOM_CUSTOM_ATTRIBUTES: _set_room_custom_attributes,
             common.MessageType.SET_ROOM_KEEP_OPEN: _set_room_keepopen,
             common.MessageType.LIST_CLIENTS: _list_clients,
             common.MessageType.SET_CLIENT_NAME: _set_client_name,
-            common.MessageType.SET_CLIENT_CUSTOM_ATTRIBUTES: _set_client_attributes,
+            common.MessageType.SET_CLIENT_CUSTOM_ATTRIBUTES: _set_client_custom_attributes,
             common.MessageType.CLIENT_ID: _client_id,
             common.MessageType.CONTENT: _content,
         }
@@ -220,7 +220,7 @@ class Room:
         self.byte_size = 0
         self.joinable = False  # A room becomes joinable when its first client has send all the initial content
 
-        self.attributes: Dict[str, Any] = {}  # attributes are used between clients, but not by the server
+        self.custom_attributes: Dict[str, Any] = {}  # custom attributes are used between clients, but not by the server
 
         self._commands: List[common.Command] = []
 
@@ -243,9 +243,9 @@ class Room:
         logger.info("Remove Client % s from Room % s", connection.address, self.name)
         self._connections.remove(connection)
 
-    def room_dict(self):
+    def attributes_dict(self):
         return {
-            **self.attributes,
+            **self.custom_attributes,
             common.RoomAttributes.KEEP_OPEN: self.keep_open,
             common.RoomAttributes.COMMAND_COUNT: self.command_count(),
             common.RoomAttributes.BYTE_SIZE: self.byte_size,
@@ -326,7 +326,7 @@ class Server:
         self._rooms[room_name] = room
         logger.info(f"Room {room_name} added")
 
-        self.broadcast_room_update(room, room.room_dict())  # Inform new room
+        self.broadcast_room_update(room, room.attributes_dict())  # Inform new room
         self.broadcast_client_update(connection, {common.ClientAttributes.ROOM: connection.room.name})
 
     def join_room(self, connection: Connection, room_name: str):
@@ -393,13 +393,13 @@ class Server:
             common.Command(common.MessageType.ROOM_UPDATE, common.encode_json({room.name: attributes}),)
         )
 
-    def set_room_attributes(self, room_name: str, attributes: Mapping[str, Any]):
+    def set_room_custom_attributes(self, room_name: str, custom_attributes: Mapping[str, Any]):
         with self._mutex:
             if room_name not in self._rooms:
                 logger.warning("Room %s does not exist.", room_name)
                 return
 
-            diff = update_dict_and_get_diff(self._rooms[room_name].attributes, attributes)
+            diff = update_dict_and_get_diff(self._rooms[room_name].custom_attributes, custom_attributes)
             self.broadcast_room_update(self._rooms[room_name], diff)
 
     def set_room_keep_open(self, room_name: str, value: bool):
@@ -414,12 +414,12 @@ class Server:
 
     def get_list_rooms_command(self) -> common.Command:
         with self._mutex:
-            result_dict = {room_name: value.room_dict() for room_name, value in self._rooms.items()}
+            result_dict = {room_name: value.attributes_dict() for room_name, value in self._rooms.items()}
             return common.Command(common.MessageType.LIST_ROOMS, common.encode_json(result_dict))
 
     def get_list_clients_command(self) -> common.Command:
         with self._mutex:
-            result_dict = {cid: c.client_dict() for cid, c in self._connections.items()}
+            result_dict = {cid: c.client_attributes() for cid, c in self._connections.items()}
             return common.Command(common.MessageType.LIST_CLIENTS, common.encode_json(result_dict))
 
     def handle_client_disconnect(self, connection: Connection):
@@ -459,7 +459,7 @@ class Server:
                         self._connections[connection.unique_id] = connection
                     connection.start()
                     logger.info(f"New connection from {client_address}")
-                    self.broadcast_client_update(connection, connection.client_dict())
+                    self.broadcast_client_update(connection, connection.client_attributes())
             except KeyboardInterrupt:
                 break
 
