@@ -1,4 +1,5 @@
 from enum import IntEnum
+from typing import Dict, Mapping, Any
 import select
 import socket
 import struct
@@ -481,3 +482,12 @@ def write_message(sock: socket.socket, command: Command):
 
 def make_set_room_metadata_command(room_name: str, metadata: dict):
     return Command(MessageType.SET_ROOM_METADATA, encode_string(room_name) + encode_json(metadata))
+
+
+def update_dict_and_get_diff(current: Dict[str, Any], updates: Mapping[str, Any]) -> Dict[str, Any]:
+    diff = {}
+    for key, value in updates.items():
+        if key not in current or current[key] != value:
+            current[key] = value
+            diff[key] = value
+    return diff

@@ -2,9 +2,11 @@ import queue
 import socket
 import logging
 import time
+from typing import Dict, Any
 
 import mixer.broadcaster.common as common
 from mixer.broadcaster.common import MessageType
+from mixer.broadcaster.common import update_dict_and_get_diff
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
 
@@ -23,6 +25,7 @@ class Client:
         self.received_commands = queue.Queue()
         self.pending_commands = queue.Queue()  # todo: does not need to be a queue anymore, at least for Blender client
         self.socket = None
+        self.current_metadata: Dict[str, Any] = {}
 
     def __del__(self):
         if self.socket is not None:
@@ -108,8 +111,12 @@ class Client:
         return self.safe_write_message(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
 
     def set_client_metadata(self, metadata: dict):
+        diff = update_dict_and_get_diff(self.current_metadata, metadata)
+        if diff == {}:
+            return True
+
         return self.safe_write_message(
-            common.Command(common.MessageType.SET_CLIENT_METADATA, common.encode_json(metadata), 0)
+            common.Command(common.MessageType.SET_CLIENT_METADATA, common.encode_json(diff), 0)
         )
 
     def set_room_metadata(self, room_name: str, metadata: dict):

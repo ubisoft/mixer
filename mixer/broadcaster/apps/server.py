@@ -10,19 +10,11 @@ from typing import Tuple, List, Mapping, Dict, Optional, Any
 
 from mixer.broadcaster.cli_utils import init_logging, add_logging_cli_args
 import mixer.broadcaster.common as common
+from mixer.broadcaster.common import update_dict_and_get_diff
 
 SHUTDOWN = False
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
-
-
-def update_dict_and_get_diff(current: Dict[str, Any], updates: Mapping[str, Any]) -> Dict[str, Any]:
-    diff = {}
-    for key, value in updates.items():
-        if key not in current or current[key] != value:
-            current[key] = value
-            diff[key] = value
-    return diff
 
 
 class Connection:
