@@ -160,7 +160,7 @@ def interactive_loop(args):
                 elif command == "leave":
                     client.leave_room(command_args[0])
                 elif command == "setclientname":
-                    client.set_client_metadata({common.ClientMetadata.USERNAME: command_args[0]})
+                    client.set_client_attributes({common.ClientAttributes.USERNAME: command_args[0]})
                 elif command == "disconnect":
                     client.disconnect()
                     client = None

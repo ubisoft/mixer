@@ -8,7 +8,7 @@ from mixer import operators
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.bl_properties import UserItem
 from mixer.share_data import share_data
-from mixer.broadcaster.common import ClientMetadata
+from mixer.broadcaster.common import ClientAttributes
 from mixer.blender_data.debug_addon import DebugDataPanel
 
 if TYPE_CHECKING:
@@ -47,12 +47,12 @@ def update_user_list(do_redraw=True):
     for client_id, client in share_data.clients_dict.items():
         item = props.users.add()
         item.is_me = client_id == share_data.client.client_id
-        item.name = client.get(ClientMetadata.USERNAME, "<unamed>")
-        item.ip = client.get(ClientMetadata.IP, "")
-        item.port = client.get(ClientMetadata.PORT, 0)
+        item.name = client.get(ClientAttributes.USERNAME, "<unamed>")
+        item.ip = client.get(ClientAttributes.IP, "")
+        item.port = client.get(ClientAttributes.PORT, 0)
         item.ip_port = f"{item.ip}:{item.port}"
-        item.room = client.get(ClientMetadata.ROOM, "<no room>") or "<no room>"
-        item.internal_color = client.get(ClientMetadata.USERCOLOR, (0, 0, 0))
+        item.room = client.get(ClientAttributes.ROOM, "<no room>") or "<no room>"
+        item.internal_color = client.get(ClientAttributes.USERCOLOR, (0, 0, 0))
         if "blender_windows" in client:
             for window in client["blender_windows"]:
                 window_item = item.windows.add()
@@ -60,12 +60,12 @@ def update_user_list(do_redraw=True):
                 window_item.view_layer = window["view_layer"]
                 window_item.screen = window["screen"]
                 window_item.areas_3d_count = len(window["areas_3d"])
-        if ClientMetadata.USERSCENES in client:
-            for scene_name, scene_dict in client[ClientMetadata.USERSCENES].items():
+        if ClientAttributes.USERSCENES in client:
+            for scene_name, scene_dict in client[ClientAttributes.USERSCENES].items():
                 scene_item = item.scenes.add()
                 scene_item.scene = scene_name
-                if ClientMetadata.USERSCENES_FRAME in scene_dict:
-                    scene_item.frame = scene_dict[ClientMetadata.USERSCENES_FRAME]
+                if ClientAttributes.USERSCENES_FRAME in scene_dict:
+                    scene_item.frame = scene_dict[ClientAttributes.USERSCENES_FRAME]
 
     redraw_if(do_redraw)
 
@@ -85,7 +85,7 @@ def update_room_list(do_redraw=True):
                 [
                     client
                     for client in share_data.clients_dict.values()
-                    if client.get(ClientMetadata.ROOM, None) == room_name
+                    if client.get(ClientAttributes.ROOM, None) == room_name
                 ]
             )
         else:

@@ -26,7 +26,7 @@ from mixer.stats import StatsTimer, save_statistics, get_stats_filename, stats_t
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
 from mixer.blender_data.blenddata import BlendData
-from mixer.broadcaster.common import ClientMetadata, RoomMetadata
+from mixer.broadcaster.common import ClientAttributes, RoomAttributes
 from mixer.draw import remove_draw_handlers
 
 import mixer.shot_manager as shot_manager
@@ -180,12 +180,12 @@ def update_frame_start_end():
         share_data.end_frame = bpy.context.scene.frame_end
 
 
-def set_client_metadata():
+def set_client_attributes():
     prefs = get_mixer_prefs()
     username = prefs.user
     usercolor = prefs.color
-    share_data.client.set_client_metadata(
-        {ClientMetadata.USERNAME: username, ClientMetadata.USERCOLOR: list(usercolor)}
+    share_data.client.set_client_attributes(
+        {ClientAttributes.USERNAME: username, ClientAttributes.USERCOLOR: list(usercolor)}
     )
 
 
@@ -196,7 +196,7 @@ def join_room(room_name: str):
     BlendData.instance().reset()
     share_data.session_id += 1
     share_data.current_room = room_name
-    set_client_metadata()
+    set_client_attributes()
     share_data.client.join_room(room_name)
     share_data.client.send_set_current_scene(bpy.context.scene.name_full)
 
@@ -1123,7 +1123,7 @@ def connect():
 
     assert is_client_connected()
 
-    set_client_metadata()
+    set_client_attributes()
 
     return True
 
@@ -1301,7 +1301,7 @@ class JoinRoomOperator(bpy.types.Operator):
                 "Experimental flag does not match selected room",
             ),
             (
-                lambda: get_selected_room_dict().get(RoomMetadata.JOINABLE, False),
+                lambda: get_selected_room_dict().get(RoomAttributes.JOINABLE, False),
                 "Room is not joinable, first client has not finished sending initial content.",
             ),
         ]
@@ -1381,8 +1381,8 @@ class DownloadRoomOperator(bpy.types.Operator):
         props = get_mixer_props()
         room_index = props.room_index
         room = props.rooms[room_index].name
-        metadata, commands = download_room(prefs.host, prefs.port, room)
-        save_room(metadata, commands, self.filepath)
+        attributes, commands = download_room(prefs.host, prefs.port, room)
+        save_room(attributes, commands, self.filepath)
 
         return {"FINISHED"}
 
@@ -1410,8 +1410,8 @@ class UploadRoomOperator(bpy.types.Operator):
         prefs = get_mixer_prefs()
         props = get_mixer_props()
 
-        metadata, commands = load_room(props.upload_room_filepath)
-        upload_room(prefs.host, prefs.port, props.upload_room_name, metadata, commands)
+        attributes, commands = load_room(props.upload_room_filepath)
+        upload_room(prefs.host, prefs.port, props.upload_room_name, attributes, commands)
 
         return {"FINISHED"}
 

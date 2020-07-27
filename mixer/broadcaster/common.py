@@ -27,8 +27,8 @@ class MessageType(IntEnum):
     CONNECTION_LOST = 13
     # All all joined and un joined clients
     LIST_CLIENTS = 14
-    SET_CLIENT_METADATA = 15
-    SET_ROOM_METADATA = 16
+    SET_CLIENT_CUSTOM_ATTRIBUTES = 15
+    SET_ROOM_CUSTOM_ATTRIBUTES = 16
     SET_ROOM_KEEP_OPEN = 17
     CLIENT_ID = 18  # Client: ask the server to send the unique id string for him; Server: send the unique id string of the client
 
@@ -125,11 +125,11 @@ class SensorFitMode(IntEnum):
     HORIZONTAL = 2
 
 
-class ClientMetadata:
+class ClientAttributes:
     """
-    Metadata associated with a client by the server.
+    Attributes associated with a client by the server.
     First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
-    Clients are free to define metadata they need, but some standard names are provided here to ease sync
+    Clients are free to define custom attributes they need, but some standard names are provided here to ease sync
     between clients of different kind.
     """
 
@@ -138,10 +138,10 @@ class ClientMetadata:
     PORT = "port"  # Sent by server only, type = int
     ROOM = "room"  # Sent by server only, type = str
 
-    # Client to server metadata, not used by the server but clients are encouraged to use these keys for the same semantic
+    # Client to server attributes, not used by the server but clients are encouraged to use these keys for the same semantic
     USERNAME = "user_name"  # type = str
     USERCOLOR = "user_color"  # type = float3 (as list)
-    USERSCENES = "user_scenes"  # type = dict(str, dict) key = Scene name_full, value = a dictionnary for scene metadata relative to the user
+    USERSCENES = "user_scenes"  # type = dict(str, dict) key = Scene name_full, value = a dictionnary for scene attributes relative to the user
     USERSCENES_FRAME = "frame"  # type = int, can be a field in a user_scenes dict
     USERSCENES_SELECTED_OBJECTS = "selected_objects"  # type = list[string], can be a field in a user_scenes dict
     USERSCENES_VIEWS = (
@@ -154,11 +154,11 @@ class ClientMetadata:
     )
 
 
-class RoomMetadata:
+class RoomAttributes:
     """
-    Metadata associated with a room by the server.
+    Attributes associated with a room by the server.
     First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
-    Clients are free to define metadata they need, but some standard names are provided here to ease sync
+    Clients are free to define custom attributes they need, but some standard names are provided here to ease sync
     between clients of different kind.
     """
 
@@ -386,7 +386,7 @@ class CommandFormatter:
     def format_clients(self, clients):
         s = ""
         for c in clients:
-            s += f'   - {c[ClientMetadata.IP]}:{c[ClientMetadata.PORT]} name = "{c[ClientMetadata.USERNAME]}" room = "{c[ClientMetadata.ROOM]}"\n'
+            s += f'   - {c[ClientAttributes.IP]}:{c[ClientAttributes.PORT]} name = "{c[ClientAttributes.USERNAME]}" room = "{c[ClientAttributes.ROOM]}"\n'
         return s
 
     def format(self, command: Command):
@@ -480,8 +480,8 @@ def write_message(sock: Optional[socket.socket], command: Command):
         raise ClientDisconnectedException()
 
 
-def make_set_room_metadata_command(room_name: str, metadata: dict):
-    return Command(MessageType.SET_ROOM_METADATA, encode_string(room_name) + encode_json(metadata))
+def make_set_room_attributes_command(room_name: str, attributes: dict):
+    return Command(MessageType.SET_ROOM_CUSTOM_ATTRIBUTES, encode_string(room_name) + encode_json(attributes))
 
 
 def update_dict_and_get_diff(current: Dict[str, Any], updates: Mapping[str, Any]) -> Dict[str, Any]:

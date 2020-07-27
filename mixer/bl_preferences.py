@@ -5,7 +5,7 @@ import random
 import bpy
 
 from mixer.broadcaster import common
-from mixer.broadcaster.common import ClientMetadata
+from mixer.broadcaster.common import ClientAttributes
 from mixer.share_data import share_data
 from mixer.stats import get_stats_directory
 from mixer.ui import draw_preferences_ui, update_panels_category
@@ -31,12 +31,12 @@ class MixerPreferences(bpy.types.AddonPreferences):
     def on_user_changed(self, context):
         client = share_data.client
         if client and client.is_connected():
-            client.set_client_metadata({ClientMetadata.USERNAME: self.user})
+            client.set_client_attributes({ClientAttributes.USERNAME: self.user})
 
     def on_user_color_changed(self, context):
         client = share_data.client
         if client and client.is_connected():
-            client.set_client_metadata({ClientMetadata.USERCOLOR: list(self.color)})
+            client.set_client_attributes({ClientAttributes.USERCOLOR: list(self.color)})
 
     category: bpy.props.StringProperty(
         name="Tab Category",

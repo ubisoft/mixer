@@ -27,7 +27,7 @@ class Connection:
 
         self.unique_id = f"{address[0]}:{address[1]}"
 
-        self.metadata: Dict[str, Any] = {}  # metadata are used between clients, but not by the server
+        self.attributes: Dict[str, Any] = {}  # attributes are used between clients, but not by the server
 
         self._command_queue: queue.Queue = queue.Queue()  # Pending commands to send to the client
         self._server = server
@@ -66,15 +66,15 @@ class Connection:
 
     def client_dict(self) -> Dict[str, Any]:
         return {
-            **self.metadata,
-            common.ClientMetadata.ID: f"{self.unique_id}",
-            common.ClientMetadata.IP: self.address[0],
-            common.ClientMetadata.PORT: self.address[1],
-            common.ClientMetadata.ROOM: self.room.name if self.room is not None else None,
+            **self.attributes,
+            common.ClientAttributes.ID: f"{self.unique_id}",
+            common.ClientAttributes.IP: self.address[0],
+            common.ClientAttributes.PORT: self.address[1],
+            common.ClientAttributes.ROOM: self.room.name if self.room is not None else None,
         }
 
-    def set_client_metadata(self, metadata: Mapping[str, Any]):
-        diff = update_dict_and_get_diff(self.metadata, metadata)
+    def set_client_attributes(self, attributes: Mapping[str, Any]):
+        diff = update_dict_and_get_diff(self.attributes, attributes)
         self._server.broadcast_client_update(self, diff)
 
     def send_error(self, s: str):
@@ -92,7 +92,7 @@ class Connection:
             return
         if not self.room.joinable:
             self.room.joinable = True
-            self._server.broadcast_room_update(self.room, {common.RoomMetadata.JOINABLE: True})
+            self._server.broadcast_room_update(self.room, {common.RoomAttributes.JOINABLE: True})
 
     def run(self):
         def _join_room(command: common.Command):
@@ -109,18 +109,18 @@ class Connection:
             self._server.delete_room(command.data.decode())
 
         def _set_client_name(command: common.Command):
-            self.set_client_metadata({common.ClientMetadata.USERNAME: command.data.decode()})
+            self.set_client_attributes({common.ClientAttributes.USERNAME: command.data.decode()})
 
         def _list_clients(command: common.Command):
             self.send_command(self._server.get_list_clients_command())
 
-        def _set_client_metadata(command: common.Command):
-            self.set_client_metadata(common.decode_json(command.data, 0)[0])
+        def _set_client_attributes(command: common.Command):
+            self.set_client_attributes(common.decode_json(command.data, 0)[0])
 
-        def _set_room_metadata(command: common.Command):
+        def _set_room_attributes(command: common.Command):
             room_name, offset = common.decode_string(command.data, 0)
-            metadata, _ = common.decode_json(command.data, offset)
-            self._server.set_room_metadata(room_name, metadata)
+            attributes, _ = common.decode_json(command.data, offset)
+            self._server.set_room_attributes(room_name, attributes)
 
         def _set_room_keepopen(command: common.Command):
             room_name, offset = common.decode_string(command.data, 0)
@@ -140,11 +140,11 @@ class Connection:
             common.MessageType.LEAVE_ROOM: _leave_room,
             common.MessageType.LIST_ROOMS: _list_rooms,
             common.MessageType.DELETE_ROOM: _delete_room,
-            common.MessageType.SET_ROOM_METADATA: _set_room_metadata,
+            common.MessageType.SET_ROOM_CUSTOM_ATTRIBUTES: _set_room_attributes,
             common.MessageType.SET_ROOM_KEEP_OPEN: _set_room_keepopen,
             common.MessageType.LIST_CLIENTS: _list_clients,
             common.MessageType.SET_CLIENT_NAME: _set_client_name,
-            common.MessageType.SET_CLIENT_METADATA: _set_client_metadata,
+            common.MessageType.SET_CLIENT_CUSTOM_ATTRIBUTES: _set_client_attributes,
             common.MessageType.CLIENT_ID: _client_id,
             common.MessageType.CONTENT: _content,
         }
@@ -220,7 +220,7 @@ class Room:
         self.byte_size = 0
         self.joinable = False  # A room becomes joinable when its first client has send all the initial content
 
-        self.metadata: Dict[str, Any] = {}  # metadata are used between clients, but not by the server
+        self.attributes: Dict[str, Any] = {}  # attributes are used between clients, but not by the server
 
         self._commands: List[common.Command] = []
 
@@ -245,11 +245,11 @@ class Room:
 
     def room_dict(self):
         return {
-            **self.metadata,
-            common.RoomMetadata.KEEP_OPEN: self.keep_open,
-            common.RoomMetadata.COMMAND_COUNT: self.command_count(),
-            common.RoomMetadata.BYTE_SIZE: self.byte_size,
-            common.RoomMetadata.JOINABLE: self.joinable,
+            **self.attributes,
+            common.RoomAttributes.KEEP_OPEN: self.keep_open,
+            common.RoomAttributes.COMMAND_COUNT: self.command_count(),
+            common.RoomAttributes.BYTE_SIZE: self.byte_size,
+            common.RoomAttributes.JOINABLE: self.joinable,
         }
 
     def broadcast_commands(self, connection: Connection):
@@ -283,9 +283,9 @@ class Room:
 
             room_update = {}
             if self.byte_size != current_byte_size:
-                room_update[common.RoomMetadata.BYTE_SIZE] = self.byte_size
+                room_update[common.RoomAttributes.BYTE_SIZE] = self.byte_size
             if current_command_count != len(self._commands):
-                room_update[common.RoomMetadata.COMMAND_COUNT] = len(self._commands)
+                room_update[common.RoomAttributes.COMMAND_COUNT] = len(self._commands)
 
             sender._server.broadcast_room_update(self, room_update)
 
@@ -327,7 +327,7 @@ class Server:
         logger.info(f"Room {room_name} added")
 
         self.broadcast_room_update(room, room.room_dict())  # Inform new room
-        self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: connection.room.name})
+        self.broadcast_client_update(connection, {common.ClientAttributes.ROOM: connection.room.name})
 
     def join_room(self, connection: Connection, room_name: str):
         assert not connection.has_room()
@@ -350,7 +350,7 @@ class Server:
 
         try:
             room.broadcast_commands(connection)
-            self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: connection.room.name})
+            self.broadcast_client_update(connection, {common.ClientAttributes.ROOM: connection.room.name})
         except Exception as e:
             connection.room = None
             raise e
@@ -364,7 +364,7 @@ class Server:
             room.remove_client(connection)
             connection.room = None
             connection.send_command(common.Command(common.MessageType.LEAVE_ROOM))
-            self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: None})
+            self.broadcast_client_update(connection, {common.ClientAttributes.ROOM: None})
 
             if room.client_count() == 0 and not room.keep_open:
                 logger.info('No more clients in room "%s" and not keep_open', room.name)
@@ -377,29 +377,29 @@ class Server:
             for connection in self._connections.values():
                 connection.add_command(command)
 
-    def broadcast_client_update(self, connection: Connection, metadata: Dict[str, Any]):
-        if metadata == {}:
+    def broadcast_client_update(self, connection: Connection, attributes: Dict[str, Any]):
+        if attributes == {}:
             return
 
         self.broadcast_to_all_clients(
-            common.Command(common.MessageType.CLIENT_UPDATE, common.encode_json({connection.unique_id: metadata}))
+            common.Command(common.MessageType.CLIENT_UPDATE, common.encode_json({connection.unique_id: attributes}))
         )
 
-    def broadcast_room_update(self, room: Room, metadata: Dict[str, Any]):
-        if metadata == {}:
+    def broadcast_room_update(self, room: Room, attributes: Dict[str, Any]):
+        if attributes == {}:
             return
 
         self.broadcast_to_all_clients(
-            common.Command(common.MessageType.ROOM_UPDATE, common.encode_json({room.name: metadata}),)
+            common.Command(common.MessageType.ROOM_UPDATE, common.encode_json({room.name: attributes}),)
         )
 
-    def set_room_metadata(self, room_name: str, metadata: Mapping[str, Any]):
+    def set_room_attributes(self, room_name: str, attributes: Mapping[str, Any]):
         with self._mutex:
             if room_name not in self._rooms:
                 logger.warning("Room %s does not exist.", room_name)
                 return
 
-            diff = update_dict_and_get_diff(self._rooms[room_name].metadata, metadata)
+            diff = update_dict_and_get_diff(self._rooms[room_name].attributes, attributes)
             self.broadcast_room_update(self._rooms[room_name], diff)
 
     def set_room_keep_open(self, room_name: str, value: bool):
@@ -410,7 +410,7 @@ class Server:
             room = self._rooms[room_name]
             if room.keep_open != value:
                 room.keep_open = value
-                self.broadcast_room_update(room, {common.RoomMetadata.KEEP_OPEN: room.keep_open})
+                self.broadcast_room_update(room, {common.RoomAttributes.KEEP_OPEN: room.keep_open})
 
     def get_list_rooms_command(self) -> common.Command:
         with self._mutex:

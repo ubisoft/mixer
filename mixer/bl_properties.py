@@ -3,7 +3,7 @@ import logging
 
 import bpy
 
-from mixer.broadcaster.common import RoomMetadata
+from mixer.broadcaster.common import RoomAttributes
 from mixer.share_data import share_data
 
 logger = logging.getLogger(__name__)
@@ -23,9 +23,9 @@ class RoomItem(bpy.types.PropertyGroup):
         if (
             share_data.rooms_dict is not None
             and self.name in share_data.rooms_dict
-            and RoomMetadata.KEEP_OPEN in share_data.rooms_dict[self.name]
+            and RoomAttributes.KEEP_OPEN in share_data.rooms_dict[self.name]
         ):
-            return share_data.rooms_dict[self.name][RoomMetadata.KEEP_OPEN]
+            return share_data.rooms_dict[self.name][RoomAttributes.KEEP_OPEN]
         return False
 
     def on_keep_open_changed(self, value):
@@ -36,27 +36,27 @@ class RoomItem(bpy.types.PropertyGroup):
         if (
             share_data.rooms_dict is not None
             and self.name in share_data.rooms_dict
-            and RoomMetadata.COMMAND_COUNT in share_data.rooms_dict[self.name]
+            and RoomAttributes.COMMAND_COUNT in share_data.rooms_dict[self.name]
         ):
-            return share_data.rooms_dict[self.name][RoomMetadata.COMMAND_COUNT]
+            return share_data.rooms_dict[self.name][RoomAttributes.COMMAND_COUNT]
         return 0
 
     def get_mega_byte_size(self):
         if (
             share_data.rooms_dict is not None
             and self.name in share_data.rooms_dict
-            and RoomMetadata.BYTE_SIZE in share_data.rooms_dict[self.name]
+            and RoomAttributes.BYTE_SIZE in share_data.rooms_dict[self.name]
         ):
-            return share_data.rooms_dict[self.name][RoomMetadata.BYTE_SIZE] * 1e-6
+            return share_data.rooms_dict[self.name][RoomAttributes.BYTE_SIZE] * 1e-6
         return 0
 
     def is_joinable(self):
         if (
             share_data.rooms_dict is not None
             and self.name in share_data.rooms_dict
-            and RoomMetadata.JOINABLE in share_data.rooms_dict[self.name]
+            and RoomAttributes.JOINABLE in share_data.rooms_dict[self.name]
         ):
-            return share_data.rooms_dict[self.name][RoomMetadata.JOINABLE]
+            return share_data.rooms_dict[self.name][RoomAttributes.JOINABLE]
         return False
 
     name: bpy.props.StringProperty(name="Name")

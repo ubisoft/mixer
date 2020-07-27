@@ -25,7 +25,7 @@ class Client:
         self.received_commands = queue.Queue()
         self.pending_commands = queue.Queue()  # todo: does not need to be a queue anymore, at least for Blender client
         self.socket = None
-        self.current_metadata: Dict[str, Any] = {}
+        self.current_attributes: Dict[str, Any] = {}
 
     def __del__(self):
         if self.socket is not None:
@@ -110,17 +110,17 @@ class Client:
     def delete_room(self, room_name):
         return self.safe_write_message(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
 
-    def set_client_metadata(self, metadata: dict):
-        diff = update_dict_and_get_diff(self.current_metadata, metadata)
+    def set_client_attributes(self, attributes: dict):
+        diff = update_dict_and_get_diff(self.current_attributes, attributes)
         if diff == {}:
             return True
 
         return self.safe_write_message(
-            common.Command(common.MessageType.SET_CLIENT_METADATA, common.encode_json(diff), 0)
+            common.Command(common.MessageType.SET_CLIENT_CUSTOM_ATTRIBUTES, common.encode_json(diff), 0)
         )
 
-    def set_room_metadata(self, room_name: str, metadata: dict):
-        return self.safe_write_message(common.make_set_room_metadata_command(room_name, metadata))
+    def set_room_attributes(self, room_name: str, attributes: dict):
+        return self.safe_write_message(common.make_set_room_attributes_command(room_name, attributes))
 
     def send_list_rooms(self):
         return self.safe_write_message(common.Command(common.MessageType.LIST_ROOMS))

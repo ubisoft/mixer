@@ -11,7 +11,7 @@ from mixer import ui
 from mixer.bl_utils import get_mixer_prefs
 from mixer.share_data import share_data
 from mixer.broadcaster import common
-from mixer.broadcaster.common import ClientMetadata
+from mixer.broadcaster.common import ClientAttributes
 from mixer.broadcaster.client import Client
 from mixer.blender_client import camera as camera_api
 from mixer.blender_client import collection as collection_api
@@ -54,9 +54,9 @@ def get_view_dict(region: bpy.types.Region, region_3d: bpy.types.RegionView3D):
     v4 = get_target(region, region_3d, (0, height))  # top left
 
     return {
-        ClientMetadata.USERSCENES_VIEWS_EYE: list(eye),
-        ClientMetadata.USERSCENES_VIEWS_TARGET: list(region_3d.view_location),
-        ClientMetadata.USERSCENES_VIEWS_SCREEN_CORNERS: [v1, v2, v3, v4],
+        ClientAttributes.USERSCENES_VIEWS_EYE: list(eye),
+        ClientAttributes.USERSCENES_VIEWS_TARGET: list(region_3d.view_location),
+        ClientAttributes.USERSCENES_VIEWS_SCREEN_CORNERS: [v1, v2, v3, v4],
     }
 
 
@@ -608,17 +608,17 @@ class ClientBlender(Client):
     def query_current_frame(self):
         share_data.client.send_frame(bpy.context.scene.frame_current)
 
-    def compute_client_metadata(self):
-        scene_metadata = {}
+    def compute_client_custom_attributes(self):
+        scene_attributes = {}
         for scene in bpy.data.scenes:
-            scene_metadata[scene.name_full] = {ClientMetadata.USERSCENES_FRAME: scene.frame_current}
+            scene_attributes[scene.name_full] = {ClientAttributes.USERSCENES_FRAME: scene.frame_current}
             scene_selection = set()
             for obj in scene.objects:
                 for view_layer in scene.view_layers:
                     if obj.select_get(view_layer=view_layer):
                         scene_selection.add(obj.name_full)
-            scene_metadata[scene.name_full][ClientMetadata.USERSCENES_SELECTED_OBJECTS] = list(scene_selection)
-            scene_metadata[scene.name_full][ClientMetadata.USERSCENES_VIEWS] = dict()
+            scene_attributes[scene.name_full][ClientAttributes.USERSCENES_SELECTED_OBJECTS] = list(scene_selection)
+            scene_attributes[scene.name_full][ClientAttributes.USERSCENES_VIEWS] = dict()
 
         # Send information about opened windows and 3d areas
         # Will server later to display view frustums of users
@@ -635,11 +635,11 @@ class ClientBlender(Client):
                             if region.type == "WINDOW":
                                 view_id = str(area.as_pointer())
                                 view_dict = get_view_dict(region, area.spaces.active.region_3d)
-                                scene_metadata[scene][ClientMetadata.USERSCENES_VIEWS][view_id] = view_dict
+                                scene_attributes[scene][ClientAttributes.USERSCENES_VIEWS][view_id] = view_dict
                                 areas_3d.append(view_id)
                 windows.append({"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d": areas_3d})
 
-        return {"blender_windows": windows, common.ClientMetadata.USERSCENES: scene_metadata}
+        return {"blender_windows": windows, common.ClientAttributes.USERSCENES: scene_attributes}
 
     @stats_timer(share_data)
     def network_consumer(self):
@@ -713,7 +713,7 @@ class ClientBlender(Client):
                             # The server asks for scene content (at room creation)
                             try:
                                 assert share_data.current_room is not None
-                                self.set_room_metadata(
+                                self.set_room_attributes(
                                     share_data.current_room, {"experimental_sync": get_mixer_prefs().experimental_sync},
                                 )
                                 self.send_scene_content()
@@ -868,4 +868,4 @@ class ClientBlender(Client):
                     parent = ob
             share_data.pending_parenting = remaining_parentings
 
-        self.set_client_metadata(self.compute_client_metadata())
+        self.set_client_attributes(self.compute_client_custom_attributes())
