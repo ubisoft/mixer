@@ -6,7 +6,7 @@ import select
 import threading
 import socket
 import queue
-from typing import Tuple, List, Mapping, Dict, Optional, Any
+from typing import List, Mapping, Dict, Optional, Any
 
 from mixer.broadcaster.cli_utils import init_logging, add_logging_cli_args
 import mixer.broadcaster.common as common
@@ -35,6 +35,9 @@ class Connection:
     def start(self):
         self.thread.start()
 
+    def has_room(self):
+        return self.room is not None
+
     def join_room(self, room_name: str):
         error = None
         if self.room is not None:
@@ -47,19 +50,17 @@ class Connection:
 
         self._server.join_room(self, room_name)
 
-    def leave_room(self, room_name: str):
+    def leave_room(self):
         error = None
         if self.room is None:
-            error = f"Received leave_room({room_name}) but no room is joined"
-        elif room_name != self.room.name:
-            error = f"Received leave_room({room_name}) but room {self.room.name} is joined instead"
+            error = f"Received leave_room but no room is joined"
 
         if error:
             logger.warning(error)
             self.send_error(error)
             return
 
-        self._server.leave_room(self, room_name)
+        self._server.leave_room(self)
 
     def get_unique_id(self) -> str:
         return f"{self.address[0]}:{self.address[1]}"
@@ -96,7 +97,8 @@ class Connection:
                     self.join_room(command.data.decode())
 
                 elif command.type == common.MessageType.LEAVE_ROOM:
-                    self.leave_room(command.data.decode())
+                    room_name = command.data.decode()  # Dummy
+                    self.leave_room()
 
                 elif command.type == common.MessageType.LIST_ROOMS:
                     self.send_command(self._server.get_list_rooms_command())
@@ -259,26 +261,9 @@ class Room:
 
 class Server:
     def __init__(self):
-        Address = Tuple[str, str]  # noqa
         self._rooms: Dict[str, Room] = {}
-        # Connections not joined to any room
-        self._unjoined_connections: Dict[Address, Connection] = {}
+        self._connections: Dict[str, Connection] = {}
         self._mutex = threading.RLock()
-
-    def client_count(self):
-        """
-        Returns (number of joined connections, number of unjoined connections)
-        """
-        joined = 0
-        for room in self._rooms.values():
-            joined += room.client_count()
-        unjoined = len(self._unjoined_connections)
-        return (joined, unjoined)
-
-    def _remove_unjoined_client(self, connection: Connection):
-        with self._mutex:
-            logger.debug("Server : removing unjoined client %s", connection.address)
-            del self._unjoined_connections[connection.address]
 
     def delete_room(self, room_name: str):
         with self._mutex:
@@ -314,14 +299,9 @@ class Server:
             self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: connection.room.name})
 
     def join_room(self, connection: Connection, room_name: str):
-        assert connection.room is None
+        assert not connection.has_room()
 
         with self._mutex:
-            peer = connection.address
-            if peer in self._unjoined_connections:
-                logger.debug("Reusing connection %s", peer)
-                del self._unjoined_connections[peer]
-
             room = self._rooms.get(room_name)
             if room:
                 room.join_flag = True  # Room cannot be deleted from here
@@ -343,18 +323,14 @@ class Server:
 
         self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: connection.room.name})
 
-    def leave_room(self, connection: Connection, room_name: str):
+    def leave_room(self, connection: Connection):
+        assert connection.room is not None
         with self._mutex:
-            room = self._rooms.get(room_name)
+            room = self._rooms.get(connection.room.name)
             if room is None:
-                raise ValueError(f"Room not found {room_name})")
+                raise ValueError(f"Room not found {connection.room.name})")
             room.remove_client(connection)
-
-            peer = connection.address
-            assert peer not in self._unjoined_connections
-            self._unjoined_connections[peer] = connection
             connection.room = None
-
             connection.send_command(common.Command(common.MessageType.LEAVE_ROOM))
             self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: None})
 
@@ -364,16 +340,9 @@ class Server:
             else:
                 logger.info(f"Connections left in room {room.name}: {room.client_count()}.")
 
-    def all_connections(self) -> List[Connection]:
-        with self._mutex:
-            connections = list(self._unjoined_connections.values())
-            for room in self._rooms.values():
-                connections += room._connections
-            return connections
-
     def broadcast_to_all_clients(self, command: common.Command):
         with self._mutex:
-            for connection in self.all_connections():
+            for connection in self._connections.values():
                 connection.add_command(command)
 
     def broadcast_client_update(self, connection: Connection, metadata: Dict[str, Any]):
@@ -426,14 +395,14 @@ class Server:
 
     def get_list_all_clients_command(self) -> common.Command:
         with self._mutex:
-            result_dict = {connection.get_unique_id(): connection.client_id() for connection in self.all_connections()}
+            result_dict = {cid: c.client_id() for cid, c in self._connections.items()}
             return common.Command(common.MessageType.LIST_ALL_CLIENTS, common.encode_json(result_dict))
 
     def handle_client_disconnect(self, connection: Connection):
         if connection.room is not None:
-            self.leave_room(connection, connection.room.name)
+            self.leave_room(connection)
 
-        self._remove_unjoined_client(connection)
+        del self._connections[connection.get_unique_id()]
 
         try:
             connection.socket.close()
@@ -461,8 +430,7 @@ class Server:
                 if len(readable) > 0:
                     client_socket, client_address = sock.accept()
                     connection = Connection(self, client_socket, client_address)
-                    assert connection.address not in self._unjoined_connections
-                    self._unjoined_connections[connection.address] = connection
+                    self._connections[connection.get_unique_id()] = connection
                     connection.start()
                     logger.info(f"New connection from {client_address}")
                     self.broadcast_client_update(connection, connection.client_id())
