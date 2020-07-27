@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Dict, Mapping, Any
+from typing import Dict, Mapping, Any, Optional
 import select
 import socket
 import struct
@@ -169,6 +169,7 @@ class RoomMetadata:
     )
     COMMAND_COUNT = "command_count"  # Sent by server only, type = bool, indicate how many commands the room contains
     BYTE_SIZE = "byte_size"  # Sent by server only, type = int, indicate the size in byte of the room
+    JOINABLE = "joinable"  # Sent by server only, type = bool, indicate if the room is joinable
 
 
 class ClientDisconnectedException(Exception):
@@ -436,7 +437,7 @@ def recv(socket: socket.socket, size: int):
     return result
 
 
-def read_message(socket: socket.socket) -> Command:
+def read_message(socket: socket.socket) -> Optional[Command]:
     if not socket:
         logger.warning("read_message called with no socket")
         return None

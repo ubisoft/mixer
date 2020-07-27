@@ -50,12 +50,22 @@ class RoomItem(bpy.types.PropertyGroup):
             return share_data.rooms_dict[self.name][RoomMetadata.BYTE_SIZE] * 1e-6
         return 0
 
+    def is_joinable(self):
+        if (
+            share_data.rooms_dict is not None
+            and self.name in share_data.rooms_dict
+            and RoomMetadata.JOINABLE in share_data.rooms_dict[self.name]
+        ):
+            return share_data.rooms_dict[self.name][RoomMetadata.JOINABLE]
+        return False
+
     name: bpy.props.StringProperty(name="Name")
     users_count: bpy.props.IntProperty(name="Users Count")
     experimental_sync: bpy.props.BoolProperty(name="Experimental Sync", get=is_room_experimental)
     keep_open: bpy.props.BoolProperty(name="Keep Open", default=False, get=is_kept_open, set=on_keep_open_changed)
     command_count: bpy.props.IntProperty(name="Command Count", get=get_command_count)
     mega_byte_size: bpy.props.FloatProperty(name="Mega Byte Size", get=get_mega_byte_size)
+    joinable: bpy.props.BoolProperty(name="Joinable", get=is_joinable)
 
 
 class UserWindowItem(bpy.types.PropertyGroup):

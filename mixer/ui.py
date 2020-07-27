@@ -122,6 +122,7 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         if get_mixer_props().display_rooms_details:
             split.label(text="Command Count")
             split.label(text="Size (MB)")
+            split.label(text="Joinable")
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.split()
@@ -132,6 +133,7 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         if get_mixer_props().display_rooms_details:
             split.prop(item, "command_count", text="")
             split.prop(item, "mega_byte_size", text="")
+            split.prop(item, "joinable", text="")
 
 
 def draw_user_settings_ui(layout: bpy.types.UILayout):

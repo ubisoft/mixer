@@ -717,6 +717,8 @@ class ClientBlender(Client):
                                     share_data.current_room, {"experimental_sync": get_mixer_prefs().experimental_sync},
                                 )
                                 self.send_scene_content()
+                                # Inform end of content
+                                self.add_command(common.Command(common.MessageType.CONTENT))
                             except Exception as e:
                                 self.on_connection_lost()
                                 raise SendSceneContentFailed() from e

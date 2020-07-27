@@ -82,6 +82,19 @@ class Connection:
         logger.warning("Sending error %s", s)
         self.send_command(common.Command(common.MessageType.SEND_ERROR, common.encode_string(s)))
 
+    def set_room_joinable(self):
+        if self.room is None:
+            self.send_error("Unjoined client trying to set room joinable")
+            return
+        if self.room.creator_client_id != self.get_unique_id():
+            self.send_error(
+                f"Client {self.get_unique_id()} trying to set joinbale room {self.room.name} created by {self.room.creator_client_id}"
+            )
+            return
+        if not self.room.joinable:
+            self.room.joinable = True
+            self._server.broadcast_room_update(self.room, {common.RoomMetadata.JOINABLE: True})
+
     def run(self):
         global SHUTDOWN
         while not SHUTDOWN:
@@ -132,6 +145,9 @@ class Connection:
                         )
                     )
 
+                elif command.type == common.MessageType.CONTENT:
+                    self.set_room_joinable()
+
                 elif command.type.value > common.MessageType.COMMAND.value:
                     if self.room is not None:
                         self.room.add_command(command, self)
@@ -181,19 +197,20 @@ class Room:
     - dispatch added commands to clients already in the room
     """
 
-    def __init__(self, server: Server, room_name: str):
+    def __init__(self, server: Server, room_name: str, creator_client_id: str):
         self.name = room_name
         self.keep_open = False  # Should the room remain open when no more clients are inside ?
         self.byte_size = 0
+        self.joinable = False  # A room becomes joinable when its first client has send all the initial content
 
         self.metadata: Dict[str, Any] = {}  # metadata are used between clients, but not by the server
 
         self._commands: List[common.Command] = []
 
-        self.join_flag = False
-
         self._commands_mutex: threading.RLock = threading.RLock()
         self._connections: List[Connection] = []
+
+        self.creator_client_id = creator_client_id
 
     def client_count(self):
         return len(self._connections)
@@ -215,6 +232,7 @@ class Room:
             common.RoomMetadata.KEEP_OPEN: self.keep_open,
             common.RoomMetadata.COMMAND_COUNT: self.command_count(),
             common.RoomMetadata.BYTE_SIZE: self.byte_size,
+            common.RoomMetadata.JOINABLE: self.joinable,
         }
 
     def broadcast_commands(self, connection: Connection):
@@ -273,9 +291,6 @@ class Server:
             if self._rooms[room_name].client_count() > 0:
                 logger.warning("Room %s is not empty.", room_name)
                 return
-            if self._rooms[room_name].join_flag:
-                logger.warning("Room %s is being joined.", room_name)
-                return
 
             del self._rooms[room_name]
             logger.info(f"Room {room_name} deleted")
@@ -286,42 +301,42 @@ class Server:
 
     def _create_room(self, connection: Connection, room_name: str):
         logger.info(f"Room {room_name} does not exist. Creating it.")
-        room = Room(self, room_name)
+        room = Room(self, room_name, connection.get_unique_id())
         room.add_client(connection)
         connection.room = room
         connection.send_command(common.Command(common.MessageType.CONTENT))
 
-        with self._mutex:
-            self._rooms[room_name] = room
-            logger.info(f"Room {room_name} added")
+        self._rooms[room_name] = room
+        logger.info(f"Room {room_name} added")
 
-            self.broadcast_room_update(room, room.room_dict())  # Inform new room
-            self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: connection.room.name})
+        self.broadcast_room_update(room, room.room_dict())  # Inform new room
+        self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: connection.room.name})
 
     def join_room(self, connection: Connection, room_name: str):
         assert not connection.has_room()
 
         with self._mutex:
             room = self._rooms.get(room_name)
-            if room:
-                room.join_flag = True  # Room cannot be deleted from here
+            if room is None:
+                self._create_room(connection, room_name)
+                return
 
-        if room is None:
-            self._create_room(connection, room_name)
-            return
+            if not room.joinable:
+                logging.error("Room %s not joinable yet.", room_name)
+                return
 
-        try:
+            # Do this before releasing the global mutex
+            # Ensure the room will not be deleted because it now has at least one client
+            room.add_client(connection)
             connection.room = room
             connection.send_command(common.Command(common.MessageType.CLEAR_CONTENT))
+
+        try:
             room.broadcast_commands(connection)
-            room.add_client(connection)
+            self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: connection.room.name})
         except Exception as e:
             connection.room = None
             raise e
-        finally:
-            room.join_flag = False  # Room can be delete from here
-
-        self.broadcast_client_update(connection, {common.ClientMetadata.ROOM: connection.room.name})
 
     def leave_room(self, connection: Connection):
         assert connection.room is not None
@@ -382,15 +397,7 @@ class Server:
 
     def get_list_rooms_command(self) -> common.Command:
         with self._mutex:
-            result_dict = {
-                room_name: {
-                    **value.metadata,
-                    common.RoomMetadata.KEEP_OPEN: value.keep_open,
-                    common.RoomMetadata.COMMAND_COUNT: value.command_count(),
-                    common.RoomMetadata.BYTE_SIZE: value.byte_size,
-                }
-                for room_name, value in self._rooms.items()
-            }
+            result_dict = {room_name: value.room_dict() for room_name, value in self._rooms.items()}
             return common.Command(common.MessageType.LIST_ROOMS, common.encode_json(result_dict))
 
     def get_list_all_clients_command(self) -> common.Command:

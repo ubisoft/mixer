@@ -26,7 +26,7 @@ from mixer.stats import StatsTimer, save_statistics, get_stats_filename, stats_t
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
 from mixer.blender_data.blenddata import BlendData
-from mixer.broadcaster.common import ClientMetadata
+from mixer.broadcaster.common import ClientMetadata, RoomMetadata
 from mixer.draw import remove_draw_handlers
 
 import mixer.shot_manager as shot_manager
@@ -1299,6 +1299,10 @@ class JoinRoomOperator(bpy.types.Operator):
                     )
                 ),
                 "Experimental flag does not match selected room",
+            ),
+            (
+                lambda: get_selected_room_dict().get(RoomMetadata.JOINABLE, False),
+                "Room is not joinable, first client has not finished sending initial content.",
             ),
         ]
 
