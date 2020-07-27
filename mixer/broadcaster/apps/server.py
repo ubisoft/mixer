@@ -265,7 +265,7 @@ class Room:
             command_type = command.type
             if command_type.value > common.MessageType.OPTIMIZED_COMMANDS.value:
                 command_path = common.decode_string(command.data, 0)[0]
-                if len(self._commands) > 0:
+                if self.command_count() > 0:
                     stored_command = self._commands[-1]
                     if (
                         command_type == stored_command.type
@@ -278,14 +278,14 @@ class Room:
 
         with self._commands_mutex:
             current_byte_size = self.byte_size
-            current_command_count = len(self._commands)
+            current_command_count = self.command_count()
             merge_command()
 
             room_update = {}
             if self.byte_size != current_byte_size:
                 room_update[common.RoomAttributes.BYTE_SIZE] = self.byte_size
-            if current_command_count != len(self._commands):
-                room_update[common.RoomAttributes.COMMAND_COUNT] = len(self._commands)
+            if current_command_count != self.command_count():
+                room_update[common.RoomAttributes.COMMAND_COUNT] = self.command_count()
 
             sender._server.broadcast_room_update(self, room_update)
 
