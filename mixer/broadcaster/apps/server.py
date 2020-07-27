@@ -123,17 +123,17 @@ class Connection:
             metadata, _ = common.decode_json(command.data, offset)
             self._server.set_room_metadata(room_name, metadata)
 
-        def _set_room_keepopen():
+        def _set_room_keepopen(command: common.Command):
             room_name, offset = common.decode_string(command.data, 0)
             value, _ = common.decode_bool(command.data, offset)
             self._server.set_room_keep_open(room_name, value)
 
-        def _client_id():
+        def _client_id(command: common.Command):
             self.send_command(
                 common.Command(common.MessageType.CLIENT_ID, f"{self.address[0]}:{self.address[1]}".encode("utf8"))
             )
 
-        def _content():
+        def _content(command: common.Command):
             self.set_room_joinable()
 
         command_handlers = {
@@ -142,7 +142,7 @@ class Connection:
             common.MessageType.LIST_ROOMS: _list_rooms,
             common.MessageType.DELETE_ROOM: _delete_room,
             common.MessageType.SET_ROOM_METADATA: _set_room_metadata,
-            common.MessageType.SET_ROOM_KEEPOPEN: _set_room_keepopen,
+            common.MessageType.SET_ROOM_KEEP_OPEN: _set_room_keepopen,
             common.MessageType.LIST_CLIENTS: _list_clients,
             common.MessageType.SET_CLIENT_NAME: _set_client_name,
             common.MessageType.SET_CLIENT_METADATA: _set_client_metadata,
