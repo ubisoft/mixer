@@ -48,6 +48,8 @@ class Client:
                 "Connecting from local %s:%s to %s:%s", local_address[0], local_address[1], self.host, self.port,
             )
             self.safe_write_message(common.Command(common.MessageType.CLIENT_ID))
+            self.safe_write_message(common.Command(common.MessageType.LIST_ALL_CLIENTS))
+            self.safe_write_message(common.Command(common.MessageType.LIST_ROOMS))
         except ConnectionRefusedError:
             self.socket = None
         except common.ClientDisconnectedException:
@@ -169,8 +171,7 @@ class Client:
         try:
             command = self.received_commands.get_nowait()
             self.received_commands.task_done()
-            if command.type not in (common.MessageType.LIST_ALL_CLIENTS, common.MessageType.LIST_ROOMS,):
-                logger.debug("Receive %s (queue size = %d)", command.type, self.received_commands.qsize())
+            logger.debug("Receive %s (queue size = %d)", command.type, self.received_commands.qsize())
             return command
         except queue.Empty:
             return None

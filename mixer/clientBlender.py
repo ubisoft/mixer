@@ -2,7 +2,7 @@ import logging
 import os
 import struct
 import traceback
-from typing import Set, Tuple
+from typing import Set, Tuple, Mapping, Any
 
 import bpy
 from mathutils import Matrix, Quaternion
@@ -510,12 +510,44 @@ class ClientBlender(Client):
         if "Disconnect" in self.callbacks:
             self.callbacks["Disconnect"]()
 
-    def build_list_all_clients(self, client_ids):
-        share_data.client_ids = client_ids
+    def build_list_all_clients(self, client_ids: Mapping[str, Mapping[str, Any]]):
+        if share_data.client_ids is None:
+            share_data.client_ids = {}
+        for client_id, client_dict in client_ids.items():
+            if client_id not in share_data.client_ids:
+                share_data.client_ids[client_id] = {}
+            for key, value in client_dict.items():
+                share_data.client_ids[client_id][key] = value
         ui.update_ui_lists()
 
-    def build_list_rooms(self, rooms_dict: dict):
-        share_data.rooms_dict = rooms_dict
+    def handle_client_disconnected(self, client_id: str):
+        if share_data.client_ids is None:
+            logger.warning("Client %s disconnedted but no cleints info received", client_id)
+            return
+        if client_id not in share_data.client_ids:
+            logger.warning("Client %s disconnected but not in internal dict.", client_id)
+            return
+        del share_data.client_ids[client_id]
+        ui.update_ui_lists()
+
+    def build_list_rooms(self, rooms_dict: Mapping[str, Mapping[str, Any]]):
+        if share_data.rooms_dict is None:
+            share_data.rooms_dict = {}
+        for room_id, room_dict in rooms_dict.items():
+            if room_id not in share_data.rooms_dict:
+                share_data.rooms_dict[room_id] = {}
+            for key, value in room_dict.items():
+                share_data.rooms_dict[room_id][key] = value
+        ui.update_ui_lists()
+
+    def handle_room_deleted(self, room_name: str):
+        if share_data.rooms_dict is None:
+            logger.warning("Room %s deleted but no room info received", room_name)
+            return
+        if room_name not in share_data.rooms_dict:
+            logger.warning("Room %s deleted but not in internal dict.", room_name)
+            return
+        del share_data.rooms_dict[room_name]
         ui.update_ui_lists()
 
     def send_scene_content(self):
@@ -615,9 +647,6 @@ class ClientBlender(Client):
 
         set_draw_handlers()
 
-        # Ask for room list
-        self.send_list_rooms()
-
         # Loop remains infinite while we have GROUP_BEGIN commands without their corresponding GROUP_END received
         # todo Change this -> probably not a good idea because the sending client might disconnect before GROUP_END occurs
         # or it needs to be guaranteed by the server
@@ -651,6 +680,22 @@ class ClientBlender(Client):
                     processed = True
                 elif command.type == common.MessageType.CLIENT_ID:
                     self.client_id = command.data.decode()
+                    processed = True
+                elif command.type == common.MessageType.ROOM_UPDATE:
+                    rooms_dict, _ = common.decode_json(command.data, 0)
+                    self.build_list_rooms(rooms_dict)
+                    processed = True
+                elif command.type == common.MessageType.ROOM_DELETED:
+                    room_name, _ = common.decode_string(command.data, 0)
+                    self.handle_room_deleted(room_name)
+                    processed = True
+                elif command.type == common.MessageType.CLIENT_UPDATE:
+                    clients, _ = common.decode_json(command.data, 0)
+                    self.build_list_all_clients(clients)
+                    processed = True
+                elif command.type == common.MessageType.CLIENT_DISCONNECTED:
+                    client_id, _ = common.decode_string(command.data, 0)
+                    self.handle_client_disconnected(client_id)
                     processed = True
                 elif command.type == common.MessageType.CONNECTION_LOST:
                     self.on_connection_lost()

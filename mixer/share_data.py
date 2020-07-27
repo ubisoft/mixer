@@ -1,7 +1,7 @@
 from collections import namedtuple
 from datetime import datetime
 import logging
-from typing import List, Mapping, Set
+from typing import List, Mapping, Set, Dict, Any
 from uuid import uuid4
 
 from mixer.blender_data.proxy import BpyBlendProxy
@@ -53,8 +53,8 @@ class ShareData:
         self.client = None
 
         # as received fom LIST_ALL_CLIENTS
-        self.client_ids: Mapping[str, dict] = None
-        self.rooms_dict: Mapping[str, dict] = None
+        self.client_ids: Dict[str, Dict[str, Any]] = None
+        self.rooms_dict: Dict[str, Dict[str, Any]] = None
 
         self.localServerProcess = None
         self.selected_objects_names = []

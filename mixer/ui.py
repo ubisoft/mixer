@@ -47,16 +47,12 @@ def update_user_list(do_redraw=True):
     for client_id, client in share_data.client_ids.items():
         item = props.users.add()
         item.is_me = client_id == share_data.client.client_id
-        item.name = (
-            client[ClientMetadata.USERNAME]
-            if (ClientMetadata.USERNAME in client and client[ClientMetadata.USERNAME])
-            else "<unamed>"
-        )
-        item.ip = client[ClientMetadata.IP]
-        item.port = client[ClientMetadata.PORT]
+        item.name = client.get(ClientMetadata.USERNAME, "<unamed>")
+        item.ip = client.get(ClientMetadata.IP, "")
+        item.port = client.get(ClientMetadata.PORT, 0)
         item.ip_port = f"{item.ip}:{item.port}"
-        item.room = client[ClientMetadata.ROOM] or ""
-        item.internal_color = client[ClientMetadata.USERCOLOR] if ClientMetadata.USERCOLOR in client else (0, 0, 0)
+        item.room = client.get(ClientMetadata.ROOM, "<no room>") or "<no room>"
+        item.internal_color = client.get(ClientMetadata.USERCOLOR, (0, 0, 0))
         if "blender_windows" in client:
             for window in client["blender_windows"]:
                 window_item = item.windows.add()
@@ -84,9 +80,16 @@ def update_room_list(do_redraw=True):
     for room_name, _ in share_data.rooms_dict.items():
         item = props.rooms.add()
         item.name = room_name
-        item.users_count = len(
-            [client for client in share_data.client_ids.values() if client[ClientMetadata.ROOM] == room_name]
-        )
+        if share_data.client_ids is not None:
+            item.users_count = len(
+                [
+                    client
+                    for client in share_data.client_ids.values()
+                    if client.get(ClientMetadata.ROOM, None) == room_name
+                ]
+            )
+        else:
+            item.users_count = -1
 
     redraw_if(do_redraw)
 
@@ -123,7 +126,7 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.split()
         split.label(text=item.name)  # avoids renaming the item by accident
-        split.label(text=f"{item.users_count} users")
+        split.label(text=f"{item.users_count if item.users_count >= 0 else '?'} users")
         split.prop(item, "experimental_sync", text="")
         split.prop(item, "keep_open", text="")
         if get_mixer_props().display_rooms_details:
@@ -225,7 +228,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                     user_layout = box.box()
                 row = user_layout.split()
                 row.label(text=f"{user.name}", icon="HOME" if user.is_me else "NONE")
-                row.label(text=f"{(user.room or '<no room>')}")
+                row.label(text=f"{user.room}")
                 row.prop(user, "color", text="")
                 if mixer_props.display_users_details:
                     row.label(text=f"{user.ip_port}")

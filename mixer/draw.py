@@ -110,6 +110,9 @@ def users_frustum_name_draw():
 
 
 def users_frustrum_draw_iteration(per_user_callback, per_frustum_callback):
+    if share_data.client_ids is None:
+        return
+
     prefs = get_mixer_prefs()
 
     for user_dict in share_data.client_ids.values():
@@ -199,6 +202,9 @@ def users_selection_name_draw():
 
 
 def users_selection_draw_iteration(per_user_callback, per_object_callback):
+    if share_data.client_ids is None:
+        return
+
     prefs = get_mixer_prefs()
 
     for user_dict in share_data.client_ids.values():

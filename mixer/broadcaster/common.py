@@ -32,6 +32,12 @@ class MessageType(IntEnum):
     SET_ROOM_KEEP_OPEN = 17
     CLIENT_ID = 18  # Allow a client to know its own id, a unique string
 
+    CLIENT_UPDATE = 19  # Notify that data of a client have changed
+    ROOM_UPDATE = 20  # Notify that data of a room have changed
+    ROOM_DELETED = 21  # Notify a room was deleted
+
+    CLIENT_DISCONNECTED = 22  # Notify a client has diconnected
+
     COMMAND = 100
     DELETE = 101
     CAMERA = 102
