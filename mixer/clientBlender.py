@@ -510,24 +510,24 @@ class ClientBlender(Client):
         if "Disconnect" in self.callbacks:
             self.callbacks["Disconnect"]()
 
-    def build_list_all_clients(self, client_ids: Mapping[str, Mapping[str, Any]]):
-        if share_data.client_ids is None:
-            share_data.client_ids = {}
-        for client_id, client_dict in client_ids.items():
-            if client_id not in share_data.client_ids:
-                share_data.client_ids[client_id] = {}
+    def build_list_all_clients(self, clients_dict: Mapping[str, Mapping[str, Any]]):
+        if share_data.clients_dict is None:
+            share_data.clients_dict = {}
+        for client_id, client_dict in clients_dict.items():
+            if client_id not in share_data.clients_dict:
+                share_data.clients_dict[client_id] = {}
             for key, value in client_dict.items():
-                share_data.client_ids[client_id][key] = value
+                share_data.clients_dict[client_id][key] = value
         ui.update_ui_lists()
 
     def handle_client_disconnected(self, client_id: str):
-        if share_data.client_ids is None:
+        if share_data.clients_dict is None:
             logger.warning("Client %s disconnedted but no cleints info received", client_id)
             return
-        if client_id not in share_data.client_ids:
+        if client_id not in share_data.clients_dict:
             logger.warning("Client %s disconnected but not in internal dict.", client_id)
             return
-        del share_data.client_ids[client_id]
+        del share_data.clients_dict[client_id]
         ui.update_ui_lists()
 
     def build_list_rooms(self, rooms_dict: Mapping[str, Mapping[str, Any]]):

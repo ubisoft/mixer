@@ -65,7 +65,7 @@ class Connection:
     def get_unique_id(self) -> str:
         return f"{self.address[0]}:{self.address[1]}"
 
-    def client_id(self) -> Dict[str, Any]:
+    def client_dict(self) -> Dict[str, Any]:
         return {
             **self.metadata,
             common.ClientMetadata.ID: f"{self.get_unique_id()}",
@@ -402,7 +402,7 @@ class Server:
 
     def get_list_all_clients_command(self) -> common.Command:
         with self._mutex:
-            result_dict = {cid: c.client_id() for cid, c in self._connections.items()}
+            result_dict = {cid: c.client_dict() for cid, c in self._connections.items()}
             return common.Command(common.MessageType.LIST_ALL_CLIENTS, common.encode_json(result_dict))
 
     def handle_client_disconnect(self, connection: Connection):
@@ -442,7 +442,7 @@ class Server:
                         self._connections[connection.get_unique_id()] = connection
                     connection.start()
                     logger.info(f"New connection from {client_address}")
-                    self.broadcast_client_update(connection, connection.client_id())
+                    self.broadcast_client_update(connection, connection.client_dict())
             except KeyboardInterrupt:
                 break
 

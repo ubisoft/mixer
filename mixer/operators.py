@@ -1145,7 +1145,7 @@ def disconnect():
             share_data.client.disconnect()
         share_data.client = None
 
-    share_data.client_ids = None
+    share_data.clients_dict = None
     share_data.rooms_dict = None
     share_data.current_room = None
 

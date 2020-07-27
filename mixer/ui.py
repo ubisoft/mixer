@@ -40,11 +40,11 @@ def update_ui_lists():
 def update_user_list(do_redraw=True):
     props = get_mixer_props()
     props.users.clear()
-    if share_data.client_ids is None:
+    if share_data.clients_dict is None:
         redraw_if(do_redraw)
         return
 
-    for client_id, client in share_data.client_ids.items():
+    for client_id, client in share_data.clients_dict.items():
         item = props.users.add()
         item.is_me = client_id == share_data.client.client_id
         item.name = client.get(ClientMetadata.USERNAME, "<unamed>")
@@ -80,11 +80,11 @@ def update_room_list(do_redraw=True):
     for room_name, _ in share_data.rooms_dict.items():
         item = props.rooms.add()
         item.name = room_name
-        if share_data.client_ids is not None:
+        if share_data.clients_dict is not None:
             item.users_count = len(
                 [
                     client
-                    for client in share_data.client_ids.values()
+                    for client in share_data.clients_dict.values()
                     if client.get(ClientMetadata.ROOM, None) == room_name
                 ]
             )

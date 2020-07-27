@@ -52,8 +52,7 @@ class ShareData:
         self.session_id = 0  # For logging and debug
         self.client = None
 
-        # as received fom LIST_ALL_CLIENTS
-        self.client_ids: Dict[str, Dict[str, Any]] = None
+        self.clients_dict: Dict[str, Dict[str, Any]] = None
         self.rooms_dict: Dict[str, Dict[str, Any]] = None
 
         self.localServerProcess = None
