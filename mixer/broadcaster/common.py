@@ -464,7 +464,7 @@ def read_message(socket: socket.socket) -> Optional[Command]:
         raise
 
 
-def write_message(sock: socket.socket, command: Command):
+def write_message(sock: Optional[socket.socket], command: Command):
     if not sock:
         logger.warning("write_message called with no socket")
         return
