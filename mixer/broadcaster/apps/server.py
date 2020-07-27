@@ -96,6 +96,60 @@ class Connection:
             self._server.broadcast_room_update(self.room, {common.RoomMetadata.JOINABLE: True})
 
     def run(self):
+        def _join_room(command: common.Command):
+            self.join_room(command.data.decode())
+
+        def _leave_room(command: common.Command):
+            _ = command.data.decode()  # todo remove room_name from protocol
+            self.leave_room()
+
+        def _list_rooms(command: common.Command):
+            self.send_command(self._server.get_list_rooms_command())
+
+        def _delete_room(command: common.Command):
+            self._server.delete_room(command.data.decode())
+
+        def _set_client_name(command: common.Command):
+            self.set_client_metadata({common.ClientMetadata.USERNAME: command.data.decode()})
+
+        def _list_clients(command: common.Command):
+            self.send_command(self._server.get_list_clients_command())
+
+        def _set_client_metadata(command: common.Command):
+            self.set_client_metadata(common.decode_json(command.data, 0)[0])
+
+        def _set_room_metadata(command: common.Command):
+            room_name, offset = common.decode_string(command.data, 0)
+            metadata, _ = common.decode_json(command.data, offset)
+            self._server.set_room_metadata(room_name, metadata)
+
+        def _set_room_keepopen():
+            room_name, offset = common.decode_string(command.data, 0)
+            value, _ = common.decode_bool(command.data, offset)
+            self._server.set_room_keep_open(room_name, value)
+
+        def _client_id():
+            self.send_command(
+                common.Command(common.MessageType.CLIENT_ID, f"{self.address[0]}:{self.address[1]}".encode("utf8"))
+            )
+
+        def _content():
+            self.set_room_joinable()
+
+        command_handlers = {
+            common.MessageType.JOIN_ROOM: _join_room,
+            common.MessageType.LEAVE_ROOM: _leave_room,
+            common.MessageType.LIST_ROOMS: _list_rooms,
+            common.MessageType.DELETE_ROOM: _delete_room,
+            common.MessageType.SET_ROOM_METADATA: _set_room_metadata,
+            common.MessageType.SET_ROOM_KEEPOPEN: _set_room_keepopen,
+            common.MessageType.LIST_CLIENTS: _list_clients,
+            common.MessageType.SET_CLIENT_NAME: _set_client_name,
+            common.MessageType.SET_CLIENT_METADATA: _set_client_metadata,
+            common.MessageType.CLIENT_ID: _client_id,
+            common.MessageType.CONTENT: _content,
+        }
+
         global SHUTDOWN
         while not SHUTDOWN:
             try:
@@ -106,47 +160,8 @@ class Connection:
             if command is not None:
                 logger.debug("Received from %s:%s - %s", self.address[0], self.address[1], command.type)
 
-                if command.type == common.MessageType.JOIN_ROOM:
-                    self.join_room(command.data.decode())
-
-                elif command.type == common.MessageType.LEAVE_ROOM:
-                    room_name = command.data.decode()  # Dummy
-                    self.leave_room()
-
-                elif command.type == common.MessageType.LIST_ROOMS:
-                    self.send_command(self._server.get_list_rooms_command())
-
-                elif command.type == common.MessageType.DELETE_ROOM:
-                    self._server.delete_room(command.data.decode())
-
-                elif command.type == common.MessageType.SET_CLIENT_NAME:
-                    self.set_client_metadata({common.ClientMetadata.USERNAME: command.data.decode()})
-
-                elif command.type == common.MessageType.LIST_CLIENTS:
-                    self.send_command(self._server.get_list_clients_command())
-
-                elif command.type == common.MessageType.SET_CLIENT_METADATA:
-                    self.set_client_metadata(common.decode_json(command.data, 0)[0])
-
-                elif command.type == common.MessageType.SET_ROOM_METADATA:
-                    room_name, offset = common.decode_string(command.data, 0)
-                    metadata, _ = common.decode_json(command.data, offset)
-                    self._server.set_room_metadata(room_name, metadata)
-
-                elif command.type == common.MessageType.SET_ROOM_KEEP_OPEN:
-                    room_name, offset = common.decode_string(command.data, 0)
-                    value, _ = common.decode_bool(command.data, offset)
-                    self._server.set_room_keep_open(room_name, value)
-
-                elif command.type == common.MessageType.CLIENT_ID:
-                    self.send_command(
-                        common.Command(
-                            common.MessageType.CLIENT_ID, f"{self.address[0]}:{self.address[1]}".encode("utf8")
-                        )
-                    )
-
-                elif command.type == common.MessageType.CONTENT:
-                    self.set_room_joinable()
+                if command.type in command_handlers:
+                    command_handlers[command.type](command)
 
                 elif command.type.value > common.MessageType.COMMAND.value:
                     if self.room is not None:
@@ -158,6 +173,9 @@ class Connection:
                             self.address[1],
                             command.type.value,
                         )
+
+                else:
+                    logger.error("Command %s received but no handler for it on server", command.type)
 
             try:
                 while True:
