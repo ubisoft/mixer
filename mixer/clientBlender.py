@@ -510,7 +510,7 @@ class ClientBlender(Client):
         if "Disconnect" in self.callbacks:
             self.callbacks["Disconnect"]()
 
-    def build_list_all_clients(self, clients_dict: Mapping[str, Mapping[str, Any]]):
+    def build_list_clients(self, clients_dict: Mapping[str, Mapping[str, Any]]):
         if share_data.clients_dict is None:
             share_data.clients_dict = {}
         for client_id, client_dict in clients_dict.items():
@@ -670,9 +670,9 @@ class ClientBlender(Client):
                     continue
 
                 processed = False
-                if command.type == common.MessageType.LIST_ALL_CLIENTS:
+                if command.type == common.MessageType.LIST_CLIENTS:
                     clients, _ = common.decode_json(command.data, 0)
-                    self.build_list_all_clients(clients)
+                    self.build_list_clients(clients)
                     processed = True
                 elif command.type == common.MessageType.LIST_ROOMS:
                     rooms_dict, _ = common.decode_json(command.data, 0)
@@ -691,7 +691,7 @@ class ClientBlender(Client):
                     processed = True
                 elif command.type == common.MessageType.CLIENT_UPDATE:
                     clients, _ = common.decode_json(command.data, 0)
-                    self.build_list_all_clients(clients)
+                    self.build_list_clients(clients)
                     processed = True
                 elif command.type == common.MessageType.CLIENT_DISCONNECTED:
                     client_id, _ = common.decode_string(command.data, 0)

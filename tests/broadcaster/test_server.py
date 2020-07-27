@@ -32,9 +32,9 @@ def network_consumer(client, delegate):
 
         if command.type == common.MessageType.LIST_ROOMS:
             delegate.build_list_rooms(command.data)
-        elif command.type == common.MessageType.LIST_ALL_CLIENTS:
+        elif command.type == common.MessageType.LIST_CLIENTS:
             clients, _ = common.decode_json(command.data, 0)
-            delegate.build_list_all_clients(clients)
+            delegate.build_list_clients(clients)
         elif command.type == common.MessageType.CONNECTION_LOST:
             delegate.on_connection_lost()
 

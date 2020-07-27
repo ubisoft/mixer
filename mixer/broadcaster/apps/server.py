@@ -122,8 +122,8 @@ class Connection:
                 elif command.type == common.MessageType.SET_CLIENT_NAME:
                     self.set_client_metadata({common.ClientMetadata.USERNAME: command.data.decode()})
 
-                elif command.type == common.MessageType.LIST_ALL_CLIENTS:
-                    self.send_command(self._server.get_list_all_clients_command())
+                elif command.type == common.MessageType.LIST_CLIENTS:
+                    self.send_command(self._server.get_list_clients_command())
 
                 elif command.type == common.MessageType.SET_CLIENT_METADATA:
                     self.set_client_metadata(common.decode_json(command.data, 0)[0])
@@ -400,10 +400,10 @@ class Server:
             result_dict = {room_name: value.room_dict() for room_name, value in self._rooms.items()}
             return common.Command(common.MessageType.LIST_ROOMS, common.encode_json(result_dict))
 
-    def get_list_all_clients_command(self) -> common.Command:
+    def get_list_clients_command(self) -> common.Command:
         with self._mutex:
             result_dict = {cid: c.client_dict() for cid, c in self._connections.items()}
-            return common.Command(common.MessageType.LIST_ALL_CLIENTS, common.encode_json(result_dict))
+            return common.Command(common.MessageType.LIST_CLIENTS, common.encode_json(result_dict))
 
     def handle_client_disconnect(self, connection: Connection):
         if connection.room is not None:

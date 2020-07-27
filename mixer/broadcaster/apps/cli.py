@@ -29,9 +29,9 @@ class CliClient(client.Client):
         command = common.Command(common.MessageType.DELETE_ROOM, name.encode())
         self.add_and_process_command(command)
 
-    def list_all_clients(self):
-        command = common.Command(common.MessageType.LIST_ALL_CLIENTS)
-        self.add_and_process_command(command, common.MessageType.LIST_ALL_CLIENTS)
+    def list_clients(self):
+        command = common.Command(common.MessageType.LIST_CLIENTS)
+        self.add_and_process_command(command, common.MessageType.LIST_CLIENTS)
 
     def add_and_process_command(self, command: common.Command, expected_response_type: common.MessageType = None):
         self.add_command(command)
@@ -153,10 +153,8 @@ def interactive_loop(args):
                     raise RuntimeError('Not connected, use "connect" first')
                 if command == "listrooms":
                     client.list_rooms()
-                elif command == "listjoinedclients":
+                elif command == "listclients":
                     client.list_clients()
-                elif command == "listallclients":
-                    client.list_all_clients()
                 elif command == "join":
                     client.join_room(command_args[0])
                 elif command == "leave":

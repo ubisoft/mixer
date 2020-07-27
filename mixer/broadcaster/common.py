@@ -15,29 +15,28 @@ logger = logging.getLogger(__name__)
 
 class MessageType(IntEnum):
     JOIN_ROOM = 1
-    CREATE_ROOM = 2
     LEAVE_ROOM = 3
     LIST_ROOMS = 4
-    CONTENT = 5
-    CLEAR_CONTENT = 6
+    CONTENT = 5  # Server: ask client to send initial room content; Client: notify server content has been sent
+    CLEAR_CONTENT = 6  # Server: ask client to clear its own content before room content is sent
     DELETE_ROOM = 7
 
     # All joined clients for all rooms
-    SET_CLIENT_NAME = 11
+    SET_CLIENT_NAME = 11  # Deprecated
     SEND_ERROR = 12
     CONNECTION_LOST = 13
     # All all joined and un joined clients
-    LIST_ALL_CLIENTS = 14
+    LIST_CLIENTS = 14
     SET_CLIENT_METADATA = 15
     SET_ROOM_METADATA = 16
     SET_ROOM_KEEP_OPEN = 17
-    CLIENT_ID = 18  # Allow a client to know its own id, a unique string
+    CLIENT_ID = 18  # Client: ask the server to send the unique id string for him; Server: send the unique id string of the client
 
-    CLIENT_UPDATE = 19  # Notify that data of a client have changed
-    ROOM_UPDATE = 20  # Notify that data of a room have changed
-    ROOM_DELETED = 21  # Notify a room was deleted
+    CLIENT_UPDATE = 19  # Server: Notify that data of a client have changed
+    ROOM_UPDATE = 20  # Server: Notify that data of a room have changed
+    ROOM_DELETED = 21  # Server: Notify a room was deleted
 
-    CLIENT_DISCONNECTED = 22  # Notify a client has diconnected
+    CLIENT_DISCONNECTED = 22  # Server: Notify a client has diconnected
 
     COMMAND = 100
     DELETE = 101
@@ -401,7 +400,7 @@ class CommandFormatter:
                 s += "  No rooms"
             else:
                 s += f" {len(rooms)} room(s) : {rooms}"
-        elif command.type == MessageType.LIST_ALL_CLIENTS:
+        elif command.type == MessageType.LIST_CLIENTS:
             clients, _ = decode_json(command.data, 0)
             if len(clients) == 0:
                 s += "  No clients\n"
