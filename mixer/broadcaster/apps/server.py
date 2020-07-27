@@ -40,30 +40,6 @@ class Connection:
     def has_room(self):
         return self.room is not None
 
-    def join_room(self, room_name: str):
-        error = None
-        if self.room is not None:
-            error = f"Received join_room({room_name}) but room {self.room.name} is already joined"
-
-        if error:
-            logger.warning(error)
-            self.send_error(error)
-            return
-
-        self._server.join_room(self, room_name)
-
-    def leave_room(self):
-        error = None
-        if self.room is None:
-            error = f"Received leave_room but no room is joined"
-
-        if error:
-            logger.warning(error)
-            self.send_error(error)
-            return
-
-        self._server.leave_room(self)
-
     def client_attributes(self) -> Dict[str, Any]:
         return {
             **self.custom_attributes,
@@ -73,34 +49,24 @@ class Connection:
             common.ClientAttributes.ROOM: self.room.name if self.room is not None else None,
         }
 
-    def set_custom_attributes(self, custom_attributes: Mapping[str, Any]):
-        diff = update_dict_and_get_diff(self.custom_attributes, custom_attributes)
-        self._server.broadcast_client_update(self, diff)
-
-    def send_error(self, s: str):
-        logger.warning("Sending error %s", s)
-        self.send_command(common.Command(common.MessageType.SEND_ERROR, common.encode_string(s)))
-
-    def set_room_joinable(self):
-        if self.room is None:
-            self.send_error("Unjoined client trying to set room joinable")
-            return
-        if self.room.creator_client_id != self.unique_id:
-            self.send_error(
-                f"Client {self.unique_id} trying to set joinbale room {self.room.name} created by {self.room.creator_client_id}"
-            )
-            return
-        if not self.room.joinable:
-            self.room.joinable = True
-            self._server.broadcast_room_update(self.room, {common.RoomAttributes.JOINABLE: True})
-
     def run(self):
+        def _send_error(self, s: str):
+            logger.warning("Sending error %s", s)
+            self.send_command(common.Command(common.MessageType.SEND_ERROR, common.encode_string(s)))
+
         def _join_room(command: common.Command):
-            self.join_room(command.data.decode())
+            if self.room is not None:
+                self.send_error(f"Received join_room but room {self.room.name} is already joined")
+                return
+            room_name = command.data.decode()
+            self._server.join_room(self, room_name)
 
         def _leave_room(command: common.Command):
+            if self.room is None:
+                self.send_error(f"Received leave_room but no room is joined")
+                return
             _ = command.data.decode()  # todo remove room_name from protocol
-            self.leave_room()
+            self._server.leave_room(self)
 
         def _list_rooms(command: common.Command):
             self.send_command(self._server.get_list_rooms_command())
@@ -108,21 +74,25 @@ class Connection:
         def _delete_room(command: common.Command):
             self._server.delete_room(command.data.decode())
 
+        def _set_custom_attributes(custom_attributes: Mapping[str, Any]):
+            diff = update_dict_and_get_diff(self.custom_attributes, custom_attributes)
+            self._server.broadcast_client_update(self, diff)
+
         def _set_client_name(command: common.Command):
-            self.set_custom_attributes({common.ClientAttributes.USERNAME: command.data.decode()})
+            _set_custom_attributes({common.ClientAttributes.USERNAME: command.data.decode()})
 
         def _list_clients(command: common.Command):
             self.send_command(self._server.get_list_clients_command())
 
         def _set_client_custom_attributes(command: common.Command):
-            self.set_custom_attributes(common.decode_json(command.data, 0)[0])
+            _set_custom_attributes(common.decode_json(command.data, 0)[0])
 
         def _set_room_custom_attributes(command: common.Command):
             room_name, offset = common.decode_string(command.data, 0)
             custom_attributes, _ = common.decode_json(command.data, offset)
             self._server.set_room_custom_attributes(room_name, custom_attributes)
 
-        def _set_room_keepopen(command: common.Command):
+        def _set_room_keep_open(command: common.Command):
             room_name, offset = common.decode_string(command.data, 0)
             value, _ = common.decode_bool(command.data, offset)
             self._server.set_room_keep_open(room_name, value)
@@ -133,7 +103,19 @@ class Connection:
             )
 
         def _content(command: common.Command):
-            self.set_room_joinable()
+            if self.room is None:
+                self.send_error("Unjoined client trying to set room joinable")
+                return
+            if self.room.creator_client_id != self.unique_id:
+                self.send_error(
+                    f"Client {self.unique_id} trying to set joinable room {self.room.name} created by {self.room.creator_client_id}"
+                )
+                return
+            if self.room.joinable:
+                self.send_error(f"Trying to set joinable room {self.room.name} which is already joinable")
+                return
+            self.room.joinable = True
+            self._server.broadcast_room_update(self.room, {common.RoomAttributes.JOINABLE: True})
 
         command_handlers = {
             common.MessageType.JOIN_ROOM: _join_room,
@@ -141,7 +123,7 @@ class Connection:
             common.MessageType.LIST_ROOMS: _list_rooms,
             common.MessageType.DELETE_ROOM: _delete_room,
             common.MessageType.SET_ROOM_CUSTOM_ATTRIBUTES: _set_room_custom_attributes,
-            common.MessageType.SET_ROOM_KEEP_OPEN: _set_room_keepopen,
+            common.MessageType.SET_ROOM_KEEP_OPEN: _set_room_keep_open,
             common.MessageType.LIST_CLIENTS: _list_clients,
             common.MessageType.SET_CLIENT_NAME: _set_client_name,
             common.MessageType.SET_CLIENT_CUSTOM_ATTRIBUTES: _set_client_custom_attributes,
