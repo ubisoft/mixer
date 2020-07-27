@@ -25,6 +25,8 @@ class Connection:
         self.address = address
         self.room: Optional[Room] = None
 
+        self.unique_id = f"{address[0]}:{address[1]}"
+
         self.metadata: Dict[str, Any] = {}  # metadata are used between clients, but not by the server
 
         self._command_queue: queue.Queue = queue.Queue()  # Pending commands to send to the client
@@ -62,13 +64,10 @@ class Connection:
 
         self._server.leave_room(self)
 
-    def get_unique_id(self) -> str:
-        return f"{self.address[0]}:{self.address[1]}"
-
     def client_dict(self) -> Dict[str, Any]:
         return {
             **self.metadata,
-            common.ClientMetadata.ID: f"{self.get_unique_id()}",
+            common.ClientMetadata.ID: f"{self.unique_id}",
             common.ClientMetadata.IP: self.address[0],
             common.ClientMetadata.PORT: self.address[1],
             common.ClientMetadata.ROOM: self.room.name if self.room is not None else None,
@@ -86,9 +85,9 @@ class Connection:
         if self.room is None:
             self.send_error("Unjoined client trying to set room joinable")
             return
-        if self.room.creator_client_id != self.get_unique_id():
+        if self.room.creator_client_id != self.unique_id:
             self.send_error(
-                f"Client {self.get_unique_id()} trying to set joinbale room {self.room.name} created by {self.room.creator_client_id}"
+                f"Client {self.unique_id} trying to set joinbale room {self.room.name} created by {self.room.creator_client_id}"
             )
             return
         if not self.room.joinable:
@@ -319,7 +318,7 @@ class Server:
 
     def _create_room(self, connection: Connection, room_name: str):
         logger.info(f"Room {room_name} does not exist. Creating it.")
-        room = Room(self, room_name, connection.get_unique_id())
+        room = Room(self, room_name, connection.unique_id)
         room.add_client(connection)
         connection.room = room
         connection.send_command(common.Command(common.MessageType.CONTENT))
@@ -383,7 +382,7 @@ class Server:
             return
 
         self.broadcast_to_all_clients(
-            common.Command(common.MessageType.CLIENT_UPDATE, common.encode_json({connection.get_unique_id(): metadata}))
+            common.Command(common.MessageType.CLIENT_UPDATE, common.encode_json({connection.unique_id: metadata}))
         )
 
     def broadcast_room_update(self, room: Room, metadata: Dict[str, Any]):
@@ -428,7 +427,7 @@ class Server:
             self.leave_room(connection)
 
         with self._mutex:
-            del self._connections[connection.get_unique_id()]
+            del self._connections[connection.unique_id]
 
         try:
             connection.socket.close()
@@ -437,7 +436,7 @@ class Server:
         logger.info("%s closed", connection.address)
 
         self.broadcast_to_all_clients(
-            common.Command(common.MessageType.CLIENT_DISCONNECTED, common.encode_string(connection.get_unique_id()))
+            common.Command(common.MessageType.CLIENT_DISCONNECTED, common.encode_string(connection.unique_id))
         )
 
     def run(self, port):
@@ -457,7 +456,7 @@ class Server:
                     client_socket, client_address = sock.accept()
                     connection = Connection(self, client_socket, client_address)
                     with self._mutex:
-                        self._connections[connection.get_unique_id()] = connection
+                        self._connections[connection.unique_id] = connection
                     connection.start()
                     logger.info(f"New connection from {client_address}")
                     self.broadcast_client_update(connection, connection.client_dict())
