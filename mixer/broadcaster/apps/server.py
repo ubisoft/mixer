@@ -298,26 +298,26 @@ class Server:
                 common.Command(common.MessageType.ROOM_DELETED, common.encode_string(room_name))
             )
 
-    def _create_room(self, connection: Connection, room_name: str):
-        logger.info(f"Room {room_name} does not exist. Creating it.")
-        room = Room(self, room_name, connection.unique_id)
-        room.add_client(connection)
-        connection.room = room
-        connection.send_command(common.Command(common.MessageType.CONTENT))
-
-        self._rooms[room_name] = room
-        logger.info(f"Room {room_name} added")
-
-        self.broadcast_room_update(room, room.attributes_dict())  # Inform new room
-        self.broadcast_client_update(connection, {common.ClientAttributes.ROOM: connection.room.name})
-
     def join_room(self, connection: Connection, room_name: str):
         assert not connection.has_room()
+
+        def _create_room():
+            logger.info(f"Room {room_name} does not exist. Creating it.")
+            room = Room(self, room_name, connection.unique_id)
+            room.add_client(connection)
+            connection.room = room
+            connection.send_command(common.Command(common.MessageType.CONTENT))
+
+            self._rooms[room_name] = room
+            logger.info(f"Room {room_name} added")
+
+            self.broadcast_room_update(room, room.attributes_dict())  # Inform new room
+            self.broadcast_client_update(connection, {common.ClientAttributes.ROOM: connection.room.name})
 
         with self._mutex:
             room = self._rooms.get(room_name)
             if room is None:
-                self._create_room(connection, room_name)
+                _create_room()
                 return
 
             if not room.joinable:
