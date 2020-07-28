@@ -221,7 +221,7 @@ def join_room(room_name: str):
 def leave_current_room():
     logger.info("leave_current_room")
 
-    if share_data.client.current_room:
+    if share_data.client and share_data.client.current_room:
         share_data.leave_current_room()
         HandlerManager.set_handlers(False)
 
