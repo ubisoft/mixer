@@ -50,20 +50,20 @@ class Connection:
         }
 
     def run(self):
-        def _send_error(self, s: str):
+        def _send_error(s: str):
             logger.warning("Sending error %s", s)
             self.send_command(common.Command(common.MessageType.SEND_ERROR, common.encode_string(s)))
 
         def _join_room(command: common.Command):
             if self.room is not None:
-                self.send_error(f"Received join_room but room {self.room.name} is already joined")
+                _send_error(f"Received join_room but room {self.room.name} is already joined")
                 return
             room_name = command.data.decode()
             self._server.join_room(self, room_name)
 
         def _leave_room(command: common.Command):
             if self.room is None:
-                self.send_error(f"Received leave_room but no room is joined")
+                _send_error(f"Received leave_room but no room is joined")
                 return
             _ = command.data.decode()  # todo remove room_name from protocol
             self._server.leave_room(self)
@@ -104,15 +104,15 @@ class Connection:
 
         def _content(command: common.Command):
             if self.room is None:
-                self.send_error("Unjoined client trying to set room joinable")
+                _send_error("Unjoined client trying to set room joinable")
                 return
             if self.room.creator_client_id != self.unique_id:
-                self.send_error(
+                _send_error(
                     f"Client {self.unique_id} trying to set joinable room {self.room.name} created by {self.room.creator_client_id}"
                 )
                 return
             if self.room.joinable:
-                self.send_error(f"Trying to set joinable room {self.room.name} which is already joinable")
+                _send_error(f"Trying to set joinable room {self.room.name} which is already joinable")
                 return
             self.room.joinable = True
             self._server.broadcast_room_update(self.room, {common.RoomAttributes.JOINABLE: True})
