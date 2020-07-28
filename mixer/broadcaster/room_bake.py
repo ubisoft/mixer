@@ -28,11 +28,11 @@ def download_room(host: str, port: int, room_name: str) -> Tuple[dict, List[Comm
                 if command is None:
                     continue
                 if room_attributes is None and command.type == MessageType.LIST_ROOMS:
-                    rooms_dict, _ = decode_json(command.data, 0)
-                    if room_name not in rooms_dict:
+                    rooms_attributes, _ = decode_json(command.data, 0)
+                    if room_name not in rooms_attributes:
                         logger.error("Room %s does not exist on server", room_name)
                         return {}, []
-                    room_attributes = rooms_dict[room_name]
+                    room_attributes = rooms_attributes[room_name]
                     logger.info(
                         "Meta data received, number of commands in the room: %d",
                         room_attributes[RoomAttributes.COMMAND_COUNT],

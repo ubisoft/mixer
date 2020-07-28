@@ -110,12 +110,12 @@ def users_frustum_name_draw():
 
 
 def users_frustrum_draw_iteration(per_user_callback, per_frustum_callback):
-    if share_data.clients_dict is None:
+    if share_data.client is None:
         return
 
     prefs = get_mixer_prefs()
 
-    for user_dict in share_data.clients_dict.values():
+    for user_dict in share_data.client.clients_attributes.values():
         scenes = user_dict.get(ClientAttributes.USERSCENES, None)
         if not scenes:
             continue
@@ -202,12 +202,12 @@ def users_selection_name_draw():
 
 
 def users_selection_draw_iteration(per_user_callback, per_object_callback):
-    if share_data.clients_dict is None:
+    if share_data.client is None:
         return
 
     prefs = get_mixer_prefs()
 
-    for user_dict in share_data.clients_dict.values():
+    for user_dict in share_data.client.clients_attributes.values():
         scenes = user_dict.get(ClientAttributes.USERSCENES, None)
         if not scenes:
             continue

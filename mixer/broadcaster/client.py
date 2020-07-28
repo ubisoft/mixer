@@ -2,7 +2,7 @@ import queue
 import socket
 import logging
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Mapping
 
 import mixer.broadcaster.common as common
 from mixer.broadcaster.common import MessageType
@@ -17,6 +17,7 @@ class Client:
     - handling the connection with the server
     - receiving packet of bytes to convert them to commands
     - send commands
+    - maintain an updated view of clients and room states from server's inputs
     """
 
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
@@ -25,7 +26,9 @@ class Client:
         self.received_commands = queue.Queue()
         self.pending_commands = queue.Queue()  # todo: does not need to be a queue anymore, at least for Blender client
         self.socket = None
-        self.current_attributes: Dict[str, Any] = {}
+        self.current_custom_attributes: Dict[str, Any] = {}
+        self.clients_attributes: Dict[str, Dict[str, Any]] = {}
+        self.rooms_attributes: Dict[str, Dict[str, Any]] = {}
 
     def __del__(self):
         if self.socket is not None:
@@ -111,7 +114,7 @@ class Client:
         return self.safe_write_message(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
 
     def set_client_attributes(self, attributes: dict):
-        diff = update_dict_and_get_diff(self.current_attributes, attributes)
+        diff = update_dict_and_get_diff(self.current_custom_attributes, attributes)
         if diff == {}:
             return True
 
@@ -182,6 +185,42 @@ class Client:
             return command
         except queue.Empty:
             return None
+
+    def build_list_clients(self, clients_attributes: Mapping[str, Mapping[str, Any]]):
+        if self.clients_attributes is None:
+            self.clients_attributes = {}
+        for client_id, client_dict in clients_attributes.items():
+            if client_id not in self.clients_attributes:
+                self.clients_attributes[client_id] = {}
+            for key, value in client_dict.items():
+                self.clients_attributes[client_id][key] = value
+
+    def handle_client_disconnected(self, client_id: str):
+        if self.clients_attributes is None:
+            logger.warning("Client %s disconnedted but no cleints info received", client_id)
+            return
+        if client_id not in self.clients_attributes:
+            logger.warning("Client %s disconnected but not in internal dict.", client_id)
+            return
+        del self.clients_attributes[client_id]
+
+    def build_list_rooms(self, rooms_attributes: Mapping[str, Mapping[str, Any]]):
+        if self.rooms_attributes is None:
+            self.rooms_attributes = {}
+        for room_id, room_dict in rooms_attributes.items():
+            if room_id not in self.rooms_attributes:
+                self.rooms_attributes[room_id] = {}
+            for key, value in room_dict.items():
+                self.rooms_attributes[room_id][key] = value
+
+    def handle_room_deleted(self, room_name: str):
+        if self.rooms_attributes is None:
+            logger.warning("Room %s deleted but no room info received", room_name)
+            return
+        if room_name not in self.rooms_attributes:
+            logger.warning("Room %s deleted but not in internal dict.", room_name)
+            return
+        del self.rooms_attributes[room_name]
 
 
 # For tests

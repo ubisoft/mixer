@@ -12,20 +12,20 @@ logger = logging.getLogger(__name__)
 class RoomItem(bpy.types.PropertyGroup):
     def is_room_experimental(self):
         if (
-            share_data.rooms_dict is not None
-            and self.name in share_data.rooms_dict
-            and "experimental_sync" in share_data.rooms_dict[self.name]
+            share_data.client is not None
+            and self.name in share_data.client.rooms_attributes
+            and "experimental_sync" in share_data.client.rooms_attributes[self.name]
         ):
-            return share_data.rooms_dict[self.name]["experimental_sync"]
+            return share_data.client.rooms_attributes[self.name]["experimental_sync"]
         return False
 
     def is_kept_open(self):
         if (
-            share_data.rooms_dict is not None
-            and self.name in share_data.rooms_dict
-            and RoomAttributes.KEEP_OPEN in share_data.rooms_dict[self.name]
+            share_data.client is not None
+            and self.name in share_data.client.rooms_attributes
+            and RoomAttributes.KEEP_OPEN in share_data.client.rooms_attributes[self.name]
         ):
-            return share_data.rooms_dict[self.name][RoomAttributes.KEEP_OPEN]
+            return share_data.client.rooms_attributes[self.name][RoomAttributes.KEEP_OPEN]
         return False
 
     def on_keep_open_changed(self, value):
@@ -34,29 +34,29 @@ class RoomItem(bpy.types.PropertyGroup):
 
     def get_command_count(self):
         if (
-            share_data.rooms_dict is not None
-            and self.name in share_data.rooms_dict
-            and RoomAttributes.COMMAND_COUNT in share_data.rooms_dict[self.name]
+            share_data.client is not None
+            and self.name in share_data.client.rooms_attributes
+            and RoomAttributes.COMMAND_COUNT in share_data.client.rooms_attributes[self.name]
         ):
-            return share_data.rooms_dict[self.name][RoomAttributes.COMMAND_COUNT]
+            return share_data.client.rooms_attributes[self.name][RoomAttributes.COMMAND_COUNT]
         return 0
 
     def get_mega_byte_size(self):
         if (
-            share_data.rooms_dict is not None
-            and self.name in share_data.rooms_dict
-            and RoomAttributes.BYTE_SIZE in share_data.rooms_dict[self.name]
+            share_data.client is not None
+            and self.name in share_data.client.rooms_attributes
+            and RoomAttributes.BYTE_SIZE in share_data.client.rooms_attributes[self.name]
         ):
-            return share_data.rooms_dict[self.name][RoomAttributes.BYTE_SIZE] * 1e-6
+            return share_data.client.rooms_attributes[self.name][RoomAttributes.BYTE_SIZE] * 1e-6
         return 0
 
     def is_joinable(self):
         if (
-            share_data.rooms_dict is not None
-            and self.name in share_data.rooms_dict
-            and RoomAttributes.JOINABLE in share_data.rooms_dict[self.name]
+            share_data.client is not None
+            and self.name in share_data.client.rooms_attributes
+            and RoomAttributes.JOINABLE in share_data.client.rooms_attributes[self.name]
         ):
-            return share_data.rooms_dict[self.name][RoomAttributes.JOINABLE]
+            return share_data.client.rooms_attributes[self.name][RoomAttributes.JOINABLE]
         return False
 
     name: bpy.props.StringProperty(name="Name")

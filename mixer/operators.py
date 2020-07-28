@@ -1145,8 +1145,6 @@ def disconnect():
             share_data.client.disconnect()
         share_data.client = None
 
-    share_data.clients_dict = None
-    share_data.rooms_dict = None
     share_data.current_room = None
 
     ui.update_ui_lists()
@@ -1215,7 +1213,6 @@ def create_main_client(host: str, port: int):
 
 
 poll_is_client_connected = (lambda: is_client_connected(), "Client not connected")
-poll_rooms_received_from_server = (lambda: share_data.rooms_dict is not None, "Rooms not received from server")
 poll_already_in_a_room = (lambda: not share_data.current_room, "Already in a room")
 
 
@@ -1246,10 +1243,9 @@ class CreateRoomOperator(bpy.types.Operator):
     def poll_functors(cls, context):
         return [
             poll_is_client_connected,
-            poll_rooms_received_from_server,
             poll_already_in_a_room,
             (lambda: get_mixer_prefs().room != "", "Room name cannot be empty"),
-            (lambda: get_mixer_prefs().room not in share_data.rooms_dict, "Room already exists"),
+            (lambda: get_mixer_prefs().room not in share_data.client.rooms_attributes, "Room already exists"),
         ]
 
     @classmethod
@@ -1273,7 +1269,7 @@ class CreateRoomOperator(bpy.types.Operator):
 def get_selected_room_dict():
     room_index = get_mixer_props().room_index
     assert room_index < len(get_mixer_props().rooms)
-    return share_data.rooms_dict[get_mixer_props().rooms[room_index].name]
+    return share_data.client.rooms_attributes[get_mixer_props().rooms[room_index].name]
 
 
 class JoinRoomOperator(bpy.types.Operator):
@@ -1287,7 +1283,6 @@ class JoinRoomOperator(bpy.types.Operator):
     def poll_functors(cls, context):
         return [
             poll_is_client_connected,
-            poll_rooms_received_from_server,
             poll_already_in_a_room,
             (lambda: get_mixer_props().room_index < len(get_mixer_props().rooms), "Invalid room selection"),
             (
@@ -1399,9 +1394,8 @@ class UploadRoomOperator(bpy.types.Operator):
         mixer_props = get_mixer_props()
         return (
             is_client_connected()
-            and share_data.rooms_dict is not None
             and os.path.exists(mixer_props.upload_room_filepath)
-            and mixer_props.upload_room_name not in share_data.rooms_dict
+            and mixer_props.upload_room_name not in share_data.client.rooms_attributes
         )
 
     def execute(self, context):

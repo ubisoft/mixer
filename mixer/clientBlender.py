@@ -510,46 +510,6 @@ class ClientBlender(Client):
         if "Disconnect" in self.callbacks:
             self.callbacks["Disconnect"]()
 
-    def build_list_clients(self, clients_dict: Mapping[str, Mapping[str, Any]]):
-        if share_data.clients_dict is None:
-            share_data.clients_dict = {}
-        for client_id, client_dict in clients_dict.items():
-            if client_id not in share_data.clients_dict:
-                share_data.clients_dict[client_id] = {}
-            for key, value in client_dict.items():
-                share_data.clients_dict[client_id][key] = value
-        ui.update_ui_lists()
-
-    def handle_client_disconnected(self, client_id: str):
-        if share_data.clients_dict is None:
-            logger.warning("Client %s disconnedted but no cleints info received", client_id)
-            return
-        if client_id not in share_data.clients_dict:
-            logger.warning("Client %s disconnected but not in internal dict.", client_id)
-            return
-        del share_data.clients_dict[client_id]
-        ui.update_ui_lists()
-
-    def build_list_rooms(self, rooms_dict: Mapping[str, Mapping[str, Any]]):
-        if share_data.rooms_dict is None:
-            share_data.rooms_dict = {}
-        for room_id, room_dict in rooms_dict.items():
-            if room_id not in share_data.rooms_dict:
-                share_data.rooms_dict[room_id] = {}
-            for key, value in room_dict.items():
-                share_data.rooms_dict[room_id][key] = value
-        ui.update_ui_lists()
-
-    def handle_room_deleted(self, room_name: str):
-        if share_data.rooms_dict is None:
-            logger.warning("Room %s deleted but no room info received", room_name)
-            return
-        if room_name not in share_data.rooms_dict:
-            logger.warning("Room %s deleted but not in internal dict.", room_name)
-            return
-        del share_data.rooms_dict[room_name]
-        ui.update_ui_lists()
-
     def send_scene_content(self):
         if "SendContent" in self.callbacks:
             self.callbacks["SendContent"]()
@@ -673,25 +633,30 @@ class ClientBlender(Client):
                 if command.type == common.MessageType.LIST_CLIENTS:
                     clients, _ = common.decode_json(command.data, 0)
                     self.build_list_clients(clients)
+                    ui.update_ui_lists()
                     processed = True
                 elif command.type == common.MessageType.LIST_ROOMS:
-                    rooms_dict, _ = common.decode_json(command.data, 0)
-                    self.build_list_rooms(rooms_dict)
+                    rooms_attributes, _ = common.decode_json(command.data, 0)
+                    self.build_list_rooms(rooms_attributes)
+                    ui.update_ui_lists()
                     processed = True
                 elif command.type == common.MessageType.CLIENT_ID:
                     self.client_id = command.data.decode()
                     processed = True
                 elif command.type == common.MessageType.ROOM_UPDATE:
-                    rooms_dict, _ = common.decode_json(command.data, 0)
-                    self.build_list_rooms(rooms_dict)
+                    rooms_attributes_update, _ = common.decode_json(command.data, 0)
+                    self.build_list_rooms(rooms_attributes_update)
+                    ui.update_ui_lists()
                     processed = True
                 elif command.type == common.MessageType.ROOM_DELETED:
                     room_name, _ = common.decode_string(command.data, 0)
                     self.handle_room_deleted(room_name)
+                    ui.update_ui_lists()
                     processed = True
                 elif command.type == common.MessageType.CLIENT_UPDATE:
                     clients, _ = common.decode_json(command.data, 0)
                     self.build_list_clients(clients)
+                    ui.update_ui_lists()
                     processed = True
                 elif command.type == common.MessageType.CLIENT_DISCONNECTED:
                     client_id, _ = common.decode_string(command.data, 0)
