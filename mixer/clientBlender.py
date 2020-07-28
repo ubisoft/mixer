@@ -41,7 +41,7 @@ def get_target(region: bpy.types.Region, region_3d: bpy.types.RegionView3D, pixe
     return [target.x, target.y, target.z]
 
 
-def get_view_dict(region: bpy.types.Region, region_3d: bpy.types.RegionView3D):
+def get_view_frustum_attributes(region: bpy.types.Region, region_3d: bpy.types.RegionView3D):
     from bpy_extras import view3d_utils
 
     width = region.width
@@ -594,7 +594,7 @@ class ClientBlender(Client):
                         for region in area.regions:
                             if region.type == "WINDOW":
                                 view_id = str(area.as_pointer())
-                                view_dict = get_view_dict(region, area.spaces.active.region_3d)
+                                view_dict = get_view_frustum_attributes(region, area.spaces.active.region_3d)
                                 scene_attributes[scene][ClientAttributes.USERSCENES_VIEWS][view_id] = view_dict
                                 areas_3d.append(view_id)
                 windows.append({"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d": areas_3d})
