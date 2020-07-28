@@ -15,6 +15,7 @@ from mixer.broadcaster.common import update_attributes_and_get_diff
 SHUTDOWN = False
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
+_log_server_updates: bool = False
 
 
 class Connection:
@@ -67,6 +68,7 @@ class Connection:
                 return
             _ = command.data.decode()  # todo remove room_name from protocol
             self._server.leave_room(self)
+            self.send_command(common.Command(common.MessageType.LEAVE_ROOM))
 
         def _list_rooms(command: common.Command):
             self.send_command(self._server.get_list_rooms_command())
@@ -165,7 +167,11 @@ class Connection:
                     except queue.Empty:
                         break
 
-                    logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
+                    if _log_server_updates or command.type not in (
+                        common.MessageType.CLIENT_UPDATE,
+                        common.MessageType.ROOM_UPDATE,
+                    ):
+                        logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
                     common.write_message(self.socket, command)
 
                     self._command_queue.task_done()
@@ -345,7 +351,6 @@ class Server:
                 raise ValueError(f"Room not found {connection.room.name})")
             room.remove_client(connection)
             connection.room = None
-            connection.send_command(common.Command(common.MessageType.LEAVE_ROOM))
             self.broadcast_client_update(connection, {common.ClientAttributes.ROOM: None})
 
             if room.client_count() == 0 and not room.keep_open:
@@ -405,11 +410,13 @@ class Server:
             return common.Command(common.MessageType.LIST_CLIENTS, common.encode_json(result_dict))
 
     def handle_client_disconnect(self, connection: Connection):
-        if connection.room is not None:
-            self.leave_room(connection)
-
+        # First remove connection from server state, to avoid further broadcasting tentatives
         with self._mutex:
             del self._connections[connection.unique_id]
+
+        # Clean leaving of the room
+        if connection.room is not None:
+            self.leave_room(connection)
 
         try:
             connection.socket.close()
@@ -451,8 +458,11 @@ class Server:
 
 
 def main():
+    global _log_server_updates
     args, args_parser = parse_cli_args()
     init_logging(args)
+
+    _log_server_updates = args.log_server_updates
 
     server = Server()
     server.run(args.port)
@@ -462,6 +472,7 @@ def parse_cli_args():
     parser = argparse.ArgumentParser(description="Start broadcasting server for Mixer")
     add_logging_cli_args(parser)
     parser.add_argument("--port", type=int, default=common.DEFAULT_PORT)
+    parser.add_argument("--log-server-updates", action="store_true")
     return parser.parse_args(), parser
 
 
