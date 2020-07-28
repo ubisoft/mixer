@@ -610,9 +610,7 @@ class ClientBlender(Client):
         # or it needs to be guaranteed by the server
         group_count = 0
         while True:
-            self.fetch_outgoing_commands(get_mixer_prefs().commands_send_interval)
-
-            received_commands = self.fetch_incoming_commands()
+            received_commands = self.fetch_commands(get_mixer_prefs().commands_send_interval)
             if received_commands is None:
                 self.on_connection_lost()
                 break

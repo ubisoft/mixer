@@ -34,7 +34,7 @@ class CliClient(client.Client):
         self.add_and_process_command(command, common.MessageType.LIST_CLIENTS)
 
     def add_and_process_command(self, command: common.Command, expected_response_type: common.MessageType = None):
-        if not self.safe_write_message(command):
+        if not self.send_command(command):
             self.disconnect()
             return
 

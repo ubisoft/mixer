@@ -54,9 +54,9 @@ class Client:
             logger.info(
                 "Connecting from local %s:%s to %s:%s", local_address[0], local_address[1], self.host, self.port,
             )
-            self.safe_write_message(common.Command(common.MessageType.CLIENT_ID))
-            self.safe_write_message(common.Command(common.MessageType.LIST_CLIENTS))
-            self.safe_write_message(common.Command(common.MessageType.LIST_ROOMS))
+            self.send_command(common.Command(common.MessageType.CLIENT_ID))
+            self.send_command(common.Command(common.MessageType.LIST_CLIENTS))
+            self.send_command(common.Command(common.MessageType.LIST_ROOMS))
         except ConnectionRefusedError:
             self.socket = None
         except common.ClientDisconnectedException:
@@ -83,7 +83,21 @@ class Client:
         # Set socket to None before putting CONNECTION_LIST message to avoid sending/reading new messages
         self.socket = None
 
-    def safe_write_message(self, command: common.Command):
+    def wait(self, message_type: MessageType) -> bool:
+        """
+        Wait for a command of a given message type, the remaining commands are ignored.
+        Usually message_type is LEAVING_ROOM.
+        """
+        while self.is_connected():
+            received_commands = self.fetch_incoming_commands()
+            if received_commands is None:
+                break
+            for command in received_commands:
+                if command.type == message_type:
+                    return True
+        return False
+
+    def send_command(self, command: common.Command):
         try:
             common.write_message(self.socket, command)
             return True
@@ -92,32 +106,32 @@ class Client:
             return False
 
     def join_room(self, room_name: str):
-        return self.safe_write_message(common.Command(common.MessageType.JOIN_ROOM, room_name.encode("utf8"), 0))
+        return self.send_command(common.Command(common.MessageType.JOIN_ROOM, room_name.encode("utf8"), 0))
 
     def leave_room(self, room_name: str):
         self.current_room = None
-        return self.safe_write_message(common.Command(common.MessageType.LEAVE_ROOM, room_name.encode("utf8"), 0))
+        return self.send_command(common.Command(common.MessageType.LEAVE_ROOM, room_name.encode("utf8"), 0))
 
     def delete_room(self, room_name: str):
-        return self.safe_write_message(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
+        return self.send_command(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
 
     def set_client_attributes(self, attributes: dict):
         diff = update_attributes_and_get_diff(self.current_custom_attributes, attributes)
         if diff == {}:
             return True
 
-        return self.safe_write_message(
+        return self.send_command(
             common.Command(common.MessageType.SET_CLIENT_CUSTOM_ATTRIBUTES, common.encode_json(diff), 0)
         )
 
     def set_room_attributes(self, room_name: str, attributes: dict):
-        return self.safe_write_message(common.make_set_room_attributes_command(room_name, attributes))
+        return self.send_command(common.make_set_room_attributes_command(room_name, attributes))
 
     def send_list_rooms(self):
-        return self.safe_write_message(common.Command(common.MessageType.LIST_ROOMS))
+        return self.send_command(common.Command(common.MessageType.LIST_ROOMS))
 
     def set_room_keep_open(self, room_name: str, value: bool):
-        return self.safe_write_message(
+        return self.send_command(
             common.Command(
                 common.MessageType.SET_ROOM_KEEP_OPEN, common.encode_string(room_name) + common.encode_bool(value), 0
             )
@@ -203,10 +217,14 @@ class Client:
         for idx, command in enumerate(self.pending_commands):
             logger.debug("Send %s (%d / %d)", command.type, idx + 1, len(self.pending_commands))
 
-            if not self.safe_write_message(command):
+            if not self.send_command(command):
                 break
 
             if commands_send_interval > 0:
                 time.sleep(commands_send_interval)
 
         self.pending_commands = []
+
+    def fetch_commands(self, commands_send_interval=0) -> Optional[List[common.Command]]:
+        self.fetch_outgoing_commands(commands_send_interval)
+        return self.fetch_incoming_commands()

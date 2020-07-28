@@ -23,8 +23,7 @@ class Delegate:
 
 
 def network_consumer(client, delegate):
-    client.fetch_outgoing_commands()
-    received_commands = client.fetch_incoming_commands()
+    received_commands = client.fetch_commands()
 
     if received_commands is None:
         return
