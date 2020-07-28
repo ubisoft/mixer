@@ -137,30 +137,27 @@ class Connection:
         while not SHUTDOWN:
             try:
                 command = common.read_message(self.socket)
-            except common.ClientDisconnectedException:
-                break
 
-            if command is not None:
-                logger.debug("Received from %s:%s - %s", self.address[0], self.address[1], command.type)
+                if command is not None:
+                    logger.debug("Received from %s:%s - %s", self.address[0], self.address[1], command.type)
 
-                if command.type in command_handlers:
-                    command_handlers[command.type](command)
+                    if command.type in command_handlers:
+                        command_handlers[command.type](command)
 
-                elif command.type.value > common.MessageType.COMMAND.value:
-                    if self.room is not None:
-                        self.room.add_command(command, self)
+                    elif command.type.value > common.MessageType.COMMAND.value:
+                        if self.room is not None:
+                            self.room.add_command(command, self)
+                        else:
+                            logger.warning(
+                                "%s:%s - %s received but no room was joined",
+                                self.address[0],
+                                self.address[1],
+                                command.type.value,
+                            )
+
                     else:
-                        logger.warning(
-                            "%s:%s - %s received but no room was joined",
-                            self.address[0],
-                            self.address[1],
-                            command.type.value,
-                        )
+                        logger.error("Command %s received but no handler for it on server", command.type)
 
-                else:
-                    logger.error("Command %s received but no handler for it on server", command.type)
-
-            try:
                 while True:
                     try:
                         command = self._command_queue.get_nowait()
@@ -172,7 +169,7 @@ class Connection:
                         common.MessageType.ROOM_UPDATE,
                     ):
                         logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
-                    common.write_message(self.socket, command)
+                    self.send_command(command)
 
                     self._command_queue.task_done()
             except common.ClientDisconnectedException:
