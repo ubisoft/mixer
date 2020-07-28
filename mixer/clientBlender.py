@@ -11,7 +11,7 @@ from mixer import ui
 from mixer.bl_utils import get_mixer_prefs
 from mixer.share_data import share_data
 from mixer.broadcaster import common
-from mixer.broadcaster.common import ClientAttributes
+from mixer.broadcaster.common import ClientAttributes, MessageType
 from mixer.broadcaster.client import Client
 from mixer.blender_client import camera as camera_api
 from mixer.blender_client import collection as collection_api
@@ -628,180 +628,149 @@ class ClientBlender(Client):
                     group_count -= 1
                     continue
 
-                processed = False
-                if command.type == common.MessageType.LIST_CLIENTS:
-                    clients, _ = common.decode_json(command.data, 0)
-                    self.update_clients_attributes(clients)
+                if self.has_default_handler(command.type):
                     ui.update_ui_lists()
-                    processed = True
-                elif command.type == common.MessageType.LIST_ROOMS:
-                    rooms_attributes, _ = common.decode_json(command.data, 0)
-                    self.update_rooms_attributes(rooms_attributes)
-                    ui.update_ui_lists()
-                    processed = True
-                elif command.type == common.MessageType.CLIENT_ID:
-                    self.client_id = command.data.decode()
-                    processed = True
-                elif command.type == common.MessageType.ROOM_UPDATE:
-                    rooms_attributes_update, _ = common.decode_json(command.data, 0)
-                    self.update_rooms_attributes(rooms_attributes_update)
-                    ui.update_ui_lists()
-                    processed = True
-                elif command.type == common.MessageType.ROOM_DELETED:
-                    room_name, _ = common.decode_string(command.data, 0)
-                    self.handle_room_deleted(room_name)
-                    ui.update_ui_lists()
-                    processed = True
-                elif command.type == common.MessageType.CLIENT_UPDATE:
-                    clients, _ = common.decode_json(command.data, 0)
-                    self.update_clients_attributes(clients)
-                    ui.update_ui_lists()
-                    processed = True
-                elif command.type == common.MessageType.CLIENT_DISCONNECTED:
-                    client_id, _ = common.decode_string(command.data, 0)
-                    self.handle_client_disconnected(client_id)
-                    ui.update_ui_lists()
-                    processed = True
+                    self.block_signals = False  # todo investigate why we should but this to false here
+                    continue
 
-                if not processed and set_dirty:
+                if set_dirty:
                     share_data.set_dirty()
                     set_dirty = False
 
                 self.block_signals = True
 
-                if not processed:
-                    try:
-                        if command.type == common.MessageType.CONTENT:
-                            # The server asks for scene content (at room creation)
-                            try:
-                                assert share_data.client.current_room is not None
-                                self.set_room_attributes(
-                                    share_data.client.current_room,
-                                    {"experimental_sync": get_mixer_prefs().experimental_sync},
-                                )
-                                self.send_scene_content()
-                                # Inform end of content
-                                self.add_command(common.Command(common.MessageType.CONTENT))
-                            except Exception as e:
-                                self.on_connection_lost()
-                                raise SendSceneContentFailed() from e
-                            continue
+                try:
+                    if command.type == common.MessageType.CONTENT:
+                        # The server asks for scene content (at room creation)
+                        try:
+                            assert share_data.client.current_room is not None
+                            self.set_room_attributes(
+                                share_data.client.current_room,
+                                {"experimental_sync": get_mixer_prefs().experimental_sync},
+                            )
+                            self.send_scene_content()
+                            # Inform end of content
+                            self.add_command(common.Command(common.MessageType.CONTENT))
+                        except Exception as e:
+                            self.on_connection_lost()
+                            raise SendSceneContentFailed() from e
+                        continue
 
-                        # Put this to true by default
-                        # todo Check build commands that do not trigger depsgraph update
-                        # because it can lead to ignoring real updates when a false positive is encountered
-                        command_triggers_depsgraph_update = True
+                    # Put this to true by default
+                    # todo Check build commands that do not trigger depsgraph update
+                    # because it can lead to ignoring real updates when a false positive is encountered
+                    command_triggers_depsgraph_update = True
 
-                        if command.type == common.MessageType.GREASE_PENCIL_MESH:
-                            grease_pencil_api.build_grease_pencil_mesh(command.data)
-                        elif command.type == common.MessageType.GREASE_PENCIL_MATERIAL:
-                            grease_pencil_api.build_grease_pencil_material(command.data)
-                        elif command.type == common.MessageType.GREASE_PENCIL_CONNECTION:
-                            grease_pencil_api.build_grease_pencil_connection(command.data)
+                    if command.type == common.MessageType.GREASE_PENCIL_MESH:
+                        grease_pencil_api.build_grease_pencil_mesh(command.data)
+                    elif command.type == common.MessageType.GREASE_PENCIL_MATERIAL:
+                        grease_pencil_api.build_grease_pencil_material(command.data)
+                    elif command.type == common.MessageType.GREASE_PENCIL_CONNECTION:
+                        grease_pencil_api.build_grease_pencil_connection(command.data)
 
-                        elif command.type == common.MessageType.CLEAR_CONTENT:
-                            self.clear_content()
-                        elif command.type == common.MessageType.MESH:
-                            self.build_mesh(command.data)
-                        elif command.type == common.MessageType.TRANSFORM:
-                            self.build_transform(command.data)
-                        elif command.type == common.MessageType.MATERIAL:
-                            material_api.build_material(command.data)
-                        elif command.type == common.MessageType.ASSIGN_MATERIAL:
-                            material_api.build_assign_material(command.data)
-                        elif command.type == common.MessageType.DELETE:
-                            self.build_delete(command.data)
-                        elif command.type == common.MessageType.CAMERA:
-                            camera_api.build_camera(command.data)
-                        elif command.type == common.MessageType.LIGHT:
-                            light_api.build_light(command.data)
-                        elif command.type == common.MessageType.RENAME:
-                            self.build_rename(command.data)
-                        elif command.type == common.MessageType.DUPLICATE:
-                            self.build_duplicate(command.data)
-                        elif command.type == common.MessageType.SEND_TO_TRASH:
-                            self.build_send_to_trash(command.data)
-                        elif command.type == common.MessageType.RESTORE_FROM_TRASH:
-                            self.build_restore_from_trash(command.data)
-                        elif command.type == common.MessageType.TEXTURE:
-                            self.build_texture_file(command.data)
+                    elif command.type == common.MessageType.CLEAR_CONTENT:
+                        self.clear_content()
+                    elif command.type == common.MessageType.MESH:
+                        self.build_mesh(command.data)
+                    elif command.type == common.MessageType.TRANSFORM:
+                        self.build_transform(command.data)
+                    elif command.type == common.MessageType.MATERIAL:
+                        material_api.build_material(command.data)
+                    elif command.type == common.MessageType.ASSIGN_MATERIAL:
+                        material_api.build_assign_material(command.data)
+                    elif command.type == common.MessageType.DELETE:
+                        self.build_delete(command.data)
+                    elif command.type == common.MessageType.CAMERA:
+                        camera_api.build_camera(command.data)
+                    elif command.type == common.MessageType.LIGHT:
+                        light_api.build_light(command.data)
+                    elif command.type == common.MessageType.RENAME:
+                        self.build_rename(command.data)
+                    elif command.type == common.MessageType.DUPLICATE:
+                        self.build_duplicate(command.data)
+                    elif command.type == common.MessageType.SEND_TO_TRASH:
+                        self.build_send_to_trash(command.data)
+                    elif command.type == common.MessageType.RESTORE_FROM_TRASH:
+                        self.build_restore_from_trash(command.data)
+                    elif command.type == common.MessageType.TEXTURE:
+                        self.build_texture_file(command.data)
 
-                        elif command.type == common.MessageType.COLLECTION:
-                            collection_api.build_collection(command.data)
-                        elif command.type == common.MessageType.COLLECTION_REMOVED:
-                            collection_api.build_collection_removed(command.data)
+                    elif command.type == common.MessageType.COLLECTION:
+                        collection_api.build_collection(command.data)
+                    elif command.type == common.MessageType.COLLECTION_REMOVED:
+                        collection_api.build_collection_removed(command.data)
 
-                        elif command.type == common.MessageType.INSTANCE_COLLECTION:
-                            collection_api.build_collection_instance(command.data)
+                    elif command.type == common.MessageType.INSTANCE_COLLECTION:
+                        collection_api.build_collection_instance(command.data)
 
-                        elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
-                            collection_api.build_collection_to_collection(command.data)
-                        elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
-                            collection_api.build_remove_collection_from_collection(command.data)
-                        elif command.type == common.MessageType.ADD_OBJECT_TO_COLLECTION:
-                            collection_api.build_add_object_to_collection(command.data)
-                        elif command.type == common.MessageType.REMOVE_OBJECT_FROM_COLLECTION:
-                            collection_api.build_remove_object_from_collection(command.data)
+                    elif command.type == common.MessageType.ADD_COLLECTION_TO_COLLECTION:
+                        collection_api.build_collection_to_collection(command.data)
+                    elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_COLLECTION:
+                        collection_api.build_remove_collection_from_collection(command.data)
+                    elif command.type == common.MessageType.ADD_OBJECT_TO_COLLECTION:
+                        collection_api.build_add_object_to_collection(command.data)
+                    elif command.type == common.MessageType.REMOVE_OBJECT_FROM_COLLECTION:
+                        collection_api.build_remove_object_from_collection(command.data)
 
-                        elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
-                            scene_api.build_collection_to_scene(command.data)
-                        elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_SCENE:
-                            scene_api.build_remove_collection_from_scene(command.data)
-                        elif command.type == common.MessageType.ADD_OBJECT_TO_SCENE:
-                            scene_api.build_add_object_to_scene(command.data)
-                        elif command.type == common.MessageType.REMOVE_OBJECT_FROM_SCENE:
-                            scene_api.build_remove_object_from_scene(command.data)
+                    elif command.type == common.MessageType.ADD_COLLECTION_TO_SCENE:
+                        scene_api.build_collection_to_scene(command.data)
+                    elif command.type == common.MessageType.REMOVE_COLLECTION_FROM_SCENE:
+                        scene_api.build_remove_collection_from_scene(command.data)
+                    elif command.type == common.MessageType.ADD_OBJECT_TO_SCENE:
+                        scene_api.build_add_object_to_scene(command.data)
+                    elif command.type == common.MessageType.REMOVE_OBJECT_FROM_SCENE:
+                        scene_api.build_remove_object_from_scene(command.data)
 
-                        elif command.type == common.MessageType.SCENE:
-                            scene_api.build_scene(command.data)
-                        elif command.type == common.MessageType.SCENE_REMOVED:
-                            scene_api.build_scene_removed(command.data)
-                        elif command.type == common.MessageType.SCENE_RENAMED:
-                            scene_api.build_scene_renamed(command.data)
+                    elif command.type == common.MessageType.SCENE:
+                        scene_api.build_scene(command.data)
+                    elif command.type == common.MessageType.SCENE_REMOVED:
+                        scene_api.build_scene_removed(command.data)
+                    elif command.type == common.MessageType.SCENE_RENAMED:
+                        scene_api.build_scene_renamed(command.data)
 
-                        elif command.type == common.MessageType.OBJECT_VISIBILITY:
-                            object_api.build_object_visibility(command.data)
+                    elif command.type == common.MessageType.OBJECT_VISIBILITY:
+                        object_api.build_object_visibility(command.data)
 
-                        elif command.type == common.MessageType.FRAME:
-                            self.build_frame(command.data)
-                        elif command.type == common.MessageType.QUERY_CURRENT_FRAME:
-                            self.query_current_frame()
+                    elif command.type == common.MessageType.FRAME:
+                        self.build_frame(command.data)
+                    elif command.type == common.MessageType.QUERY_CURRENT_FRAME:
+                        self.query_current_frame()
 
-                        elif command.type == common.MessageType.PLAY:
-                            self.build_play(command.data)
-                        elif command.type == common.MessageType.PAUSE:
-                            self.build_pause(command.data)
-                        elif command.type == common.MessageType.ADD_KEYFRAME:
-                            self.build_add_keyframe(command.data)
-                        elif command.type == common.MessageType.REMOVE_KEYFRAME:
-                            self.build_remove_keyframe(command.data)
-                        elif command.type == common.MessageType.QUERY_OBJECT_DATA:
-                            self.build_query_object_data(command.data)
+                    elif command.type == common.MessageType.PLAY:
+                        self.build_play(command.data)
+                    elif command.type == common.MessageType.PAUSE:
+                        self.build_pause(command.data)
+                    elif command.type == common.MessageType.ADD_KEYFRAME:
+                        self.build_add_keyframe(command.data)
+                    elif command.type == common.MessageType.REMOVE_KEYFRAME:
+                        self.build_remove_keyframe(command.data)
+                    elif command.type == common.MessageType.QUERY_OBJECT_DATA:
+                        self.build_query_object_data(command.data)
 
-                        elif command.type == common.MessageType.CLEAR_ANIMATIONS:
-                            self.build_clear_animations(command.data)
-                        elif command.type == common.MessageType.SHOT_MANAGER_MONTAGE_MODE:
-                            self.build_montage_mode(command.data)
-                        elif command.type == common.MessageType.SHOT_MANAGER_ACTION:
-                            shot_manager.build_shot_manager_action(command.data)
+                    elif command.type == common.MessageType.CLEAR_ANIMATIONS:
+                        self.build_clear_animations(command.data)
+                    elif command.type == common.MessageType.SHOT_MANAGER_MONTAGE_MODE:
+                        self.build_montage_mode(command.data)
+                    elif command.type == common.MessageType.SHOT_MANAGER_ACTION:
+                        shot_manager.build_shot_manager_action(command.data)
 
-                        elif command.type == common.MessageType.BLENDER_DATA_UPDATE:
-                            data_api.build_data_update(command.data)
-                        elif command.type == common.MessageType.BLENDER_DATA_REMOVE:
-                            data_api.build_data_remove(command.data)
-                        else:
-                            # Command is ignored, so no depsgraph update can be triggered
-                            command_triggers_depsgraph_update = False
+                    elif command.type == common.MessageType.BLENDER_DATA_UPDATE:
+                        data_api.build_data_update(command.data)
+                    elif command.type == common.MessageType.BLENDER_DATA_REMOVE:
+                        data_api.build_data_remove(command.data)
+                    else:
+                        # Command is ignored, so no depsgraph update can be triggered
+                        command_triggers_depsgraph_update = False
 
-                        if command_triggers_depsgraph_update:
-                            self.skip_next_depsgraph_update = True
+                    if command_triggers_depsgraph_update:
+                        self.skip_next_depsgraph_update = True
 
-                    except Exception as e:
-                        logger.warning(
-                            f"Exception during processing of message {str(command.type)} ...\n" + traceback.format_exc()
-                        )
-                        if isinstance(e, SendSceneContentFailed):
-                            raise
+                except Exception as e:
+                    logger.warning(
+                        f"Exception during processing of message {str(command.type)} ...\n" + traceback.format_exc()
+                    )
+                    if isinstance(e, SendSceneContentFailed):
+                        raise
 
                 self.block_signals = False
 

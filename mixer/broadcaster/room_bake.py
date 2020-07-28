@@ -57,6 +57,16 @@ def download_room(host: str, port: int, room_name: str) -> Tuple[Dict[str, Any],
 
 
 def upload_room(host: str, port: int, room_name: str, room_attributes: dict, commands: List[Command]):
+    def _wait_for(client: Client, message_type: MessageType) -> bool:
+        while client.is_connected():
+            received_commands = client.fetch_incoming_commands()
+            if received_commands is None:
+                break
+            for command in received_commands:
+                if command.type == message_type:
+                    return True
+        return False
+
     with Client(host, port) as client:
         client.join_room(room_name)
         client.set_room_attributes(room_name, room_attributes)
@@ -70,7 +80,7 @@ def upload_room(host: str, port: int, room_name: str, room_attributes: dict, com
         client.fetch_outgoing_commands()
 
         client.leave_room(room_name)
-        if client.wait_for(MessageType.LEAVE_ROOM) is None:
+        if not _wait_for(client, MessageType.LEAVE_ROOM):
             raise ClientDisconnectedException("Client disconnected before the end of upload room")
 
 

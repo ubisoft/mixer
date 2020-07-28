@@ -1,7 +1,7 @@
 import socket
 import logging
 import time
-from typing import Dict, Any, Mapping, Optional, List
+from typing import Dict, Any, Mapping, Optional, List, Callable
 
 import mixer.broadcaster.common as common
 from mixer.broadcaster.common import MessageType
@@ -91,32 +91,14 @@ class Client:
             self.handle_connection_lost()
             return False
 
-    def join_room(self, room_name):
+    def join_room(self, room_name: str):
         return self.safe_write_message(common.Command(common.MessageType.JOIN_ROOM, room_name.encode("utf8"), 0))
 
-    def leave_room(self, room_name):
+    def leave_room(self, room_name: str):
         self.current_room = None
         return self.safe_write_message(common.Command(common.MessageType.LEAVE_ROOM, room_name.encode("utf8"), 0))
 
-    def wait_for(self, message_type: MessageType) -> Optional[List[common.Command]]:
-        """
-        Wait for a specific message type to be received and returns the list of all commands received during that time.
-        Returns None if the client was disconnected before.
-        """
-        all_received_commands: List[common.Command] = []
-        while self.is_connected():
-            self.fetch_outgoing_commands()
-            received_commands = self.fetch_incoming_commands()
-            if received_commands is None:
-                break
-            all_received_commands += received_commands
-            for command in received_commands:
-                if command.type == message_type:
-                    return all_received_commands
-
-        return None
-
-    def delete_room(self, room_name):
+    def delete_room(self, room_name: str):
         return self.safe_write_message(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
 
     def set_client_attributes(self, attributes: dict):
@@ -141,10 +123,59 @@ class Client:
             )
         )
 
+    def _handle_list_client(self, command: common.Command):
+        clients_attributes, _ = common.decode_json(command.data, 0)
+        update_named_attributes(self.clients_attributes, clients_attributes)
+
+    def _handle_list_rooms(self, command: common.Command):
+        rooms_attributes, _ = common.decode_json(command.data, 0)
+        update_named_attributes(self.rooms_attributes, rooms_attributes)
+
+    def _handle_client_id(self, command: common.Command):
+        self.client_id = command.data.decode()
+
+    def _handle_room_update(self, command: common.Command):
+        rooms_attributes_update, _ = common.decode_json(command.data, 0)
+        update_named_attributes(self.rooms_attributes, rooms_attributes_update)
+
+    def _handle_room_deleted(self, command: common.Command):
+        room_name, _ = common.decode_string(command.data, 0)
+
+        if room_name not in self.rooms_attributes:
+            logger.warning("Room %s deleted but no attributes in internal view.", room_name)
+            return
+        del self.rooms_attributes[room_name]
+
+    def _handle_client_update(self, command: common.Command):
+        clients_attributes_update, _ = common.decode_json(command.data, 0)
+        update_named_attributes(self.clients_attributes, clients_attributes_update)
+
+    def _handle_client_disconnected(self, command: common.Command):
+        client_id, _ = common.decode_string(command.data, 0)
+
+        if client_id not in self.clients_attributes:
+            logger.warning("Client %s disconnected but no attributes in internal view.", client_id)
+            return
+        del self.clients_attributes[client_id]
+
+    _default_command_handlers: Mapping[MessageType, Callable[[common.Command], None]] = {
+        MessageType.LIST_CLIENTS: _handle_list_client,
+        MessageType.LIST_ROOMS: _handle_list_rooms,
+        MessageType.CLIENT_ID: _handle_client_id,
+        MessageType.ROOM_UPDATE: _handle_room_update,
+        MessageType.ROOM_DELETED: _handle_room_deleted,
+        MessageType.CLIENT_UPDATE: _handle_client_update,
+        MessageType.CLIENT_DISCONNECTED: _handle_client_disconnected,
+    }
+
+    def has_default_handler(self, message_type: MessageType):
+        return message_type in self._default_command_handlers
+
     def fetch_incoming_commands(self) -> Optional[List[common.Command]]:
         """
         Gather incoming commands from the socket and return them as a list.
         """
+
         received_commands: List[common.Command] = []
         while True:
             try:
@@ -158,6 +189,9 @@ class Client:
 
             logger.debug("Receive %s", command.type)
             received_commands.append(command)
+
+            if command.type in self._default_command_handlers:
+                self._default_command_handlers[command.type](self, command)
 
         logger.debug("Received %d commands", len(received_commands))
         return received_commands
@@ -176,21 +210,3 @@ class Client:
                 time.sleep(commands_send_interval)
 
         self.pending_commands = []
-
-    def update_clients_attributes(self, clients_attributes_update: Mapping[str, Mapping[str, Any]]):
-        update_named_attributes(self.clients_attributes, clients_attributes_update)
-
-    def handle_client_disconnected(self, client_id: str):
-        if client_id not in self.clients_attributes:
-            logger.warning("Client %s disconnected but no attributes in internal view.", client_id)
-            return
-        del self.clients_attributes[client_id]
-
-    def update_rooms_attributes(self, rooms_attributes_update: Mapping[str, Mapping[str, Any]]):
-        update_named_attributes(self.rooms_attributes, rooms_attributes_update)
-
-    def handle_room_deleted(self, room_name: str):
-        if room_name not in self.rooms_attributes:
-            logger.warning("Room %s deleted but no attributes in internal view.", room_name)
-            return
-        del self.rooms_attributes[room_name]
