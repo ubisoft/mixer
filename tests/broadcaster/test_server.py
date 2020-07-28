@@ -21,9 +21,6 @@ class Delegate:
     def update_clients_attributes(self, data):
         return None
 
-    def on_connection_lost(self):
-        return None
-
 
 def network_consumer(client, delegate):
     client.fetch_commands()
@@ -38,8 +35,6 @@ def network_consumer(client, delegate):
         elif command.type == common.MessageType.LIST_CLIENTS:
             clients_attributes, _ = common.decode_json(command.data, 0)
             delegate.update_clients_attributes(clients_attributes)
-        elif command.type == common.MessageType.CONNECTION_LOST:
-            delegate.on_connection_lost()
 
 
 @unittest.skip("")

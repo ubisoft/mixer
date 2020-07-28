@@ -24,7 +24,7 @@ class MessageType(IntEnum):
     # All joined clients for all rooms
     SET_CLIENT_NAME = 11  # Deprecated
     SEND_ERROR = 12
-    CONNECTION_LOST = 13
+
     # All all joined and un joined clients
     LIST_CLIENTS = 14
     SET_CLIENT_CUSTOM_ATTRIBUTES = 15
@@ -407,8 +407,6 @@ class CommandFormatter:
             else:
                 s += f"  {len(clients)} client(s):\n"
                 s += self.format_clients(clients)
-        elif command.type == MessageType.CONNECTION_LOST:
-            s += "CONNECTION_LOST:\n"
         elif command.type == MessageType.SEND_ERROR:
             s += f"ERROR: {decode_string(command.data, 0)[0]}\n"
         else:

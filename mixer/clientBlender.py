@@ -612,15 +612,16 @@ class ClientBlender(Client):
         # or it needs to be guaranteed by the server
         group_count = 0
         while True:
-            self.fetch_commands(commands_send_interval=get_mixer_prefs().commands_send_interval)
+            self.fetch_outgoing_commands(get_mixer_prefs().commands_send_interval)
+
+            received_commands = self.fetch_incoming_commands()
+            if received_commands is None:
+                self.on_connection_lost()
+                break
 
             set_dirty = True
             # Process all received commands
-            while True:
-                command = self.get_next_received_command()
-                if command is None:
-                    break
-
+            for command in received_commands:
                 if command.type == common.MessageType.GROUP_BEGIN:
                     group_count += 1
                     continue
@@ -663,9 +664,6 @@ class ClientBlender(Client):
                     self.handle_client_disconnected(client_id)
                     ui.update_ui_lists()
                     processed = True
-                elif command.type == common.MessageType.CONNECTION_LOST:
-                    self.on_connection_lost()
-                    break
 
                 if not processed and set_dirty:
                     share_data.set_dirty()

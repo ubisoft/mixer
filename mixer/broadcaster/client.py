@@ -1,8 +1,7 @@
-import queue
 import socket
 import logging
 import time
-from typing import Dict, Any, Mapping, Optional
+from typing import Dict, Any, Mapping, Optional, List
 
 import mixer.broadcaster.common as common
 from mixer.broadcaster.common import MessageType
@@ -23,8 +22,7 @@ class Client:
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         self.host = host
         self.port = port
-        self.received_commands = queue.Queue()
-        self.pending_commands = queue.Queue()  # todo: does not need to be a queue anymore, at least for Blender client
+        self.pending_commands: List[common.Command] = []
         self.socket = None
         self.current_custom_attributes: Dict[str, Any] = {}
         self.clients_attributes: Dict[str, Dict[str, Any]] = {}
@@ -75,15 +73,13 @@ class Client:
     def is_connected(self):
         return self.socket is not None
 
-    def add_command(self, command):
-        self.pending_commands.put(command)
+    def add_command(self, command: common.Command):
+        self.pending_commands.append(command)
 
     def handle_connection_lost(self):
         logger.info("Connection lost for %s:%s", self.host, self.port)
         # Set socket to None before putting CONNECTION_LIST message to avoid sending/reading new messages
         self.socket = None
-        command = common.Command(common.MessageType.CONNECTION_LOST)
-        self.received_commands.put(command)
 
     def safe_write_message(self, command: common.Command):
         try:
@@ -137,56 +133,41 @@ class Client:
             )
         )
 
-    def fetch_incoming_commands(self):
+    def fetch_incoming_commands(self) -> Optional[List[common.Command]]:
         """
-        Gather incoming commands in received_commands queue.
+        Gather incoming commands from the socket and return them as a list.
         """
+        received_commands: List[common.Command] = []
         while True:
             try:
                 command = common.read_message(self.socket)
             except common.ClientDisconnectedException:
                 self.handle_connection_lost()
-                break
+                return None
 
             if command is None:
                 break
 
-            self.received_commands.put(command)
+            logger.debug("Receive %s", command.type)
+            received_commands.append(command)
+
+        logger.debug("Received %d commands", len(received_commands))
+        return received_commands
 
     def fetch_outgoing_commands(self, commands_send_interval=0):
         """
         Send commands in pending_commands queue to the server.
         """
-        while True:
-            try:
-                command = self.pending_commands.get_nowait()
-            except queue.Empty:
-                break
-
-            logger.debug("Send %s (queue size = %d)", command.type, self.pending_commands.qsize())
+        for idx, command in enumerate(self.pending_commands):
+            logger.debug("Send %s (%d / %d)", command.type, idx + 1, len(self.pending_commands))
 
             if not self.safe_write_message(command):
                 break
 
-            self.pending_commands.task_done()
             if commands_send_interval > 0:
                 time.sleep(commands_send_interval)
 
-    def fetch_commands(self, commands_send_interval=0):
-        """
-        commands_send_interval is used for debug, to test stability
-        """
-        self.fetch_incoming_commands()
-        self.fetch_outgoing_commands(commands_send_interval)
-
-    def get_next_received_command(self):
-        try:
-            command = self.received_commands.get_nowait()
-            self.received_commands.task_done()
-            logger.debug("Receive %s (queue size = %d)", command.type, self.received_commands.qsize())
-            return command
-        except queue.Empty:
-            return None
+        self.pending_commands = []
 
     def update_clients_attributes(self, clients_attributes_update: Mapping[str, Mapping[str, Any]]):
         update_named_attributes(self.clients_attributes, clients_attributes_update)

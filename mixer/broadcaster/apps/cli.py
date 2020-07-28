@@ -34,22 +34,27 @@ class CliClient(client.Client):
         self.add_and_process_command(command, common.MessageType.LIST_CLIENTS)
 
     def add_and_process_command(self, command: common.Command, expected_response_type: common.MessageType = None):
-        self.add_command(command)
+        if not self.safe_write_message(command):
+            self.disconnect()
+            return
 
         received = None
         while received is None or (expected_response_type is not None and received.type != expected_response_type):
-            self.fetch_commands()
-            received = self.get_next_received_command()
+            received_commands = self.fetch_incoming_commands()
 
-            if received is not None:
-                if received.type == common.MessageType.CONNECTION_LOST:
-                    self.disconnect()
+            if received_commands is None:
+                self.disconnect()
+                return
+
+            for command in received_commands:
+                if command.type == common.MessageType.SEND_ERROR:
+                    logger.error(common.decode_string(command.data, 0)[0])
                     return
-                if received.type == common.MessageType.SEND_ERROR:
-                    logger.error(common.decode_string(received.data, 0)[0])
-                    return
+                elif command.type == expected_response_type or expected_response_type is None:
+                    received = command
+                    break
                 else:
-                    logger.info("Ignoring command %s", received.type)
+                    logger.info("Ignoring command %s", command.type)
 
         if expected_response_type is not None:
             print(self.formatter.format(received))
