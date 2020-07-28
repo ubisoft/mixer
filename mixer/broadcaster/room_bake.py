@@ -24,7 +24,6 @@ def download_room(host: str, port: int, room_name: str) -> Tuple[Dict[str, Any],
             while room_attributes is None or len(commands) < room_attributes[RoomAttributes.COMMAND_COUNT]:
                 client.fetch_outgoing_commands()
                 received_commands = client.fetch_incoming_commands()
-                command = client.get_next_received_command()
                 if received_commands is None:
                     raise ClientDisconnectedException()
                 for command in received_commands:
@@ -65,6 +64,8 @@ def upload_room(host: str, port: int, room_name: str, room_attributes: dict, com
 
         for c in commands:
             client.add_command(c)
+
+        client.add_command(Command(MessageType.CONTENT))
 
         client.fetch_outgoing_commands()
 
