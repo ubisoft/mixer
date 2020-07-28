@@ -59,7 +59,7 @@ def remove_draw_handlers():
 def users_frustrum_draw():
     prefs = get_mixer_prefs()
 
-    if not prefs.display_frustums_gizmos or share_data.current_room is None:
+    if not prefs.display_frustums_gizmos or share_data.client.current_room is None:
         return
 
     import bgl
@@ -96,7 +96,7 @@ def users_frustrum_draw():
 def users_frustum_name_draw():
     prefs = get_mixer_prefs()
 
-    if not prefs.display_names_gizmos or share_data.current_room is None:
+    if not prefs.display_names_gizmos or share_data.client.current_room is None:
         return
 
     def per_user_callback(user_dict):
@@ -124,7 +124,7 @@ def users_frustrum_draw_iteration(per_user_callback, per_frustum_callback):
         user_room = user_dict[ClientAttributes.ROOM]
         if (
             not prefs.display_own_gizmos and share_data.client.client_id == user_id
-        ) or share_data.current_room != user_room:
+        ) or share_data.client.current_room != user_room:
             continue  # don't draw my own frustums or frustums from users outside my room
 
         if not per_user_callback(user_dict):
@@ -157,7 +157,7 @@ def users_selection_draw():
 
     prefs = get_mixer_prefs()
 
-    if not prefs.display_selections_gizmos or share_data.current_room is None:
+    if not prefs.display_selections_gizmos or share_data.client.current_room is None:
         return
 
     shader = gpu.shader.from_builtin("3D_UNIFORM_COLOR")
@@ -187,7 +187,7 @@ def users_selection_draw():
 def users_selection_name_draw():
     prefs = get_mixer_prefs()
 
-    if not prefs.display_names_gizmos or share_data.current_room is None:
+    if not prefs.display_names_gizmos or share_data.client.current_room is None:
         return
 
     def per_user_callback(user_dict):
@@ -216,7 +216,7 @@ def users_selection_draw_iteration(per_user_callback, per_object_callback):
         user_room = user_dict[ClientAttributes.ROOM]
         if (
             not prefs.display_own_gizmos and share_data.client.client_id == user_id
-        ) or share_data.current_room != user_room:
+        ) or share_data.client.current_room != user_room:
             continue  # don't draw my own selection or selection from users outside my room
 
         if not per_user_callback(user_dict):

@@ -2,7 +2,7 @@ import queue
 import socket
 import logging
 import time
-from typing import Dict, Any, Mapping
+from typing import Dict, Any, Mapping, Optional
 
 import mixer.broadcaster.common as common
 from mixer.broadcaster.common import MessageType
@@ -29,6 +29,7 @@ class Client:
         self.current_custom_attributes: Dict[str, Any] = {}
         self.clients_attributes: Dict[str, Dict[str, Any]] = {}
         self.rooms_attributes: Dict[str, Dict[str, Any]] = {}
+        self.current_room: Optional[str] = None
 
     def __del__(self):
         if self.socket is not None:
@@ -96,6 +97,7 @@ class Client:
         return self.safe_write_message(common.Command(common.MessageType.JOIN_ROOM, room_name.encode("utf8"), 0))
 
     def leave_room(self, room_name):
+        self.current_room = None
         return self.safe_write_message(common.Command(common.MessageType.LEAVE_ROOM, room_name.encode("utf8"), 0))
 
     def wait_for(self, message_type: MessageType):

@@ -677,9 +677,10 @@ class ClientBlender(Client):
                         if command.type == common.MessageType.CONTENT:
                             # The server asks for scene content (at room creation)
                             try:
-                                assert share_data.current_room is not None
+                                assert share_data.client.current_room is not None
                                 self.set_room_attributes(
-                                    share_data.current_room, {"experimental_sync": get_mixer_prefs().experimental_sync},
+                                    share_data.client.current_room,
+                                    {"experimental_sync": get_mixer_prefs().experimental_sync},
                                 )
                                 self.send_scene_content()
                                 # Inform end of content

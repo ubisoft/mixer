@@ -66,9 +66,6 @@ class ShareData:
         self.shot_manager = ShotManager()
 
     def clear_room_data(self):
-        # equivalent to handlers set
-        self.current_room: str = None
-
         self.objects_added: Set(str) = set()
         self.objects_removed: Set(str) = set()
         self.collections_added: Set(str) = set()
@@ -145,7 +142,7 @@ class ShareData:
 
     def leave_current_room(self):
         if self.client is not None:
-            self.client.leave_room(share_data.current_room)
+            self.client.leave_room(share_data.client.current_room)
         self.clear_room_data()
 
         self._blender_scenes: Mapping[str, bpy.types.Scene] = {}

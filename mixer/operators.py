@@ -192,10 +192,10 @@ def set_client_attributes():
 def join_room(room_name: str):
     logger.info("join_room")
 
-    assert share_data.current_room is None
+    assert share_data.client.current_room is None
     BlendData.instance().reset()
     share_data.session_id += 1
-    share_data.current_room = room_name
+    share_data.client.current_room = room_name
     set_client_attributes()
     share_data.client.join_room(room_name)
     share_data.client.send_set_current_scene(bpy.context.scene.name_full)
@@ -221,7 +221,7 @@ def join_room(room_name: str):
 def leave_current_room():
     logger.info("leave_current_room")
 
-    if share_data.current_room:
+    if share_data.client.current_room:
         share_data.leave_current_room()
         HandlerManager.set_handlers(False)
 
@@ -236,7 +236,7 @@ def leave_current_room():
 
 def is_joined():
     connected = share_data.client is not None and share_data.client.is_connected()
-    return connected and share_data.current_room
+    return connected and share_data.client.current_room
 
 
 @persistent
@@ -1145,8 +1145,6 @@ def disconnect():
             share_data.client.disconnect()
         share_data.client = None
 
-    share_data.current_room = None
-
     ui.update_ui_lists()
     ui.redraw()
 
@@ -1213,7 +1211,7 @@ def create_main_client(host: str, port: int):
 
 
 poll_is_client_connected = (lambda: is_client_connected(), "Client not connected")
-poll_already_in_a_room = (lambda: not share_data.current_room, "Already in a room")
+poll_already_in_a_room = (lambda: not share_data.client.current_room, "Already in a room")
 
 
 def generic_poll(cls, context):
@@ -1257,7 +1255,7 @@ class CreateRoomOperator(bpy.types.Operator):
         return generic_description(cls, context, properties)
 
     def execute(self, context):
-        assert share_data.current_room is None
+        assert share_data.client.current_room is None
         if not is_client_connected():
             return {"CANCELLED"}
 
@@ -1310,9 +1308,8 @@ class JoinRoomOperator(bpy.types.Operator):
         return generic_description(cls, context, properties)
 
     def execute(self, context):
-        assert not share_data.current_room
+        assert not share_data.client.current_room
         share_data.set_dirty()
-        share_data.current_room = None
 
         props = get_mixer_props()
         room_index = props.room_index
@@ -1419,7 +1416,7 @@ class LeaveRoomOperator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return is_client_connected() and share_data.current_room is not None
+        return is_client_connected() and share_data.client.current_room is not None
 
     def execute(self, context):
         leave_current_room()
@@ -1517,7 +1514,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
     def execute(self, context):
         bpy.data.window_managers["WinMan"].mixer.send_base_meshes = False
         mixer_prefs = get_mixer_prefs()
-        if not share_data.current_room:
+        if not share_data.client.current_room:
             if not connect():
                 return {"CANCELLED"}
             join_room(mixer_prefs.room)
@@ -1525,7 +1522,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
         args = [
             mixer_prefs.VRtist,
             "--room",
-            share_data.current_room,
+            share_data.client.current_room,
             "--hostname",
             mixer_prefs.host,
             "--port",

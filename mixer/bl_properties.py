@@ -151,7 +151,7 @@ class MixerProperties(bpy.types.PropertyGroup):
         self.snap_view_users_values = [
             (user.ip_port, f"{user.name} ({user.ip_port})", "", user_to_unique_index[user.ip_port])
             for index, user in enumerate(self.users)
-            if user.room == share_data.current_room  # and not user.is_me
+            if user.room == share_data.client.current_room
         ]
         return self.snap_view_users_values
 

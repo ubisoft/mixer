@@ -213,7 +213,9 @@ class MixerSettingsPanel(bpy.types.Panel):
             if mixer_props.display_users_filter == "no_room":
                 return user.room == ""
             if mixer_props.display_users_filter == "current_room":
-                return user.room == share_data.current_room or (share_data.current_room is None and user.room == "")
+                return user.room == share_data.client.current_room or (
+                    share_data.client.current_room is None and user.room == ""
+                )
             if mixer_props.display_users_filter == "selected_room":
                 if mixer_props.room_index >= 0 and mixer_props.room_index < len(mixer_props.rooms):
                     return user.room == mixer_props.rooms[mixer_props.room_index].name
@@ -256,7 +258,7 @@ class MixerSettingsPanel(bpy.types.Panel):
             layout, mixer_props, "display_snapping_options", alert=True, text=f"Sync Options - Not implemented yet"
         ):
             box = layout.box().column()
-            if share_data.current_room is None:
+            if share_data.client.current_room is None:
                 box.label(text="You must join a room to select sync options")
             else:
                 row = box.row()
@@ -289,7 +291,7 @@ class MixerSettingsPanel(bpy.types.Panel):
             )
             layout.operator(operators.DisconnectOperator.bl_idname, text="Disconnect")
 
-            if not operators.share_data.current_room:
+            if not operators.share_data.client.current_room:
                 split = layout.split(factor=0.6)
                 split.prop(mixer_prefs, "room", text="Room")
                 split.operator(operators.CreateRoomOperator.bl_idname)
@@ -302,7 +304,7 @@ class MixerSettingsPanel(bpy.types.Panel):
             else:
                 split = layout.split(factor=0.6)
                 split.label(
-                    text=f"Room: {share_data.current_room}{(' (experimental sync)' if mixer_prefs.experimental_sync else '')}"
+                    text=f"Room: {share_data.client.current_room}{(' (experimental sync)' if mixer_prefs.experimental_sync else '')}"
                 )
                 split.operator(operators.LeaveRoomOperator.bl_idname, text=f"Leave Room")
 
@@ -318,7 +320,7 @@ class MixerSettingsPanel(bpy.types.Panel):
             layout = layout.box().column()
             ROOM_UL_ItemRenderer.draw_header(layout)
             layout.template_list("ROOM_UL_ItemRenderer", "", mixer_props, "rooms", mixer_props, "room_index", rows=2)
-            if share_data.current_room is None:
+            if share_data.client.current_room is None:
                 layout.operator(operators.JoinRoomOperator.bl_idname)
             else:
                 layout.operator(operators.LeaveRoomOperator.bl_idname)
