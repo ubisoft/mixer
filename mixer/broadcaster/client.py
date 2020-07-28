@@ -24,6 +24,8 @@ class Client:
         self.port = port
         self.pending_commands: List[common.Command] = []
         self.socket = None
+
+        self.client_id: Optional[str] = None  # Will be filled with a unique string identifying this client
         self.current_custom_attributes: Dict[str, Any] = {}
         self.clients_attributes: Dict[str, Dict[str, Any]] = {}
         self.rooms_attributes: Dict[str, Dict[str, Any]] = {}

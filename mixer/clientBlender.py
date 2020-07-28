@@ -68,8 +68,6 @@ class ClientBlender(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(ClientBlender, self).__init__(host, port)
 
-        self.client_id = None  # Will be filled with a unique string identifying this client
-
         self.textures: Set[str] = set()
         self.callbacks = {}
 
