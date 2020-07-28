@@ -23,13 +23,13 @@ class Delegate:
 
 
 def network_consumer(client, delegate):
-    client.fetch_commands()
+    client.fetch_outgoing_commands()
+    received_commands = client.fetch_incoming_commands()
 
-    while True:
-        command = client.get_next_received_command()
-        if command is None:
-            return
+    if received_commands is None:
+        return
 
+    for command in received_commands:
         if command.type == common.MessageType.LIST_ROOMS:
             delegate.update_rooms_attributes(command.data)
         elif command.type == common.MessageType.LIST_CLIENTS:

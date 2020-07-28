@@ -96,17 +96,23 @@ class Client:
         self.current_room = None
         return self.safe_write_message(common.Command(common.MessageType.LEAVE_ROOM, room_name.encode("utf8"), 0))
 
-    def wait_for(self, message_type: MessageType):
+    def wait_for(self, message_type: MessageType) -> Optional[List[common.Command]]:
+        """
+        Wait for a specific message type to be received and returns the list of all commands received during that time.
+        Returns None if the client was disconnected before.
+        """
+        all_received_commands: List[common.Command] = []
         while self.is_connected():
-            self.fetch_commands()
-            while self.is_connected():
-                command = self.get_next_received_command()
-                if command is None:
-                    break
+            self.fetch_outgoing_commands()
+            received_commands = self.fetch_incoming_commands()
+            if received_commands is None:
+                break
+            all_received_commands += received_commands
+            for command in received_commands:
                 if command.type == message_type:
-                    return True
-        # was disconnected before getting the message
-        return False
+                    return all_received_commands
+
+        return None
 
     def delete_room(self, room_name):
         return self.safe_write_message(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
