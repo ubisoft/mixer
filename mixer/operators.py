@@ -203,7 +203,7 @@ def join_room(room_name: str):
     share_data.current_statistics = {
         "session_id": share_data.session_id,
         "blendfile": bpy.data.filepath,
-        "statsfile": get_stats_filename(share_data.runId, share_data.session_id),
+        "statsfile": get_stats_filename(share_data.run_id, share_data.session_id),
         "user": get_mixer_prefs().user,
         "room": room_name,
         "children": {},
@@ -1089,7 +1089,7 @@ def start_local_server():
     else:
         args = {}
 
-    share_data.localServerProcess = subprocess.Popen(
+    share_data.local_server_process = subprocess.Popen(
         [bpy.app.binary_path_python, "-m", "mixer.broadcaster.apps.server", "--port", str(get_mixer_prefs().port)],
         cwd=dir_path,
         shell=False,

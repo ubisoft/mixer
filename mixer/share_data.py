@@ -48,11 +48,11 @@ class SceneInfo:
 
 class ShareData:
     def __init__(self):
-        self.runId = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.session_id = 0  # For logging and debug
         self.client = None
 
-        self.localServerProcess = None
+        self.local_server_process = None
         self.selected_objects_names = []
 
         self.current_statistics = None
