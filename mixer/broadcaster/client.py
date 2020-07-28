@@ -221,25 +221,3 @@ class Client:
             logger.warning("Room %s deleted but not in internal dict.", room_name)
             return
         del self.rooms_attributes[room_name]
-
-
-# For tests
-if __name__ == "__main__":
-    client = Client()
-
-    while True:
-        msg = input("> ")
-        # Peut planter si vous tapez des caractères spéciaux
-        if msg == "end":
-            break
-
-        encoded_msg = msg.encode()
-
-        if msg.startswith("Transform"):
-            client.add_command(common.Command(common.MessageType.TRANSFORM, encoded_msg[9:]))
-        if msg.startswith("Delete"):
-            client.add_command(common.Command(common.MessageType.DELETE, encoded_msg[6:]))
-        elif msg.startswith("Room"):
-            client.join_room(msg[4:])
-
-    client.disconnect()
