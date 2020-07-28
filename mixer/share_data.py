@@ -1,7 +1,7 @@
 from collections import namedtuple
 from datetime import datetime
 import logging
-from typing import List, Mapping, Set, Dict, Any
+from typing import List, Mapping, Set
 from uuid import uuid4
 
 from mixer.blender_data.proxy import BpyBlendProxy

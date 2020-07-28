@@ -484,10 +484,33 @@ def make_set_room_attributes_command(room_name: str, attributes: dict):
     return Command(MessageType.SET_ROOM_CUSTOM_ATTRIBUTES, encode_string(room_name) + encode_json(attributes))
 
 
-def update_dict_and_get_diff(current: Dict[str, Any], updates: Mapping[str, Any]) -> Dict[str, Any]:
+def update_attributes_and_get_diff(current: Dict[str, Any], updates: Mapping[str, Any]) -> Dict[str, Any]:
     diff = {}
     for key, value in updates.items():
         if key not in current or current[key] != value:
             current[key] = value
             diff[key] = value
     return diff
+
+
+def update_named_attributes_and_get_diff(
+    current: Dict[str, Dict[str, Any]], updates: Mapping[str, Dict[str, Any]]
+) -> Dict[str, Dict[str, Any]]:
+    diff = {}
+    for name, attrs_updates in updates.items():
+        if name not in current:
+            current[name] = attrs_updates
+            diff[name] = attrs_updates
+        else:
+            diff[name] = update_attributes_and_get_diff(current[name], attrs_updates)
+    return diff
+
+
+def update_named_attributes(current: Dict[str, Dict[str, Any]], updates: Mapping[str, Dict[str, Any]]):
+    for name, attrs_updates in updates.items():
+        if name not in current:
+            current[name] = attrs_updates
+        else:
+            attrs = current[name]
+            for attr_name, attr_value in attrs_updates.items():
+                attrs[attr_name] = attr_value

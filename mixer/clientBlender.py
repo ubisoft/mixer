@@ -2,7 +2,7 @@ import logging
 import os
 import struct
 import traceback
-from typing import Set, Tuple, Mapping, Any
+from typing import Set, Tuple
 
 import bpy
 from mathutils import Matrix, Quaternion

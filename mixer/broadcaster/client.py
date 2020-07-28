@@ -6,7 +6,7 @@ from typing import Dict, Any, Mapping
 
 import mixer.broadcaster.common as common
 from mixer.broadcaster.common import MessageType
-from mixer.broadcaster.common import update_dict_and_get_diff
+from mixer.broadcaster.common import update_attributes_and_get_diff, update_named_attributes
 
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ class Client:
         return self.safe_write_message(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
 
     def set_client_attributes(self, attributes: dict):
-        diff = update_dict_and_get_diff(self.current_custom_attributes, attributes)
+        diff = update_attributes_and_get_diff(self.current_custom_attributes, attributes)
         if diff == {}:
             return True
 
@@ -186,38 +186,20 @@ class Client:
         except queue.Empty:
             return None
 
-    def update_clients_attributes(self, clients_attributes: Mapping[str, Mapping[str, Any]]):
-        if self.clients_attributes is None:
-            self.clients_attributes = {}
-        for client_id, client_dict in clients_attributes.items():
-            if client_id not in self.clients_attributes:
-                self.clients_attributes[client_id] = {}
-            for key, value in client_dict.items():
-                self.clients_attributes[client_id][key] = value
+    def update_clients_attributes(self, clients_attributes_update: Mapping[str, Mapping[str, Any]]):
+        update_named_attributes(self.clients_attributes, clients_attributes_update)
 
     def handle_client_disconnected(self, client_id: str):
-        if self.clients_attributes is None:
-            logger.warning("Client %s disconnedted but no cleints info received", client_id)
-            return
         if client_id not in self.clients_attributes:
-            logger.warning("Client %s disconnected but not in internal dict.", client_id)
+            logger.warning("Client %s disconnected but no attributes in internal view.", client_id)
             return
         del self.clients_attributes[client_id]
 
-    def update_rooms_attributes(self, rooms_attributes: Mapping[str, Mapping[str, Any]]):
-        if self.rooms_attributes is None:
-            self.rooms_attributes = {}
-        for room_id, room_dict in rooms_attributes.items():
-            if room_id not in self.rooms_attributes:
-                self.rooms_attributes[room_id] = {}
-            for key, value in room_dict.items():
-                self.rooms_attributes[room_id][key] = value
+    def update_rooms_attributes(self, rooms_attributes_update: Mapping[str, Mapping[str, Any]]):
+        update_named_attributes(self.rooms_attributes, rooms_attributes_update)
 
     def handle_room_deleted(self, room_name: str):
-        if self.rooms_attributes is None:
-            logger.warning("Room %s deleted but no room info received", room_name)
-            return
         if room_name not in self.rooms_attributes:
-            logger.warning("Room %s deleted but not in internal dict.", room_name)
+            logger.warning("Room %s deleted but no attributes in internal view.", room_name)
             return
         del self.rooms_attributes[room_name]

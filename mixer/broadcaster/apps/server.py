@@ -10,7 +10,7 @@ from typing import List, Mapping, Dict, Optional, Any
 
 from mixer.broadcaster.cli_utils import init_logging, add_logging_cli_args
 import mixer.broadcaster.common as common
-from mixer.broadcaster.common import update_dict_and_get_diff
+from mixer.broadcaster.common import update_attributes_and_get_diff
 
 SHUTDOWN = False
 
@@ -75,7 +75,7 @@ class Connection:
             self._server.delete_room(command.data.decode())
 
         def _set_custom_attributes(custom_attributes: Mapping[str, Any]):
-            diff = update_dict_and_get_diff(self.custom_attributes, custom_attributes)
+            diff = update_attributes_and_get_diff(self.custom_attributes, custom_attributes)
             self._server.broadcast_client_update(self, diff)
 
         def _set_client_name(command: common.Command):
@@ -381,7 +381,7 @@ class Server:
                 logger.warning("Room %s does not exist.", room_name)
                 return
 
-            diff = update_dict_and_get_diff(self._rooms[room_name].custom_attributes, custom_attributes)
+            diff = update_attributes_and_get_diff(self._rooms[room_name].custom_attributes, custom_attributes)
             self.broadcast_room_update(self._rooms[room_name], diff)
 
     def set_room_keep_open(self, room_name: str, value: bool):
