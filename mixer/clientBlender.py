@@ -632,12 +632,12 @@ class ClientBlender(Client):
                 processed = False
                 if command.type == common.MessageType.LIST_CLIENTS:
                     clients, _ = common.decode_json(command.data, 0)
-                    self.build_list_clients(clients)
+                    self.update_clients_attributes(clients)
                     ui.update_ui_lists()
                     processed = True
                 elif command.type == common.MessageType.LIST_ROOMS:
                     rooms_attributes, _ = common.decode_json(command.data, 0)
-                    self.build_list_rooms(rooms_attributes)
+                    self.update_rooms_attributes(rooms_attributes)
                     ui.update_ui_lists()
                     processed = True
                 elif command.type == common.MessageType.CLIENT_ID:
@@ -645,7 +645,7 @@ class ClientBlender(Client):
                     processed = True
                 elif command.type == common.MessageType.ROOM_UPDATE:
                     rooms_attributes_update, _ = common.decode_json(command.data, 0)
-                    self.build_list_rooms(rooms_attributes_update)
+                    self.update_rooms_attributes(rooms_attributes_update)
                     ui.update_ui_lists()
                     processed = True
                 elif command.type == common.MessageType.ROOM_DELETED:
@@ -655,7 +655,7 @@ class ClientBlender(Client):
                     processed = True
                 elif command.type == common.MessageType.CLIENT_UPDATE:
                     clients, _ = common.decode_json(command.data, 0)
-                    self.build_list_clients(clients)
+                    self.update_clients_attributes(clients)
                     ui.update_ui_lists()
                     processed = True
                 elif command.type == common.MessageType.CLIENT_DISCONNECTED:

@@ -15,7 +15,10 @@ class Delegate:
         self.clients = None
         self.name_room = None
 
-    def build_list_rooms(self, data):
+    def update_rooms_attributes(self, data):
+        return None
+
+    def update_clients_attributes(self, data):
         return None
 
     def on_connection_lost(self):
@@ -31,10 +34,10 @@ def network_consumer(client, delegate):
             return
 
         if command.type == common.MessageType.LIST_ROOMS:
-            delegate.build_list_rooms(command.data)
+            delegate.update_rooms_attributes(command.data)
         elif command.type == common.MessageType.LIST_CLIENTS:
-            clients, _ = common.decode_json(command.data, 0)
-            delegate.build_list_clients(clients)
+            clients_attributes, _ = common.decode_json(command.data, 0)
+            delegate.update_clients_attributes(clients_attributes)
         elif command.type == common.MessageType.CONNECTION_LOST:
             delegate.on_connection_lost()
 

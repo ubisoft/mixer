@@ -186,7 +186,7 @@ class Client:
         except queue.Empty:
             return None
 
-    def build_list_clients(self, clients_attributes: Mapping[str, Mapping[str, Any]]):
+    def update_clients_attributes(self, clients_attributes: Mapping[str, Mapping[str, Any]]):
         if self.clients_attributes is None:
             self.clients_attributes = {}
         for client_id, client_dict in clients_attributes.items():
@@ -204,7 +204,7 @@ class Client:
             return
         del self.clients_attributes[client_id]
 
-    def build_list_rooms(self, rooms_attributes: Mapping[str, Mapping[str, Any]]):
+    def update_rooms_attributes(self, rooms_attributes: Mapping[str, Mapping[str, Any]]):
         if self.rooms_attributes is None:
             self.rooms_attributes = {}
         for room_id, room_dict in rooms_attributes.items():
