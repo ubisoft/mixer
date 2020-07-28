@@ -661,6 +661,7 @@ class ClientBlender(Client):
                 elif command.type == common.MessageType.CLIENT_DISCONNECTED:
                     client_id, _ = common.decode_string(command.data, 0)
                     self.handle_client_disconnected(client_id)
+                    ui.update_ui_lists()
                     processed = True
                 elif command.type == common.MessageType.CONNECTION_LOST:
                     self.on_connection_lost()
