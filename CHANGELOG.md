@@ -1,3 +1,13 @@
+# 0.13.0 (2020-07-23)
+
+## Optimization
+
+- Client-Server connection stabilization: send less messages for client/room updates, better usage of mutexes, refactor server.py (#162)
+
+## Misc.
+
+- Display version string in Mixer panel titlebar (#154)
+
 # 0.12.0 (2020-07-22)
 
 ## Features
