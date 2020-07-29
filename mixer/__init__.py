@@ -3,8 +3,9 @@ import faulthandler
 import logging
 import os
 from pathlib import Path
+from typing import Dict, Any
 
-bl_info = {
+bl_info: Dict[str, Any] = {
     "name": "Mixer",
     "author": "Ubisoft Animation Studio",
     "description": "Collaborative 3D edition accross 3D Softwares",
@@ -16,6 +17,8 @@ bl_info = {
     "tracker_url": "",
     "category": "Collaboration",
 }
+
+__version__ = f"v{bl_info['version'][0]}.{bl_info['version'][1]}.{bl_info['version'][2]}"
 
 logger = logging.getLogger(__name__)
 logger.propagate = False
