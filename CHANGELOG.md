@@ -1,3 +1,9 @@
+# 0.13.1 (2020-07-23)
+
+## Bugfix
+
+- Remove type of bl_info because Blender cannot parse it
+
 # 0.13.0 (2020-07-23)
 
 ## Optimization

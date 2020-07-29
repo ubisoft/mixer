@@ -3,9 +3,8 @@ import faulthandler
 import logging
 import os
 from pathlib import Path
-from typing import Dict, Any
 
-bl_info: Dict[str, Any] = {
+bl_info = {
     "name": "Mixer",
     "author": "Ubisoft Animation Studio",
     "description": "Collaborative 3D edition accross 3D Softwares",
