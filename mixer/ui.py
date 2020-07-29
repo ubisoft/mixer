@@ -8,7 +8,7 @@ from mixer import operators
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.bl_properties import UserItem
 from mixer.share_data import share_data
-from mixer.broadcaster.common import ClientMetadata
+from mixer.broadcaster.common import ClientAttributes
 from mixer.blender_data.debug_addon import DebugDataPanel
 
 if TYPE_CHECKING:
@@ -40,23 +40,19 @@ def update_ui_lists():
 def update_user_list(do_redraw=True):
     props = get_mixer_props()
     props.users.clear()
-    if share_data.client_ids is None:
+    if share_data.client is None:
         redraw_if(do_redraw)
         return
 
-    for client_id, client in share_data.client_ids.items():
+    for client_id, client in share_data.client.clients_attributes.items():
         item = props.users.add()
         item.is_me = client_id == share_data.client.client_id
-        item.name = (
-            client[ClientMetadata.USERNAME]
-            if (ClientMetadata.USERNAME in client and client[ClientMetadata.USERNAME])
-            else "<unamed>"
-        )
-        item.ip = client[ClientMetadata.IP]
-        item.port = client[ClientMetadata.PORT]
+        item.name = client.get(ClientAttributes.USERNAME, "<unamed>")
+        item.ip = client.get(ClientAttributes.IP, "")
+        item.port = client.get(ClientAttributes.PORT, 0)
         item.ip_port = f"{item.ip}:{item.port}"
-        item.room = client[ClientMetadata.ROOM] or ""
-        item.internal_color = client[ClientMetadata.USERCOLOR] if ClientMetadata.USERCOLOR in client else (0, 0, 0)
+        item.room = client.get(ClientAttributes.ROOM, "<no room>") or "<no room>"
+        item.internal_color = client.get(ClientAttributes.USERCOLOR, (0, 0, 0))
         if "blender_windows" in client:
             for window in client["blender_windows"]:
                 window_item = item.windows.add()
@@ -64,12 +60,12 @@ def update_user_list(do_redraw=True):
                 window_item.view_layer = window["view_layer"]
                 window_item.screen = window["screen"]
                 window_item.areas_3d_count = len(window["areas_3d"])
-        if ClientMetadata.USERSCENES in client:
-            for scene_name, scene_dict in client[ClientMetadata.USERSCENES].items():
+        if ClientAttributes.USERSCENES in client:
+            for scene_name, scene_dict in client[ClientAttributes.USERSCENES].items():
                 scene_item = item.scenes.add()
                 scene_item.scene = scene_name
-                if ClientMetadata.USERSCENES_FRAME in scene_dict:
-                    scene_item.frame = scene_dict[ClientMetadata.USERSCENES_FRAME]
+                if ClientAttributes.USERSCENES_FRAME in scene_dict:
+                    scene_item.frame = scene_dict[ClientAttributes.USERSCENES_FRAME]
 
     redraw_if(do_redraw)
 
@@ -77,16 +73,23 @@ def update_user_list(do_redraw=True):
 def update_room_list(do_redraw=True):
     props = get_mixer_props()
     props.rooms.clear()
-    if share_data.rooms_dict is None:
+    if share_data.client is None:
         redraw_if(do_redraw)
         return
 
-    for room_name, _ in share_data.rooms_dict.items():
+    for room_name, _ in share_data.client.rooms_attributes.items():
         item = props.rooms.add()
         item.name = room_name
-        item.users_count = len(
-            [client for client in share_data.client_ids.values() if client[ClientMetadata.ROOM] == room_name]
-        )
+        if share_data.client is not None:
+            item.users_count = len(
+                [
+                    client
+                    for client in share_data.client.clients_attributes.values()
+                    if client.get(ClientAttributes.ROOM, None) == room_name
+                ]
+            )
+        else:
+            item.users_count = -1
 
     redraw_if(do_redraw)
 
@@ -119,16 +122,18 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         if get_mixer_props().display_rooms_details:
             split.label(text="Command Count")
             split.label(text="Size (MB)")
+            split.label(text="Joinable")
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.split()
         split.label(text=item.name)  # avoids renaming the item by accident
-        split.label(text=f"{item.users_count} users")
+        split.label(text=f"{item.users_count if item.users_count >= 0 else '?'} users")
         split.prop(item, "experimental_sync", text="")
         split.prop(item, "keep_open", text="")
         if get_mixer_props().display_rooms_details:
             split.prop(item, "command_count", text="")
             split.prop(item, "mega_byte_size", text="")
+            split.prop(item, "joinable", text="")
 
 
 def draw_user_settings_ui(layout: bpy.types.UILayout):
@@ -208,7 +213,9 @@ class MixerSettingsPanel(bpy.types.Panel):
             if mixer_props.display_users_filter == "no_room":
                 return user.room == ""
             if mixer_props.display_users_filter == "current_room":
-                return user.room == share_data.current_room or (share_data.current_room is None and user.room == "")
+                return user.room == share_data.client.current_room or (
+                    share_data.client.current_room is None and user.room == ""
+                )
             if mixer_props.display_users_filter == "selected_room":
                 if mixer_props.room_index >= 0 and mixer_props.room_index < len(mixer_props.rooms):
                     return user.room == mixer_props.rooms[mixer_props.room_index].name
@@ -225,7 +232,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                     user_layout = box.box()
                 row = user_layout.split()
                 row.label(text=f"{user.name}", icon="HOME" if user.is_me else "NONE")
-                row.label(text=f"{(user.room or '<no room>')}")
+                row.label(text=f"{user.room}")
                 row.prop(user, "color", text="")
                 if mixer_props.display_users_details:
                     row.label(text=f"{user.ip_port}")
@@ -251,7 +258,7 @@ class MixerSettingsPanel(bpy.types.Panel):
             layout, mixer_props, "display_snapping_options", alert=True, text=f"Sync Options - Not implemented yet"
         ):
             box = layout.box().column()
-            if share_data.current_room is None:
+            if share_data.client.current_room is None:
                 box.label(text="You must join a room to select sync options")
             else:
                 row = box.row()
@@ -284,7 +291,7 @@ class MixerSettingsPanel(bpy.types.Panel):
             )
             layout.operator(operators.DisconnectOperator.bl_idname, text="Disconnect")
 
-            if not operators.share_data.current_room:
+            if not operators.share_data.client.current_room:
                 split = layout.split(factor=0.6)
                 split.prop(mixer_prefs, "room", text="Room")
                 split.operator(operators.CreateRoomOperator.bl_idname)
@@ -297,7 +304,7 @@ class MixerSettingsPanel(bpy.types.Panel):
             else:
                 split = layout.split(factor=0.6)
                 split.label(
-                    text=f"Room: {share_data.current_room}{(' (experimental sync)' if mixer_prefs.experimental_sync else '')}"
+                    text=f"Room: {share_data.client.current_room}{(' (experimental sync)' if mixer_prefs.experimental_sync else '')}"
                 )
                 split.operator(operators.LeaveRoomOperator.bl_idname, text=f"Leave Room")
 
@@ -313,7 +320,7 @@ class MixerSettingsPanel(bpy.types.Panel):
             layout = layout.box().column()
             ROOM_UL_ItemRenderer.draw_header(layout)
             layout.template_list("ROOM_UL_ItemRenderer", "", mixer_props, "rooms", mixer_props, "room_index", rows=2)
-            if share_data.current_room is None:
+            if share_data.client.current_room is None:
                 layout.operator(operators.JoinRoomOperator.bl_idname)
             else:
                 layout.operator(operators.LeaveRoomOperator.bl_idname)

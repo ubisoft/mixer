@@ -1,13 +1,11 @@
 from enum import IntEnum
-import threading
+from typing import Dict, Mapping, Any, Optional
 import select
 import socket
 import struct
 import json
 import logging
 
-
-mutex = threading.RLock()
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12800
@@ -17,27 +15,28 @@ logger = logging.getLogger(__name__)
 
 class MessageType(IntEnum):
     JOIN_ROOM = 1
-    CREATE_ROOM = 2
     LEAVE_ROOM = 3
     LIST_ROOMS = 4
-    CONTENT = 5
-    CLEAR_CONTENT = 6
+    CONTENT = 5  # Server: ask client to send initial room content; Client: notify server content has been sent
+    CLEAR_CONTENT = 6  # Server: ask client to clear its own content before room content is sent
     DELETE_ROOM = 7
-    CLEAR_ROOM = 8
 
-    # All clients that have joined a room
-    LIST_ROOM_CLIENTS = 9
     # All joined clients for all rooms
-    LIST_CLIENTS = 10
-    SET_CLIENT_NAME = 11
+    SET_CLIENT_NAME = 11  # Deprecated
     SEND_ERROR = 12
-    CONNECTION_LOST = 13
+
     # All all joined and un joined clients
-    LIST_ALL_CLIENTS = 14
-    SET_CLIENT_METADATA = 15
-    SET_ROOM_METADATA = 16
+    LIST_CLIENTS = 14
+    SET_CLIENT_CUSTOM_ATTRIBUTES = 15
+    SET_ROOM_CUSTOM_ATTRIBUTES = 16
     SET_ROOM_KEEP_OPEN = 17
-    CLIENT_ID = 18  # Allow a client to know its own id, a unique string
+    CLIENT_ID = 18  # Client: ask the server to send the unique id string for him; Server: send the unique id string of the client
+
+    CLIENT_UPDATE = 19  # Server: Notify that data of a client have changed
+    ROOM_UPDATE = 20  # Server: Notify that data of a room have changed
+    ROOM_DELETED = 21  # Server: Notify a room was deleted
+
+    CLIENT_DISCONNECTED = 22  # Server: Notify a client has diconnected
 
     COMMAND = 100
     DELETE = 101
@@ -126,11 +125,11 @@ class SensorFitMode(IntEnum):
     HORIZONTAL = 2
 
 
-class ClientMetadata:
+class ClientAttributes:
     """
-    Metadata associated with a client by the server.
+    Attributes associated with a client by the server.
     First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
-    Clients are free to define metadata they need, but some standard names are provided here to ease sync
+    Clients are free to define custom attributes they need, but some standard names are provided here to ease sync
     between clients of different kind.
     """
 
@@ -139,10 +138,10 @@ class ClientMetadata:
     PORT = "port"  # Sent by server only, type = int
     ROOM = "room"  # Sent by server only, type = str
 
-    # Client to server metadata, not used by the server but clients are encouraged to use these keys for the same semantic
+    # Client to server attributes, not used by the server but clients are encouraged to use these keys for the same semantic
     USERNAME = "user_name"  # type = str
     USERCOLOR = "user_color"  # type = float3 (as list)
-    USERSCENES = "user_scenes"  # type = dict(str, dict) key = Scene name_full, value = a dictionnary for scene metadata relative to the user
+    USERSCENES = "user_scenes"  # type = dict(str, dict) key = Scene name_full, value = a dictionnary for scene attributes relative to the user
     USERSCENES_FRAME = "frame"  # type = int, can be a field in a user_scenes dict
     USERSCENES_SELECTED_OBJECTS = "selected_objects"  # type = list[string], can be a field in a user_scenes dict
     USERSCENES_VIEWS = (
@@ -155,11 +154,11 @@ class ClientMetadata:
     )
 
 
-class RoomMetadata:
+class RoomAttributes:
     """
-    Metadata associated with a room by the server.
+    Attributes associated with a room by the server.
     First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
-    Clients are free to define metadata they need, but some standard names are provided here to ease sync
+    Clients are free to define custom attributes they need, but some standard names are provided here to ease sync
     between clients of different kind.
     """
 
@@ -169,6 +168,7 @@ class RoomMetadata:
     )
     COMMAND_COUNT = "command_count"  # Sent by server only, type = bool, indicate how many commands the room contains
     BYTE_SIZE = "byte_size"  # Sent by server only, type = int, indicate the size in byte of the room
+    JOINABLE = "joinable"  # Sent by server only, type = bool, indicate if the room is joinable
 
 
 class ClientDisconnectedException(Exception):
@@ -386,7 +386,7 @@ class CommandFormatter:
     def format_clients(self, clients):
         s = ""
         for c in clients:
-            s += f'   - {c[ClientMetadata.IP]}:{c[ClientMetadata.PORT]} name = "{c[ClientMetadata.USERNAME]}" room = "{c[ClientMetadata.ROOM]}"\n'
+            s += f'   - {c[ClientAttributes.IP]}:{c[ClientAttributes.PORT]} name = "{c[ClientAttributes.USERNAME]}" room = "{c[ClientAttributes.ROOM]}"\n'
         return s
 
     def format(self, command: Command):
@@ -400,22 +400,13 @@ class CommandFormatter:
                 s += "  No rooms"
             else:
                 s += f" {len(rooms)} room(s) : {rooms}"
-        elif command.type == MessageType.LIST_ROOM_CLIENTS:
-            clients, _ = decode_json(command.data, 0)
-            if len(clients) == 0:
-                s += f"  No clients in room"
-            else:
-                s += f"  {len(clients)} client(s) in room :\n"
-                s += self.format_clients(clients)
-        elif command.type == MessageType.LIST_CLIENTS or command.type == MessageType.LIST_ALL_CLIENTS:
+        elif command.type == MessageType.LIST_CLIENTS:
             clients, _ = decode_json(command.data, 0)
             if len(clients) == 0:
                 s += "  No clients\n"
             else:
                 s += f"  {len(clients)} client(s):\n"
                 s += self.format_clients(clients)
-        elif command.type == MessageType.CONNECTION_LOST:
-            s += "CONNECTION_LOST:\n"
         elif command.type == MessageType.SEND_ERROR:
             s += f"ERROR: {decode_string(command.data, 0)[0]}\n"
         else:
@@ -443,7 +434,7 @@ def recv(socket: socket.socket, size: int):
     return result
 
 
-def read_message(socket: socket.socket) -> Command:
+def read_message(socket: socket.socket) -> Optional[Command]:
     if not socket:
         logger.warning("read_message called with no socket")
         return None
@@ -471,7 +462,7 @@ def read_message(socket: socket.socket) -> Command:
         raise
 
 
-def write_message(sock: socket.socket, command: Command):
+def write_message(sock: Optional[socket.socket], command: Command):
     if not sock:
         logger.warning("write_message called with no socket")
         return
@@ -487,5 +478,37 @@ def write_message(sock: socket.socket, command: Command):
         raise ClientDisconnectedException()
 
 
-def make_set_room_metadata_command(room_name: str, metadata: dict):
-    return Command(MessageType.SET_ROOM_METADATA, encode_string(room_name) + encode_json(metadata))
+def make_set_room_attributes_command(room_name: str, attributes: dict):
+    return Command(MessageType.SET_ROOM_CUSTOM_ATTRIBUTES, encode_string(room_name) + encode_json(attributes))
+
+
+def update_attributes_and_get_diff(current: Dict[str, Any], updates: Mapping[str, Any]) -> Dict[str, Any]:
+    diff = {}
+    for key, value in updates.items():
+        if key not in current or current[key] != value:
+            current[key] = value
+            diff[key] = value
+    return diff
+
+
+def update_named_attributes_and_get_diff(
+    current: Dict[str, Dict[str, Any]], updates: Mapping[str, Dict[str, Any]]
+) -> Dict[str, Dict[str, Any]]:
+    diff = {}
+    for name, attrs_updates in updates.items():
+        if name not in current:
+            current[name] = attrs_updates
+            diff[name] = attrs_updates
+        else:
+            diff[name] = update_attributes_and_get_diff(current[name], attrs_updates)
+    return diff
+
+
+def update_named_attributes(current: Dict[str, Dict[str, Any]], updates: Mapping[str, Dict[str, Any]]):
+    for name, attrs_updates in updates.items():
+        if name not in current:
+            current[name] = attrs_updates
+        else:
+            attrs = current[name]
+            for attr_name, attr_value in attrs_updates.items():
+                attrs[attr_name] = attr_value

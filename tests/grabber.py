@@ -5,6 +5,7 @@ from mixer.broadcaster.common import encode_string, encode_bool
 from mixer.broadcaster.client import Client
 from typing import Mapping, List
 import time
+import sys
 
 
 class CommandStream:
@@ -32,34 +33,35 @@ class Grabber:
         self.streams = CommandStream()
 
     def grab(self, host, port, room_name: str):
-        client = Client(host, port)
-        client.connect()
-        command = Command(MessageType.JOIN_ROOM, room_name.encode("utf8"))
-        client.add_command(command)
+        with Client(host, port) as client:
+            client.join_room(room_name)
 
-        attempts_max = 20
-        attempts = 0
-        try:
-            while attempts < attempts_max:
-                client.fetch_commands()
-                command = client.get_next_received_command()
-                if command is None:
+            attempts_max = 20
+            attempts = 0
+            try:
+                while attempts < attempts_max:
+                    received_commands = client.fetch_incoming_commands()
+                    if received_commands is None:
+                        raise ClientDisconnectedException()
+
                     attempts += 1
                     time.sleep(0.01)
-                    continue
-                attempts = 0
-                if command.type <= MessageType.COMMAND:
-                    continue
-                # Ignore command serial Id, that may not match
-                command.id = 0
-                self.streams.data[command.type].append(command.data)
-        except ClientDisconnectedException:
-            pass
 
-        client.add_command(Command(MessageType.SET_ROOM_KEEP_OPEN, encode_string(room_name) + encode_bool(False)))
-        client.add_command(Command(MessageType.LEAVE_ROOM, room_name.encode("utf8")))
+                    for command in received_commands:
+                        attempts = 0
+                        if command.type <= MessageType.COMMAND:
+                            continue
+                        # Ignore command serial Id, that may not match
+                        command.id = 0
+                        self.streams.data[command.type].append(command.data)
+            except ClientDisconnectedException:
+                print("Grabber: disconnected before received command stream.", file=sys.stderr)
 
-        client.threadAlive = False
+            client.send_command(Command(MessageType.SET_ROOM_KEEP_OPEN, encode_string(room_name) + encode_bool(False)))
+            client.send_command(Command(MessageType.LEAVE_ROOM, room_name.encode("utf8")))
+
+            if not client.wait(MessageType.LEAVE_ROOM):
+                print("Grabber: disconnected before receiving LEAVE_ROOM.", file=sys.stderr)
 
     def sort(self):
         self.streams.sort()

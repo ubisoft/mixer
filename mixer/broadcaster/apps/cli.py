@@ -29,39 +29,32 @@ class CliClient(client.Client):
         command = common.Command(common.MessageType.DELETE_ROOM, name.encode())
         self.add_and_process_command(command)
 
-    def clear_room(self, name):
-        command = common.Command(common.MessageType.CLEAR_ROOM, name.encode())
-        self.add_and_process_command(command)
-
-    def list_room_clients(self, name):
-        command = common.Command(common.MessageType.LIST_ROOM_CLIENTS, name.encode())
-        self.add_and_process_command(command, common.MessageType.LIST_ROOM_CLIENTS)
-
     def list_clients(self):
         command = common.Command(common.MessageType.LIST_CLIENTS)
         self.add_and_process_command(command, common.MessageType.LIST_CLIENTS)
 
-    def list_all_clients(self):
-        command = common.Command(common.MessageType.LIST_ALL_CLIENTS)
-        self.add_and_process_command(command, common.MessageType.LIST_ALL_CLIENTS)
-
     def add_and_process_command(self, command: common.Command, expected_response_type: common.MessageType = None):
-        self.add_command(command)
+        if not self.send_command(command):
+            self.disconnect()
+            return
 
         received = None
         while received is None or (expected_response_type is not None and received.type != expected_response_type):
-            self.fetch_commands()
-            received = self.get_next_received_command()
+            received_commands = self.fetch_incoming_commands()
 
-            if received is not None:
-                if received.type == common.MessageType.CONNECTION_LOST:
-                    self.disconnect()
+            if received_commands is None:
+                self.disconnect()
+                return
+
+            for command in received_commands:
+                if command.type == common.MessageType.SEND_ERROR:
+                    logger.error(common.decode_string(command.data, 0)[0])
                     return
-                if received.type == common.MessageType.SEND_ERROR:
-                    logger.error(common.decode_string(received.data, 0)[0])
-                    return
+                elif command.type == expected_response_type or expected_response_type is None:
+                    received = command
+                    break
                 else:
-                    logger.info("Ignoring command %s", received.type)
+                    logger.info("Ignoring command %s", command.type)
 
         if expected_response_type is not None:
             print(self.formatter.format(received))
@@ -81,24 +74,6 @@ def process_room_command(args):
                 client = CliClient(args)
                 for name in args.name:
                     client.delete_room(name)
-            else:
-                print("Expected one or more room names")
-
-        elif args.command == "clear":
-            count = len(args.name)
-            if count:
-                client = CliClient(args)
-                for name in args.name:
-                    client.clear_room(name)
-            else:
-                print("Expected one or more room names")
-
-        elif args.command == "clients":
-            count = len(args.name)
-            if count:
-                client = CliClient(args)
-                for name in args.name:
-                    client.list_room_clients(name)
             else:
                 print("Expected one or more room names")
     except ServerError as e:
@@ -183,18 +158,14 @@ def interactive_loop(args):
                     raise RuntimeError('Not connected, use "connect" first')
                 if command == "listrooms":
                     client.list_rooms()
-                elif command == "listroomclients":
-                    client.list_room_clients(command_args[0])
-                elif command == "listjoinedclients":
+                elif command == "listclients":
                     client.list_clients()
-                elif command == "listallclients":
-                    client.list_all_clients()
                 elif command == "join":
                     client.join_room(command_args[0])
                 elif command == "leave":
                     client.leave_room(command_args[0])
                 elif command == "setclientname":
-                    client.set_client_metadata({common.ClientMetadata.USERNAME: command_args[0]})
+                    client.set_client_attributes({common.ClientAttributes.USERNAME: command_args[0]})
                 elif command == "disconnect":
                     client.disconnect()
                     client = None

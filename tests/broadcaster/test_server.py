@@ -1,7 +1,6 @@
 import unittest
 import threading
 import time
-import logging
 
 from mixer.broadcaster.apps.server import Server
 from mixer.broadcaster.client import Client
@@ -16,40 +15,25 @@ class Delegate:
         self.clients = None
         self.name_room = None
 
-    def build_list_rooms(self, data):
+    def update_rooms_attributes(self, data):
         return None
 
-    def build_list_room_clients(self, clients):
-        logging.info("xxx %s", clients)
-        self.clients = clients
-        if clients is None:
-            self.name_room = None
-        else:
-            self.name_room = [(c[common.ClientMetadata.USERNAME], c[common.ClientMetadata.ROOM]) for c in clients]
-        return None
-
-    def on_connection_lost(self):
+    def update_clients_attributes(self, data):
         return None
 
 
 def network_consumer(client, delegate):
-    client.fetch_commands()
+    received_commands = client.fetch_commands()
 
-    while True:
-        command = client.get_next_received_command()
-        if command is None:
-            return
+    if received_commands is None:
+        return
 
+    for command in received_commands:
         if command.type == common.MessageType.LIST_ROOMS:
-            delegate.build_list_rooms(command.data)
-        elif command.type == common.MessageType.LIST_ROOM_CLIENTS:
-            clients, _ = common.decode_json(command.data, 0)
-            delegate.build_list_room_clients(clients)
-        elif command.type == common.MessageType.LIST_ALL_CLIENTS:
-            clients, _ = common.decode_json(command.data, 0)
-            delegate.build_list_all_clients(clients)
-        elif command.type == common.MessageType.CONNECTION_LOST:
-            delegate.on_connection_lost()
+            delegate.update_rooms_attributes(command.data)
+        elif command.type == common.MessageType.LIST_CLIENTS:
+            clients_attributes, _ = common.decode_json(command.data, 0)
+            delegate.update_clients_attributes(clients_attributes)
 
 
 @unittest.skip("")
@@ -121,7 +105,7 @@ class TestServer(unittest.TestCase):
         delay()
         self.assertEqual(server.client_count(), (0, 1))
 
-        c0.set_client_metadata({common.ClientMetadata.USERNAME: c0_name})
+        c0.set_client_attributes({common.ClientAttributes.USERNAME: c0_name})
         c0.join_room(c0_room)
         delay()
         network_consumer(c0, self._delegate)
@@ -143,12 +127,12 @@ class TestServer(unittest.TestCase):
         d0 = Delegate()
         c0 = Client()
         c0.join_room(c0_room)
-        c0.set_client_metadata({common.ClientMetadata.USERNAME: c0_name})
+        c0.set_client_attributes({common.ClientAttributes.USERNAME: c0_name})
 
         d1 = Delegate()
         c1 = Client()
         c1.join_room(c1_room)
-        c1.set_client_metadata({common.ClientMetadata.USERNAME: c1_name})
+        c1.set_client_attributes({common.ClientAttributes.USERNAME: c1_name})
 
         delay()
 
@@ -174,12 +158,12 @@ class TestServer(unittest.TestCase):
         d0 = Delegate()
         c0 = Client()
         c0.join_room(c0_room)
-        c0.set_client_metadata({common.ClientMetadata.USERNAME: c0_name})
+        c0.set_client_attributes({common.ClientAttributes.USERNAME: c0_name})
 
         d1 = Delegate()
         c1 = Client()
         c1.join_room(c1_room)
-        c1.set_client_metadata({common.ClientMetadata.USERNAME: c1_name})
+        c1.set_client_attributes({common.ClientAttributes.USERNAME: c1_name})
 
         c1.leave_room(c1_room)
 

@@ -1,6 +1,6 @@
 from mixer.share_data import share_data
 from mixer.bl_utils import get_mixer_prefs
-from mixer.broadcaster.common import ClientMetadata
+from mixer.broadcaster.common import ClientAttributes
 
 import bpy
 from mathutils import Matrix, Vector
@@ -59,7 +59,7 @@ def remove_draw_handlers():
 def users_frustrum_draw():
     prefs = get_mixer_prefs()
 
-    if not prefs.display_frustums_gizmos or share_data.current_room is None:
+    if not prefs.display_frustums_gizmos or share_data.client.current_room is None:
         return
 
     import bgl
@@ -78,7 +78,7 @@ def users_frustrum_draw():
     indices = ((1, 2), (2, 3), (3, 4), (4, 1), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5))
 
     def per_user_callback(user_dict):
-        user_color = user_dict.get(ClientMetadata.USERCOLOR, DEFAULT_COLOR)
+        user_color = user_dict.get(ClientAttributes.USERCOLOR, DEFAULT_COLOR)
         shader.uniform_float("color", (*user_color, 1))
         return True
 
@@ -96,11 +96,11 @@ def users_frustrum_draw():
 def users_frustum_name_draw():
     prefs = get_mixer_prefs()
 
-    if not prefs.display_names_gizmos or share_data.current_room is None:
+    if not prefs.display_names_gizmos or share_data.client.current_room is None:
         return
 
     def per_user_callback(user_dict):
-        user_name = user_dict.get(ClientMetadata.USERNAME, None)
+        user_name = user_dict.get(ClientAttributes.USERNAME, None)
         return user_name is not None
 
     def per_frustum_callback(user_dict, frustum):
@@ -110,18 +110,21 @@ def users_frustum_name_draw():
 
 
 def users_frustrum_draw_iteration(per_user_callback, per_frustum_callback):
+    if share_data.client is None:
+        return
+
     prefs = get_mixer_prefs()
 
-    for user_dict in share_data.client_ids.values():
-        scenes = user_dict.get(ClientMetadata.USERSCENES, None)
+    for user_dict in share_data.client.clients_attributes.values():
+        scenes = user_dict.get(ClientAttributes.USERSCENES, None)
         if not scenes:
             continue
 
-        user_id = user_dict[ClientMetadata.ID]
-        user_room = user_dict[ClientMetadata.ROOM]
+        user_id = user_dict[ClientAttributes.ID]
+        user_room = user_dict[ClientAttributes.ROOM]
         if (
             not prefs.display_own_gizmos and share_data.client.client_id == user_id
-        ) or share_data.current_room != user_room:
+        ) or share_data.client.current_room != user_room:
             continue  # don't draw my own frustums or frustums from users outside my room
 
         if not per_user_callback(user_dict):
@@ -131,7 +134,7 @@ def users_frustrum_draw_iteration(per_user_callback, per_frustum_callback):
             if scene_name != bpy.context.scene.name_full:
                 continue
 
-            views = scene_dict.get(ClientMetadata.USERSCENES_VIEWS, None)
+            views = scene_dict.get(ClientAttributes.USERSCENES_VIEWS, None)
             if views is None:
                 continue
 
@@ -140,9 +143,9 @@ def users_frustrum_draw_iteration(per_user_callback, per_frustum_callback):
                     continue  # Only occurs when drawing my own frustum
 
                 frustum = [
-                    view_dict[ClientMetadata.USERSCENES_VIEWS_EYE],
-                    *view_dict[ClientMetadata.USERSCENES_VIEWS_SCREEN_CORNERS],
-                    view_dict[ClientMetadata.USERSCENES_VIEWS_TARGET],
+                    view_dict[ClientAttributes.USERSCENES_VIEWS_EYE],
+                    *view_dict[ClientAttributes.USERSCENES_VIEWS_SCREEN_CORNERS],
+                    view_dict[ClientAttributes.USERSCENES_VIEWS_TARGET],
                 ]
                 per_frustum_callback(user_dict, frustum)
 
@@ -154,7 +157,7 @@ def users_selection_draw():
 
     prefs = get_mixer_prefs()
 
-    if not prefs.display_selections_gizmos or share_data.current_room is None:
+    if not prefs.display_selections_gizmos or share_data.client.current_room is None:
         return
 
     shader = gpu.shader.from_builtin("3D_UNIFORM_COLOR")
@@ -168,7 +171,7 @@ def users_selection_draw():
     indices = ((0, 1), (1, 2), (2, 3), (0, 3), (4, 5), (5, 6), (6, 7), (4, 7), (0, 4), (1, 5), (2, 6), (3, 7))
 
     def per_user_callback(user_dict):
-        user_color = user_dict.get(ClientMetadata.USERCOLOR, DEFAULT_COLOR)
+        user_color = user_dict.get(ClientAttributes.USERCOLOR, DEFAULT_COLOR)
         shader.uniform_float("color", (*user_color, 1))
         return True
 
@@ -184,11 +187,11 @@ def users_selection_draw():
 def users_selection_name_draw():
     prefs = get_mixer_prefs()
 
-    if not prefs.display_names_gizmos or share_data.current_room is None:
+    if not prefs.display_names_gizmos or share_data.client.current_room is None:
         return
 
     def per_user_callback(user_dict):
-        user_name = user_dict.get(ClientMetadata.USERNAME, None)
+        user_name = user_dict.get(ClientAttributes.USERNAME, None)
         return user_name is not None
 
     def per_object_callback(user_dict, object, matrix, local_bbox):
@@ -199,18 +202,21 @@ def users_selection_name_draw():
 
 
 def users_selection_draw_iteration(per_user_callback, per_object_callback):
+    if share_data.client is None:
+        return
+
     prefs = get_mixer_prefs()
 
-    for user_dict in share_data.client_ids.values():
-        scenes = user_dict.get(ClientMetadata.USERSCENES, None)
+    for user_dict in share_data.client.clients_attributes.values():
+        scenes = user_dict.get(ClientAttributes.USERSCENES, None)
         if not scenes:
             continue
 
-        user_id = user_dict[ClientMetadata.ID]
-        user_room = user_dict[ClientMetadata.ROOM]
+        user_id = user_dict[ClientAttributes.ID]
+        user_room = user_dict[ClientAttributes.ROOM]
         if (
             not prefs.display_own_gizmos and share_data.client.client_id == user_id
-        ) or share_data.current_room != user_room:
+        ) or share_data.client.current_room != user_room:
             continue  # don't draw my own selection or selection from users outside my room
 
         if not per_user_callback(user_dict):
@@ -220,7 +226,7 @@ def users_selection_draw_iteration(per_user_callback, per_object_callback):
             if scene_name != bpy.context.scene.name_full:
                 continue
 
-            selected_objects = scene_dict.get(ClientMetadata.USERSCENES_SELECTED_OBJECTS, None)
+            selected_objects = scene_dict.get(ClientAttributes.USERSCENES_SELECTED_OBJECTS, None)
             if selected_objects is None:
                 continue
 
@@ -260,12 +266,12 @@ def draw_user_name(user_dict, coord_3d):
         return  # Sometimes happen, maybe due to mathematical precision issues or incoherencies
     blf.position(0, text_coords[0], text_coords[1] + 10, 0)
     blf.size(0, 16, 72)
-    user_color = user_dict.get(ClientMetadata.USERCOLOR, DEFAULT_COLOR)
+    user_color = user_dict.get(ClientAttributes.USERCOLOR, DEFAULT_COLOR)
     blf.color(0, user_color[0], user_color[1], user_color[2], 1.0)
 
-    text = user_dict.get(ClientMetadata.USERNAME, None)
+    text = user_dict.get(ClientAttributes.USERNAME, None)
     if prefs.display_ids_gizmos:
-        text += f" ({user_dict[ClientMetadata.ID]})"
+        text += f" ({user_dict[ClientAttributes.ID]})"
 
     blf.draw(0, text)
 

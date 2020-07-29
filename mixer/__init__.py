@@ -30,8 +30,8 @@ def cleanup():
     if share_data.current_statistics is not None and share_data.auto_save_statistics:
         stats.save_statistics(share_data.current_statistics, share_data.statistics_directory)
     try:
-        if share_data.localServerProcess:
-            share_data.localServerProcess.kill()
+        if share_data.local_server_process:
+            share_data.local_server_process.kill()
     except Exception:
         pass
 
@@ -78,7 +78,7 @@ def get_logs_directory():
 def get_log_file():
     from mixer.share_data import share_data
 
-    return os.path.join(get_logs_directory(), f"mixer_logs_{share_data.runId}.log")
+    return os.path.join(get_logs_directory(), f"mixer_logs_{share_data.run_id}.log")
 
 
 def register():

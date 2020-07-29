@@ -48,15 +48,11 @@ class SceneInfo:
 
 class ShareData:
     def __init__(self):
-        self.runId = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.session_id = 0  # For logging and debug
         self.client = None
 
-        # as received fom LIST_ALL_CLIENTS
-        self.client_ids: Mapping[str, dict] = None
-        self.rooms_dict: Mapping[str, dict] = None
-
-        self.localServerProcess = None
+        self.local_server_process = None
         self.selected_objects_names = []
 
         self.current_statistics = None
@@ -70,9 +66,6 @@ class ShareData:
         self.shot_manager = ShotManager()
 
     def clear_room_data(self):
-        # equivalent to handlers set
-        self.current_room: str = None
-
         self.objects_added: Set(str) = set()
         self.objects_removed: Set(str) = set()
         self.collections_added: Set(str) = set()
@@ -149,7 +142,7 @@ class ShareData:
 
     def leave_current_room(self):
         if self.client is not None:
-            self.client.leave_room(share_data.current_room)
+            self.client.leave_room(share_data.client.current_room)
         self.clear_room_data()
 
         self._blender_scenes: Mapping[str, bpy.types.Scene] = {}
