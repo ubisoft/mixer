@@ -1,3 +1,13 @@
+# 0.14.0
+
+## Features
+
+- Display percentage of data received when joining a room (#186)
+
+## Optimization
+
+- Server: give more importance to received messages and improve concurrency when a client join a large room (#183)
+
 # 0.13.1 (2020-07-23)
 
 ## Bugfix
