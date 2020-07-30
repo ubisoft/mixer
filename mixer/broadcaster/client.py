@@ -89,8 +89,10 @@ class Client:
         Usually message_type is LEAVING_ROOM.
         """
         while self.is_connected():
-            received_commands = self.fetch_incoming_commands()
-            if received_commands is None:
+            try:
+                received_commands = self.fetch_incoming_commands()
+            except common.ClientDisconnectedException:
+                self.handle_connection_lost()
                 break
             for command in received_commands:
                 if command.type == message_type:
@@ -185,29 +187,25 @@ class Client:
     def has_default_handler(self, message_type: MessageType):
         return message_type in self._default_command_handlers
 
-    def fetch_incoming_commands(self) -> Optional[List[common.Command]]:
+    def fetch_incoming_commands(self) -> List[common.Command]:
         """
         Gather incoming commands from the socket and return them as a list.
+        Process those that have a default handler with the one registered.
         """
+        try:
+            received_commands = common.read_all_messages(self.socket)
+        except common.ClientDisconnectedException:
+            self.handle_connection_lost()
+            raise
 
-        received_commands: List[common.Command] = []
-        while True:
-            try:
-                command = common.read_message(self.socket)
-            except common.ClientDisconnectedException:
-                self.handle_connection_lost()
-                return None
-
-            if command is None:
-                break
-
-            logger.debug("Receive %s", command.type)
-            received_commands.append(command)
-
+        count = len(received_commands)
+        if count > 0:
+            logger.debug("Received %d commands", len(received_commands))
+        for command in received_commands:
+            logger.debug("Received %s", command.type)
             if command.type in self._default_command_handlers:
                 self._default_command_handlers[command.type](self, command)
 
-        logger.debug("Received %d commands", len(received_commands))
         return received_commands
 
     def fetch_outgoing_commands(self, commands_send_interval=0):
@@ -225,6 +223,6 @@ class Client:
 
         self.pending_commands = []
 
-    def fetch_commands(self, commands_send_interval=0) -> Optional[List[common.Command]]:
+    def fetch_commands(self, commands_send_interval=0) -> List[common.Command]:
         self.fetch_outgoing_commands(commands_send_interval)
         return self.fetch_incoming_commands()

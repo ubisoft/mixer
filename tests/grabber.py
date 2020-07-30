@@ -41,8 +41,6 @@ class Grabber:
             try:
                 while attempts < attempts_max:
                     received_commands = client.fetch_incoming_commands()
-                    if received_commands is None:
-                        raise ClientDisconnectedException()
 
                     attempts += 1
                     time.sleep(0.01)

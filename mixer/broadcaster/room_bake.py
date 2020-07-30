@@ -23,8 +23,7 @@ def download_room(host: str, port: int, room_name: str) -> Tuple[Dict[str, Any],
         try:
             while room_attributes is None or len(commands) < room_attributes[RoomAttributes.COMMAND_COUNT]:
                 received_commands = client.fetch_incoming_commands()
-                if received_commands is None:
-                    raise ClientDisconnectedException()
+
                 for command in received_commands:
                     if room_attributes is None and command.type == MessageType.LIST_ROOMS:
                         rooms_attributes, _ = decode_json(command.data, 0)
