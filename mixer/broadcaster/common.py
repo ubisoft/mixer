@@ -1,5 +1,5 @@
 from enum import IntEnum
-from typing import Dict, Mapping, Any, Optional
+from typing import Dict, Mapping, Any, Optional, List
 import select
 import socket
 import struct
@@ -416,6 +416,10 @@ class CommandFormatter:
 
 
 def recv(socket: socket.socket, size: int):
+    """
+    Try to read size bytes from the socket.
+    Raise ClientDisconnectedException if the socket is disconnected.
+    """
     result = b""
     while size != 0:
         r, _, _ = select.select([socket], [], [], 0.1)
@@ -435,6 +439,11 @@ def recv(socket: socket.socket, size: int):
 
 
 def read_message(socket: socket.socket) -> Optional[Command]:
+    """
+    Try to read a full message from the socket.
+    Raise ClientDisconnectedException if the socket is disconnected.
+    Return None if no message is waiting on the socket.
+    """
     if not socket:
         logger.warning("read_message called with no socket")
         return None
@@ -460,6 +469,21 @@ def read_message(socket: socket.socket) -> Optional[Command]:
     except Exception as e:
         logger.error(e, exc_info=True)
         raise
+
+
+def read_all_messages(socket: socket.socket) -> List[Command]:
+    """
+    Try to read all messages waiting on the socket.
+    Raise ClientDisconnectedException if the socket is disconnected.
+    Return empty list if no message is waiting on the socket.
+    """
+    received_commands: List[Command] = []
+    while True:
+        command = read_message(socket)
+        if command is None:
+            break
+        received_commands.append(command)
+    return received_commands
 
 
 def write_message(sock: Optional[socket.socket], command: Command):
