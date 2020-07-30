@@ -89,8 +89,10 @@ class Client:
         Usually message_type is LEAVING_ROOM.
         """
         while self.is_connected():
-            received_commands = self.fetch_incoming_commands()
-            if received_commands is None:
+            try:
+                received_commands = self.fetch_incoming_commands()
+            except common.ClientDisconnectedException:
+                self.handle_connection_lost()
                 break
             for command in received_commands:
                 if command.type == message_type:
@@ -185,7 +187,7 @@ class Client:
     def has_default_handler(self, message_type: MessageType):
         return message_type in self._default_command_handlers
 
-    def fetch_incoming_commands(self) -> Optional[List[common.Command]]:
+    def fetch_incoming_commands(self) -> List[common.Command]:
         """
         Gather incoming commands from the socket and return them as a list.
         """
@@ -194,9 +196,9 @@ class Client:
         while True:
             try:
                 command = common.read_message(self.socket)
-            except common.ClientDisconnectedException:
+            except common.ClientDisconnectedException as e:
                 self.handle_connection_lost()
-                return None
+                raise e
 
             if command is None:
                 break
@@ -225,6 +227,6 @@ class Client:
 
         self.pending_commands = []
 
-    def fetch_commands(self, commands_send_interval=0) -> Optional[List[common.Command]]:
+    def fetch_commands(self, commands_send_interval=0) -> List[common.Command]:
         self.fetch_outgoing_commands(commands_send_interval)
         return self.fetch_incoming_commands()

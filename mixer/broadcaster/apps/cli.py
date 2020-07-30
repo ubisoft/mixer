@@ -42,10 +42,6 @@ class CliClient(client.Client):
         while received is None or (expected_response_type is not None and received.type != expected_response_type):
             received_commands = self.fetch_incoming_commands()
 
-            if received_commands is None:
-                self.disconnect()
-                return
-
             for command in received_commands:
                 if command.type == common.MessageType.SEND_ERROR:
                     logger.error(common.decode_string(command.data, 0)[0])
