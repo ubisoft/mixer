@@ -17,6 +17,10 @@ SHUTDOWN = False
 logger = logging.getLogger() if __name__ == "__main__" else logging.getLogger(__name__)
 _log_server_updates: bool = False
 
+# If more that this number of commands need to be broadcaster to a joining
+# client, then release the room mutex while broadcasting
+MAX_BROADCAST_COMMAND_COUNT = 64
+
 
 class Connection:
     """ Represent a connection with a client """
@@ -38,9 +42,6 @@ class Connection:
     def start(self):
         self.thread.start()
 
-    def has_room(self):
-        return self.room is not None
-
     def client_attributes(self) -> Dict[str, Any]:
         return {
             **self.custom_attributes,
@@ -60,7 +61,10 @@ class Connection:
                 _send_error(f"Received join_room but room {self.room.name} is already joined")
                 return
             room_name = command.data.decode()
-            self._server.join_room(self, room_name)
+            try:
+                self._server.join_room(self, room_name)
+            except Exception as e:
+                _send_error(f"{e}")
 
         def _leave_room(command: common.Command):
             if self.room is None:
@@ -108,11 +112,6 @@ class Connection:
             if self.room is None:
                 _send_error("Unjoined client trying to set room joinable")
                 return
-            if self.room.creator_client_id != self.unique_id:
-                _send_error(
-                    f"Client {self.unique_id} trying to set joinable room {self.room.name} created by {self.room.creator_client_id}"
-                )
-                return
             if self.room.joinable:
                 _send_error(f"Trying to set joinable room {self.room.name} which is already joinable")
                 return
@@ -140,7 +139,8 @@ class Connection:
                 logger.debug("Received from %s - %d commands ", self.unique_id, count)
 
             for command in received_commands:
-                logger.debug("Received from %s - %s", self.unique_id, command.type)
+                if _log_server_updates or command.type not in (common.MessageType.SET_CLIENT_CUSTOM_ATTRIBUTES,):
+                    logger.debug("Received from %s - %s", self.unique_id, command.type)
 
                 if command.type in command_handlers:
                     command_handlers[command.type](command)
@@ -152,26 +152,13 @@ class Connection:
                             "%s:%s - %s received but no room was joined",
                             self.address[0],
                             self.address[1],
-                            command.type.value,
+                            command.type,
                         )
                 else:
                     logger.error("Command %s received but no handler for it on server", command.type)
 
         def _handle_outgoing_commands():
-            while True:
-                try:
-                    command = self._command_queue.get_nowait()
-                except queue.Empty:
-                    break
-
-                if _log_server_updates or command.type not in (
-                    common.MessageType.CLIENT_UPDATE,
-                    common.MessageType.ROOM_UPDATE,
-                ):
-                    logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
-                self.send_command(command)
-
-                self._command_queue.task_done()
+            self.fetch_outgoing_commands()
 
         global SHUTDOWN
         while not SHUTDOWN:
@@ -182,6 +169,16 @@ class Connection:
                 break
 
         self._server.handle_client_disconnect(self)
+
+    def fetch_outgoing_commands(self):
+        while True:
+            try:
+                command = self._command_queue.get_nowait()
+            except queue.Empty:
+                break
+
+            self.send_command(command)
+            self._command_queue.task_done()
 
     def add_command(self, command: common.Command):
         """
@@ -194,6 +191,11 @@ class Connection:
         Directly send a command to the socket. Meant to be used by this thread.
         """
         assert threading.current_thread() is self.thread
+        if _log_server_updates or command.type not in (
+            common.MessageType.CLIENT_UPDATE,
+            common.MessageType.ROOM_UPDATE,
+        ):
+            logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
         common.write_message(self.socket, command)
 
 
@@ -205,7 +207,7 @@ class Room:
     - dispatch added commands to clients already in the room
     """
 
-    def __init__(self, server: Server, room_name: str, creator_client_id: str):
+    def __init__(self, server: Server, room_name: str, creator: Connection):
         self.name = room_name
         self.keep_open = False  # Should the room remain open when no more clients are inside ?
         self.byte_size = 0
@@ -216,19 +218,59 @@ class Room:
         self._commands: List[common.Command] = []
 
         self._commands_mutex: threading.RLock = threading.RLock()
-        self._connections: List[Connection] = []
+        self._connections: List[Connection] = [creator]
 
-        self.creator_client_id = creator_client_id
+        self.join_count: int = 0
+        # this is used to ensure a room cannot be deleted while clients are joining (creator is not considered to be joining)
+        # Server is responsible of increasing / decreasing join_count, with mutex protection
+
+        creator.room = self
+        creator.send_command(common.Command(common.MessageType.JOIN_ROOM, common.encode_string(self.name)))
+        creator.send_command(
+            common.Command(common.MessageType.CONTENT)
+        )  # self.joinable will be set to true by creator later
 
     def client_count(self):
-        return len(self._connections)
+        return len(self._connections) + self.join_count
 
     def command_count(self):
         return len(self._commands)
 
     def add_client(self, connection: Connection):
-        logger.info(f"Add Client {connection.address} to Room {self.name}")
-        self._connections.append(connection)
+        logger.info(f"Add Client {connection.unique_id} to Room {self.name}")
+
+        connection.send_command(common.Command(common.MessageType.CLEAR_CONTENT))  # todo temporary size stored here
+
+        offset = 0
+
+        def _try_finish_sync():
+            connection.fetch_outgoing_commands()
+            with self._commands_mutex:
+                # from here no one can add commands anymore to self._commands (clients can still join and read previous commands)
+                command_count = self.command_count()
+                if command_count - offset > MAX_BROADCAST_COMMAND_COUNT:
+                    return False  # while still more than MAX_BROADCAST_COMMAND_COUNT commands to broadcast, release the mutex
+
+                # now is time to synchronize all room participants: broadcast remaining commands to new client
+                for i in range(offset, command_count):
+                    command = self._commands[i]
+                    connection.add_command(command)
+
+                # now he's part of the room, let him/her know
+                self._connections.append(connection)
+                connection.room = self
+                connection.add_command(common.Command(common.MessageType.JOIN_ROOM, common.encode_string(self.name)))
+                return True
+
+        while True:
+            if _try_finish_sync():
+                break  # all done
+            # broadcast commands that were added since last check
+            command_count = self.command_count()
+            for i in range(offset, command_count):
+                command = self._commands[i]  # atomic wrt. the GIL
+                connection.add_command(command)
+            offset = command_count
 
     def remove_client(self, connection: Connection):
         logger.info("Remove Client % s from Room % s", connection.address, self.name)
@@ -242,11 +284,6 @@ class Room:
             common.RoomAttributes.BYTE_SIZE: self.byte_size,
             common.RoomAttributes.JOINABLE: self.joinable,
         }
-
-    def broadcast_commands(self, connection: Connection):
-        with self._commands_mutex:
-            for command in self._commands:
-                connection.add_command(command)
 
     def add_command(self, command, sender: Connection):
         def merge_command():
@@ -308,16 +345,13 @@ class Server:
             )
 
     def join_room(self, connection: Connection, room_name: str):
-        assert not connection.has_room()
+        assert connection.room is None
 
         def _create_room():
             logger.info(f"Room {room_name} does not exist. Creating it.")
-            room = Room(self, room_name, connection.unique_id)
-            room.add_client(connection)
-            connection.room = room
-            connection.send_command(common.Command(common.MessageType.CONTENT))
-
+            room = Room(self, room_name, connection)
             self._rooms[room_name] = room
+            # room is now visible to others, but not joinable until the client has sent CONTENT
             logger.info(f"Room {room_name} added")
 
             self.broadcast_room_update(room, room.attributes_dict())  # Inform new room
@@ -330,21 +364,21 @@ class Server:
                 return
 
             if not room.joinable:
-                logging.error("Room %s not joinable yet.", room_name)
-                return
+                raise Exception(f"Room {room_name} not joinable yet.")
 
             # Do this before releasing the global mutex
             # Ensure the room will not be deleted because it now has at least one client
-            room.add_client(connection)
-            connection.room = room
-            connection.send_command(common.Command(common.MessageType.CLEAR_CONTENT))
+            room.join_count += 1
 
-        try:
-            room.broadcast_commands(connection)
-            self.broadcast_client_update(connection, {common.ClientAttributes.ROOM: connection.room.name})
-        except Exception as e:
-            connection.room = None
-            raise e
+        room.add_client(connection)
+        # this call can take a while because history broadcasting occurs, so the mutex is released here
+
+        # from here client is in the room list, we can decrease join_count
+        with self._mutex:
+            room.join_count -= 1
+
+        assert connection.room is not None
+        self.broadcast_client_update(connection, {common.ClientAttributes.ROOM: connection.room.name})
 
     def leave_room(self, connection: Connection):
         assert connection.room is not None
