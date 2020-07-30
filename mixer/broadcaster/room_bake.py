@@ -55,12 +55,19 @@ def download_room(host: str, port: int, room_name: str) -> Tuple[Dict[str, Any],
 
 
 def upload_room(host: str, port: int, room_name: str, room_attributes: dict, commands: List[Command]):
+    """
+    Upload a room to the server.
+    Warning: This function is blocking, so when run from Blender the client dedicated to the user will be blocked and will accumulate lot of
+    room updates that will be processed later.
+    Todo: Write a non blocking version of this function to be used inside Blender, some kind of UploadClient that can exist side by side with BlenderClient.
+    """
     with Client(host, port) as client:
         client.join_room(room_name)
         client.set_room_attributes(room_name, room_attributes)
         client.set_room_keep_open(room_name, True)
 
-        for c in commands:
+        for idx, c in enumerate(commands):
+            logger.debug("Sending command %s (%d / %d)", c.type, idx, len(commands))
             client.send_command(c)
 
         client.send_command(Command(MessageType.CONTENT))

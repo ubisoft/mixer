@@ -307,6 +307,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                 split.label(
                     text=f"Room: {share_data.client.current_room}{(' (experimental sync)' if mixer_prefs.experimental_sync else '')}"
                 )
+                split.label(text=f"Join: {get_mixer_props().joining_percentage * 100:.2f} %")
                 split.operator(operators.LeaveRoomOperator.bl_idname, text=f"Leave Room")
 
             self.draw_rooms(layout)
