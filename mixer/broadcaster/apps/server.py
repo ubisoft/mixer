@@ -133,45 +133,51 @@ class Connection:
             common.MessageType.CONTENT: _content,
         }
 
+        def _handle_incoming_commands():
+            received_commands = common.read_all_messages(self.socket)
+            count = len(received_commands)
+            if count > 0:
+                logger.debug("Received from %s - %d commands ", self.unique_id, count)
+
+            for command in received_commands:
+                logger.debug("Received from %s - %s", self.unique_id, command.type)
+
+                if command.type in command_handlers:
+                    command_handlers[command.type](command)
+                elif command.type.value > common.MessageType.COMMAND.value:
+                    if self.room is not None:
+                        self.room.add_command(command, self)
+                    else:
+                        logger.warning(
+                            "%s:%s - %s received but no room was joined",
+                            self.address[0],
+                            self.address[1],
+                            command.type.value,
+                        )
+                else:
+                    logger.error("Command %s received but no handler for it on server", command.type)
+
+        def _handle_outgoing_commands():
+            while True:
+                try:
+                    command = self._command_queue.get_nowait()
+                except queue.Empty:
+                    break
+
+                if _log_server_updates or command.type not in (
+                    common.MessageType.CLIENT_UPDATE,
+                    common.MessageType.ROOM_UPDATE,
+                ):
+                    logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
+                self.send_command(command)
+
+                self._command_queue.task_done()
+
         global SHUTDOWN
         while not SHUTDOWN:
             try:
-                command = common.read_message(self.socket)
-
-                if command is not None:
-                    logger.debug("Received from %s:%s - %s", self.address[0], self.address[1], command.type)
-
-                    if command.type in command_handlers:
-                        command_handlers[command.type](command)
-
-                    elif command.type.value > common.MessageType.COMMAND.value:
-                        if self.room is not None:
-                            self.room.add_command(command, self)
-                        else:
-                            logger.warning(
-                                "%s:%s - %s received but no room was joined",
-                                self.address[0],
-                                self.address[1],
-                                command.type.value,
-                            )
-
-                    else:
-                        logger.error("Command %s received but no handler for it on server", command.type)
-
-                while True:
-                    try:
-                        command = self._command_queue.get_nowait()
-                    except queue.Empty:
-                        break
-
-                    if _log_server_updates or command.type not in (
-                        common.MessageType.CLIENT_UPDATE,
-                        common.MessageType.ROOM_UPDATE,
-                    ):
-                        logger.debug("Sending to %s:%s - %s", self.address[0], self.address[1], command.type)
-                    self.send_command(command)
-
-                    self._command_queue.task_done()
+                _handle_incoming_commands()
+                _handle_outgoing_commands()
             except common.ClientDisconnectedException:
                 break
 

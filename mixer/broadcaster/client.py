@@ -201,10 +201,10 @@ class Client:
         count = len(received_commands)
         if count > 0:
             logger.debug("Received %d commands", len(received_commands))
-            for command in received_commands:
-                logger.debug("Received %s", command.type)
-                if command.type in self._default_command_handlers:
-                    self._default_command_handlers[command.type](self, command)
+        for command in received_commands:
+            logger.debug("Received %s", command.type)
+            if command.type in self._default_command_handlers:
+                self._default_command_handlers[command.type](self, command)
 
         return received_commands
 
