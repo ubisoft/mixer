@@ -195,7 +195,10 @@ def join_room(room_name: str):
     assert share_data.client.current_room is None
     BlendData.instance().reset()
     share_data.session_id += 1
+    # todo tech debt -> current_room should be set when JOIN_ROOM is received
+    # todo _joining_room_name should be set in client timer
     share_data.client.current_room = room_name
+    share_data.client._joining_room_name = room_name
     set_client_attributes()
     share_data.client.join_room(room_name)
     share_data.client.send_set_current_scene(bpy.context.scene.name_full)

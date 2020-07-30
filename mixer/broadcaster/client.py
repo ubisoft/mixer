@@ -174,6 +174,12 @@ class Client:
             return
         del self.clients_attributes[client_id]
 
+    def _handle_join_room(self, command: common.Command):
+        room_name, _ = common.decode_string(command.data, 0)
+
+        logger.info("Join room %s confirmed by server", room_name)
+        self.current_room = room_name
+
     _default_command_handlers: Mapping[MessageType, Callable[[common.Command], None]] = {
         MessageType.LIST_CLIENTS: _handle_list_client,
         MessageType.LIST_ROOMS: _handle_list_rooms,
@@ -182,6 +188,7 @@ class Client:
         MessageType.ROOM_DELETED: _handle_room_deleted,
         MessageType.CLIENT_UPDATE: _handle_client_update,
         MessageType.CLIENT_DISCONNECTED: _handle_client_disconnected,
+        MessageType.JOIN_ROOM: _handle_join_room,
     }
 
     def has_default_handler(self, message_type: MessageType):

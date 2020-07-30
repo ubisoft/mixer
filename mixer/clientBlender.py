@@ -1,17 +1,16 @@
 import logging
 import os
 import struct
-import traceback
-from typing import Set, Tuple
+from typing import Set, Tuple, Optional
 
 import bpy
 from mathutils import Matrix, Quaternion
 import mixer
 from mixer import ui
-from mixer.bl_utils import get_mixer_prefs
+from mixer.bl_utils import get_mixer_prefs, get_mixer_props
 from mixer.share_data import share_data
 from mixer.broadcaster import common
-from mixer.broadcaster.common import ClientAttributes, MessageType
+from mixer.broadcaster.common import ClientAttributes, MessageType, RoomAttributes
 from mixer.broadcaster.client import Client
 from mixer.blender_client import camera as camera_api
 from mixer.blender_client import collection as collection_api
@@ -77,6 +76,11 @@ class ClientBlender(Client):
         # because it will produce some kind of infinite recursive update
         self.block_signals = False
         # block_signals is set to True when our timer transforms received commands into scene updates
+
+        self._joining: bool = False
+        self._joining_room_name: Optional[str] = None
+        self._received_command_count: int = 0
+        self._received_byte_size: int = 0
 
     def add_callback(self, name, func):
         self.callbacks[name] = func
@@ -614,6 +618,16 @@ class ClientBlender(Client):
             set_dirty = True
             # Process all received commands
             for command in received_commands:
+                if self._joining and command.type.value > common.MessageType.COMMAND.value:
+                    self._received_byte_size += command.byte_size()
+                    self._received_command_count += 1
+                    if self._joining_room_name in self.rooms_attributes:
+                        get_mixer_props().joining_percentage = (
+                            self._received_byte_size
+                            / self.rooms_attributes[self._joining_room_name][RoomAttributes.BYTE_SIZE]
+                        )
+                        ui.redraw()
+
                 if command.type == MessageType.GROUP_BEGIN:
                     group_count += 1
                     continue
@@ -623,6 +637,10 @@ class ClientBlender(Client):
                     continue
 
                 if self.has_default_handler(command.type):
+                    if command.type == MessageType.JOIN_ROOM and self._joining:
+                        self._joining = False
+                        get_mixer_props().joining_percentage = 1
+
                     ui.update_ui_lists()
                     self.block_signals = False  # todo investigate why we should but this to false here
                     continue
@@ -664,6 +682,11 @@ class ClientBlender(Client):
 
                     elif command.type == MessageType.CLEAR_CONTENT:
                         self.clear_content()
+                        self._joining = True
+                        self._received_command_count = 0
+                        self._received_byte_size = 0
+                        get_mixer_props().joining_percentage = 0
+                        ui.redraw()
                     elif command.type == MessageType.MESH:
                         self.build_mesh(command.data)
                     elif command.type == MessageType.TRANSFORM:
@@ -760,10 +783,8 @@ class ClientBlender(Client):
                         self.skip_next_depsgraph_update = True
 
                 except Exception as e:
-                    logger.warning(
-                        f"Exception during processing of message {str(command.type)} ...\n" + traceback.format_exc()
-                    )
-                    if isinstance(e, SendSceneContentFailed):
+                    logger.warning(f"Exception during processing of message {str(command.type)} ...\n", stack_info=True)
+                    if get_mixer_prefs().env == "development" or isinstance(e, SendSceneContentFailed):
                         raise
 
                 self.block_signals = False

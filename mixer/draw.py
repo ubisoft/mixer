@@ -1,5 +1,5 @@
 from mixer.share_data import share_data
-from mixer.bl_utils import get_mixer_prefs
+from mixer.bl_utils import get_mixer_prefs, get_mixer_props
 from mixer.broadcaster.common import ClientAttributes
 
 import bpy
@@ -15,6 +15,7 @@ class DrawHandlers:
     users_frustum_name_draw_handler = None
     users_selection_draw_handler = None
     users_selection_name_draw_handler = None
+    joinging_percentage_draw_handler = None
 
 
 _draw_handlers = DrawHandlers()
@@ -39,6 +40,10 @@ def set_draw_handlers():
         _draw_handlers.users_selection_name_draw_handler = bpy.types.SpaceView3D.draw_handler_add(
             users_selection_name_draw, (), "WINDOW", "POST_PIXEL"
         )
+    if not _draw_handlers.joinging_percentage_draw_handler:
+        _draw_handlers.joinging_percentage_draw_handler = bpy.types.SpaceView3D.draw_handler_add(
+            joining_percentage_draw, (), "WINDOW", "POST_PIXEL"
+        )
 
 
 def remove_draw_handlers():
@@ -54,6 +59,26 @@ def remove_draw_handlers():
     if _draw_handlers.users_selection_name_draw_handler:
         bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.users_selection_name_draw_handler, "WINDOW")
         _draw_handlers.users_selection_name_draw_handler = None
+    if _draw_handlers.joinging_percentage_draw_handler:
+        bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.joinging_percentage_draw_handler, "WINDOW")
+        _draw_handlers.joinging_percentage_draw_handler = None
+
+
+def joining_percentage_draw():
+    props = get_mixer_props()
+
+    if not share_data.client._joining:
+        return
+
+    import blf
+
+    point_size = bpy.context.area.height * 10
+
+    blf.position(0, 32, 32, 0)
+    blf.size(0, point_size, 1)
+    blf.color(0, 1, 0, 1, 1.0)
+
+    blf.draw(0, f"{props.joining_percentage * 100:.2f} % (Mixer Join)")
 
 
 def users_frustrum_draw():
