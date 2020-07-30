@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from mixer.blender_data.proxy import BpyBlendProxy
 from mixer.blender_data.filter import test_context
+from mixer.bl_utils import get_mixer_prefs
 
 import bpy
 from mixer.shot_manager_data import ShotManager
@@ -343,7 +344,26 @@ class ShareData:
         for obj in self.blender_objects.values():
             self.objects_transforms[obj.name_full] = obj.matrix_local.copy()
 
+    def sanitize_blender_ids(self, id_dict):
+        # todo investigate this
+        # the classic error is ReferenceError: StructRNA of type Object has been removed
+        # I think we should remove the lazy update of dicts, because references become stale, we don't know why
+        # in the meantime we need this to ensure we avoid crashes in production
+        sanitized = {}
+        for _key, value in id_dict.items():
+            try:
+                sanitized[
+                    value.name_full
+                ] = value  # the access value.name_full should trigger the error if the ID is invalid
+            except ReferenceError as e:
+                logger.error(e, stack_info=True)
+                if get_mixer_prefs().env == "development":
+                    raise  # raise back in development, for debugging
+        return sanitized
+
     def update_current_data(self):
+        self._blender_objects = self.sanitize_blender_ids(self._blender_objects)
+
         self.update_scenes_info()
         self.update_collections_info()
         self.update_objects_info()
