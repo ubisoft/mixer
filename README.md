@@ -1,10 +1,10 @@
 # Mixer
 
-**Disclaimer**: This project is in alpha state and actively developped. Do not use it to edit your production assets without a backup or you might break them. In the code you might see references to VRtist or Shot Manager, which are other technologies / addons that are developped in our studio. Don't pay too much attention to related code since we plan to extract it in some way, probably with a plugins strategy.
+**Disclaimer**: This project is in alpha state and actively developed. Do not use it to edit your production assets without a backup or you might break them. In the code you might see references to VRtist or Shot Manager, which are other technologies / addons that are developed in our studio. Don't pay too much attention to related code since we plan to extract it in some way, probably with a plugins strategy.
 
 ## Introduction
 
-Mixer is a Blender addon developped at Ubisoft Animation Studio for Real Time Collaboration in 3D edition. It allows multiple Blender users to work on the same scene at the same time. Thanks to a broadcasting server that is independent from Blender, it is also possible to implement a connection for other 3D editing softwares.
+Mixer is a Blender addon developed at Ubisoft Animation Studio for Real Time Collaboration in 3D edition. It allows multiple Blender users to work on the same scene at the same time. Thanks to a broadcasting server that is independent from Blender, it is also possible to implement a connection for other 3D editing softwares.
 
 ## Repositories
 
