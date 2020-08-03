@@ -14,7 +14,7 @@ We open source this addon through two repositories:
 
 On the Gitlab repository you can see the CI tasks running (linting, unit tests, packing the addon and releases) and you have access to clean releases on the dedicated page https://gitlab.com/ubisoft-animation-studio/mixer/-/releases.
 
-For now we are still working on our internal Gitlab instance and mirroring to github.com and gitlab.com. In the future we might consider moving entirely to one of the public repositories.
+For now we are still working on our internal Gitlab instance and mirroring to github.com and gitlab.com. In the future we might consider moving entirely to one of the public repositories. As a consequence, the gitlab.com repository only run our unit tests on release tags using [a specialized CICD script](gitlab/gitlab.com-ci.yml). This is to avoid running too many tests on our gitlab runners.
 
 ## Usage
 
