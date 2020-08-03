@@ -31,7 +31,7 @@ def set_log_level(log_level):
 
 
 def join_room(room_name: str = "mixer_unittest"):
-    from mixer.blender_client import join_room
+    from mixer.connection import join_room
 
     join_room(room_name)
 

@@ -12,9 +12,9 @@ from pathlib import Path
 from mixer.stats import save_statistics, get_stats_filename
 from mixer.blender_data.blenddata import BlendData
 from mixer.draw import remove_draw_handlers
-from mixer.blender_client import SendSceneContentFailed, BlenderClient, HandlerManager
+from mixer.blender_client import SendSceneContentFailed, BlenderClient
+from mixer.handlers import HandlerManager
 
-_STILL_ACTIVE = 259
 
 logger = logging.getLogger(__name__)
 

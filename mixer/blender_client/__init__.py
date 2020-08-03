@@ -845,6 +845,8 @@ def update_params(obj):
 
 
 def clear_scene_content():
+    from mixer.handlers import HandlerManager
+
     with HandlerManager(False):
 
         data = [
@@ -881,6 +883,8 @@ def clear_scene_content():
 
 @stats_timer(share_data)
 def send_scene_content():
+    from mixer.handlers import HandlerManager, send_scene_data_to_server
+
     if get_mixer_prefs().no_send_scene_content:
         return
 

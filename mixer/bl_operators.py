@@ -6,7 +6,6 @@ import subprocess
 import bpy
 
 from mixer.share_data import share_data
-from mixer import ui
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.stats import save_statistics
 from mixer.broadcaster.common import RoomAttributes
@@ -224,6 +223,8 @@ class LeaveRoomOperator(bpy.types.Operator):
         return is_client_connected() and share_data.client.current_room is not None
 
     def execute(self, context):
+        from mixer import ui
+
         leave_current_room()
         ui.update_ui_lists()
         return {"FINISHED"}
