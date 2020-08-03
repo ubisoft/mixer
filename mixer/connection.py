@@ -4,7 +4,7 @@ import bpy
 from mixer import ui
 from mixer.bl_utils import get_mixer_prefs
 from mixer.share_data import share_data
-from mixer.broadcaster.common import ClientAttributes
+from mixer.broadcaster.common import ClientAttributes, ClientDisconnectedException
 import subprocess
 import time
 from pathlib import Path
@@ -12,6 +12,7 @@ from pathlib import Path
 from mixer.stats import save_statistics, get_stats_filename
 from mixer.blender_data.blenddata import BlendData
 from mixer.draw import remove_draw_handlers
+from mixer.blender_client import SendSceneContentFailed, BlenderClient, HandlerManager
 
 _STILL_ACTIVE = 259
 
@@ -176,7 +177,17 @@ def network_consumer_timer():
     # if we register it directly, then bpy.app.timers.is_registered(share_data.client.network_consumer)
     # return False...
     # However, with a simple function bpy.app.timers.is_registered works.
-    share_data.client.network_consumer()
+    try:
+        share_data.client.network_consumer()
+    except (ClientDisconnectedException, SendSceneContentFailed) as e:
+        logger.warning(e)
+        share_data.client = None
+        disconnect()
+        return None
+    except Exception as e:
+        logger.error(e, stack_info=True)
+        if get_mixer_prefs().env == "development":
+            raise
 
     # Run every 1 / 100 seconds
     return 0.01

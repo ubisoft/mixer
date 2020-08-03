@@ -10,7 +10,7 @@ from mixer import ui
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.stats import save_statistics
 from mixer.broadcaster.common import RoomAttributes
-from mixer.blender_client import is_client_connected, connect, join_room, leave_current_room, disconnect
+from mixer.connection import is_client_connected, connect, join_room, leave_current_room, disconnect
 
 logger = logging.getLogger(__name__)
 

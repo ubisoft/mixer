@@ -25,9 +25,6 @@ import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
 from mixer.draw import set_draw_handlers
 import itertools
-import subprocess
-import time
-from pathlib import Path
 from typing import Mapping, Any
 from uuid import uuid4
 
@@ -36,10 +33,9 @@ from bpy.app.handlers import persistent
 from mixer.share_data import object_visibility
 from mixer.blender_client.camera import send_camera
 from mixer.blender_client.light import send_light
-from mixer.stats import StatsTimer, save_statistics, get_stats_filename
+from mixer.stats import StatsTimer
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
-from mixer.blender_data.blenddata import BlendData
 from mixer.draw import remove_draw_handlers
 
 _STILL_ACTIVE = 259
@@ -517,10 +513,6 @@ class BlenderClient(Client):
         logger.info("send_delate %s", obj_name)
         self.add_command(common.Command(MessageType.DELETE, self.get_delete_buffer(obj_name), 0))
 
-    def on_connection_lost(self):
-        share_data.client = None
-        disconnect()
-
     def build_frame(self, data):
         start = 0
         frame, start = common.decode_int(data, start)
@@ -620,9 +612,6 @@ class BlenderClient(Client):
         group_count = 0
         while True:
             received_commands = self.fetch_commands(get_mixer_prefs().commands_send_interval)
-            if received_commands is None:
-                self.on_connection_lost()
-                break
 
             set_dirty = True
             # Process all received commands
@@ -673,7 +662,6 @@ class BlenderClient(Client):
                             # Inform end of content
                             self.add_command(common.Command(MessageType.CONTENT))
                         except Exception as e:
-                            self.on_connection_lost()
                             raise SendSceneContentFailed() from e
                         continue
 
@@ -976,8 +964,7 @@ def update_frame_start_end():
 @persistent
 def handler_on_load(scene):
     logger.info("handler_on_load")
-
-    disconnect()
+    pass
 
 
 def get_scene(scene_name):
