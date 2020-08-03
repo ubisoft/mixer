@@ -24,6 +24,23 @@ from mixer.blender_client import scene as scene_api
 import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
 from mixer.draw import set_draw_handlers
+import itertools
+import subprocess
+import time
+from pathlib import Path
+from typing import Mapping, Any
+from uuid import uuid4
+
+from bpy.app.handlers import persistent
+
+from mixer.share_data import object_visibility
+from mixer.blender_client.camera import send_camera
+from mixer.blender_client.light import send_light
+from mixer.stats import StatsTimer, save_statistics, get_stats_filename
+from mixer.blender_data.diff import BpyBlendDiff
+from mixer.blender_data.filter import safe_context
+from mixer.blender_data.blenddata import BlendData
+from mixer.draw import remove_draw_handlers
 
 _STILL_ACTIVE = 259
 
@@ -816,38 +833,6 @@ class ClientBlender(Client):
             share_data.pending_parenting = remaining_parentings
 
         self.set_client_attributes(self.compute_client_custom_attributes())
-import itertools
-import logging
-import subprocess
-import time
-from pathlib import Path
-from typing import Mapping, Any
-from uuid import uuid4
-
-import bpy
-from bpy.app.handlers import persistent
-
-from mixer.share_data import share_data, object_visibility
-from mixer.blender_client import collection as collection_api
-from mixer.blender_client import data as data_api
-from mixer.blender_client import grease_pencil as grease_pencil_api
-from mixer.blender_client import object_ as object_api
-from mixer.blender_client import scene as scene_api
-from mixer.blender_client.camera import send_camera
-from mixer.blender_client.light import send_light
-from mixer import clientBlender
-from mixer import ui
-from mixer.bl_utils import get_mixer_prefs
-from mixer.stats import StatsTimer, save_statistics, get_stats_filename, stats_timer
-from mixer.blender_data.diff import BpyBlendDiff
-from mixer.blender_data.filter import safe_context
-from mixer.blender_data.blenddata import BlendData
-from mixer.broadcaster.common import ClientAttributes
-from mixer.draw import remove_draw_handlers
-
-import mixer.shot_manager as shot_manager
-
-logger = logging.getLogger(__name__)
 
 
 class HandlerManager:
@@ -2004,7 +1989,7 @@ def create_main_client(host: str, port: int):
         logger.debug("create_main_client: share_data.client is not None")
         share_data.client = None
 
-    client = clientBlender.ClientBlender(host, port)
+    client = ClientBlender(host, port)
     client.connect()
     if not client.is_connected():
         return False
