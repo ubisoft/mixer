@@ -80,9 +80,9 @@ class SendSceneContentFailed(Exception):
     pass
 
 
-class ClientBlender(Client):
+class BlenderClient(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
-        super(ClientBlender, self).__init__(host, port)
+        super(BlenderClient, self).__init__(host, port)
 
         self.textures: Set[str] = set()
 
@@ -1965,7 +1965,7 @@ def create_main_client(host: str, port: int):
         logger.debug("create_main_client: share_data.client is not None")
         share_data.client = None
 
-    client = ClientBlender(host, port)
+    client = BlenderClient(host, port)
     client.connect()
     if not client.is_connected():
         return False
