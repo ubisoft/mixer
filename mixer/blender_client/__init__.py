@@ -863,19 +863,19 @@ class HandlerManager:
             if connect:
                 bpy.app.handlers.frame_change_post.append(handler_send_frame_changed)
                 bpy.app.handlers.depsgraph_update_post.append(handler_send_scene_data_to_server)
-                bpy.app.handlers.undo_pre.append(on_undo_redo_pre)
-                bpy.app.handlers.redo_pre.append(on_undo_redo_pre)
-                bpy.app.handlers.undo_post.append(on_undo_redo_post)
-                bpy.app.handlers.redo_post.append(on_undo_redo_post)
-                bpy.app.handlers.load_post.append(on_load)
+                bpy.app.handlers.undo_pre.append(handler_on_undo_redo_pre)
+                bpy.app.handlers.redo_pre.append(handler_on_undo_redo_pre)
+                bpy.app.handlers.undo_post.append(handler_on_undo_redo_post)
+                bpy.app.handlers.redo_post.append(handler_on_undo_redo_post)
+                bpy.app.handlers.load_post.append(handler_on_load)
             else:
-                bpy.app.handlers.load_post.remove(on_load)
+                bpy.app.handlers.load_post.remove(handler_on_load)
                 bpy.app.handlers.frame_change_post.remove(handler_send_frame_changed)
                 bpy.app.handlers.depsgraph_update_post.remove(handler_send_scene_data_to_server)
-                bpy.app.handlers.undo_pre.remove(on_undo_redo_pre)
-                bpy.app.handlers.redo_pre.remove(on_undo_redo_pre)
-                bpy.app.handlers.undo_post.remove(on_undo_redo_post)
-                bpy.app.handlers.redo_post.remove(on_undo_redo_post)
+                bpy.app.handlers.undo_pre.remove(handler_on_undo_redo_pre)
+                bpy.app.handlers.redo_pre.remove(handler_on_undo_redo_pre)
+                bpy.app.handlers.undo_post.remove(handler_on_undo_redo_post)
+                bpy.app.handlers.redo_post.remove(handler_on_undo_redo_post)
 
                 remove_draw_handlers()
         except Exception as e:
@@ -1036,8 +1036,8 @@ def is_joined():
 
 
 @persistent
-def on_load(scene):
-    logger.info("on_load")
+def handler_on_load(scene):
+    logger.info("handler_on_load")
 
     disconnect()
 
@@ -1699,7 +1699,7 @@ def send_scene_data_to_server(scene, dummy):
 
 
 @persistent
-def on_undo_redo_pre(scene):
+def handler_on_undo_redo_pre(scene):
     logger.info("on_undo_redo_pre")
     send_scene_data_to_server(scene, None)
 
@@ -1733,7 +1733,7 @@ def remap_objects_info():
 
 @stats_timer(share_data)
 @persistent
-def on_undo_redo_post(scene, dummy):
+def handler_on_undo_redo_post(scene, dummy):
     logger.info("on_undo_redo_post")
 
     share_data.set_dirty()
