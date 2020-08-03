@@ -85,7 +85,6 @@ class ClientBlender(Client):
         super(ClientBlender, self).__init__(host, port)
 
         self.textures: Set[str] = set()
-        self.callbacks = {}
 
         self.skip_next_depsgraph_update = False
         # skip_next_depsgraph_update is set to True in the main timer function when a received command
@@ -98,9 +97,6 @@ class ClientBlender(Client):
         self._joining_room_name: Optional[str] = None
         self._received_command_count: int = 0
         self._received_byte_size: int = 0
-
-    def add_callback(self, name, func):
-        self.callbacks[name] = func
 
     # returns the path of an object
     def get_object_path(self, obj):
@@ -522,12 +518,8 @@ class ClientBlender(Client):
         self.add_command(common.Command(MessageType.DELETE, self.get_delete_buffer(obj_name), 0))
 
     def on_connection_lost(self):
-        if "Disconnect" in self.callbacks:
-            self.callbacks["Disconnect"]()
-
-    def send_scene_content(self):
-        if "SendContent" in self.callbacks:
-            self.callbacks["SendContent"]()
+        share_data.client = None
+        disconnect()
 
     def build_frame(self, data):
         start = 0
@@ -569,15 +561,15 @@ class ClientBlender(Client):
             if ctx["screen"].is_animation_playing:
                 bpy.ops.screen.animation_play(ctx)
 
-    def clear_content(self):
-        if "ClearContent" in self.callbacks:
-            self.callbacks["ClearContent"]()
-
     def query_object_data(self, object_name):
         previous_value = share_data.client.skip_next_depsgraph_update
         share_data.client.skip_next_depsgraph_update = False
-        if "QueryObjectData" in self.callbacks:
-            self.callbacks["QueryObjectData"](object_name)
+
+        if object_name not in share_data.blender_objects:
+            return
+        ob = share_data.blender_objects[object_name]
+        update_params(ob)
+
         share_data.client.skip_next_depsgraph_update = previous_value
 
     def query_current_frame(self):
@@ -677,7 +669,7 @@ class ClientBlender(Client):
                                 share_data.client.current_room,
                                 {"experimental_sync": get_mixer_prefs().experimental_sync},
                             )
-                            self.send_scene_content()
+                            send_scene_content()
                             # Inform end of content
                             self.add_command(common.Command(MessageType.CONTENT))
                         except Exception as e:
@@ -698,7 +690,7 @@ class ClientBlender(Client):
                         grease_pencil_api.build_grease_pencil_connection(command.data)
 
                     elif command.type == MessageType.CLEAR_CONTENT:
-                        self.clear_content()
+                        clear_scene_content()
                         self._joining = True
                         self._received_command_count = 0
                         self._received_byte_size = 0
@@ -1944,24 +1936,8 @@ def disconnect():
     ui.redraw()
 
 
-def on_disconnect_from_server():
-    share_data.client = None
-    disconnect()
-
-
 def is_client_connected():
     return share_data.client is not None and share_data.client.is_connected()
-
-
-def on_frame_update():
-    send_frame_changed(bpy.context.scene)
-
-
-def on_query_object_data(object_name):
-    if object_name not in share_data.blender_objects:
-        return
-    ob = share_data.blender_objects[object_name]
-    update_params(ob)
 
 
 def network_consumer_timer():
@@ -1995,10 +1971,6 @@ def create_main_client(host: str, port: int):
         return False
 
     share_data.client = client
-    share_data.client.add_callback("SendContent", send_scene_content)
-    share_data.client.add_callback("ClearContent", clear_scene_content)
-    share_data.client.add_callback("Disconnect", on_disconnect_from_server)
-    share_data.client.add_callback("QueryObjectData", on_query_object_data)
     if not bpy.app.timers.is_registered(network_consumer_timer):
         bpy.app.timers.register(network_consumer_timer)
 
