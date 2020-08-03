@@ -85,7 +85,7 @@ def get_log_file():
 
 def register():
     from mixer import ui
-    from mixer import operators
+    from mixer import bl_operators
     from mixer import bl_properties, bl_preferences
     from mixer.blender_data import debug_addon
 
@@ -110,14 +110,14 @@ def register():
     bl_preferences.register()
     bl_properties.register()
     ui.register()
-    operators.register()
+    bl_operators.register()
 
     atexit.register(cleanup)
 
 
 def unregister():
     from mixer import ui
-    from mixer import operators
+    from mixer import bl_operators
     from mixer import bl_properties, bl_preferences
     from mixer.blender_data import debug_addon
 
@@ -125,7 +125,7 @@ def unregister():
 
     atexit.unregister(cleanup)
 
-    operators.unregister()
+    bl_operators.unregister()
     ui.unregister()
     bl_properties.unregister()
     bl_preferences.unregister()
