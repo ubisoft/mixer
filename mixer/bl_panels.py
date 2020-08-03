@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import bpy
 import os
 import logging
-from mixer import operators
+from mixer import bl_operators
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.bl_properties import UserItem
 from mixer.share_data import share_data
@@ -159,8 +159,8 @@ def draw_advanced_settings_ui(layout: bpy.types.UILayout):
 def draw_developer_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
     layout.prop(mixer_prefs, "statistics_directory", text="Stats Directory")
-    layout.operator(operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
-    layout.operator(operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
+    layout.operator(bl_operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
+    layout.operator(bl_operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
     layout.prop(mixer_prefs, "auto_save_statistics", text="Auto Save Statistics")
     layout.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
     layout.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
@@ -285,17 +285,17 @@ class MixerSettingsPanel(bpy.types.Panel):
 
         if not self.connected():
             draw_connection_settings_ui(layout.row())
-            layout.operator(operators.ConnectOperator.bl_idname, text="Connect")
+            layout.operator(bl_operators.ConnectOperator.bl_idname, text="Connect")
         else:
             layout.label(
                 text=f"Connected to {mixer_prefs.host}:{mixer_prefs.port} with ID {share_data.client.client_id}"
             )
-            layout.operator(operators.DisconnectOperator.bl_idname, text="Disconnect")
+            layout.operator(bl_operators.DisconnectOperator.bl_idname, text="Disconnect")
 
-            if not operators.share_data.client.current_room:
+            if not share_data.client.current_room:
                 split = layout.split(factor=0.6)
                 split.prop(mixer_prefs, "room", text="Room")
-                split.operator(operators.CreateRoomOperator.bl_idname)
+                split.operator(bl_operators.CreateRoomOperator.bl_idname)
                 row = layout.row()
                 row.prop(
                     mixer_prefs,
@@ -308,7 +308,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                     text=f"Room: {share_data.client.current_room}{(' (experimental sync)' if mixer_prefs.experimental_sync else '')}"
                 )
                 split.label(text=f"Join: {get_mixer_props().joining_percentage * 100:.2f} %")
-                split.operator(operators.LeaveRoomOperator.bl_idname, text=f"Leave Room")
+                split.operator(bl_operators.LeaveRoomOperator.bl_idname, text=f"Leave Room")
 
             self.draw_rooms(layout)
             self.draw_users(layout)
@@ -323,16 +323,16 @@ class MixerSettingsPanel(bpy.types.Panel):
             ROOM_UL_ItemRenderer.draw_header(layout)
             layout.template_list("ROOM_UL_ItemRenderer", "", mixer_props, "rooms", mixer_props, "room_index", rows=2)
             if share_data.client.current_room is None:
-                layout.operator(operators.JoinRoomOperator.bl_idname)
+                layout.operator(bl_operators.JoinRoomOperator.bl_idname)
             else:
-                layout.operator(operators.LeaveRoomOperator.bl_idname)
+                layout.operator(bl_operators.LeaveRoomOperator.bl_idname)
             if collapsable_panel(layout, mixer_props, "display_advanced_room_control", text="Advanced room controls"):
                 box = layout.box()
                 col = box.column()
-                col.operator(operators.DeleteRoomOperator.bl_idname)
-                col.operator(operators.DownloadRoomOperator.bl_idname)
+                col.operator(bl_operators.DeleteRoomOperator.bl_idname)
+                col.operator(bl_operators.DownloadRoomOperator.bl_idname)
                 subbox = col.box()
-                subbox.row().operator(operators.UploadRoomOperator.bl_idname)
+                subbox.row().operator(bl_operators.UploadRoomOperator.bl_idname)
                 row = subbox.row()
                 row.prop(mixer_props, "upload_room_name", text="Name")
                 row.prop(
@@ -367,7 +367,7 @@ class VRtistSettingsPanel(bpy.types.Panel):
         layout.prop(
             mixer_prefs, "VRtist", text="Path", icon=("ERROR" if not os.path.exists(mixer_prefs.VRtist) else "NONE")
         )
-        layout.operator(operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
+        layout.operator(bl_operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
 
 
 panels = (

@@ -6,7 +6,6 @@ from typing import Set, Tuple, Optional
 import bpy
 from mathutils import Matrix, Quaternion
 import mixer
-from mixer import ui
 from mixer.bl_utils import get_mixer_prefs, get_mixer_props
 from mixer.share_data import share_data
 from mixer.broadcaster import common
@@ -23,9 +22,10 @@ from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
 import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
-from mixer.draw import set_draw_handlers
+from mixer.draw_handlers import set_draw_handlers
 
-_STILL_ACTIVE = 259
+from mixer.blender_client.camera import send_camera
+from mixer.blender_client.light import send_light
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +63,11 @@ class SendSceneContentFailed(Exception):
     pass
 
 
-class ClientBlender(Client):
+class BlenderClient(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
-        super(ClientBlender, self).__init__(host, port)
+        super(BlenderClient, self).__init__(host, port)
 
         self.textures: Set[str] = set()
-        self.callbacks = {}
 
         self.skip_next_depsgraph_update = False
         # skip_next_depsgraph_update is set to True in the main timer function when a received command
@@ -81,9 +80,6 @@ class ClientBlender(Client):
         self._joining_room_name: Optional[str] = None
         self._received_command_count: int = 0
         self._received_byte_size: int = 0
-
-    def add_callback(self, name, func):
-        self.callbacks[name] = func
 
     # returns the path of an object
     def get_object_path(self, obj):
@@ -504,14 +500,6 @@ class ClientBlender(Client):
         logger.info("send_delate %s", obj_name)
         self.add_command(common.Command(MessageType.DELETE, self.get_delete_buffer(obj_name), 0))
 
-    def on_connection_lost(self):
-        if "Disconnect" in self.callbacks:
-            self.callbacks["Disconnect"]()
-
-    def send_scene_content(self):
-        if "SendContent" in self.callbacks:
-            self.callbacks["SendContent"]()
-
     def build_frame(self, data):
         start = 0
         frame, start = common.decode_int(data, start)
@@ -552,15 +540,15 @@ class ClientBlender(Client):
             if ctx["screen"].is_animation_playing:
                 bpy.ops.screen.animation_play(ctx)
 
-    def clear_content(self):
-        if "ClearContent" in self.callbacks:
-            self.callbacks["ClearContent"]()
-
     def query_object_data(self, object_name):
         previous_value = share_data.client.skip_next_depsgraph_update
         share_data.client.skip_next_depsgraph_update = False
-        if "QueryObjectData" in self.callbacks:
-            self.callbacks["QueryObjectData"](object_name)
+
+        if object_name not in share_data.blender_objects:
+            return
+        ob = share_data.blender_objects[object_name]
+        update_params(ob)
+
         share_data.client.skip_next_depsgraph_update = previous_value
 
     def query_current_frame(self):
@@ -601,6 +589,8 @@ class ClientBlender(Client):
 
     @stats_timer(share_data)
     def network_consumer(self):
+        from mixer.bl_panels import redraw as redraw_panels, update_ui_lists
+
         assert self.is_connected()
 
         set_draw_handlers()
@@ -611,9 +601,6 @@ class ClientBlender(Client):
         group_count = 0
         while True:
             received_commands = self.fetch_commands(get_mixer_prefs().commands_send_interval)
-            if received_commands is None:
-                self.on_connection_lost()
-                break
 
             set_dirty = True
             # Process all received commands
@@ -626,7 +613,7 @@ class ClientBlender(Client):
                             self._received_byte_size
                             / self.rooms_attributes[self._joining_room_name][RoomAttributes.BYTE_SIZE]
                         )
-                        ui.redraw()
+                        redraw_panels()
 
                 if command.type == MessageType.GROUP_BEGIN:
                     group_count += 1
@@ -641,7 +628,7 @@ class ClientBlender(Client):
                         self._joining = False
                         get_mixer_props().joining_percentage = 1
 
-                    ui.update_ui_lists()
+                    update_ui_lists()
                     self.block_signals = False  # todo investigate why we should but this to false here
                     continue
 
@@ -660,11 +647,10 @@ class ClientBlender(Client):
                                 share_data.client.current_room,
                                 {"experimental_sync": get_mixer_prefs().experimental_sync},
                             )
-                            self.send_scene_content()
+                            send_scene_content()
                             # Inform end of content
                             self.add_command(common.Command(MessageType.CONTENT))
                         except Exception as e:
-                            self.on_connection_lost()
                             raise SendSceneContentFailed() from e
                         continue
 
@@ -681,12 +667,12 @@ class ClientBlender(Client):
                         grease_pencil_api.build_grease_pencil_connection(command.data)
 
                     elif command.type == MessageType.CLEAR_CONTENT:
-                        self.clear_content()
+                        clear_scene_content()
                         self._joining = True
                         self._received_command_count = 0
                         self._received_byte_size = 0
                         get_mixer_props().joining_percentage = 0
-                        ui.redraw()
+                        redraw_panels()
                     elif command.type == MessageType.MESH:
                         self.build_mesh(command.data)
                     elif command.type == MessageType.TRANSFORM:
@@ -816,3 +802,111 @@ class ClientBlender(Client):
             share_data.pending_parenting = remaining_parentings
 
         self.set_client_attributes(self.compute_client_custom_attributes())
+
+
+def update_params(obj):
+    # send collection instances
+    if obj.instance_type == "COLLECTION":
+        collection_api.send_collection_instance(share_data.client, obj)
+        return
+
+    if not hasattr(obj, "data"):
+        return
+
+    typename = obj.bl_rna.name
+    if obj.data:
+        typename = obj.data.bl_rna.name
+
+    supported_lights = ["Sun Light", "Point Light", "Spot Light", "Area Light"]
+    if (
+        typename != "Camera"
+        and typename != "Mesh"
+        and typename != "Curve"
+        and typename != "Text Curve"
+        and typename != "Grease Pencil"
+        and typename not in supported_lights
+    ):
+        return
+
+    if typename == "Camera":
+        send_camera(share_data.client, obj)
+
+    if typename in supported_lights:
+        send_light(share_data.client, obj)
+
+    if typename == "Grease Pencil":
+        for material in obj.data.materials:
+            share_data.client.send_material(material)
+        grease_pencil_api.send_grease_pencil_mesh(share_data.client, obj)
+        grease_pencil_api.send_grease_pencil_connection(share_data.client, obj)
+
+    if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
+        if obj.mode == "OBJECT":
+            share_data.client.send_mesh(obj)
+
+
+def clear_scene_content():
+    from mixer.handlers import HandlerManager
+
+    with HandlerManager(False):
+
+        data = [
+            "cameras",
+            "collections",
+            "curves",
+            "grease_pencils",
+            "images",
+            "lights",
+            "objects",
+            "materials",
+            "metaballs",
+            "meshes",
+            "textures",
+            "worlds",
+            "sounds",
+        ]
+
+        for name in data:
+            collection = getattr(bpy.data, name)
+            for obj in collection:
+                collection.remove(obj)
+
+        # Cannot remove the last scene at this point, treat it differently
+        for scene in bpy.data.scenes[:-1]:
+            scene_api.delete_scene(scene)
+
+        share_data.clear_before_state()
+
+        if len(bpy.data.scenes) == 1:
+            scene = bpy.data.scenes[0]
+            scene.name = "__last_scene_to_be_removed__"
+
+
+@stats_timer(share_data)
+def send_scene_content():
+    from mixer.handlers import HandlerManager, send_scene_data_to_server
+
+    if get_mixer_prefs().no_send_scene_content:
+        return
+
+    with HandlerManager(False):
+        # mesh baking may trigger depsgraph_updatewhen more than one view layer and
+        # cause to reenter send_scene_data_to_server() and send duplicate messages
+
+        share_data.clear_before_state()
+        share_data.init_proxy()
+        share_data.client.send_group_begin()
+
+        # Temporary waiting for material sync. Should move to send_scene_data_to_server
+        for material in bpy.data.materials:
+            share_data.client.send_material(material)
+
+        send_scene_data_to_server(None, None)
+
+        shot_manager.send_scene()
+        share_data.client.send_frame_start_end(bpy.context.scene.frame_start, bpy.context.scene.frame_end)
+        share_data.start_frame = bpy.context.scene.frame_start
+        share_data.end_frame = bpy.context.scene.frame_end
+        share_data.client.send_frame(bpy.context.scene.frame_current)
+
+        share_data.client.send_group_end()
