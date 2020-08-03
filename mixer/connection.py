@@ -1,7 +1,6 @@
 import logging
 
 import bpy
-from mixer import ui
 from mixer.bl_utils import get_mixer_prefs
 from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientAttributes, ClientDisconnectedException
@@ -11,7 +10,7 @@ from pathlib import Path
 
 from mixer.stats import save_statistics, get_stats_filename
 from mixer.blender_data.blenddata import BlendData
-from mixer.draw import remove_draw_handlers
+from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client import SendSceneContentFailed, BlenderClient
 from mixer.handlers import HandlerManager
 
@@ -140,6 +139,8 @@ def connect():
 
 
 def disconnect():
+    from mixer.bl_panels import update_ui_lists
+
     logger.info("disconnect")
 
     leave_current_room()
@@ -156,8 +157,7 @@ def disconnect():
             share_data.client.disconnect()
         share_data.client = None
 
-    ui.update_ui_lists()
-    ui.redraw()
+    update_ui_lists()
 
 
 def is_client_connected():

@@ -6,7 +6,6 @@ from typing import Set, Tuple, Optional
 import bpy
 from mathutils import Matrix, Quaternion
 import mixer
-from mixer import ui
 from mixer.bl_utils import get_mixer_prefs, get_mixer_props
 from mixer.share_data import share_data
 from mixer.broadcaster import common
@@ -23,7 +22,7 @@ from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
 import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
-from mixer.draw import set_draw_handlers
+from mixer.draw_handlers import set_draw_handlers
 
 from mixer.blender_client.camera import send_camera
 from mixer.blender_client.light import send_light
@@ -590,6 +589,8 @@ class BlenderClient(Client):
 
     @stats_timer(share_data)
     def network_consumer(self):
+        from mixer.bl_panels import redraw as redraw_panels, update_ui_lists
+
         assert self.is_connected()
 
         set_draw_handlers()
@@ -612,7 +613,7 @@ class BlenderClient(Client):
                             self._received_byte_size
                             / self.rooms_attributes[self._joining_room_name][RoomAttributes.BYTE_SIZE]
                         )
-                        ui.redraw()
+                        redraw_panels()
 
                 if command.type == MessageType.GROUP_BEGIN:
                     group_count += 1
@@ -627,7 +628,7 @@ class BlenderClient(Client):
                         self._joining = False
                         get_mixer_props().joining_percentage = 1
 
-                    ui.update_ui_lists()
+                    update_ui_lists()
                     self.block_signals = False  # todo investigate why we should but this to false here
                     continue
 
@@ -671,7 +672,7 @@ class BlenderClient(Client):
                         self._received_command_count = 0
                         self._received_byte_size = 0
                         get_mixer_props().joining_percentage = 0
-                        ui.redraw()
+                        redraw_panels()
                     elif command.type == MessageType.MESH:
                         self.build_mesh(command.data)
                     elif command.type == MessageType.TRANSFORM:

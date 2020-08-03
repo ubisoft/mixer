@@ -223,10 +223,10 @@ class LeaveRoomOperator(bpy.types.Operator):
         return is_client_connected() and share_data.client.current_room is not None
 
     def execute(self, context):
-        from mixer import ui
+        from mixer.bl_panels import update_ui_lists
 
         leave_current_room()
-        ui.update_ui_lists()
+        update_ui_lists()
         return {"FINISHED"}
 
 

@@ -19,7 +19,7 @@ from mixer.share_data import object_visibility
 from mixer.stats import StatsTimer
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
-from mixer.draw import remove_draw_handlers
+from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client import update_params
 
 logger = logging.getLogger(__name__)

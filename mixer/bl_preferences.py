@@ -8,7 +8,7 @@ from mixer.broadcaster import common
 from mixer.broadcaster.common import ClientAttributes
 from mixer.share_data import share_data
 from mixer.stats import get_stats_directory
-from mixer.ui import draw_preferences_ui, update_panels_category
+from mixer.bl_panels import draw_preferences_ui, update_panels_category
 
 logger = logging.getLogger(__name__)
 
