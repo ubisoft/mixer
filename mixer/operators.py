@@ -1034,15 +1034,6 @@ def clear_scene_content():
             scene.name = "__last_scene_to_be_removed__"
 
 
-def is_parent_in_collection(collection, obj):
-    parent = obj.parent
-    while parent is not None:
-        if parent in collection.objects[:]:
-            return True
-        parent = parent.parent
-    return False
-
-
 @stats_timer(share_data)
 def send_scene_content():
     if get_mixer_prefs().no_send_scene_content:
