@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Mixer is based on message broadcasting: the server broadcasts messages from all clients of a **Room** to other clients of the same room. Messages are also accumulated in a list of the room. When a new client want to join the room, the server starts by sending him all messages from the list before putting him in the room.
+Mixer is based on message broadcasting: the server broadcasts messages from all clients of a [Room](#room) to other clients of the same room. Messages are also accumulated in a list of the room. When a new client want to join the room, the server starts by sending him all messages from the list before putting him in the room.
 
 This document explain the behavior of the server when he receives Mixer messages types.
 
