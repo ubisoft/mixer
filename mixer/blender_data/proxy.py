@@ -1254,6 +1254,12 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
                 setattr(bl_instance, key, value)
         else:
             value.save(bl_instance, key)
+    except TypeError as e:
+        # common for enum that have unsupported default values, such as FFmpegSettings.ffmpeg_preset,
+        # which seems initialized at "" and triggers :
+        #   TypeError('bpy_struct: item.attr = val: enum "" not found in (\'BEST\', \'GOOD\', \'REALTIME\')')
+        logger.debug(f"write attribute skipped {bl_instance}.{key}...")
+        logger.debug(f" ...Exception: {repr(e)}")
     except Exception as e:
         logger.warning(f"write attribute skipped {bl_instance}.{key}...")
         logger.warning(f" ...Exception: {repr(e)}")

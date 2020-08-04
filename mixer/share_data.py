@@ -364,7 +364,7 @@ class ShareData:
                     value.name_full
                 ] = value  # the access value.name_full should trigger the error if the ID is invalid
             except ReferenceError as e:
-                logger.error(e, stack_info=True)
+                logger.error(e)
                 if get_mixer_prefs().env == "development":
                     raise  # raise back in development, for debugging
         return sanitized
