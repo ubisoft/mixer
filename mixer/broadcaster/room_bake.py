@@ -1,6 +1,7 @@
 from mixer.broadcaster.common import MessageType, encode_json
 from mixer.broadcaster.common import Command
 from mixer.broadcaster.common import ClientDisconnectedException
+from mixer.broadcaster.common import read_all_messages
 from mixer.broadcaster.client import Client
 from typing import List, Tuple, Dict, Any
 import logging
@@ -72,7 +73,7 @@ def upload_room(host: str, port: int, room_name: str, room_attributes: dict, com
 
             # The server will send back room update messages since the room is joined.
             # Consume them to avoid a client/server deadlock on broadcaster full send socket
-            client.fetch_incoming_commands()
+            read_all_messages(client.socket, timeout=0.0)
 
         client.send_command(Command(MessageType.CONTENT))
 
