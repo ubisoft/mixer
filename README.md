@@ -46,6 +46,7 @@ If you have quick questions or want to chat with us, we have a channel on the Bl
 
 More documentation is available in the `doc` directory:
 
+- [Client-Server protocol](doc/protocol.md)
 - [Data synchronization](doc/synchronization.md)
 - [Developer environment](doc/development.md)
 - [Releasing a new version](doc/release.md)
