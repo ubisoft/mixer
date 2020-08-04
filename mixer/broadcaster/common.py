@@ -438,7 +438,7 @@ def recv(socket: socket.socket, size: int):
     return result
 
 
-def read_message(socket: socket.socket) -> Optional[Command]:
+def read_message(socket: socket.socket, timeout: Optional[float] = None) -> Optional[Command]:
     """
     Try to read a full message from the socket.
     Raise ClientDisconnectedException if the socket is disconnected.
@@ -448,7 +448,8 @@ def read_message(socket: socket.socket) -> Optional[Command]:
         logger.warning("read_message called with no socket")
         return None
 
-    r, _, _ = select.select([socket], [], [], 0.0001)
+    select_timeout = timeout if timeout is not None else 0.0001
+    r, _, _ = select.select([socket], [], [], select_timeout)
     if len(r) == 0:
         return None
 
@@ -471,7 +472,7 @@ def read_message(socket: socket.socket) -> Optional[Command]:
         raise
 
 
-def read_all_messages(socket: socket.socket) -> List[Command]:
+def read_all_messages(socket: socket.socket, timeout: Optional[float] = None) -> List[Command]:
     """
     Try to read all messages waiting on the socket.
     Raise ClientDisconnectedException if the socket is disconnected.
@@ -479,7 +480,7 @@ def read_all_messages(socket: socket.socket) -> List[Command]:
     """
     received_commands: List[Command] = []
     while True:
-        command = read_message(socket)
+        command = read_message(socket, timeout=timeout)
         if command is None:
             break
         received_commands.append(command)
