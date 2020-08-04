@@ -1,3 +1,7 @@
+"""
+This module defines utilities for statistics computation and export.
+"""
+
 import time
 import os
 import json
@@ -11,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 class StatsTimer:
+    """
+    Class to measure execution time of a code section. Can be used as a context manager.
+    """
+
     def __init__(self, share_data, key, log=None):
         assert share_data.current_statistics
 
@@ -107,6 +115,11 @@ def save_statistics(stats_dict, stats_directory):
 
 
 def stats_timer(share_data, log=None):
+    """
+    A decorator to measure and store execution time of a function with respec to
+    the call stack.
+    """
+
     def inner_decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):

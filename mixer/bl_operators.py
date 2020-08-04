@@ -1,3 +1,7 @@
+"""
+This module define Blender Operators types for the addon.
+"""
+
 import logging
 import os
 import socket

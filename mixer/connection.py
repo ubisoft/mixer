@@ -1,3 +1,8 @@
+"""
+This module define how the addon connect and interact with the server, for the Mixer protocol.
+It updates the addon state according to this connection.
+"""
+
 import logging
 
 import bpy

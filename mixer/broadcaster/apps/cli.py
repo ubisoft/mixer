@@ -1,3 +1,9 @@
+"""
+CLI application to interact with a Mixer server.
+
+Broken right now, need to be fixed.
+"""
+
 import argparse
 import logging
 

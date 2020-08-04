@@ -1,3 +1,7 @@
+"""
+This module defines Blender Preferences for the addon.
+"""
+
 import os
 import logging
 import random
@@ -26,6 +30,16 @@ def set_log_level(self, value):
 
 
 class MixerPreferences(bpy.types.AddonPreferences):
+    """
+    Preferences class, store persistent properties and options.
+
+    Note for developers using blender-vscode - when an addon is disabled, its preferences are erased, so you will
+    loose them regularly while developing with hot-reload.
+    A possible solution is to make the addon fully reloadable like described here https://developer.blender.org/T67387#982929
+    and avoid using hot-reload of blender-vscode.
+    A task exists to support keeping preferences of disabled add-ons: https://developer.blender.org/T71486
+    """
+
     bl_idname = __package__
 
     def on_user_changed(self, context):

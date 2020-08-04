@@ -1,3 +1,10 @@
+"""
+This module handles generic updates using the blender_data package.
+
+The goal for Mixer is to replace all code specific to entities (camera, light, material, ...) by this generic update
+mechanism.
+"""
+
 import logging
 import traceback
 from typing import List, Tuple

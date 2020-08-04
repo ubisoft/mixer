@@ -14,7 +14,7 @@ class Client:
     """
     The client class is responsible for:
     - handling the connection with the server
-    - receiving packet of bytes to convert them to commands
+    - receiving packet of bytes and convert them to commands
     - send commands
     - maintain an updated view of clients and room states from server's inputs
     """

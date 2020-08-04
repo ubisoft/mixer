@@ -1,3 +1,11 @@
+"""
+This module defines Blender draw handlers for Mixer.
+
+Draw handlers are added to SpaceView3D to notify the users of changes in its 3D viewport.
+
+We draw clients frustums, clients selection, and joining percentage during Room joining.
+"""
+
 from mixer.share_data import share_data
 from mixer.bl_utils import get_mixer_prefs, get_mixer_props
 from mixer.broadcaster.common import ClientAttributes
@@ -22,6 +30,9 @@ _draw_handlers = DrawHandlers()
 
 
 def set_draw_handlers():
+    """
+    Set draw handlers if not already set.
+    """
     global _draw_handlers
 
     if not _draw_handlers.users_frustums_draw_handler:
@@ -47,6 +58,9 @@ def set_draw_handlers():
 
 
 def remove_draw_handlers():
+    """
+    Unset draw handlers if already set.
+    """
     if _draw_handlers.users_frustums_draw_handler:
         bpy.types.SpaceView3D.draw_handler_remove(_draw_handlers.users_frustums_draw_handler, "WINDOW")
         _draw_handlers.users_frustums_draw_handler = None
