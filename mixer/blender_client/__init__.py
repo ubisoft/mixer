@@ -1,3 +1,21 @@
+"""
+This package defines how we send Blender updates to the server, and how we interpret updates we receive to update
+Blender's data.
+
+This functionnalities are implemented in the BlenderClient class and in submodules of the package.
+
+Submodules with a well defined entity name (camera, collection, light, ...) handle updates for the corresponding
+data type in Blender. The goal is to replace all this specific code with the submodule data.py, which use
+the blender_data package to treat updates of Blender's data in a generic way.
+
+Specific code will still be required to handle non-Blender clients. As an exemple, mesh.py add to the MESH
+message a triangulated, with modifiers applied, of the mesh. This is for non-Blender clients. In the future we want to
+move these kind of specific processes to a plug-in system.
+
+The main function in this file is BlenderClient.network_consumer, which is the function called by the Blender timer
+we register.
+"""
+
 import logging
 import os
 import struct
@@ -64,6 +82,12 @@ class SendSceneContentFailed(Exception):
 
 
 class BlenderClient(Client):
+    """
+    Client specialized for Blender. Extends Client base class by adding and handling data related to Blender.
+
+    See network_consumer() method which can be considered the entry point of this class.
+    """
+
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(BlenderClient, self).__init__(host, port)
 
@@ -592,6 +616,20 @@ class BlenderClient(Client):
 
     @stats_timer(share_data)
     def network_consumer(self):
+        """
+        This method can be considered the entry point of this class. It is meant to be called regularly to send
+        pending commands to the server, and receive then process new ones.
+
+        Pending commands are accumulated with add_command(), most calls originate from handlers function.
+
+        Incoming commands are read from the socket and directly processed here to update Blender's data. This can
+        be costly and a possible optimization in the future would be to split the processing accross several timer
+        run. This can be challenging because we need to keep the current update state. Maybe this can be solved
+        naturally with coroutines.
+
+        We call it from the timer registered by the addon.
+        """
+
         from mixer.bl_panels import redraw as redraw_panels, update_ui_lists
 
         assert self.is_connected()
@@ -849,6 +887,10 @@ def update_params(obj):
 
 
 def clear_scene_content():
+    """
+    Clear data before joining a room.
+    """
+
     from mixer.handlers import HandlerManager
 
     with HandlerManager(False):
@@ -887,6 +929,10 @@ def clear_scene_content():
 
 @stats_timer(share_data)
 def send_scene_content():
+    """
+    Initial data send to fill a new room.
+    """
+
     from mixer.handlers import HandlerManager, send_scene_data_to_server
 
     if get_mixer_prefs().no_send_scene_content:

@@ -1,3 +1,9 @@
+"""
+Server application.
+
+Can be launched from command line, or from the Mixer addon in Blender.
+"""
+
 from __future__ import annotations
 
 import logging

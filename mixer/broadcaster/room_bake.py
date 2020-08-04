@@ -1,3 +1,9 @@
+"""
+This module defines an API to download, upload, save and load rooms.
+
+An known issue is that all these functions are synchronous, so we cannot inform the user of completion.
+"""
+
 from mixer.broadcaster.common import MessageType, encode_json
 from mixer.broadcaster.common import Command
 from mixer.broadcaster.common import ClientDisconnectedException

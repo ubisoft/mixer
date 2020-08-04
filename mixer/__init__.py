@@ -1,3 +1,9 @@
+"""
+Mixer addon entry point for Blender.
+
+Register/unregister functions and logging setup.
+"""
+
 import atexit
 import faulthandler
 import logging

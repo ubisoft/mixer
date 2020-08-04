@@ -1,3 +1,7 @@
+"""
+Utility functions for CLI applications, mostly related to logging and argument parsing.
+"""
+
 import logging
 import logging.handlers
 import argparse

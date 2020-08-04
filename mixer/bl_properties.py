@@ -1,3 +1,7 @@
+"""
+This module defines Blender Property types for the addon.
+"""
+
 import os
 import logging
 
@@ -103,6 +107,11 @@ next_user_unique_index = 0
 
 
 class MixerProperties(bpy.types.PropertyGroup):
+    """
+    Main Property class, registered on the WindowManager.
+    Store non-persistent options and data to be displayed on the UI.
+    """
+
     rooms: bpy.props.CollectionProperty(name="Rooms", type=RoomItem)
     room_index: bpy.props.IntProperty()  # index in the list of rooms
 

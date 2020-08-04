@@ -1,3 +1,10 @@
+"""
+This module defines how Shot Manager messages are handled.
+
+Shot Manager is another addon we develop and that can be controlled through Mixer.
+We plan to extract this code in a plug-in system in the future to avoid polluting the core of Mixer.
+"""
+
 from enum import IntEnum
 
 import bpy
