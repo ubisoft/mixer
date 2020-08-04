@@ -73,7 +73,8 @@ def build_data_update(buffer):
             logger.error("... update ignored")
             return
 
-        logger.info("build_data_update: %s[%s]", collection_name, key)
+        uuid = id_proxy.mixer_uuid()
+        logger.info("build_data_update: %s[%s] %s", collection_name, key, uuid)
         share_data.proxy.update_one(id_proxy)
         # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
         share_data.set_dirty()

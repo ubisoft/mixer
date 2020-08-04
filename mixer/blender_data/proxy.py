@@ -979,7 +979,11 @@ class BpyPropDataCollectionProxy(Proxy):
 
             # the ID will have changed if the object has been morphed (change light type, for instance)
             uuid = proxy.mixer_uuid()
-            existing_id = visit_state.ids[uuid]
+            existing_id = visit_state.ids.get(uuid)
+            if existing_id is None:
+                logger.warning(f"Non existent uuid {uuid} while updating {collection_name}[{name}]")
+                return None
+
             id_ = existing_proxy.save()
             if existing_id != id_:
                 visit_state.root_ids.remove(existing_id)
@@ -1041,7 +1045,7 @@ class BpyPropDataCollectionProxy(Proxy):
             # TODO do we need uuid. Can find the proxy by name, no ?
             proxy = visit_state.id_proxies[uuid]
             removal = proxy._blenddata_path[0:2]
-            logger.info("Perform removal for %s[%s]", removal[0], removal[1])
+            logger.info("Perform removal for %s[%s] %s", removal[0], removal[1], uuid)
             removals.append(removal)
             del self._data[name]
             id_ = visit_state.ids[uuid]
