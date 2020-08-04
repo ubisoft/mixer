@@ -6,6 +6,13 @@ from mixer.shot_manager_data import Shot
 
 import mixer.broadcaster.common as common
 
+try:
+    from shotmanager.api import shot_manager
+    from shotmanager.api import shot
+    from shotmanager.api import take
+except Exception:
+    pass
+
 
 class SMAction(IntEnum):
     ADD_SHOT = 0
@@ -15,7 +22,28 @@ class SMAction(IntEnum):
     UPDATE_SHOT = 4
 
 
+def get_shot_manager():
+    sm_props = None
+    try:
+        sm_props = shot_manager.get_shot_manager(bpy.context.scene)
+    except Exception:
+        pass
+    return sm_props
+
+
+def get_or_set_current_take(sm_props):
+    current_take = shot_manager.get_current_take(sm_props)
+    if not current_take:
+        current_take = shot_manager.add_take(sm_props, at_index=-1, name="Main Take")
+    return current_take
+
+
 def build_shot_manager_action(data):
+    sm_props = get_shot_manager()
+    if sm_props is None:
+        return
+    get_or_set_current_take(sm_props)
+
     index = 0
     action, index = common.decode_int(data, index)
     shot_index, index = common.decode_int(data, index)
@@ -27,43 +55,59 @@ def build_shot_manager_action(data):
         shot_name, index = common.decode_string(data, index)
         start, index = common.decode_int(data, index)
         end, index = common.decode_int(data, index)
-        camera, index = common.decode_string(data, index)
+        camera_name, index = common.decode_string(data, index)
+        camera = None
+        # if len(camera_name) > 0:
+        camera = bpy.data.objects[camera_name]
+
         color, index = common.decode_color(data, index)
-        if len(camera) == 0:
-            camera = bpy.data.cameras[0].name_full
-        bpy.context.scene.UAS_shot_manager_props.get_isInitialized()
-        bpy.ops.uas_shot_manager.add_shot(
-            name=shot_name, start=start, end=end, cameraName=camera, color=(color[0], color[1], color[2])
+
+        # bpy.context.scene.UAS_shot_manager_props.get_isInitialized()
+        shot_manager.add_shot(
+            sm_props,
+            at_index=shot_index,
+            take_index=-1,
+            name=shot_name,
+            start=start,  # avoid using a short start value before the lenght of the handles (which is 10)
+            end=end,
+            camera=camera,
+            color=(color[0], color[1], color[2], 1),
+            enabled=True,
         )
     # Delete
     elif action == SMAction.DELETE_SHOT:
-        bpy.ops.uas_shot_manager.remove_shot()
+        s = shot_manager.get_shot(sm_props, shot_index)
+        shot_manager.remove_shot(sm_props, s)
     # Duplicate
     elif action == SMAction.DUPLICATE_SHOT:
+        s = shot_manager.get_shot(sm_props, shot_index)
+        new_shot = shot_manager.copy_shot(sm_props, shot=s, at_index=shot_index + 1)
         shot_name, index = common.decode_string(data, index)
-        bpy.ops.uas_shot_manager.duplicate_shot(name=shot_name)  # duplicate name
+        shot.set_name(new_shot, shot_name)
     # Move
     elif action == SMAction.MOVE_SHOT:
+        s = shot_manager.get_shot(sm_props, shot_index)
         offset, index = common.decode_int(data, index)
-        bpy.ops.uas_shot_manager.list_action(action="DOWN" if offset > 0 else "UP")
+        shot_manager.move_shot_to_index(sm_props, shot=s, new_index=(shot_index + offset))
     # Update
     elif action == SMAction.UPDATE_SHOT:
-        take = bpy.context.scene.UAS_shot_manager_props.current_take_name
+        # take = bpy.context.scene.UAS_shot_manager_props.current_take_name
         start, index = common.decode_int(data, index)
         end, index = common.decode_int(data, index)
         camera, index = common.decode_string(data, index)
         color, index = common.decode_color(data, index)
         enabled, index = common.decode_int(data, index)
+        s = shot_manager.get_shot(sm_props, shot_index)
         if start > -1:
-            bpy.context.scene.UAS_shot_manager_props.takes[take].shots[shot_index].start = start
+            shot.set_start(s, start)
         if end > -1:
-            bpy.context.scene.UAS_shot_manager_props.takes[take].shots[shot_index].end = end
+            shot.set_end(s, end)
         if len(camera) > 0:
-            bpy.context.scene.UAS_shot_manager_props.takes[take].shots[shot_index].camera = bpy.data.objects[camera]
+            shot.set_camera(s, bpy.data.objects[camera])
         if color[0] > -1:
-            bpy.context.scene.UAS_shot_manager_props.takes[take].shots[shot_index].color = color
+            shot.set_color(s, color)
         if enabled != -1:
-            bpy.context.scene.UAS_shot_manager_props.takes[take].shots[shot_index].enabled = enabled
+            shot.set_enable_state(s, enabled)
 
 
 def send_montage_mode():
@@ -85,87 +129,87 @@ def check_montage_mode():
 
 
 def send_frame():
-    if not hasattr(bpy.context.scene, "UAS_shot_manager_props"):
+    sm_props = get_shot_manager()
+    if sm_props is None:
         return
+    current_shot_index = shot_manager.get_current_shot_index(sm_props)
 
-    shot_manager = bpy.context.scene.UAS_shot_manager_props
-    if share_data.shot_manager.current_shot_index != shot_manager.current_shot_index:
-        share_data.shot_manager.current_shot_index = shot_manager.current_shot_index
+    if share_data.shot_manager.current_shot_index != current_shot_index:
+        share_data.shot_manager.current_shot_index = current_shot_index
         buffer = common.encode_int(share_data.shot_manager.current_shot_index)
         share_data.client.add_command(common.Command(common.MessageType.SHOT_MANAGER_CURRENT_SHOT, buffer, 0))
 
 
 def get_state():
-    if not hasattr(bpy.context.scene, "UAS_shot_manager_props"):
+    sm_props = get_shot_manager()
+    if sm_props is None:
         return
 
-    shot_manager = bpy.context.scene.UAS_shot_manager_props
-    if shot_manager is None:
+    current_take = shot_manager.get_current_take(sm_props)
+    if current_take is None:
         return
 
-    share_data.shot_manager.current_take_name = shot_manager.current_take_name
-    if not share_data.shot_manager.current_take_name or share_data.shot_manager.current_take_name == "":
-        return
+    share_data.shot_manager.current_take_name = take.get_name(current_take)
 
     share_data.shot_manager.shots = []
-    for shot in shot_manager.takes[shot_manager.current_take_name].shots:
+    for s in shot_manager.get_shots(sm_props):
         new_shot = Shot()
-        new_shot.name = shot.name
-        if shot.camera:
-            new_shot.camera_name = shot.camera.name_full
-        new_shot.start = shot.start
-        new_shot.end = shot.end
-        new_shot.enabled = shot.enabled
+        new_shot.name = shot.get_name(s)
+        camera = shot.get_camera(s)
+        if camera:
+            new_shot.camera_name = camera.name_full
+        new_shot.start = shot.get_start(s)
+        new_shot.end = shot.get_end(s)
+        new_shot.enabled = shot.get_enable_state(s)
         share_data.shot_manager.shots.append(new_shot)
 
 
 def send_scene():
     get_state()
     buffer = common.encode_int(len(share_data.shot_manager.shots))
-    for shot in share_data.shot_manager.shots:
+    for s in share_data.shot_manager.shots:
         buffer += (
-            common.encode_string(shot.name)
-            + common.encode_string(shot.camera_name)
-            + common.encode_int(shot.start)
-            + common.encode_int(shot.end)
-            + common.encode_bool(shot.enabled)
+            common.encode_string(s.name)
+            + common.encode_string(s.camera_name)
+            + common.encode_int(s.start)
+            + common.encode_int(s.end)
+            + common.encode_bool(s.enabled)
         )
     share_data.client.add_command(common.Command(common.MessageType.SHOT_MANAGER_CONTENT, buffer, 0))
 
 
 def update_scene():
-    if not hasattr(bpy.context.scene, "UAS_shot_manager_props"):
+    sm_props = get_shot_manager()
+    if sm_props is None:
         return
 
-    shot_manager = bpy.context.scene.UAS_shot_manager_props
-    if shot_manager is None:
+    current_take = shot_manager.get_current_take(sm_props)
+    if current_take is None:
         return
 
-    current_take_name = shot_manager.current_take_name
-    if current_take_name is None or current_take_name == "":
-        return
+    current_take_name = shot_manager.get_current_take_name(sm_props)
 
     if current_take_name != share_data.shot_manager.current_take_name:
         send_scene()
         return
 
-    take = shot_manager.takes[current_take_name]
-    shots = take.shots
+    shots = shot_manager.get_shots(sm_props)
     if len(shots) != len(share_data.shot_manager.shots):
         send_scene()
         return
 
-    for i, shot in enumerate(shots):
+    for i, s in enumerate(shots):
         prev_shot = share_data.shot_manager.shots[i]
         camera_name = ""
-        if shot.camera:
-            camera_name = shot.camera.name_full
+        camera = shot.get_camera(s)
+        if camera:
+            camera_name = camera.name_full
         if (
-            prev_shot.name != shot.name
+            prev_shot.name != shot.get_name(s)
             or prev_shot.camera_name != camera_name
-            or prev_shot.start != shot.start
-            or prev_shot.end != shot.end
-            or prev_shot.enabled != shot.enabled
+            or prev_shot.start != shot.get_start(s)
+            or prev_shot.end != shot.get_end(s)
+            or prev_shot.enabled != shot.get_enable_state(s)
         ):
             send_scene()
             return
