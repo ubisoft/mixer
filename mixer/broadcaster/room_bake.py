@@ -70,6 +70,10 @@ def upload_room(host: str, port: int, room_name: str, room_attributes: dict, com
             logger.debug("Sending command %s (%d / %d)", c.type, idx, len(commands))
             client.send_command(c)
 
+            # The server will send back room update messages since the room is joined.
+            # Consume them to avoid a client/server deadlock on broadcaster full send socket
+            client.fetch_incoming_commands()
+
         client.send_command(Command(MessageType.CONTENT))
 
         client.leave_room(room_name)
