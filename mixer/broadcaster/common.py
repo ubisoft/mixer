@@ -24,6 +24,8 @@ class MessageType(IntEnum):
     A known issue of this strategy is that it is difficult to sync the code of different kind of clients (blender, vrtist)
     according to changes here. This will be adressed in the future by improving the protocol to include the notion
     of client types.
+
+    Documentation to update if you change this: doc/protocol.md
     """
 
     JOIN_ROOM = 1
@@ -143,6 +145,8 @@ class ClientAttributes:
     First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
     Clients are free to define custom attributes they need, but some standard names are provided here to ease sync
     between clients of different kind.
+
+    Documentation to update if you change this: doc/protocol.md
     """
 
     ID = "id"  # Sent by server only, type = str, the id of the client which is unique for each connected client
@@ -172,6 +176,8 @@ class RoomAttributes:
     First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
     Clients are free to define custom attributes they need, but some standard names are provided here to ease sync
     between clients of different kind.
+
+    Documentation to update if you change this: doc/protocol.md
     """
 
     NAME = "name"  # Sent by server only, type = str, the name of the room which is unique for each room

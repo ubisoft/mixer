@@ -612,6 +612,7 @@ class BlenderClient(Client):
                                 areas_3d.append(view_id)
                 windows.append({"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d": areas_3d})
 
+        # Documentation to update if you change "blender_windows": doc/protocol.md
         return {"blender_windows": windows, common.ClientAttributes.USERSCENES: scene_attributes}
 
     @stats_timer(share_data)
@@ -686,6 +687,7 @@ class BlenderClient(Client):
                             assert share_data.client.current_room is not None
                             self.set_room_attributes(
                                 share_data.client.current_room,
+                                # Documentation to update if you change "experimental_sync": doc/protocol.md
                                 {"experimental_sync": get_mixer_prefs().experimental_sync},
                             )
                             send_scene_content()
