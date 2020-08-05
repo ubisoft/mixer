@@ -255,6 +255,9 @@ default_exclusions = {
         NameFilterOut("material_slots"),
         # TODO temporary, has a seed member that makes some tests fail
         NameFilterOut("field"),
+        # TODO temporary, waiting for shkape_key support
+        # there is a loop in active_shape_key/relative_key
+        NameFilterOut("active_shape_key"),
     ],
     T.Scene: [
         NameFilterOut(

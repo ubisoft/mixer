@@ -38,6 +38,7 @@ from mixer.blender_client import material as material_api
 from mixer.blender_client import mesh as mesh_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
+from mixer.log_utils import log_traceback
 import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
 from mixer.draw_handlers import set_draw_handlers
@@ -812,7 +813,8 @@ class BlenderClient(Client):
                         self.skip_next_depsgraph_update = True
 
                 except Exception as e:
-                    logger.warning(f"Exception during processing of message {str(command.type)} ...\n", stack_info=True)
+                    logger.warning(f"Exception during processing of message {str(command.type)}")
+                    log_traceback(logger.warning)
                     if get_mixer_prefs().env == "development" or isinstance(e, SendSceneContentFailed):
                         raise
 

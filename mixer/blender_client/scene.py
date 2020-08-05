@@ -109,8 +109,14 @@ def build_remove_collection_from_scene(data):
     collection_name, _ = common.decode_string(data, index)
     logger.info("build_remove_collection_from_scene %s <- %s", scene_name, collection_name)
     scene = share_data.blender_scenes[scene_name]
-    collection = share_data.blender_collections[collection_name]
-    scene.collection.children.unlink(collection)
+    collection = share_data.blender_collections.get(collection_name)
+    if collection:
+        # otherwise already removed by Blender protocol
+        try:
+            scene.collection.children.unlink(collection)
+        except Exception as e:
+            logger.info(f"build_remove_collection_from_scene: exception during unlink... ")
+            logger.info(f"... {e} ")
 
 
 def send_add_object_to_vrtist(client: Client, scene_name: str, obj_name: str):
@@ -155,5 +161,5 @@ def build_remove_object_from_scene(data):
         try:
             scene.collection.objects.unlink(object_)
         except Exception as e:
-            logger.warning(f"build_remove_object_from_scene: exception during unlink... ")
-            logger.warning(f"... {e} ")
+            logger.info(f"build_remove_object_from_scene: exception during unlink... ")
+            logger.info(f"... {e} ")
