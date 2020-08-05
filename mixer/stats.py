@@ -11,6 +11,8 @@ import tempfile
 from pathlib import Path
 import functools
 
+from mixer.os_utils import getuser
+
 logger = logging.getLogger(__name__)
 
 
@@ -75,7 +77,7 @@ class StatsTimer:
 
 def get_stats_directory():
     if "MIXER_USER_STATS_DIR" in os.environ:
-        username = os.getlogin()
+        username = getuser()
         base_shared_path = Path(os.environ["MIXER_USER_STATS_DIR"])
         if os.path.exists(base_shared_path):
             return os.path.join(os.fspath(base_shared_path), username)
