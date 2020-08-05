@@ -1,3 +1,10 @@
+# WIP
+
+## Bugfix
+- Recursion error with shape_keys (#164)
+- Logging: format exception traceback (#149)
+- Room upload may block (#174)
+
 # 0.14.0
 
 ## Features
