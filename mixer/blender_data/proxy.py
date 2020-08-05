@@ -21,6 +21,7 @@ from mixer.blender_data.blenddata import (
     bl_rna_to_type,
 )
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix, is_pointer_to
+from mixer.log_utils import log_traceback
 
 DEBUG = True
 
@@ -1028,30 +1029,40 @@ class BpyPropDataCollectionProxy(Proxy):
         for name in added_names:
             collection_name = diff.items_added[name]
             logger.info("Perform update/creation for %s[%s]", collection_name, name)
-            id_ = blenddata.collection(collection_name).items.get(name)
-            if id_ is None:
-                logger.warning("update/added for %s[%s] : not found", collection_name, name)
-                continue
-            uuid = ensure_uuid(id_)
-            blenddata_path = (collection_name, name)
-            visit_state.root_ids.add(id_)
-            visit_state.ids[uuid] = id_
-            proxy = BpyIDProxy().load(id_, visit_state, blenddata_path)
-            visit_state.id_proxies[uuid] = proxy
-            self._data[name] = proxy
-            creations.append(proxy)
+            try:
+                id_ = blenddata.collection(collection_name).items.get(name)
+                if id_ is None:
+                    logger.warning("update/added for %s[%s] : not found", collection_name, name)
+                    continue
+                uuid = ensure_uuid(id_)
+                blenddata_path = (collection_name, name)
+                visit_state.root_ids.add(id_)
+                visit_state.ids[uuid] = id_
+                proxy = BpyIDProxy().load(id_, visit_state, blenddata_path)
+                visit_state.id_proxies[uuid] = proxy
+                self._data[name] = proxy
+                creations.append(proxy)
+            except Exception:
+                logger.error(f"Exception during update/added for {collection_name}[{name}]:")
+                log_traceback(logger.error)
 
         for name, uuid in diff.items_removed:
-            # TODO do we need uuid. Can find the proxy by name, no ?
-            proxy = visit_state.id_proxies[uuid]
-            removal = proxy._blenddata_path[0:2]
-            logger.info("Perform removal for %s[%s] %s", removal[0], removal[1], uuid)
-            removals.append(removal)
-            del self._data[name]
-            id_ = visit_state.ids[uuid]
-            visit_state.root_ids.remove(id_)
-            del visit_state.id_proxies[uuid]
-            del visit_state.ids[uuid]
+            try:
+                proxy = visit_state.id_proxies.get(uuid)
+                if proxy is None:
+                    logger.warning(f"update/removal: proxy not found for {uuid} ({name})")
+                    continue
+                removal = proxy._blenddata_path[0:2]
+                logger.info("Perform removal for %s[%s] %s", removal[0], removal[1], uuid)
+                removals.append(removal)
+                del self._data[name]
+                id_ = visit_state.ids[uuid]
+                visit_state.root_ids.remove(id_)
+                del visit_state.id_proxies[uuid]
+                del visit_state.ids[uuid]
+            except Exception:
+                logger.error(f"Exception during update/removed for {uuid} ({name})  :")
+                log_traceback(logger.error)
 
         for old_name, new_name in diff.items_renamed:
             # TODO not actually implemented
