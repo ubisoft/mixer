@@ -81,6 +81,7 @@ class DebugContext:
     serialized_addresses: Set[bpy.types.ID] = set()  # Already serialized addresses (struct or IDs), for debug
     property_stack: List[Tuple[str, any]] = []  # Stack of properties up to this point in the visit
     property_value: Any
+    limit_notified: bool = False
 
     @contextmanager
     def enter(self, property_name, property_value):
@@ -172,14 +173,27 @@ def load_as_what(attr_property: bpy.types.Property, attr: any, root_ids: RootIds
     return LoadElementAs.STRUCT
 
 
+MAX_DEPTH = 30
+
+
 # @debug_check_stack_overflow
-def read_attribute(attr: any, attr_property: any, visit_state: VisitState):
+def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
 
 
     """
-    with visit_state.debug_context.enter(attr_property.identifier, attr):
+    debug_context = visit_state.debug_context
+    if debug_context.visit_depth() > MAX_DEPTH:
+        # stop before hitting the recursion limit, it is easier to debug
+        # if we arrive here, we have cyclical data references that should be excluded in filter.py
+        if not debug_context.limit_notified:
+            debug_context.limit_notified = True
+            logger.error(f"Maximum property depth exceeded. Deeper properties ignored. Path :")
+            logger.error(debug_context.property_fullpath())
+        return
+
+    with debug_context.enter(attr_property.identifier, attr):
         attr_type = type(attr)
 
         if is_builtin(attr_type):
