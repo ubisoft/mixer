@@ -4,6 +4,7 @@
 - Recursion error with shape_keys (#164)
 - Logging: format exception traceback (#149)
 - Room upload may block (#174)
+- os.getlogin() failure on Linux (#198)
 
 # 0.14.0
 
