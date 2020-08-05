@@ -8,6 +8,8 @@ import os
 import traceback
 from typing import Callable
 
+from mixer.os_utils import getuser
+
 logger = logging.getLogger(__name__)
 logger.propagate = False
 MODULE_PATH = Path(__file__).parent.parent
@@ -34,7 +36,7 @@ def get_logs_directory():
         import tempfile
 
         if "MIXER_USER_LOGS_DIR" in os.environ:
-            username = os.getlogin()
+            username = getuser()
             base_shared_path = Path(os.environ["MIXER_USER_LOGS_DIR"])
             if os.path.exists(base_shared_path):
                 return os.path.join(os.fspath(base_shared_path), username)

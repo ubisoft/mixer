@@ -8,11 +8,12 @@ import random
 
 import bpy
 
+from mixer.bl_panels import draw_preferences_ui, update_panels_category
 from mixer.broadcaster import common
 from mixer.broadcaster.common import ClientAttributes
+from mixer.os_utils import getuser
 from mixer.share_data import share_data
 from mixer.stats import get_stats_directory
-from mixer.bl_panels import draw_preferences_ui, update_panels_category
 
 logger = logging.getLogger(__name__)
 
@@ -73,10 +74,10 @@ class MixerPreferences(bpy.types.AddonPreferences):
 
     host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
     port: bpy.props.IntProperty(name="Port", default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)))
-    room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", os.getlogin()))
+    room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", getuser()))
 
     # User name as displayed in peers user list
-    user: bpy.props.StringProperty(name="User", default=os.getlogin(), update=on_user_changed)
+    user: bpy.props.StringProperty(name="User", default=getuser(), update=on_user_changed)
     color: bpy.props.FloatVectorProperty(
         name="Color", subtype="COLOR", default=gen_random_color(), update=on_user_color_changed
     )

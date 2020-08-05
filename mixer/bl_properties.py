@@ -2,12 +2,12 @@
 This module defines Blender Property types for the addon.
 """
 
-import os
 import logging
 
 import bpy
 
 from mixer.broadcaster.common import RoomAttributes
+from mixer.os_utils import getuser
 from mixer.share_data import share_data
 
 logger = logging.getLogger(__name__)
@@ -208,7 +208,7 @@ class MixerProperties(bpy.types.PropertyGroup):
     )
 
     display_advanced_room_control: bpy.props.BoolProperty(default=False)
-    upload_room_name: bpy.props.StringProperty(default=f"{os.getlogin()}_uploaded_room", name="Upload Room Name")
+    upload_room_name: bpy.props.StringProperty(default=f"{getuser()}_uploaded_room", name="Upload Room Name")
     upload_room_filepath: bpy.props.StringProperty(default=f"", subtype="FILE_PATH", name="Upload Room File")
 
     joining_percentage: bpy.props.FloatProperty(default=0, name="Joining Percentage")
