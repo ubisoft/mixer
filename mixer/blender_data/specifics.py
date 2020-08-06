@@ -30,7 +30,12 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
         else:
             path = proxy.data("filepath")
             if path != "":
-                image = collection.load(path)
+                try:
+                    image = collection.load(path)
+                except RuntimeError as e:
+                    logger.warning(f'Cannot load image at path "{path}". Exception: ')
+                    logger.warning(f"... {e}")
+                    return None
                 # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
                 image.name = proxy.data("name")
         return image
