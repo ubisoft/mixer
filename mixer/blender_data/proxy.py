@@ -267,9 +267,12 @@ class Proxy:
 
     def data(self, key):
         if isinstance(key, int):
-            return self._data[MIXER_SEQUENCE][key]
+            try:
+                return self._data[MIXER_SEQUENCE][key]
+            except IndexError:
+                return None
         else:
-            return self._data[key]
+            return self._data.get(key)
 
     def save(self, bl_instance: any, attr_name: str):
         """

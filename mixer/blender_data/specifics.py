@@ -24,15 +24,18 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
         image = None
         if is_packed:
             name = proxy.data("name")
-            size = proxy.data("size")
-            width = size.data(0)
-            height = size.data(1)
+            width, height = proxy.data("size")
             image = collection.new(name, width, height)
             # remaning attributes will be saved from the received proxy attributes
         else:
             path = proxy.data("filepath")
             if path != "":
-                image = collection.load(path)
+                try:
+                    image = collection.load(path)
+                except RuntimeError as e:
+                    logger.warning(f'Cannot load image at path "{path}". Exception: ')
+                    logger.warning(f"... {e}")
+                    return None
                 # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
                 image.name = proxy.data("name")
         return image
