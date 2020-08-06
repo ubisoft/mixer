@@ -67,6 +67,8 @@ class BlenderClient(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(BlenderClient, self).__init__(host, port)
 
+        self.synced_time_messages = False
+
         self.textures: Set[str] = set()
 
         self.skip_next_depsgraph_update = False
@@ -80,6 +82,15 @@ class BlenderClient(Client):
         self._joining_room_name: Optional[str] = None
         self._received_command_count: int = 0
         self._received_byte_size: int = 0
+
+    def add_command(self, command: common.Command):
+        if self.synced_time_messages:
+            command = common.Command(
+                MessageType.CLIENT_ID_WRAPPER,
+                common.encode_string(self.client_id) + common.encode_int(command.type.value) + command.data,
+                0,
+            )
+        super().add_command(command)
 
     # returns the path of an object
     def get_object_path(self, obj):
@@ -504,13 +515,15 @@ class BlenderClient(Client):
         start = 0
         frame, start = common.decode_int(data, start)
         if bpy.context.scene.frame_current != frame:
-            previous_value = share_data.client.skip_next_depsgraph_update
-            share_data.client.skip_next_depsgraph_update = False
-            # bs = self.block_signals
-            # self.block_signals = False
-            bpy.context.scene.frame_set(frame)
-            # self.block_signals = bs
-            share_data.client.skip_next_depsgraph_update = previous_value
+            try:
+                previous_value = share_data.client.skip_next_depsgraph_update
+                share_data.client.skip_next_depsgraph_update = False
+                bs = self.block_signals
+                self.block_signals = False
+                bpy.context.scene.frame_set(frame)
+            finally:
+                self.block_signals = bs
+                share_data.client.skip_next_depsgraph_update = previous_value
 
     def send_frame(self, frame):
         self.add_command(common.Command(MessageType.FRAME, common.encode_int(frame), 0))

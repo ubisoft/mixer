@@ -308,6 +308,8 @@ class LaunchVRtistOperator(bpy.types.Operator):
             mixer_prefs.host,
             "--port",
             str(mixer_prefs.port),
+            "--master",
+            str(share_data.client.client_id),
         ]
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
         return {"FINISHED"}
