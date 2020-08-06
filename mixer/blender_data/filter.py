@@ -206,7 +206,11 @@ default_exclusions = {
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foerach_get()
-    T.Image: [NameFilterOut("pixels")],
+    T.Image: [
+        NameFilterOut("pixels"),
+        # meaningless to sync these, since they are handled by Image.pack() ?
+        NameFilterOut(["packed_file", "packed_files"]),
+    ],
     # TODO see comment in specifics.py:add_element()
     T.KeyingSets: [NameFilterOut("paths")],
     T.LayerCollection: [
