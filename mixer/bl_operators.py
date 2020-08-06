@@ -250,7 +250,7 @@ class ConnectOperator(bpy.types.Operator):
         try:
             self.report({"INFO"}, f'Connecting to "{prefs.host}:{prefs.port}" ...')
             if not connect():
-                self.report({"ERROR"}, "unknown error")
+                self.report({"ERROR"}, "unknown error, see log")
                 return {"CANCELLED"}
 
             self.report({"INFO"}, f'Connected to "{prefs.host}:{prefs.port}" ...')

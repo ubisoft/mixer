@@ -1,6 +1,8 @@
 # WIP
 
 ## Bugfix
+- Handle error with unimplemented volumes (#200)
+- Handle error with unimplemented packed images (#199)
 - Recursion error with shape_keys (#164)
 - Logging: format exception traceback (#149)
 - Room upload may block (#174)

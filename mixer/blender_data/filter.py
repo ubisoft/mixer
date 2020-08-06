@@ -165,6 +165,10 @@ class Context:
 
 
 test_filter = FilterStack()
+
+# Members of bpy.data that will be totally excluded from synchronization
+# Do not exclude collections that may be a target of Object.data. It we did so, an Object.data member
+# would be loaded ad a BpyIDProxy instead of a BpyIDRefProxy
 blenddata_exclude = [
     # "brushes" generates harmless warnings when EnumProperty properties are initialized with a value not in the enum
     "brushes",

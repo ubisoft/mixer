@@ -42,11 +42,19 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
 
     if collection_name == "objects":
         name = proxy.data("name")
+        target = None
         target_proxy = proxy.data("data")
         if target_proxy is not None:
-            target = target_proxy.target()
-        else:
-            target = None
+            # use class name to work around circular references with proxy.py
+            target_proxy_class = target_proxy.__class__.__name__
+            if target_proxy_class != "BpyIDRefProxy":
+                # error on the sender side
+                logger.warning(
+                    f"bpy.data.objects[{name}].data proxy is a {target_proxy_class}. Expected a BpyIDRefProxy"
+                )
+                logger.warning("... loaded as Empty")
+            else:
+                target = target_proxy.target()
         object_ = collection.new(name, target)
         return object_
 

@@ -148,10 +148,10 @@ class BlendData:
         return self._collections
 
     def collection(self, collection_name: str) -> BlendDataCollection:
-        return self._collections[collection_name]
+        return self._collections.get(collection_name)
 
     def bpy_collection(self, collection_name: str) -> T.bpy_prop_collection:
-        return self._collections[collection_name].bpy_collection()
+        return self._collections.get(collection_name).bpy_collection()
 
     def bl_collection_name_from_inner_identifier(self, type_identifier: str) -> str:
         """
