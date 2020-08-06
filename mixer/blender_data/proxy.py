@@ -592,7 +592,7 @@ class BpyIDRefProxy(Proxy):
         ref_target = self.target()
         if ref_target is None:
             logger.warning(
-                f"BpyIDRefProxy.save do not save reference (target does not exist) {bl_instance}.{attr_name} -> {self.collection}[{self.key}]"
+                f"BpyIDRefProxy.save do not save reference (target does not exist) {bl_instance}.{attr_name} -> bpy.data.{self.collection}[{self.key}]"
             )
         if isinstance(bl_instance, T.bpy_prop_collection):
             if isinstance(attr_name, str):
@@ -620,9 +620,13 @@ class BpyIDRefProxy(Proxy):
     def target(self) -> T.ID:
         """The bpy.types.ID pointed to by this reference
         """
-        collection = self.collection
+        collection = BlendData.instance().collection(self.collection)
+        if collection is None:
+            # may occur if we receive items from a more recent Blender that implements more bpy.data collections,
+            # such as bpy.data.volumes in 2.83
+            return None
         key = self.key
-        id_ = BlendData.instance().collection(collection)[key]
+        id_ = collection[key]
         return id_
 
 
@@ -1116,7 +1120,7 @@ class BpyBlendProxy(Proxy):
         """Keep track of all bpy.data items so that loading recognises references to them
 
         Call this before updading the proxy from send_scene_content. It is not needed on the
-        receiver side
+        receiver side.
         """
         # Normal operation no more involve BpyBlendProxy.load() ad initial synchronization behaves
         # like a creation. The current load_as_what() implementation relies on root_ids to determine if
