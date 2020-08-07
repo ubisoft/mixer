@@ -1,12 +1,17 @@
-# WIP
+# 0.14.1 (2020-08-07)
 
 ## Bugfix
-- Handle error with unimplemented volumes (#200)
-- Handle error with unimplemented packed images (#199)
-- Recursion error with shape_keys (#164)
+- Handle error with unsynchronized volumes (#200)
+- Handle error with unsynchronized packed images (#199)
+- Recursion error with unsynchronized shape_keys (#164)
 - Logging: format exception traceback (#149)
 - Room upload may block (#174)
-- os.getlogin() failure on Linux (#198)
+- Fix failure on Linux related to os.getlogin() (#198)
+
+## Misc:
+- Refactoring and documentation for open sourcing (#132)
+- Do not run all CICD pipelines on glitlab.com (#192)
+
 
 # 0.14.0
 
