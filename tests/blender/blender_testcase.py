@@ -10,7 +10,7 @@ import sys
 from mixer.broadcaster.common import MessageType, decode_string
 from tests.grabber import Grabber
 from tests.grabber import CommandStream
-from tests.mixer_testcase import MixerTestCase
+from tests.mixer_testcase import BlenderDesc, MixerTestCase
 
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
@@ -122,16 +122,11 @@ class TestGeneric(BlenderTestCase):
         folder = Path(__file__).parent.parent
         sender_blendfile = folder / "empty.blend"
         receiver_blendfile = folder / "empty.blend"
-        sender_wait_for_debugger = False
-        receiver_wait_for_debugger = False
+        sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
+        receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
+        blenderdescs = [sender, receiver]
         self.set_log_level(logging.DEBUG)
-        super().setUp(
-            sender_blendfile,
-            receiver_blendfile,
-            sender_wait_for_debugger=sender_wait_for_debugger,
-            receiver_wait_for_debugger=receiver_wait_for_debugger,
-            join=join,
-        )
+        super().setUp(blenderdescs=blenderdescs, join=join)
 
 
 class TestGenericJoinBefore(TestGeneric):
