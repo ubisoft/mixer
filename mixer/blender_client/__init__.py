@@ -655,6 +655,16 @@ class BlenderClient(Client):
                 self.block_signals = True
 
                 try:
+                    # manage wrapped commands with this blender id
+                    # time synced command for now
+                    if command.type == MessageType.CLIENT_ID_WRAPPER:
+                        id, index = common.decode_string(command.data, 0)
+                        if id != share_data.client.client_id:
+                            continue
+                        command_type, index = common.decode_int(command.data, index)
+                        command_data = command.data[index:]
+                        command = common.Command(command_type, command_data)
+
                     if command.type == MessageType.CONTENT:
                         # The server asks for scene content (at room creation)
                         try:
@@ -789,7 +799,8 @@ class BlenderClient(Client):
                     if get_mixer_prefs().env == "development" or isinstance(e, SendSceneContentFailed):
                         raise
 
-                self.block_signals = False
+                finally:
+                    self.block_signals = False
 
             if group_count == 0:
                 break
