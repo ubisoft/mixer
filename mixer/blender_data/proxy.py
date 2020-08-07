@@ -570,10 +570,10 @@ class BpyIDRefProxy(Proxy):
         assert getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier], None) is not None
         assert bl_instance.name_full in getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier])
 
-        self._blenddata_path = (
+        self._blenddata_path = [
             BlendData.instance().bl_collection_name_from_inner_identifier(class_bl_rna.identifier),
             bl_instance.name_full,
-        )
+        ]
         return self
 
     @property
@@ -1056,7 +1056,7 @@ class BpyPropDataCollectionProxy(Proxy):
                     logger.warning("update/added for %s[%s] : not found", collection_name, name)
                     continue
                 uuid = ensure_uuid(id_)
-                blenddata_path = (collection_name, name)
+                blenddata_path = [collection_name, name]
                 visit_state.root_ids.add(id_)
                 visit_state.ids[uuid] = id_
                 proxy = BpyIDProxy().load(id_, visit_state, blenddata_path)
@@ -1086,9 +1086,8 @@ class BpyPropDataCollectionProxy(Proxy):
                 log_traceback(logger.error)
 
         for old_name, new_name in diff.items_renamed:
-            # TODO not actually implemented
-            logger.warning("not implemented renamed %s into %s", old_name, new_name)
             self._data[new_name] = self._data[old_name]
+            self._data[new_name]._blenddata_path[1] = new_name
             del self._data[old_name]
 
         return creations, removals
