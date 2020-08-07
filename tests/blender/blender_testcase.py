@@ -1,3 +1,6 @@
+"""
+Test case for the Full Blender protocol
+"""
 import json
 import logging
 from pathlib import Path
@@ -15,6 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class BlenderTestCase(MixerTestCase):
+    """
+    Test case for the Full Blender protocol
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

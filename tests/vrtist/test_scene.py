@@ -2,6 +2,7 @@ from pathlib import Path
 import unittest
 
 from mixer.broadcaster.common import MessageType
+from tests.mixer_testcase import BlenderDesc
 from tests.vrtist.testcase import VRtistTestCase
 
 
@@ -10,8 +11,8 @@ class TestSceneEmptyDoc(VRtistTestCase):
         folder = Path(__file__).parent.parent
         sender_blendfile = folder / "empty.blend"
         receiver_blendfile = folder / "empty.blend"
-        # super().setUp(sender_blendfile, receiver_blendfile, receiver_wait_for_debugger=True)
-        super().setUp(sender_blendfile, receiver_blendfile)
+        blenderdescs = [BlenderDesc(load_file=sender_blendfile), BlenderDesc(load_file=receiver_blendfile)]
+        super().setUp(blenderdescs=blenderdescs)
 
     def test_create_scene(self):
         self.new_scene("scene_1")

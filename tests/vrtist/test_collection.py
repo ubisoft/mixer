@@ -1,7 +1,9 @@
-import unittest
-from tests.vrtist.testcase import VRtistTestCase
-from pathlib import Path
 import logging
+from pathlib import Path
+import unittest
+
+from tests.mixer_testcase import BlenderDesc
+from tests.vrtist.testcase import VRtistTestCase
 
 
 class TestCollectionDefaultDoc(VRtistTestCase):
@@ -9,15 +11,11 @@ class TestCollectionDefaultDoc(VRtistTestCase):
         folder = Path(__file__).parent.parent
         sender_blendfile = folder / "basic.blend"
         receiver_blendfile = folder / "empty.blend"
-        sender_wait_for_debugger = False
-        receiver_wait_for_debugger = False
+        sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
+        receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
+        blenderdescs = [sender, receiver]
         self.set_log_level(logging.DEBUG)
-        super().setUp(
-            sender_blendfile,
-            receiver_blendfile,
-            sender_wait_for_debugger=sender_wait_for_debugger,
-            receiver_wait_for_debugger=receiver_wait_for_debugger,
-        )
+        super().setUp(blenderdescs=blenderdescs)
 
     def test_create_collection_in_collection(self):
         self.new_collection("plop")
