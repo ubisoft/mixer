@@ -1,11 +1,15 @@
 from dataclasses import dataclass
 import logging
+import os
 import sys
 import time
 from typing import Iterable, List, Optional
 import unittest
 
+from mixer.broadcaster.common import DEFAULT_PORT
+
 from tests.blender_app import BlenderApp
+from tests.grabber import Grabber
 from tests.process import ServerProcess
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
@@ -91,6 +95,51 @@ class MixerTestCase(unittest.TestCase):
 
     def end_test(self):
         self.assert_matches()
+
+    def assert_matches(self):
+        # TODO add message cout dict as param
+
+        self._sender.disconnect_mixer()
+        # time.sleep(1)
+        self._receiver.disconnect_mixer()
+
+        # wait for disconnect before killing the server. Avoids a disconnect operator context error message
+        time.sleep(0.5)
+
+        self._server_process.kill()
+
+        # start a broadcaster server to grab the room
+        server_process = ServerProcess()
+        server_process.start()
+
+        host = "127.0.0.1"
+        port = int(os.environ.get("VRTIST_PORT", DEFAULT_PORT))
+        # upload the room
+        self._sender.connect_and_join_mixer("mixer_grab_sender", keep_room_open=True)
+        time.sleep(1)
+        self._sender.disconnect_mixer()
+
+        # download the room
+        sender_grabber = Grabber()
+        sender_grabber.grab(host, port, "mixer_grab_sender")
+        # HACK messages are not delivered in the same order on the receiver and the sender
+        # so sort each substream
+        sender_grabber.sort()
+
+        self._receiver.connect_and_join_mixer("mixer_grab_receiver", keep_room_open=True)
+        time.sleep(1)
+        self._receiver.disconnect_mixer()
+        receiver_grabber = Grabber()
+        receiver_grabber.grab(host, port, "mixer_grab_receiver")
+        receiver_grabber.sort()
+
+        server_process.kill()
+
+        # TODO_ timing error : sometimes succeeds
+        # TODO_ enhance comparison : check # elements, understandable comparison
+        s = sender_grabber.streams
+        r = receiver_grabber.streams
+        self.assert_stream_equals(s, r)
 
     def assert_user_success(self):
         """

@@ -4,11 +4,9 @@ Test case for the Full Blender protocol
 import json
 import logging
 from pathlib import Path
-import time
 import sys
 
 from mixer.broadcaster.common import MessageType, decode_string
-from tests.grabber import Grabber
 from tests.grabber import CommandStream
 from tests.mixer_testcase import BlenderDesc, MixerTestCase
 
@@ -80,38 +78,6 @@ class BlenderTestCase(MixerTestCase):
                 strings = [decode_string(buffer, 0)[0] for buffer in buffers]
                 dicts = [json.loads(string) for string in strings]
                 self.assertDictAlmostEqual(*dicts, f"content mismatch for {message_type} {i}")
-
-    def assert_matches(self):
-        # TODO add message cout dict as param
-
-        self._sender.disconnect_mixer()
-        # time.sleep(1)
-        self._receiver.disconnect_mixer()
-        # time.sleep(1)
-
-        host = "127.0.0.1"
-        port = 12800
-        self._sender.connect_and_join_mixer("mixer_grab_sender", keep_room_open=True)
-        time.sleep(1)
-        self._sender.disconnect_mixer()
-        sender_grabber = Grabber()
-        sender_grabber.grab(host, port, "mixer_grab_sender")
-
-        self._receiver.connect_and_join_mixer("mixer_grab_receiver", keep_room_open=True)
-        time.sleep(1)
-        self._receiver.disconnect_mixer()
-        receiver_grabber = Grabber()
-        receiver_grabber.grab(host, port, "mixer_grab_receiver")
-
-        # TODO_ timing error : sometimes succeeds
-        # TODO_ enhance comparison : check # elements, understandable comparison
-        s = sender_grabber.streams
-        r = receiver_grabber.streams
-        self.assert_stream_equals(s, r)
-
-    def end_test(self):
-        time.sleep(0.5)
-        self.assert_matches()
 
 
 class TestGeneric(BlenderTestCase):
