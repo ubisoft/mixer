@@ -6,6 +6,7 @@ from typing import Iterable, List, Optional
 import unittest
 
 from tests.blender_app import BlenderApp
+from tests.process import ServerProcess
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ class MixerTestCase(unittest.TestCase):
         self.expected_counts = {}
         super().__init__(*args, **kwargs)
         self._log_level = None
+        self._server_process: ServerProcess = ServerProcess()
         self._blenders: List[BlenderApp] = []
 
     def set_log_level(self, log_level):
@@ -57,6 +59,10 @@ class MixerTestCase(unittest.TestCase):
         # do not the the default ptvsd port as it will be in use when debugging the TestCase
         ptvsd_port = 5688
 
+        # start a broadcaster server
+        self._server_process.start()
+
+        # start all the blenders
         window_width = int(1920 / len(blenderdescs))
         for i, blenderdesc in enumerate(blenderdescs):
             window_x = str(i * window_width)
@@ -71,9 +77,17 @@ class MixerTestCase(unittest.TestCase):
                 blender.connect_and_join_mixer()
             self._blenders.append(blender)
 
-    def join(self):
+    def tearDown(self):
+        # quit and wait
         for blender in self._blenders:
-            blender.connect_and_join_mixer()
+            blender.quit()
+        for blender in self._blenders:
+            blender.wait()
+        for blender in self._blenders:
+            blender.close()
+
+        self._server_process.kill()
+        super().tearDown()
 
     def end_test(self):
         self.assert_matches()
@@ -100,16 +114,6 @@ class MixerTestCase(unittest.TestCase):
                     self.fail(f"receiver return code {rc} ({hex(rc)})")
                 else:
                     return
-
-    def tearDown(self):
-        # quit and wait
-        for blender in self._blenders:
-            blender.quit()
-        for blender in self._blenders:
-            blender.wait()
-        for blender in self._blenders:
-            blender.close()
-        super().tearDown()
 
     def connect(self):
         for i, blender in enumerate(self._blenders):

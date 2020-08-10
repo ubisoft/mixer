@@ -1,12 +1,15 @@
-import subprocess
-from pathlib import Path
-from typing import List, Callable
 import inspect
-import socket
-import time
-import tests.blender_lib as blender_lib
-import os
 import logging
+import os
+from pathlib import Path
+import socket
+import subprocess
+import time
+from typing import Any, Callable, Iterable, List, Optional
+
+import tests.blender_lib as blender_lib
+
+from mixer.broadcaster.common import DEFAULT_PORT
 
 """
 The idea is to automate Blender / Blender tests
@@ -26,21 +29,50 @@ Receiver Blender
 Diff the scenes
 """
 
+logger = logging.getLogger(__name__)
+
 BLENDER_EXE = os.environ.get("MIXER_BLENDER_EXE_PATH", "blender.exe")
 current_dir = Path(__file__).parent
 
 
 class Process:
+    """
+    Simple wrapper around subprocess.Popen
+    """
+
     def __init__(self):
+        self._process: subprocess.Popen = None
+
+    def start(self, args, kwargs):
+        logger.info(f"Running subprocess.Popen()")
+        logger.info(f"args:   {args}")
+        logger.info(f"kwargs: {kwargs}")
+        command_line = " ".join(args)
+        logger.info(f"command line: {command_line}")
+        try:
+            self._process = subprocess.Popen(args, **kwargs)
+        except Exception as e:
+            logger.error(f"Python.start(): Exception raised during subprocess.Popen(): ")
+            logger.error(f"{e}")
+            logger.error(f"args:   {args}")
+            logger.error(f"kwargs: {kwargs}")
+            logger.error(f"command line: {command_line}")
+
+    def wait(self, timeout: float = None):
+        try:
+            return self._process.wait(timeout)
+        except subprocess.TimeoutExpired:
+            return None
+
+    def kill(self, timeout: float = None):
+        if self._process is None:
+            return
+        self._process.kill()
+        self.wait(timeout)
         self._process = None
 
-    def stop(self):
-        if self._process is not None:
-            subprocess.Popen.kill(self._process)
-            self._process = None
 
-
-class Blender(Process):
+class BlenderProcess(Process):
     """
     Start a Blender process
     """
@@ -48,7 +80,6 @@ class Blender(Process):
     def __init__(self):
         super().__init__()
         self._cmd_args = ["--python-exit-code", "255", "--log-level", "-1", "--start-console"]
-        self._process: subprocess.Popen = None
 
     def start(self, python_script_path: str = None, script_args: List = None, blender_args: List = None):
         popen_args = [BLENDER_EXE]
@@ -61,27 +92,11 @@ class Blender(Process):
             popen_args.append("--")
             popen_args.extend([str(arg) for arg in script_args])
 
-        # print(' ' + ' '.join(popen_args))
-
-        other_args = {"creationflags": subprocess.CREATE_NEW_CONSOLE}
-        try:
-            self._process = subprocess.Popen(popen_args, shell=False, **other_args)
-        except FileNotFoundError:
-            logging.error(
-                f'Cannot start "{BLENDER_EXE}". Define MIXER_BLENDER_EXE_PATH environment variable or add to PATH'
-            )
-
-    def wait(self, timeout: float = None):
-        try:
-            return self._process.wait(timeout)
-        except subprocess.TimeoutExpired:
-            return None
-
-    def kill(self):
-        self._process.kill()
+        popen_kwargs = {"creationflags": subprocess.CREATE_NEW_CONSOLE, "shell": False}
+        super().start(popen_args, popen_kwargs)
 
 
-class BlenderServer(Blender):
+class BlenderServer(BlenderProcess):
     """
     Starts a Blender process that runs a python server. The Blender can be controlled
     by sending python source code.
@@ -140,3 +155,70 @@ class BlenderServer(Blender):
 
     def quit(self):
         self.send_function(blender_lib.quit)
+
+
+class PythonProcess(Process):
+    """
+    Starts a Blender python process that runs a script
+    """
+
+    def __init__(self):
+        super().__init__()
+        blender_exe = os.environ.get("MIXER_BLENDER_EXE_PATH", "blender.exe")
+        blender_dir = Path(blender_exe).parent
+        python_paths = list(blender_dir.glob("*/python/bin/python.exe"))
+        if len(python_paths) != 1:
+            raise RuntimeError(f"Expected one python.exe, found {len(python_paths)} : {python_paths}")
+        self._python_path = str(python_paths[0])
+
+    def start(self, args: Optional[Iterable[Any]] = ()):
+        popen_args = [self._python_path]
+        popen_args.extend([str(arg) for arg in args])
+        popen_kwargs = {}
+        popen_kwargs.update({"creationflags": subprocess.CREATE_NEW_CONSOLE})
+        popen_kwargs.update({"shell": False})
+        super().start(popen_args, popen_kwargs)
+
+
+class ServerProcess(PythonProcess):
+    """
+    Starts a broadcaster process
+    """
+
+    def __init__(self):
+        super().__init__()
+        current_dir = Path(__file__).parent
+        server_script_path = current_dir.parent / "mixer" / "broadcaster" / "apps" / "server.py"
+        self.script_path = str(server_script_path)
+        self.port: int = DEFAULT_PORT
+        self.host: str = "127.0.0.1"
+
+    def start(self):
+        # do not use an existing server, since it might not be ours and might not be setup
+        # the way we want (throttling)
+        try:
+            self._test_connect()
+        except ConnectionRefusedError:
+            pass
+        else:
+            raise RuntimeError(f"A server listening at {self.host}:{self.port} already exists. Aborting")
+
+        args = [self.script_path]
+        args.extend(["--port", str(self.port)])
+        args.extend(["--log-level", "INFO"])
+        super().start(args)
+        self._test_connect(timeout=4)
+
+    def _test_connect(self, timeout: float = 0.0):
+        waited = 0.0
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.connect((self.host, self.port))
+        except ConnectionRefusedError:
+            if waited >= timeout:
+                raise
+            delay = 0.2
+            time.sleep(delay)
+            waited += delay
+
+        sock.close()

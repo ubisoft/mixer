@@ -11,6 +11,7 @@ import tests.blender_lib as bl
 from tests.grabber import Grabber
 from tests.grabber import CommandStream
 from tests.mixer_testcase import MixerTestCase
+from tests.process import ServerProcess
 
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
@@ -59,13 +60,24 @@ class VRtistTestCase(MixerTestCase):
         self._sender.disconnect_mixer()
         # time.sleep(1)
         self._receiver.disconnect_mixer()
-        # time.sleep(1)
+
+        # wait for disconnect before killing the server. Avoids a disconnect operator context error message
+        time.sleep(0.5)
+
+        self._server_process.kill()
+
+        # start a broadcaster server to grab the room
+        server_process = ServerProcess()
+        server_process.start()
 
         host = "127.0.0.1"
         port = int(os.environ.get("VRTIST_PORT", DEFAULT_PORT))
+        # upload the room
         self._sender.connect_and_join_mixer("mixer_grab_sender", keep_room_open=True)
         time.sleep(1)
         self._sender.disconnect_mixer()
+
+        # download the room
         sender_grabber = Grabber()
         sender_grabber.grab(host, port, "mixer_grab_sender")
         # HACK messages are not delivered in the same order on the receiver and the sender
@@ -78,6 +90,8 @@ class VRtistTestCase(MixerTestCase):
         receiver_grabber = Grabber()
         receiver_grabber.grab(host, port, "mixer_grab_receiver")
         receiver_grabber.sort()
+
+        server_process.kill()
 
         # TODO_ timing error : sometimes succeeds
         # TODO_ enhance comparison : check # elements, understandable comparison
