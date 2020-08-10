@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 
 from tests.mixer_testcase import BlenderDesc
-from tests.vrtist.testcase import VRtistTestCase
+from tests.vrtist.vrtist_testcase import VRtistTestCase
 
 
 class TestCollectionDefaultDoc(VRtistTestCase):

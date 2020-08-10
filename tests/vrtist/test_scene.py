@@ -3,7 +3,7 @@ import unittest
 
 from mixer.broadcaster.common import MessageType
 from tests.mixer_testcase import BlenderDesc
-from tests.vrtist.testcase import VRtistTestCase
+from tests.vrtist.vrtist_testcase import VRtistTestCase
 
 
 class TestSceneEmptyDoc(VRtistTestCase):
