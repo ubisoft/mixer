@@ -29,6 +29,13 @@ class BlenderTestCase(MixerTestCase):
 
         self.assertIs(type(a), type(b), msg=msg)
         self.assertIsInstance(a, dict, msg=msg)
+        
+        ignore = ["mixer_uuid"]
+        for k in ignore:
+            if k in a.keys() and k in b.keys():
+                del a[k]
+                del b[k]
+
         a_sorted = sort(a)
         b_sorted = sort(b)
         self.assertSequenceEqual(a.keys(), b.keys(), msg=msg)
