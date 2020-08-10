@@ -5,11 +5,11 @@ This module defines types and utilities used by client and server code.
 from enum import IntEnum
 from typing import Dict, Mapping, Any, Optional, List
 import select
-import socket
 import struct
 import json
 import logging
 
+from mixer.broadcaster.socket import Socket
 
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 12800
@@ -433,7 +433,7 @@ class CommandFormatter:
         return s
 
 
-def recv(socket: socket.socket, size: int):
+def recv(socket: Socket, size: int):
     """
     Try to read size bytes from the socket.
     Raise ClientDisconnectedException if the socket is disconnected.
@@ -456,7 +456,7 @@ def recv(socket: socket.socket, size: int):
     return result
 
 
-def read_message(socket: socket.socket, timeout: Optional[float] = None) -> Optional[Command]:
+def read_message(socket: Socket, timeout: Optional[float] = None) -> Optional[Command]:
     """
     Try to read a full message from the socket.
     Raise ClientDisconnectedException if the socket is disconnected.
@@ -467,7 +467,7 @@ def read_message(socket: socket.socket, timeout: Optional[float] = None) -> Opti
         return None
 
     select_timeout = timeout if timeout is not None else 0.0001
-    r, _, _ = select.select([socket], [], [], select_timeout)
+    r, _, _ = select.select([socket._socket], [], [], select_timeout)
     if len(r) == 0:
         return None
 
@@ -490,7 +490,7 @@ def read_message(socket: socket.socket, timeout: Optional[float] = None) -> Opti
         raise
 
 
-def read_all_messages(socket: socket.socket, timeout: Optional[float] = None) -> List[Command]:
+def read_all_messages(socket: Socket, timeout: Optional[float] = None) -> List[Command]:
     """
     Try to read all messages waiting on the socket.
     Raise ClientDisconnectedException if the socket is disconnected.
@@ -505,7 +505,7 @@ def read_all_messages(socket: socket.socket, timeout: Optional[float] = None) ->
     return received_commands
 
 
-def write_message(sock: Optional[socket.socket], command: Command):
+def write_message(sock: Optional[Socket], command: Command):
     if not sock:
         logger.warning("write_message called with no socket")
         return
@@ -513,7 +513,7 @@ def write_message(sock: Optional[socket.socket], command: Command):
     buffer = command.to_byte_buffer()
 
     try:
-        _, w, _ = select.select([], [sock], [])
+        _, w, _ = select.select([], [sock._socket], [])
         if sock.sendall(buffer) is not None:
             raise ClientDisconnectedException()
     except (ConnectionAbortedError, ConnectionResetError) as e:

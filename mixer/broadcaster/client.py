@@ -4,6 +4,7 @@ import time
 from typing import Dict, Any, Mapping, Optional, List, Callable
 
 import mixer.broadcaster.common as common
+from mixer.broadcaster.socket import Socket
 from mixer.broadcaster.common import MessageType
 from mixer.broadcaster.common import update_attributes_and_get_diff, update_named_attributes
 
@@ -23,7 +24,7 @@ class Client:
         self.host = host
         self.port = port
         self.pending_commands: List[common.Command] = []
-        self.socket = None
+        self.socket: Socket = None
 
         self.client_id: Optional[str] = None  # Will be filled with a unique string identifying this client
         self.current_custom_attributes: Dict[str, Any] = {}
@@ -48,7 +49,8 @@ class Client:
             raise RuntimeError("Client.connect : already connected")
 
         try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket = Socket(sock)
             self.socket.connect((self.host, self.port))
             local_address = self.socket.getsockname()
             logger.info(

@@ -10,6 +10,7 @@ import logging
 import argparse
 import select
 import threading
+import time
 import socket
 import queue
 from typing import List, Mapping, Dict, Optional, Any
@@ -17,6 +18,7 @@ from typing import List, Mapping, Dict, Optional, Any
 from mixer.broadcaster.cli_utils import init_logging, add_logging_cli_args
 import mixer.broadcaster.common as common
 from mixer.broadcaster.common import update_attributes_and_get_diff
+from mixer.broadcaster.socket import Socket
 
 SHUTDOWN = False
 
@@ -31,8 +33,8 @@ MAX_BROADCAST_COMMAND_COUNT = 64
 class Connection:
     """ Represent a connection with a client """
 
-    def __init__(self, server: Server, sock: socket.socket, address):
-        self.socket: socket.socket = sock
+    def __init__(self, server: Server, sock: Socket, address):
+        self.socket: Socket = sock
         self.address = address
         self.room: Optional[Room] = None
 
@@ -42,6 +44,7 @@ class Connection:
 
         self._command_queue: queue.Queue = queue.Queue()  # Pending commands to send to the client
         self._server = server
+        self._latency: float = 0.0  # seconds
 
         self.thread: threading.Thread = threading.Thread(None, self.run)
 
@@ -142,6 +145,8 @@ class Connection:
             received_commands = common.read_all_messages(self.socket)
             count = len(received_commands)
             if count > 0:
+                # upstream
+                time.sleep(self.latency)
                 logger.debug("Received from %s - %d commands ", self.unique_id, count)
 
             for command in received_commands:
@@ -177,12 +182,17 @@ class Connection:
         self._server.handle_client_disconnect(self)
 
     def fetch_outgoing_commands(self):
+        waited_once = False
         while True:
             try:
                 command = self._command_queue.get_nowait()
             except queue.Empty:
                 break
 
+            if not waited_once:
+                waited_once = True
+                # dowstream
+                time.sleep(self._latency)
             self.send_command(command)
             self._command_queue.task_done()
 
@@ -333,6 +343,8 @@ class Server:
         self._rooms: Dict[str, Room] = {}
         self._connections: Dict[str, Connection] = {}
         self._mutex = threading.RLock()
+        self.latency: float = 0.0  # seconds
+        self.bandwidth: float = 0.0  # MBps
 
     def delete_room(self, room_name: str):
         with self._mutex:
@@ -486,7 +498,11 @@ class Server:
                 readable, _, _ = select.select([sock], [], [], timeout)
                 if len(readable) > 0:
                     client_socket, client_address = sock.accept()
+                    client_socket = Socket(client_socket)
+                    client_socket.set_bandwidth(self.bandwidth, self.bandwidth)
+
                     connection = Connection(self, client_socket, client_address)
+                    connection.latency = self.latency
                     with self._mutex:
                         self._connections[connection.unique_id] = connection
                     connection.start()
@@ -504,10 +520,15 @@ def main():
     global _log_server_updates
     args, args_parser = parse_cli_args()
     init_logging(args)
-
+    if args.latency > 0.0:
+        logger.warning(f"Latency set to {args.latency} ms")
+    if args.bandwidth > 0.0:
+        logger.warning(f"Bandwidth limited to {args.bandwidth} Mbps")
     _log_server_updates = args.log_server_updates
 
     server = Server()
+    server.latency = args.latency / 1000.0
+    server.bandwidth = args.bandwidth
     server.run(args.port)
 
 
@@ -516,6 +537,10 @@ def parse_cli_args():
     add_logging_cli_args(parser)
     parser.add_argument("--port", type=int, default=common.DEFAULT_PORT)
     parser.add_argument("--log-server-updates", action="store_true")
+    parser.add_argument(
+        "--bandwidth", type=float, default=0.0, help="simulate bandwidth limitation (megabytes per second)"
+    )
+    parser.add_argument("--latency", type=float, default=0.0, help="simulate network latency (in milliseconds)")
     return parser.parse_args(), parser
 
 
