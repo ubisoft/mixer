@@ -130,17 +130,13 @@ def connect():
         if is_localhost(prefs.host):
             start_local_server()
             if not wait_for_server(prefs.host, prefs.port):
-                logger.error("Unable to start local server")
-                return False
+                raise RuntimeError("Unable to start local server")
         else:
-            logger.error("Unable to connect to remote server %s:%s", prefs.host, prefs.port)
-            return False
+            raise RuntimeError(f"Unable to connect to remote server {prefs.host}:{prefs.port}")
 
     assert is_client_connected()
 
     set_client_attributes()
-
-    return True
 
 
 def disconnect():
