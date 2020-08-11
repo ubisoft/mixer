@@ -75,14 +75,20 @@ class Process:
 
 class BlenderProcess(Process):
     """
-    Start a Blender process
+    Start a Blender process that executes a python script
     """
 
     def __init__(self):
         super().__init__()
         self._cmd_args = ["--python-exit-code", "255", "--log-level", "-1", "--start-console"]
 
-    def start(self, python_script_path: str = None, script_args: List = None, blender_args: List = None):
+    def start(
+        self,
+        python_script_path: str = None,
+        script_args: Optional[List[Any]] = None,
+        blender_args: Optional[List[str]] = None,
+        env: Optional[List[str]] = None,
+    ):
         popen_args = [BLENDER_EXE]
         popen_args.extend(self._cmd_args)
         if blender_args is not None:
@@ -94,6 +100,7 @@ class BlenderProcess(Process):
             popen_args.extend([str(arg) for arg in script_args])
 
         popen_kwargs = {"creationflags": subprocess.CREATE_NEW_CONSOLE, "shell": False}
+        popen_kwargs.update({"env": env})
         super().start(popen_args, popen_kwargs)
 
 
@@ -117,7 +124,11 @@ class BlenderServer(BlenderProcess):
             args.append(f"--ptvsd={self._ptvsd_port}")
         if self._wait_for_debugger:
             args.append("--wait_for_debugger")
-        super().start(self._path, args, blender_args)
+
+        # The testcase will start its own server and control its configuration.
+        # If it fails we want to know and not have Blender silently start a misconfigured one
+        env = dict(os.environ, MIXER_NO_START_SERVER="1")
+        super().start(self._path, args, blender_args, env=env)
 
     def connect(self):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
