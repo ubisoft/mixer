@@ -29,7 +29,7 @@ class BlenderTestCase(MixerTestCase):
 
         self.assertIs(type(a), type(b), msg=msg)
         self.assertIsInstance(a, dict, msg=msg)
-        
+
         ignore = ["mixer_uuid"]
         for k in ignore:
             if k in a.keys() and k in b.keys():
