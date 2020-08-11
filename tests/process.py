@@ -220,5 +220,5 @@ class ServerProcess(PythonProcess):
             delay = 0.2
             time.sleep(delay)
             waited += delay
-
-        sock.close()
+        finally:
+            sock.close()
