@@ -58,9 +58,15 @@ def send_collection_removed(client: Client, collection_name):
 def build_collection_removed(data):
     name_full, index = common.decode_string(data, 0)
     logger.info("build_collectionRemove %s", name_full)
-    collection = share_data.blender_collections[name_full]
-    del share_data.blender_collections[name_full]
-    bpy.data.collections.remove(collection)
+    collection = share_data.blender_collections.get(name_full)
+    if collection:
+        # otherwise already removed by Blender protocol
+        try:
+            del share_data.blender_collections[name_full]
+            bpy.data.collections.remove(collection)
+        except Exception as e:
+            logger.info(f"build_remove_collection_from_scene: exception during unlink... ")
+            logger.info(f"... {e} ")
 
 
 def send_add_collection_to_collection(client: Client, parent_collection_name, collection_name):
@@ -130,9 +136,13 @@ def build_remove_object_from_collection(data):
 
     collection = share_data.blender_collections[collection_name]
     object_ = share_data.blender_objects.get(object_name)
-    if object_ is not None:
-        # may have been removed bu the Blender protocol
-        collection.objects.unlink(object_)
+    if object_:
+        # otherwise already removed by Blender protocol
+        try:
+            collection.objects.unlink(object_)
+        except Exception as e:
+            logger.info(f"build_remove_object_from_collection: exception during unlink... ")
+            logger.info(f"... {e} ")
 
 
 def send_collection_instance(client: Client, obj):

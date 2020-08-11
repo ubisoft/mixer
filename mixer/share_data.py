@@ -1,3 +1,7 @@
+"""
+This module defines global state of the addon. It is encapsulated in a ShareData instance.
+"""
+
 from collections import namedtuple
 from datetime import datetime
 import logging
@@ -48,6 +52,10 @@ class SceneInfo:
 
 
 class ShareData:
+    """
+    ShareData is the class storing the global state of the addon.
+    """
+
     def __init__(self):
         self.run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.session_id = 0  # For logging and debug
@@ -356,7 +364,7 @@ class ShareData:
                     value.name_full
                 ] = value  # the access value.name_full should trigger the error if the ID is invalid
             except ReferenceError as e:
-                logger.error(e, stack_info=True)
+                logger.error(e)
                 if get_mixer_prefs().env == "development":
                     raise  # raise back in development, for debugging
         return sanitized
@@ -391,4 +399,4 @@ class ShareData:
         return self.proxy is not None
 
 
-share_data = ShareData()
+share_data = ShareData()  # Instance storing addon state, is used by most of the sub-modules.

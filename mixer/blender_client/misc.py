@@ -1,3 +1,17 @@
+"""
+This module defines how we handle Objects identification from the server to clients.
+
+This identification is done with a path, which is a string of the form A/B/C where C is child of B and B is child of A.
+Each A, B and C and the name_full property of Objects. So the path encode both parenting and ids.
+
+The issues with this strategy are:
+- Parenting information is redundant accross Object: if we have A/B/C and A/B/D, the information of B being child of A
+is expressed 2 times. This lead to messages that are bigger than necessary.
+- '/' cannot be put in the name of an Object. The issue is that Blender allow this, and we have no qcheck.
+
+We plan to change the strategy to store the name_full of the parent in the command instead.
+"""
+
 from mixer.share_data import share_data
 import bpy
 

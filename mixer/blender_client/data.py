@@ -1,10 +1,17 @@
+"""
+This module handles generic updates using the blender_data package.
+
+The goal for Mixer is to replace all code specific to entities (camera, light, material, ...) by this generic update
+mechanism.
+"""
+
 import logging
-import traceback
 from typing import List, Tuple
 
 from mixer.blender_data.json_codec import Codec
 from mixer.blender_data.proxy import BpyIDProxy
 from mixer.broadcaster import common
+from mixer.log_utils import log_traceback
 from mixer.share_data import share_data
 
 logger = logging.getLogger(__name__)
@@ -66,19 +73,18 @@ def build_data_update(buffer):
             logger.error("... update ignored")
             return
 
-        logger.info("build_data_update: %s[%s]", collection_name, key)
+        uuid = id_proxy.mixer_uuid()
+        logger.info("build_data_update: %s[%s] %s", collection_name, key, uuid)
         share_data.proxy.update_one(id_proxy)
         # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
         share_data.set_dirty()
     except Exception:
-        logger.error(
-            "Exception during build_data_update\n"
-            + traceback.format_exc()
-            + f"During processing of buffer with blenddata_path {id_proxy._blenddata_path}\n"
-            + buffer[0:200]
-            + "\n...\n"
-            + buffer[-200:0]
-        )
+        logger.error("Exception during build_data_update")
+        log_traceback(logger.error)
+        logger.error(f"During processing of buffer with blenddata_path {id_proxy._blenddata_path}")
+        logger.error(buffer[0:200])
+        logger.error("...")
+        logger.error(buffer[-200:0])
         logger.error(f"Creation or update of bpy.data.{collection_name}[{key}] was ignored")
 
 
@@ -114,7 +120,7 @@ def send_data_updates(updates: List[BpyIDProxy]):
             encoded_proxy = codec.encode(proxy)
         except InvalidPath:
             logger.error("send_update: Exception :")
-            logger.error("\n" + traceback.format_exc())
+            log_traceback(logger.error)
             logger.error(f"while processing bpy.data.{collection_name}[{key}]:")
 
         # For BpyIdProxy, the target is encoded in the proxy._blenddata_path

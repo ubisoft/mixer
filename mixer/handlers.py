@@ -1,3 +1,16 @@
+"""
+This module defines Blender handlers for Mixer.
+
+The most important handlers are the depsgraph_update_post and frame_change_post that triggers
+the construction of update commands to send to the server.
+
+We also defines undo and redo handlers but these are buggy right now. We'll address their stability in the future.
+
+The load_post handler is not implemented yet and should probably be defined in another module because its behavior is
+not related to sending updates to the server. If we do that this module could be renamed "update_handlers.py" to clarify
+its purpose.
+"""
+
 import logging
 
 import bpy

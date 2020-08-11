@@ -1,6 +1,13 @@
+"""
+This module defines an API to download, upload, save and load rooms.
+
+An known issue is that all these functions are synchronous, so we cannot inform the user of completion.
+"""
+
 from mixer.broadcaster.common import MessageType, encode_json
 from mixer.broadcaster.common import Command
 from mixer.broadcaster.common import ClientDisconnectedException
+from mixer.broadcaster.common import read_all_messages
 from mixer.broadcaster.client import Client
 from typing import List, Tuple, Dict, Any
 import logging
@@ -69,6 +76,10 @@ def upload_room(host: str, port: int, room_name: str, room_attributes: dict, com
         for idx, c in enumerate(commands):
             logger.debug("Sending command %s (%d / %d)", c.type, idx, len(commands))
             client.send_command(c)
+
+            # The server will send back room update messages since the room is joined.
+            # Consume them to avoid a client/server deadlock on broadcaster full send socket
+            read_all_messages(client.socket, timeout=0.0)
 
         client.send_command(Command(MessageType.CONTENT))
 

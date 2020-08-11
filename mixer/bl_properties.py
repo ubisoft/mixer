@@ -1,9 +1,13 @@
-import os
+"""
+This module defines Blender Property types for the addon.
+"""
+
 import logging
 
 import bpy
 
 from mixer.broadcaster.common import RoomAttributes
+from mixer.os_utils import getuser
 from mixer.share_data import share_data
 
 logger = logging.getLogger(__name__)
@@ -103,6 +107,11 @@ next_user_unique_index = 0
 
 
 class MixerProperties(bpy.types.PropertyGroup):
+    """
+    Main Property class, registered on the WindowManager.
+    Store non-persistent options and data to be displayed on the UI.
+    """
+
     rooms: bpy.props.CollectionProperty(name="Rooms", type=RoomItem)
     room_index: bpy.props.IntProperty()  # index in the list of rooms
 
@@ -199,7 +208,7 @@ class MixerProperties(bpy.types.PropertyGroup):
     )
 
     display_advanced_room_control: bpy.props.BoolProperty(default=False)
-    upload_room_name: bpy.props.StringProperty(default=f"{os.getlogin()}_uploaded_room", name="Upload Room Name")
+    upload_room_name: bpy.props.StringProperty(default=f"{getuser()}_uploaded_room", name="Upload Room Name")
     upload_room_filepath: bpy.props.StringProperty(default=f"", subtype="FILE_PATH", name="Upload Room File")
 
     joining_percentage: bpy.props.FloatProperty(default=0, name="Joining Percentage")

@@ -1,14 +1,19 @@
+"""
+This module defines Blender Preferences for the addon.
+"""
+
 import os
 import logging
 import random
 
 import bpy
 
+from mixer.bl_panels import draw_preferences_ui, update_panels_category
 from mixer.broadcaster import common
 from mixer.broadcaster.common import ClientAttributes
+from mixer.os_utils import getuser
 from mixer.share_data import share_data
 from mixer.stats import get_stats_directory
-from mixer.bl_panels import draw_preferences_ui, update_panels_category
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +31,16 @@ def set_log_level(self, value):
 
 
 class MixerPreferences(bpy.types.AddonPreferences):
+    """
+    Preferences class, store persistent properties and options.
+
+    Note for developers using blender-vscode - when an addon is disabled, its preferences are erased, so you will
+    loose them regularly while developing with hot-reload.
+    A possible solution is to make the addon fully reloadable like described here https://developer.blender.org/T67387#982929
+    and avoid using hot-reload of blender-vscode.
+    A task exists to support keeping preferences of disabled add-ons: https://developer.blender.org/T71486
+    """
+
     bl_idname = __package__
 
     def on_user_changed(self, context):
@@ -59,10 +74,10 @@ class MixerPreferences(bpy.types.AddonPreferences):
 
     host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
     port: bpy.props.IntProperty(name="Port", default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)))
-    room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", os.getlogin()))
+    room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", getuser()))
 
     # User name as displayed in peers user list
-    user: bpy.props.StringProperty(name="User", default=os.getlogin(), update=on_user_changed)
+    user: bpy.props.StringProperty(name="User", default=getuser(), update=on_user_changed)
     color: bpy.props.FloatVectorProperty(
         name="Color", subtype="COLOR", default=gen_random_color(), update=on_user_color_changed
     )

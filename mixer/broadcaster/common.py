@@ -1,3 +1,7 @@
+"""
+This module defines types and utilities used by client and server code.
+"""
+
 from enum import IntEnum
 from typing import Dict, Mapping, Any, Optional, List
 import select
@@ -14,6 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 class MessageType(IntEnum):
+    """
+    Each message has a integer code to identify it.
+
+    A known issue of this strategy is that it is difficult to sync the code of different kind of clients (blender, vrtist)
+    according to changes here. This will be adressed in the future by improving the protocol to include the notion
+    of client types.
+
+    Documentation to update if you change this: doc/protocol.md
+    """
+
     JOIN_ROOM = 1
     LEAVE_ROOM = 3
     LIST_ROOMS = 4
@@ -135,6 +149,8 @@ class ClientAttributes:
     First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
     Clients are free to define custom attributes they need, but some standard names are provided here to ease sync
     between clients of different kind.
+
+    Documentation to update if you change this: doc/protocol.md
     """
 
     ID = "id"  # Sent by server only, type = str, the id of the client which is unique for each connected client
@@ -164,6 +180,8 @@ class RoomAttributes:
     First part is defined by the server, second part is generic and sent by clients to be forwarded to others.
     Clients are free to define custom attributes they need, but some standard names are provided here to ease sync
     between clients of different kind.
+
+    Documentation to update if you change this: doc/protocol.md
     """
 
     NAME = "name"  # Sent by server only, type = str, the name of the room which is unique for each room
@@ -442,7 +460,7 @@ def recv(socket: socket.socket, size: int):
     return result
 
 
-def read_message(socket: socket.socket) -> Optional[Command]:
+def read_message(socket: socket.socket, timeout: Optional[float] = None) -> Optional[Command]:
     """
     Try to read a full message from the socket.
     Raise ClientDisconnectedException if the socket is disconnected.
@@ -452,7 +470,8 @@ def read_message(socket: socket.socket) -> Optional[Command]:
         logger.warning("read_message called with no socket")
         return None
 
-    r, _, _ = select.select([socket], [], [], 0.0001)
+    select_timeout = timeout if timeout is not None else 0.0001
+    r, _, _ = select.select([socket], [], [], select_timeout)
     if len(r) == 0:
         return None
 
@@ -475,7 +494,7 @@ def read_message(socket: socket.socket) -> Optional[Command]:
         raise
 
 
-def read_all_messages(socket: socket.socket) -> List[Command]:
+def read_all_messages(socket: socket.socket, timeout: Optional[float] = None) -> List[Command]:
     """
     Try to read all messages waiting on the socket.
     Raise ClientDisconnectedException if the socket is disconnected.
@@ -483,7 +502,7 @@ def read_all_messages(socket: socket.socket) -> List[Command]:
     """
     received_commands: List[Command] = []
     while True:
-        command = read_message(socket)
+        command = read_message(socket, timeout=timeout)
         if command is None:
             break
         received_commands.append(command)

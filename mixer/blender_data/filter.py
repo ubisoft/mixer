@@ -165,6 +165,10 @@ class Context:
 
 
 test_filter = FilterStack()
+
+# Members of bpy.data that will be totally excluded from synchronization
+# Do not exclude collections that may be a target of Object.data. It we did so, an Object.data member
+# would be loaded ad a BpyIDProxy instead of a BpyIDRefProxy
 blenddata_exclude = [
     # "brushes" generates harmless warnings when EnumProperty properties are initialized with a value not in the enum
     "brushes",
@@ -206,7 +210,11 @@ default_exclusions = {
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foerach_get()
-    T.Image: [NameFilterOut("pixels")],
+    T.Image: [
+        NameFilterOut("pixels"),
+        # meaningless to sync these, since they are handled by Image.pack() ?
+        NameFilterOut(["packed_file", "packed_files"]),
+    ],
     # TODO see comment in specifics.py:add_element()
     T.KeyingSets: [NameFilterOut("paths")],
     T.LayerCollection: [
@@ -255,6 +263,9 @@ default_exclusions = {
         NameFilterOut("material_slots"),
         # TODO temporary, has a seed member that makes some tests fail
         NameFilterOut("field"),
+        # TODO temporary, waiting for shkape_key support
+        # there is a loop in active_shape_key/relative_key
+        NameFilterOut("active_shape_key"),
     ],
     T.Scene: [
         NameFilterOut(

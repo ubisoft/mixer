@@ -21,6 +21,7 @@ from mixer.blender_data.blenddata import (
     bl_rna_to_type,
 )
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix, is_pointer_to
+from mixer.log_utils import log_traceback
 
 DEBUG = True
 
@@ -80,6 +81,7 @@ class DebugContext:
     serialized_addresses: Set[bpy.types.ID] = set()  # Already serialized addresses (struct or IDs), for debug
     property_stack: List[Tuple[str, any]] = []  # Stack of properties up to this point in the visit
     property_value: Any
+    limit_notified: bool = False
 
     @contextmanager
     def enter(self, property_name, property_value):
@@ -171,14 +173,27 @@ def load_as_what(attr_property: bpy.types.Property, attr: any, root_ids: RootIds
     return LoadElementAs.STRUCT
 
 
+MAX_DEPTH = 30
+
+
 # @debug_check_stack_overflow
-def read_attribute(attr: any, attr_property: any, visit_state: VisitState):
+def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
 
 
     """
-    with visit_state.debug_context.enter(attr_property.identifier, attr):
+    debug_context = visit_state.debug_context
+    if debug_context.visit_depth() > MAX_DEPTH:
+        # stop before hitting the recursion limit, it is easier to debug
+        # if we arrive here, we have cyclical data references that should be excluded in filter.py
+        if not debug_context.limit_notified:
+            debug_context.limit_notified = True
+            logger.error(f"Maximum property depth exceeded. Deeper properties ignored. Path :")
+            logger.error(debug_context.property_fullpath())
+        return
+
+    with debug_context.enter(attr_property.identifier, attr):
         attr_type = type(attr)
 
         if is_builtin(attr_type):
@@ -252,9 +267,12 @@ class Proxy:
 
     def data(self, key):
         if isinstance(key, int):
-            return self._data[MIXER_SEQUENCE][key]
+            try:
+                return self._data[MIXER_SEQUENCE][key]
+            except IndexError:
+                return None
         else:
-            return self._data[key]
+            return self._data.get(key)
 
     def save(self, bl_instance: any, attr_name: str):
         """
@@ -574,7 +592,7 @@ class BpyIDRefProxy(Proxy):
         ref_target = self.target()
         if ref_target is None:
             logger.warning(
-                f"BpyIDRefProxy.save do not save reference (target does not exist) {bl_instance}.{attr_name} -> {self.collection}[{self.key}]"
+                f"BpyIDRefProxy.save do not save reference (target does not exist) {bl_instance}.{attr_name} -> bpy.data.{self.collection}[{self.key}]"
             )
         if isinstance(bl_instance, T.bpy_prop_collection):
             if isinstance(attr_name, str):
@@ -602,9 +620,13 @@ class BpyIDRefProxy(Proxy):
     def target(self) -> T.ID:
         """The bpy.types.ID pointed to by this reference
         """
-        collection = self.collection
+        collection = BlendData.instance().collection(self.collection)
+        if collection is None:
+            # may occur if we receive items from a more recent Blender that implements more bpy.data collections,
+            # such as bpy.data.volumes in 2.83
+            return None
         key = self.key
-        id_ = BlendData.instance().collection(collection)[key]
+        id_ = collection[key]
         return id_
 
 
@@ -979,7 +1001,11 @@ class BpyPropDataCollectionProxy(Proxy):
 
             # the ID will have changed if the object has been morphed (change light type, for instance)
             uuid = proxy.mixer_uuid()
-            existing_id = visit_state.ids[uuid]
+            existing_id = visit_state.ids.get(uuid)
+            if existing_id is None:
+                logger.warning(f"Non existent uuid {uuid} while updating {collection_name}[{name}]")
+                return None
+
             id_ = existing_proxy.save()
             if existing_id != id_:
                 visit_state.root_ids.remove(existing_id)
@@ -1024,30 +1050,40 @@ class BpyPropDataCollectionProxy(Proxy):
         for name in added_names:
             collection_name = diff.items_added[name]
             logger.info("Perform update/creation for %s[%s]", collection_name, name)
-            id_ = blenddata.collection(collection_name).items.get(name)
-            if id_ is None:
-                logger.warning("update/added for %s[%s] : not found", collection_name, name)
-                continue
-            uuid = ensure_uuid(id_)
-            blenddata_path = (collection_name, name)
-            visit_state.root_ids.add(id_)
-            visit_state.ids[uuid] = id_
-            proxy = BpyIDProxy().load(id_, visit_state, blenddata_path)
-            visit_state.id_proxies[uuid] = proxy
-            self._data[name] = proxy
-            creations.append(proxy)
+            try:
+                id_ = blenddata.collection(collection_name).items.get(name)
+                if id_ is None:
+                    logger.warning("update/added for %s[%s] : not found", collection_name, name)
+                    continue
+                uuid = ensure_uuid(id_)
+                blenddata_path = (collection_name, name)
+                visit_state.root_ids.add(id_)
+                visit_state.ids[uuid] = id_
+                proxy = BpyIDProxy().load(id_, visit_state, blenddata_path)
+                visit_state.id_proxies[uuid] = proxy
+                self._data[name] = proxy
+                creations.append(proxy)
+            except Exception:
+                logger.error(f"Exception during update/added for {collection_name}[{name}]:")
+                log_traceback(logger.error)
 
         for name, uuid in diff.items_removed:
-            # TODO do we need uuid. Can find the proxy by name, no ?
-            proxy = visit_state.id_proxies[uuid]
-            removal = proxy._blenddata_path[0:2]
-            logger.info("Perform removal for %s[%s]", removal[0], removal[1])
-            removals.append(removal)
-            del self._data[name]
-            id_ = visit_state.ids[uuid]
-            visit_state.root_ids.remove(id_)
-            del visit_state.id_proxies[uuid]
-            del visit_state.ids[uuid]
+            try:
+                proxy = visit_state.id_proxies.get(uuid)
+                if proxy is None:
+                    logger.warning(f"update/removal: proxy not found for {uuid} ({name})")
+                    continue
+                removal = proxy._blenddata_path[0:2]
+                logger.info("Perform removal for %s[%s] %s", removal[0], removal[1], uuid)
+                removals.append(removal)
+                del self._data[name]
+                id_ = visit_state.ids[uuid]
+                visit_state.root_ids.remove(id_)
+                del visit_state.id_proxies[uuid]
+                del visit_state.ids[uuid]
+            except Exception:
+                logger.error(f"Exception during update/removed for {uuid} ({name})  :")
+                log_traceback(logger.error)
 
         for old_name, new_name in diff.items_renamed:
             # TODO not actually implemented
@@ -1084,7 +1120,7 @@ class BpyBlendProxy(Proxy):
         """Keep track of all bpy.data items so that loading recognises references to them
 
         Call this before updading the proxy from send_scene_content. It is not needed on the
-        receiver side
+        receiver side.
         """
         # Normal operation no more involve BpyBlendProxy.load() ad initial synchronization behaves
         # like a creation. The current load_as_what() implementation relies on root_ids to determine if
@@ -1254,6 +1290,12 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
                 setattr(bl_instance, key, value)
         else:
             value.save(bl_instance, key)
+    except TypeError as e:
+        # common for enum that have unsupported default values, such as FFmpegSettings.ffmpeg_preset,
+        # which seems initialized at "" and triggers :
+        #   TypeError('bpy_struct: item.attr = val: enum "" not found in (\'BEST\', \'GOOD\', \'REALTIME\')')
+        logger.debug(f"write attribute skipped {bl_instance}.{key}...")
+        logger.debug(f" ...Exception: {repr(e)}")
     except Exception as e:
         logger.warning(f"write attribute skipped {bl_instance}.{key}...")
         logger.warning(f" ...Exception: {repr(e)}")
