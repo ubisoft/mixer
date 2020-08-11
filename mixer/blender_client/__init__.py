@@ -67,6 +67,8 @@ class BlenderClient(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(BlenderClient, self).__init__(host, port)
 
+        # To know if we have to tag messages as synced time messages
+        # Is set to True for messages emitted from a frame change event
         self.synced_time_messages = False
 
         self.textures: Set[str] = set()
@@ -84,6 +86,10 @@ class BlenderClient(Client):
         self._received_byte_size: int = 0
 
     def add_command(self, command: common.Command):
+        # A wrapped message is a message emitted from a frame change event.
+        # Right now we wrap this kind of messages adding the client_id.
+        # In the future we will probably always add the client_id to all messages. But the difference
+        # between synced time messages and the other must remain.
         if self.synced_time_messages:
             command = common.Command(
                 MessageType.CLIENT_ID_WRAPPER,
@@ -657,6 +663,8 @@ class BlenderClient(Client):
                 try:
                     # manage wrapped commands with this blender id
                     # time synced command for now
+                    # Consume messages with its client_id to receive commands from other clients
+                    # like play/pause. Ignore all other client_id.
                     if command.type == MessageType.CLIENT_ID_WRAPPER:
                         id, index = common.decode_string(command.data, 0)
                         if id != share_data.client.client_id:
