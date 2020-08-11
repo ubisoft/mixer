@@ -232,6 +232,15 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
 
     bl_rna = getattr(collection, "bl_rna", None)
     if bl_rna is not None:
+        if isinstance(bl_rna, type(T.ObjectModifiers.bl_rna)):
+            name = proxy.data("name")
+            modifier_type = proxy.data("type")
+            return collection.new(name, modifier_type)
+
+        if isinstance(bl_rna, type(T.ObjectConstraints.bl_rna)):
+            type_ = proxy.data("type")
+            return collection.new(type_)
+
         if isinstance(bl_rna, type(T.KeyingSets.bl_rna)):
             idname = proxy.data("bl_idname")
             return collection.new(name=key, idname=idname)
