@@ -1,6 +1,13 @@
+# WIP
+
+## Features
+
+- Independant time between clients of a same room & Blender - VRtist time sync (#195)
+
 # 0.14.1 (2020-08-07)
 
 ## Bugfix
+
 - Handle error with unsynchronized volumes (#200)
 - Handle error with unsynchronized packed images (#199)
 - Recursion error with unsynchronized shape_keys (#164)
@@ -9,9 +16,9 @@
 - Fix failure on Linux related to os.getlogin() (#198)
 
 ## Misc:
+
 - Refactoring and documentation for open sourcing (#132)
 - Do not run all CICD pipelines on glitlab.com (#192)
-
 
 # 0.14.0
 
