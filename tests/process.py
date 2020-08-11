@@ -51,6 +51,7 @@ class Process:
         logger.info(f"command line: {command_line}")
         try:
             self._process = subprocess.Popen(args, **kwargs)
+            logger.info(f"subprocess.popen: success")
         except Exception as e:
             logger.error(f"Python.start(): Exception raised during subprocess.Popen(): ")
             logger.error(f"{e}")
@@ -187,9 +188,6 @@ class ServerProcess(PythonProcess):
 
     def __init__(self):
         super().__init__()
-        current_dir = Path(__file__).parent
-        server_script_path = current_dir.parent / "mixer" / "broadcaster" / "apps" / "server.py"
-        self.script_path = str(server_script_path)
         self.port: int = DEFAULT_PORT
         self.host: str = "127.0.0.1"
 
@@ -203,7 +201,7 @@ class ServerProcess(PythonProcess):
         else:
             raise RuntimeError(f"A server listening at {self.host}:{self.port} already exists. Aborting")
 
-        args = [self.script_path]
+        args = ["-m", "mixer.broadcaster.apps.server"]
         args.extend(["--port", str(self.port)])
         args.extend(["--log-level", "INFO"])
         super().start(args)
