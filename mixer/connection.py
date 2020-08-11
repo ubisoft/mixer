@@ -128,6 +128,10 @@ def connect():
     prefs = get_mixer_prefs()
     if not create_main_client(prefs.host, prefs.port):
         if is_localhost(prefs.host):
+            if prefs.no_start_server:
+                raise RuntimeError(
+                    f"Cannot connect to existing server at {prefs.host}:{prefs.port} and MIXER_NO_START_SERVER environment variable exists"
+                )
             start_local_server()
             if not wait_for_server(prefs.host, prefs.port):
                 raise RuntimeError("Unable to start local server")
