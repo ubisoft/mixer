@@ -307,7 +307,11 @@ class Room:
             Add the command to the room list, possibly merge with the previous command.
             """
             command_type = command.type
-            if command_type.value > common.MessageType.OPTIMIZED_COMMANDS.value:
+            if (
+                common.MessageType.OPTIMIZED_COMMANDS.value
+                < command_type.value
+                < common.MessageType.END_OPTIMIZED_COMMANDS.value
+            ):
                 command_path = common.decode_string(command.data, 0)[0]
                 if self.command_count() > 0:
                     stored_command = self._commands[-1]

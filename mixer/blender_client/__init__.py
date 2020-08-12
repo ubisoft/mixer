@@ -92,6 +92,10 @@ class BlenderClient(Client):
     def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
         super(BlenderClient, self).__init__(host, port)
 
+        # To know if we have to tag messages as synced time messages
+        # Is set to True for messages emitted from a frame change event
+        self.synced_time_messages = False
+
         self.textures: Set[str] = set()
 
         self.skip_next_depsgraph_update = False
@@ -105,6 +109,19 @@ class BlenderClient(Client):
         self._joining_room_name: Optional[str] = None
         self._received_command_count: int = 0
         self._received_byte_size: int = 0
+
+    def add_command(self, command: common.Command):
+        # A wrapped message is a message emitted from a frame change event.
+        # Right now we wrap this kind of messages adding the client_id.
+        # In the future we will probably always add the client_id to all messages. But the difference
+        # between synced time messages and the other must remain.
+        if self.synced_time_messages:
+            command = common.Command(
+                MessageType.CLIENT_ID_WRAPPER,
+                common.encode_string(self.client_id) + common.encode_int(command.type.value) + command.data,
+                0,
+            )
+        super().add_command(command)
 
     # returns the path of an object
     def get_object_path(self, obj):
@@ -529,13 +546,15 @@ class BlenderClient(Client):
         start = 0
         frame, start = common.decode_int(data, start)
         if bpy.context.scene.frame_current != frame:
-            previous_value = share_data.client.skip_next_depsgraph_update
-            share_data.client.skip_next_depsgraph_update = False
-            # bs = self.block_signals
-            # self.block_signals = False
-            bpy.context.scene.frame_set(frame)
-            # self.block_signals = bs
-            share_data.client.skip_next_depsgraph_update = previous_value
+            try:
+                previous_value = share_data.client.skip_next_depsgraph_update
+                share_data.client.skip_next_depsgraph_update = False
+                bs = self.block_signals
+                self.block_signals = False
+                bpy.context.scene.frame_set(frame)
+            finally:
+                self.block_signals = bs
+                share_data.client.skip_next_depsgraph_update = previous_value
 
     def send_frame(self, frame):
         self.add_command(common.Command(MessageType.FRAME, common.encode_int(frame), 0))
@@ -682,6 +701,18 @@ class BlenderClient(Client):
                 self.block_signals = True
 
                 try:
+                    # manage wrapped commands with this blender id
+                    # time synced command for now
+                    # Consume messages with its client_id to receive commands from other clients
+                    # like play/pause. Ignore all other client_id.
+                    if command.type == MessageType.CLIENT_ID_WRAPPER:
+                        id, index = common.decode_string(command.data, 0)
+                        if id != share_data.client.client_id:
+                            continue
+                        command_type, index = common.decode_int(command.data, index)
+                        command_data = command.data[index:]
+                        command = common.Command(command_type, command_data)
+
                     if command.type == MessageType.CONTENT:
                         # The server asks for scene content (at room creation)
                         try:
@@ -818,7 +849,8 @@ class BlenderClient(Client):
                     if get_mixer_prefs().env == "development" or isinstance(e, SendSceneContentFailed):
                         raise
 
-                self.block_signals = False
+                finally:
+                    self.block_signals = False
 
             if group_count == 0:
                 break

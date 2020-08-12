@@ -125,6 +125,10 @@ class MessageType(IntEnum):
     PLAY = 206
     PAUSE = 207
 
+    END_OPTIMIZED_COMMANDS = 999
+
+    CLIENT_ID_WRAPPER = 1000
+
 
 class LightType(IntEnum):
     SPOT = 0  # directly mapped from Unity enum

@@ -106,7 +106,11 @@ def handler_send_frame_changed(scene):
         logger.debug("handler_send_frame_changed canceled (block_signals = True)")
         return
 
-    send_frame_changed(scene)
+    share_data.client.synced_time_messages = True
+    try:
+        send_frame_changed(scene)
+    finally:
+        share_data.client.synced_time_messages = False
 
 
 @persistent
