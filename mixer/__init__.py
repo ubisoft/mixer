@@ -13,7 +13,7 @@ bl_info = {
     "name": "Mixer",
     "author": "Ubisoft Animation Studio",
     "description": "Collaborative 3D edition accross 3D Softwares",
-    "version": (0, 14, 1),
+    "version": (0, 15, 0),
     "blender": (2, 82, 0),
     "location": "",
     "warning": "Experimental addon, can break your scenes",
