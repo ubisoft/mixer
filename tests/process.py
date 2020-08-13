@@ -202,7 +202,7 @@ class ServerProcess(PythonProcess):
         self.port: int = DEFAULT_PORT
         self.host: str = "127.0.0.1"
 
-    def start(self):
+    def start(self, server_args: Optional[List[str]] = None):
         # do not use an existing server, since it might not be ours and might not be setup
         # the way we want (throttling)
         try:
@@ -215,6 +215,8 @@ class ServerProcess(PythonProcess):
         args = ["-m", "mixer.broadcaster.apps.server"]
         args.extend(["--port", str(self.port)])
         args.extend(["--log-level", "INFO"])
+        if server_args:
+            args.extend(server_args)
         super().start(args)
         self._test_connect(timeout=4)
 

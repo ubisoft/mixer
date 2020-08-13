@@ -53,7 +53,13 @@ class MixerTestCase(unittest.TestCase):
     def _receiver(self):
         return self._blenders[1]
 
-    def setUp(self, blenderdescs: Iterable[BlenderDesc] = (BlenderDesc(), BlenderDesc()), join=True):
+    def setUp(
+        self,
+        blenderdescs: Iterable[BlenderDesc] = (BlenderDesc(), BlenderDesc()),
+        server_args: Optional[List[str]] = None,
+        join=True,
+        join_delay: Optional[float] = None,
+    ):
         """
         if a blendfile if not specified, blender will start with its default file.
         Not recommended) as it is machine dependent
@@ -64,7 +70,7 @@ class MixerTestCase(unittest.TestCase):
         ptvsd_port = 5688
 
         # start a broadcaster server
-        self._server_process.start()
+        self._server_process.start(server_args=server_args)
 
         # start all the blenders
         window_width = int(1920 / len(blenderdescs))
