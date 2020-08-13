@@ -62,7 +62,7 @@ class Connection:
 
     def run(self):
         def _send_error(s: str):
-            logger.warning("Sending error %s", s)
+            logger.error("Sending error %s", s)
             self.send_command(common.Command(common.MessageType.SEND_ERROR, common.encode_string(s)))
 
         def _join_room(command: common.Command):

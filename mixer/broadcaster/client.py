@@ -182,6 +182,11 @@ class Client:
         logger.info("Join room %s confirmed by server", room_name)
         self.current_room = room_name
 
+    def _handle_send_error(self, command: common.Command):
+        error_message, _ = common.decode_string(command.data, 0)
+
+        logger.error("Received error message : %s", error_message)
+
     _default_command_handlers: Mapping[MessageType, Callable[[common.Command], None]] = {
         MessageType.LIST_CLIENTS: _handle_list_client,
         MessageType.LIST_ROOMS: _handle_list_rooms,
@@ -191,6 +196,7 @@ class Client:
         MessageType.CLIENT_UPDATE: _handle_client_update,
         MessageType.CLIENT_DISCONNECTED: _handle_client_disconnected,
         MessageType.JOIN_ROOM: _handle_join_room,
+        MessageType.SEND_ERROR: _handle_send_error,
     }
 
     def has_default_handler(self, message_type: MessageType):
