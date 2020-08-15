@@ -144,24 +144,24 @@ class Connection:
             if count > 0:
                 logger.debug("Received from %s - %d commands ", self.unique_id, count)
 
-            for command in received_commands:
-                if _log_server_updates or command.type not in (common.MessageType.SET_CLIENT_CUSTOM_ATTRIBUTES,):
-                    logger.debug("Received from %s - %s", self.unique_id, command.type)
+                for command in received_commands:
+                    if _log_server_updates or command.type not in (common.MessageType.SET_CLIENT_CUSTOM_ATTRIBUTES,):
+                        logger.debug("Received from %s - %s", self.unique_id, command.type)
 
-                if command.type in command_handlers:
-                    command_handlers[command.type](command)
-                elif command.type.value > common.MessageType.COMMAND.value:
-                    if self.room is not None:
-                        self.room.add_command(command, self)
+                    if command.type in command_handlers:
+                        command_handlers[command.type](command)
+                    elif command.type.value > common.MessageType.COMMAND.value:
+                        if self.room is not None:
+                            self.room.add_command(command, self)
+                        else:
+                            logger.warning(
+                                "%s:%s - %s received but no room was joined",
+                                self.address[0],
+                                self.address[1],
+                                command.type,
+                            )
                     else:
-                        logger.warning(
-                            "%s:%s - %s received but no room was joined",
-                            self.address[0],
-                            self.address[1],
-                            command.type,
-                        )
-                else:
-                    logger.error("Command %s received but no handler for it on server", command.type)
+                        logger.error("Command %s received but no handler for it on server", command.type)
 
         def _handle_outgoing_commands():
             self.fetch_outgoing_commands()
