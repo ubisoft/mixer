@@ -490,7 +490,7 @@ class Server:
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 100)
 
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
-    
+
         binding_host = ""
         sock.bind((binding_host, port))
         sock.setblocking(0)
