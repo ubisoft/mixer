@@ -479,7 +479,7 @@ class Server:
         global SHUTDOWN
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        
+
         if hasattr(socket, 'TCP_KEEPIDLE'):
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 1)
         elif hasattr(socket, 'TCP_KEEPALIVE'):
