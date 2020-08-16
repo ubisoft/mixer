@@ -49,7 +49,17 @@ class Client:
 
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.settimeout( 5.0)
             self.socket.connect((self.host, self.port))
+
+            self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+
+            if hasattr(socket, "TCP_KEEPIDLE") and hasattr(socket, "TCP_KEEPINTVL") and hasattr(socket, "TCP_KEEPCNT"):
+                self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 1 * 60)
+                self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30)
+                self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
+                
             local_address = self.socket.getsockname()
             logger.info(
                 "Connecting from local %s:%s to %s:%s", local_address[0], local_address[1], self.host, self.port,
