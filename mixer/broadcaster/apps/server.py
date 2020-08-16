@@ -27,6 +27,7 @@ _log_server_updates: bool = False
 # client, then release the room mutex while broadcasting
 MAX_BROADCAST_COMMAND_COUNT = 64
 
+
 class Connection:
     """ Represent a connection with a client """
 
