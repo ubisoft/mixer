@@ -480,13 +480,13 @@ class Server:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-        if hasattr(socket, 'TCP_KEEPIDLE'):
+        if hasattr(socket, "TCP_KEEPIDLE"):
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 1)
-        elif hasattr(socket, 'TCP_KEEPALIVE'):
+        elif hasattr(socket, "TCP_KEEPALIVE"):
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPALIVE, 1)
-        if hasattr(socket, 'TCP_KEEPINTVL'):
+        if hasattr(socket, "TCP_KEEPINTVL"):
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 1)
-        if hasattr(socket, 'TCP_KEEPCNT'):
+        if hasattr(socket, "TCP_KEEPCNT"):
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 100)
 
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
