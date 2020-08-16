@@ -59,7 +59,7 @@ class Client:
                 self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 1 * 60)
                 self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 30)
                 self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 5)
-                                
+
             local_address = self.socket.getsockname()
             logger.info(
                 "Connecting from local %s:%s to %s:%s", local_address[0], local_address[1], self.host, self.port,
