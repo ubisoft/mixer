@@ -180,5 +180,8 @@ class MixerTestCase(unittest.TestCase):
         for blender in self._blenders:
             blender.disconnect_mixer()
 
-    def send_string(self, s: str):
-        self._sender.send_string(s)
+    def send_string(self, s: str, to: Optional[int] = 0):
+        self._blenders[to].send_string(s)
+
+    def send_strings(self, strings: List[str], to: Optional[int] = 0):
+        self.send_string("\n".join(strings), to)
