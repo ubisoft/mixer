@@ -20,7 +20,7 @@ class Client:
     - maintain an updated view of clients and room states from server's inputs
     """
 
-    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
+    def __init__(self, host: str = common.DEFAULT_HOST, port: int = common.DEFAULT_PORT):
         self.host = host
         self.port = port
         self.pending_commands: List[common.Command] = []
