@@ -45,6 +45,14 @@ class MixerTestCase(unittest.TestCase):
     def set_log_level(self, log_level):
         self._log_level = log_level
 
+    @classmethod
+    def get_class_name(cls, test_class, num, params_dict):
+        """
+        Tweak test case name for parameterized (from parameterized doc)
+        """
+        experimental = str(params_dict["experimental_sync"])
+        return f"{test_class.__name__}_Experimental_{experimental}"
+
     @property
     def _sender(self):
         return self._blenders[0]
@@ -74,15 +82,22 @@ class MixerTestCase(unittest.TestCase):
 
         # start all the blenders
         window_width = int(1920 / len(blenderdescs))
+
+        # for tests parametrization
+        env = None
+        if self.experimental_sync:
+            env = {"MIXER_EXPERIMENTAL_SYNC": "1"}
+        else:
+            env = {"MIXER_EXPERIMENTAL_SYNC": "0"}
+
         for i, blenderdesc in enumerate(blenderdescs):
             window_x = str(i * window_width)
             args = ["--window-geometry", window_x, "0", "960", "1080"]
             if blenderdesc.load_file is not None:
                 args.append(str(blenderdesc.load_file))
-
             blender = BlenderApp(python_port + i, ptvsd_port + i, blenderdesc.wait_for_debugger)
             blender.set_log_level(self._log_level)
-            blender.setup(args)
+            blender.setup(args, env=env)
             if join:
                 blender.connect_and_join_mixer()
             self._blenders.append(blender)

@@ -2,11 +2,19 @@ import logging
 from pathlib import Path
 import unittest
 
+from parameterized import parameterized_class
 from tests.mixer_testcase import BlenderDesc
 from tests.vrtist.vrtist_testcase import VRtistTestCase
 
 
-class TestCollectionDefaultDoc(VRtistTestCase):
+@parameterized_class(
+    [
+        # {"experimental_sync": True},
+        {"experimental_sync": False}
+    ],
+    class_name_func=VRtistTestCase.get_class_name,
+)
+class TestCollection(VRtistTestCase):
     def setUp(self):
         folder = Path(__file__).parent.parent
         sender_blendfile = folder / "basic.blend"

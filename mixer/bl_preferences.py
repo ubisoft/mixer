@@ -99,7 +99,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
     )
 
     experimental_sync: bpy.props.BoolProperty(
-        name="Experimental sync", default=os.environ.get("MIXER_EXPERIMENTAL_SYNC") is not None
+        name="Experimental sync", default=os.environ.get("MIXER_EXPERIMENTAL_SYNC") == "1"
     )
 
     show_server_console: bpy.props.BoolProperty(name="Show Server Console", default=False)

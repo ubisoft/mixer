@@ -23,6 +23,11 @@ class BlenderTestCase(MixerTestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def setUp(self, *args, **kwargs):
+        # Same variable as set by parameterized vrtist tests
+        self.experimental_sync = True
+        super().setUp(*args, **kwargs)
+
     def assertDictAlmostEqual(self, a, b, msg=None):  # noqa N802
         def sort(d):
             return {k: d[k] for k in sorted(d.keys())}

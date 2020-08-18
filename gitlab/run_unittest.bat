@@ -45,7 +45,7 @@ REM install Mixer in local blender
 %MIXER_BLENDER_EXE_PATH% --background --python %CURRENT_DIR%\install_mixer.py
 
 REM These tests run within blender
-%PYTHON% -m pip install unittest-xml-reporting
+%PYTHON% -m pip install unittest-xml-reporting parameterized
 %MIXER_BLENDER_EXE_PATH% --background --python-exit-code 1 --python mixer\blender_data\tests\ci.py
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
@@ -58,10 +58,8 @@ if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
 
 REM Skip as not reliable enough on the GitLab runner
-
-set MIXER_EXPERIMENTAL_SYNC=1
-%PYTHON% -m unittest discover --verbose tests.blender
-if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
+REM %PYTHON% -m unittest discover --verbose tests.blender
+REM if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
 
 if %ERROR% GEQ 1 EXIT /B %ERROR%
