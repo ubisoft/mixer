@@ -1,5 +1,5 @@
 import logging
-from typing import Any, List, Mapping, Tuple, TypeVar
+from typing import List, Mapping, Tuple
 
 import bpy
 import bpy.types as T  # noqa
@@ -9,10 +9,8 @@ from mixer.blender_data.filter import Context, skip_bpy_data_item
 from mixer.blender_data.proxy import (
     BpyBlendProxy,
     BpyIDProxy,
-    BpyStructProxy,
     BpyPropDataCollectionProxy,
     ensure_uuid,
-    Proxy,
 )
 
 logger = logging.getLogger(__name__)

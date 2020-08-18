@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import IntEnum
 import logging
-from typing import Any, List, Mapping, NamedTuple, Optional, Set, Tuple, TypeVar, Union
+from typing import Any, List, Mapping, Optional, Set, Tuple, TypeVar, Union
 from uuid import uuid4
 
 import bpy
@@ -1072,8 +1072,8 @@ class BpyPropDataCollectionProxy(Proxy):
         Args:
             uuid: the mixer_uuid of the datablock
         """
-        ## TODO scene and last_scene_ ...
-        ## TODO do we need BlendData as a cache ?
+        # TODO scene and last_scene_ ...
+        # TODO do we need BlendData as a cache ?
         logger.info("Perform removal for %s", proxy)
         BlendData.instance().collection(proxy.collection_name).remove(proxy.key)
         name = proxy.data("name")
@@ -1104,7 +1104,6 @@ class BpyPropDataCollectionProxy(Proxy):
         Update the proxy according to the diff
         """
         changeset = Changeset()
-        blenddata = BlendData.instance()
         # Sort so that the tests receive the messages in deterministic order. Sad but not very harmfull
         # TODO items_added boes not deen the collection name since it should be known by self
         added_names = sorted(diff.items_added.keys())

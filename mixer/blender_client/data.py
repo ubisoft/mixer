@@ -6,7 +6,7 @@ mechanism.
 """
 
 import logging
-from typing import Callable, List, Union
+from typing import Callable, Union
 
 from mixer.blender_data.json_codec import Codec
 from mixer.blender_data.proxy import (
