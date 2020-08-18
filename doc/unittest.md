@@ -6,6 +6,8 @@ Unit tests use the `unittest` package. Most of them will start a `broadcaster` s
 
 Running the unit test require the `MIXER_BLENDER_EXE_PATH` environment variable to be set with the absolute path to the Blender that will be used for testing.
 
+To start the tests from VScode, make sure that the addon is installed in the Blender instance that will be started, possibly by launching it once via VScode [Blender development addon](https://github.com/JacquesLucke/blender_vscode)
+
 
 ## CI/CD on unit tests
 

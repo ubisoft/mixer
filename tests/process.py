@@ -31,8 +31,14 @@ Diff the scenes
 
 logger = logging.getLogger(__name__)
 
-BLENDER_EXE = os.environ.get("MIXER_BLENDER_EXE_PATH", "blender.exe")
 current_dir = Path(__file__).parent
+
+
+def blender_exe_path() -> str:
+    blender_exe = os.environ.get("MIXER_BLENDER_EXE_PATH")
+    if blender_exe is None:
+        raise RuntimeError(f"Environment variable MIXER_BLENDER_EXE_PATH is not set")
+    return blender_exe
 
 
 class Process:
@@ -42,13 +48,14 @@ class Process:
 
     def __init__(self):
         self._process: subprocess.Popen = None
+        self.command_line: str = None
 
     def start(self, args, kwargs):
         logger.info(f"Running subprocess.Popen()")
         logger.info(f"args:   {args}")
         logger.info(f"kwargs: {kwargs}")
-        command_line = " ".join(args)
-        logger.info(f"command line: {command_line}")
+        self.command_line = " ".join(args)
+        logger.info(f"command line: {self.command_line}")
         try:
             self._process = subprocess.Popen(args, **kwargs)
             logger.info(f"subprocess.popen: success")
@@ -57,7 +64,8 @@ class Process:
             logger.error(f"{e}")
             logger.error(f"args:   {args}")
             logger.error(f"kwargs: {kwargs}")
-            logger.error(f"command line: {command_line}")
+            logger.error(f"command line: {self.command_line}")
+            raise
 
     def wait(self, timeout: float = None):
         try:
@@ -89,7 +97,7 @@ class BlenderProcess(Process):
         blender_args: Optional[List[str]] = None,
         env: Optional[List[str]] = None,
     ):
-        popen_args = [BLENDER_EXE]
+        popen_args = [blender_exe_path()]
         popen_args.extend(self._cmd_args)
         if blender_args is not None:
             popen_args.extend(blender_args)
@@ -133,16 +141,25 @@ class BlenderServer(BlenderProcess):
 
     def connect(self):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._sock.setblocking(True)
         connected = False
-        max_attempts = 200
-        attempts = 0
-        while not connected and attempts < max_attempts:
+        max_wait = 5
+
+        start = time.monotonic()
+        while not connected and time.monotonic() - start < max_wait:
             try:
                 self._sock.connect(("127.0.0.1", self._port))
                 connected = True
             except ConnectionRefusedError:
-                time.sleep(0.1)
-                attempts += 1
+                pass
+
+        if not connected:
+            message = (
+                f"Cannot connect to Blender at 127.0.0.1:{self._port} after {int(time.monotonic() - start)} seconds.\n"
+                + f"Command line was: {self.command_line}"
+            )
+
+            raise RuntimeError(message)
 
     def close(self):
         if self._sock is not None:
@@ -177,10 +194,7 @@ class PythonProcess(Process):
 
     def __init__(self):
         super().__init__()
-        blender_exe = os.environ.get("MIXER_BLENDER_EXE_PATH")
-        if blender_exe is None:
-            raise RuntimeError(f"Environment variable MIXER_BLENDER_EXE_PATH is not set")
-
+        blender_exe = blender_exe_path()
         blender_dir = Path(blender_exe).parent
         python_paths = list(blender_dir.glob("*/python/bin/python.exe"))
         if len(python_paths) != 1:
@@ -191,13 +205,14 @@ class PythonProcess(Process):
         self._python_path = str(python_paths[0])
         logger.info(f"Using python : {self._python_path}")
 
-    def start(self, args: Optional[Iterable[Any]] = ()):
+    def start(self, args: Optional[Iterable[Any]] = ()) -> str:
         popen_args = [self._python_path]
         popen_args.extend([str(arg) for arg in args])
         popen_kwargs = {}
         popen_kwargs.update({"creationflags": subprocess.CREATE_NEW_CONSOLE})
         popen_kwargs.update({"shell": False})
-        super().start(popen_args, popen_kwargs)
+
+        return super().start(popen_args, popen_kwargs)
 
 
 class ServerProcess(PythonProcess):
@@ -214,7 +229,7 @@ class ServerProcess(PythonProcess):
         # do not use an existing server, since it might not be ours and might not be setup
         # the way we want (throttling)
         try:
-            self._test_connect()
+            self._test_connect(None)
         except ConnectionRefusedError:
             pass
         else:
@@ -233,9 +248,14 @@ class ServerProcess(PythonProcess):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.connect((self.host, self.port))
-        except ConnectionRefusedError:
-            if waited >= timeout:
+        except ConnectionRefusedError as e:
+            if timeout is None:
                 raise
+            if waited >= timeout:
+                message = f"Cannot connect to broadcaster at {self.host}{self.port} after {waited} seconds.\n"
+                f"Exception: {e}\n"
+                f"Command line was: {self.command_line}"
+                raise RuntimeError(message)
             delay = 0.2
             time.sleep(delay)
             waited += delay
