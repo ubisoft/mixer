@@ -180,7 +180,7 @@ def pre_save_id(proxy: Proxy, collection: T.bpy_prop_collection, key: str) -> T.
         if light_type is not None and light_type != target.type:
             target.type = light_type
             # must reload the reference
-            target = proxy.target(collection, key)
+            target = proxy.target()
     elif isinstance(target, T.ColorManagedViewSettings):
         use_curve_mapping = proxy.data("use_curve_mapping")
         if use_curve_mapping:

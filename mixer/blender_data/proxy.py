@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import IntEnum
 import logging
-from typing import Any, Mapping, Union, Set, List, Tuple, TypeVar
+from typing import Any, List, Mapping, NamedTuple, Optional, Set, Tuple, TypeVar, Union
 from uuid import uuid4
 
 import bpy
@@ -32,8 +32,7 @@ BpyIDProxy = TypeVar("BpyIDProxy")
 logger = logging.getLogger(__name__)
 
 # Access path to the ID starting from bpy.data, such as ("cameras", "Camera")
-# or later the path of an ID not in bpy.data if useful
-BlenddataPath = Tuple[str]
+BlenddataPath = Tuple[str, str]
 
 
 # storing everything in a single dictionary is easier for serialization
@@ -377,13 +376,11 @@ class BpyStructProxy(StructLikeProxy):
 
 class BpyIDProxy(BpyStructProxy):
     """
-    Holds a copy of a Blender ID, i.e a type stored in bpy.data, like Object and Material
+    Holds a copy of a datablock, i.e a type stored in bpy.data, like Object and Material
     """
 
-    # The path of this ID startting from bpy.data, for instance ('objects', 'Cube').
-    # May be later extended to target "embedded" IDs not in bpy.data
-    _blenddata_path: BlenddataPath = None
-
+    # name of the bpy.data collection this datablock belongs to, None if embedded in another datablock
+    _bpy_data_collection: str = None
     _class_name = ""
 
     def __init__(self):
@@ -399,7 +396,14 @@ class BpyIDProxy(BpyStructProxy):
     def mixer_uuid(self) -> str:
         return self._data["mixer_uuid"]
 
-    def load(self, bl_instance: T.ID, visit_state: VisitState, blenddata_path: BlenddataPath = None):
+    def rename(self, new_name: str):
+        self._data["name"] = new_name
+        self._data["name_full"] = new_name
+
+    def __str__(self) -> str:
+        return f"BpyIDProxy for bpy.data.{self.collection_name}[{self.data('name')}] {self.mixer_uuid}"
+
+    def load(self, bl_instance: T.ID, visit_state: VisitState, bpy_data_collection_name: str = None):
         """
         """
 
@@ -415,8 +419,7 @@ class BpyIDProxy(BpyStructProxy):
 
         specifics.post_save_id(self, bl_instance)
         self._class_name = bl_instance.__class__.__name__
-        if blenddata_path is not None:
-            self._blenddata_path = blenddata_path
+        self._bpy_data_collection = bpy_data_collection_name
 
         uuid = bl_instance.get("mixer_uuid")
         if uuid:
@@ -434,11 +437,16 @@ class BpyIDProxy(BpyStructProxy):
         debug_check_proxy(self)
         return self
 
-    def collection_name(self) -> Union[str, None]:
-        return self._blenddata_path[0]
+    @property
+    def collection_name(self) -> Optional[str]:
+        """
+        The name of the bpy.data collection this object is a proxy, None if an embedded ID
+        """
+        return self._bpy_data_collection
 
-    def collection_key(self) -> Union[str, None]:
-        return self._blenddata_path[1]
+    @property
+    def collection(self) -> T.bpy_prop_collection:
+        return getattr(bpy.data, self.collection_name)
 
     def target(self, bl_instance: any, attr_name: str):
         if isinstance(bl_instance, bpy.types.bpy_prop_collection):
@@ -453,18 +461,22 @@ class BpyIDProxy(BpyStructProxy):
         return t
 
     def save(self, bl_instance: any = None, attr_name: str = None) -> T.ID:
-        blenddata = BlendData.instance()
-        if self._blenddata_path is None:
+        """
+        Save this proxy into its target ID, which may be
+        - a bpy.data member item
+        - an embedded ID
+        """
+        collection_name = self.collection_name
+        if collection_name is None:
             # TODO ID inside ID, not BlendData collection. We will need a path
             # do it on save
             logger.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} has empty blenddata path: ignore")
             return None
 
         if bl_instance is None:
-            collection_name = self._blenddata_path[0]
-            bl_instance = blenddata.bpy_collection(collection_name)
+            bl_instance = self.collection
         if attr_name is None:
-            attr_name = self._blenddata_path[1]
+            attr_name = self.data("name_full")
 
         # 2 cases
         # - ID in blenddata collection
@@ -489,6 +501,7 @@ class BpyIDProxy(BpyStructProxy):
         for k, v in self._data.items():
             write_attribute(target, k, v)
 
+        # TODO why not target ?
         return id_
 
     def update(self, other: BpyIDProxy):
@@ -552,7 +565,6 @@ class BpyIDRefProxy(Proxy):
     - Camera.dof.focus_object
     """
 
-    # same meaning as for BpyIDProxy, but limited to two compoments (bpy.data collection and key)
     _blenddata_path: BlenddataPath = None
 
     def __init__(self):
@@ -570,6 +582,7 @@ class BpyIDRefProxy(Proxy):
         assert getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier], None) is not None
         assert bl_instance.name_full in getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier])
 
+        # TODO what abut renames
         self._blenddata_path = [
             BlendData.instance().bl_collection_name_from_inner_identifier(class_bl_rna.identifier),
             bl_instance.name_full,
@@ -919,6 +932,22 @@ class BpyPropStructCollectionProxy(Proxy):
                 write_attribute(target, k, v)
 
 
+CreationChangeset = List[BpyIDProxy]
+UpdateChangeset = List[BpyIDProxy]
+# uuid, debug_display
+RemovalChangeset = List[Tuple[str, str]]
+# uuid, new_name, debug_display
+RenameChangeset = List[Tuple[str, str, str]]
+
+
+class Changeset:
+    def __init__(self):
+        self.creations: CreationChangeset = []
+        self.removals: RemovalChangeset = []
+        self.renames: RenameChangeset = []
+        self.updates: UpdateChangeset = []
+
+
 class BpyPropDataCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of ID in bpy.data. May not work as is for bpy_prop_collection on non-ID
@@ -946,7 +975,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 # if collection_name == "objects" and isinstance(item.data, T.Mesh):
                 #     continue
                 # # /HACK
-                self._data[name] = BpyIDProxy().load(item, visit_state, (collection_name, name))
+                self._data[name] = BpyIDProxy().load(item, visit_state, collection_name)
 
         return self
 
@@ -978,71 +1007,103 @@ class BpyPropDataCollectionProxy(Proxy):
     def find(self, key: str):
         return self._data.get(key)
 
-    def update_one(self, proxy: BpyIDProxy, visit_state: VisitState):
-        """Update a bpy.data item from a received BpyIDProxy and update the proxy structures accordingly
+    def create_datablock(self, proxy: BpyIDProxy, visit_state: VisitState):
+        """Create a bpy.data datablock from a received BpyIDProxy and update the proxy structures accordingly
+
+        Receiver side
 
         Args:
             proxy : this proxy contents is used to update the bpy.data collection item
         """
-        collection_name, name = proxy._blenddata_path[0:2]
-        existing_proxy = self._data.get(name)
-        if existing_proxy is None:
-            # only change other state after save, in case of exception
-            id_ = proxy.save()
-            self._data[name] = proxy
-            uuid = proxy.mixer_uuid()
-            visit_state.root_ids.add(id_)
-            visit_state.ids[uuid] = id_
-            visit_state.id_proxies[uuid] = proxy
-        else:
-            # Do not replace the existing proxy by the new one as it wil no more work with
-            # differential updates
-            existing_proxy.update(proxy)
-
-            # the ID will have changed if the object has been morphed (change light type, for instance)
-            uuid = proxy.mixer_uuid()
-            existing_id = visit_state.ids.get(uuid)
-            if existing_id is None:
-                logger.warning(f"Non existent uuid {uuid} while updating {collection_name}[{name}]")
-                return None
-
-            id_ = existing_proxy.save()
-            if existing_id != id_:
-                visit_state.root_ids.remove(existing_id)
-                visit_state.root_ids.add(id_)
-                visit_state.ids[uuid] = id_
+        # only change other state after save, in case of exception
+        id_ = proxy.save()
+        name = proxy.data("name")
+        self._data[name] = proxy
+        uuid = proxy.mixer_uuid()
+        visit_state.root_ids.add(id_)
+        visit_state.ids[uuid] = id_
+        visit_state.id_proxies[uuid] = proxy
         return id_
 
-    def remove_one(self, name, visit_state: VisitState):
-        """Remove a bpy.data collection item and update the proxy structures
+    def update_datablock(self, incoming_proxy: BpyIDProxy, visit_state: VisitState):
+        """Update a bpy.data item from a received BpyIDProxy and update the proxy structures accordingly
+
+        Receiver side
 
         Args:
-            name ([type]): the key in the bpy.data collection
+            proxy : this proxy contents is used to update the bpy.data collection item
         """
-        proxy = self._data.get(name)
+        uuid = incoming_proxy.mixer_uuid()
+        proxy = visit_state.id_proxies.get(uuid)
         if proxy is None:
-            logger.warning("remove: proxy not found for key %s", name)
+            logger.error(
+                f"update_datablock(): Missing proxy for bpy.data.{incoming_proxy.collection_name}[{incoming_proxy.name}] uuid {uuid}"
+            )
             return
 
-        collection_name, key = proxy._blenddata_path[0:2]
-        logger.info("Perform removal for %s[%s]", collection_name, key)
-        if key != name:
-            logger.error(f"remove: {key} != {name}")
+        if proxy.mixer_uuid() != incoming_proxy.mixer_uuid():
+            logger.error(
+                f"update_datablock : uuid mismatch between incoming {incoming_proxy.mixer_uuid} ({incoming_proxy}) and existing {proxy.mixer_uuid} ({proxy})"
+            )
             return
-        BlendData.instance().collection(collection_name).remove(key)
-        uuid = proxy.mixer_uuid()
+
+        # Do not replace the existing proxy by the new one as it wil no more work with
+        # differential updates
+        proxy.update(incoming_proxy)
+
+        # the ID will have changed if the object has been morphed (change light type, for instance)
+        existing_id = visit_state.ids.get(uuid)
+        if existing_id is None:
+            logger.warning(f"Non existent uuid {uuid} while updating {proxy.collection_name}[{proxy.name}]")
+            return None
+
+        id_ = proxy.save()
+        if existing_id != id_:
+            visit_state.root_ids.remove(existing_id)
+            visit_state.root_ids.add(id_)
+            visit_state.ids[uuid] = id_
+        return id_
+
+    def remove_datablock(self, proxy: BpyIDProxy):
+        """Remove a bpy.data collection item and update the proxy structures
+
+        Receiver side
+
+        Args:
+            uuid: the mixer_uuid of the datablock
+        """
+        ## TODO scene and last_scene_ ...
+        ## TODO do we need BlendData as a cache ?
+        logger.info("Perform removal for %s", proxy)
+        BlendData.instance().collection(proxy.collection_name).remove(proxy.key)
+        name = proxy.data("name")
         del self._data[name]
-        id_ = visit_state.ids[uuid]
-        visit_state.root_ids.remove(id_)
-        del visit_state.id_proxies[uuid]
-        del visit_state.ids[uuid]
 
-    def update(self, diff: BpyPropCollectionDiff, visit_state: VisitState) -> List[BpyIDProxy]:
+    def rename_datablock(self, proxy: BpyIDProxy, new_name: str, datablock: T.ID):
+        """
+        Rename a bpy.data collection item and update the proxy structures
+
+        Receiver side
+
+        Args:
+            uuid: the mixer_uuid of the datablock
+        """
+        logger.info("Perform rename %s into %s", proxy, new_name)
+        old_name = proxy.data("name")
+        if self._data[old_name] is not proxy:
+            logger.warning(f"rename_datablock(): self._data[{old_name}] is not {proxy}")
+            return
+        BlendData.instance().collection(proxy.collection_name).set_dirty()
+        proxy.rename(new_name)
+        self._data[new_name] = proxy
+        del self._data[old_name]
+        datablock.name = new_name
+
+    def update(self, diff: BpyPropCollectionDiff, visit_state: VisitState) -> Changeset:
         """
         Update the proxy according to the diff
         """
-        creations = []
-        removals = []
+        changeset = Changeset()
         blenddata = BlendData.instance()
         # Sort so that the tests receive the messages in deterministic order. Sad but not very harmfull
         # TODO items_added boes not deen the collection name since it should be known by self
@@ -1051,46 +1112,44 @@ class BpyPropDataCollectionProxy(Proxy):
             collection_name = diff.items_added[name]
             logger.info("Perform update/creation for %s[%s]", collection_name, name)
             try:
-                id_ = blenddata.collection(collection_name).items.get(name)
+                collection = getattr(bpy.data, collection_name)
+                id_ = collection.get(name)
                 if id_ is None:
-                    logger.warning("update/added for %s[%s] : not found", collection_name, name)
+                    logger.error("update/ request addition for %s[%s] : not found", collection_name, name)
                     continue
                 uuid = ensure_uuid(id_)
-                blenddata_path = [collection_name, name]
                 visit_state.root_ids.add(id_)
                 visit_state.ids[uuid] = id_
-                proxy = BpyIDProxy().load(id_, visit_state, blenddata_path)
+                proxy = BpyIDProxy().load(id_, visit_state, collection_name)
                 visit_state.id_proxies[uuid] = proxy
                 self._data[name] = proxy
-                creations.append(proxy)
+                changeset.creations.append(proxy)
             except Exception:
                 logger.error(f"Exception during update/added for {collection_name}[{name}]:")
                 log_traceback(logger.error)
 
-        for name, uuid in diff.items_removed:
+        for proxy in diff.items_removed:
             try:
-                proxy = visit_state.id_proxies.get(uuid)
-                if proxy is None:
-                    logger.warning(f"update/removal: proxy not found for {uuid} ({name})")
-                    continue
-                removal = proxy._blenddata_path[0:2]
-                logger.info("Perform removal for %s[%s] %s", removal[0], removal[1], uuid)
-                removals.append(removal)
+                logger.info("Perform removal for %s", proxy)
+                uuid = proxy.mixer_uuid()
+                changeset.removals.append((uuid, str(proxy)))
                 del self._data[name]
                 id_ = visit_state.ids[uuid]
                 visit_state.root_ids.remove(id_)
                 del visit_state.id_proxies[uuid]
                 del visit_state.ids[uuid]
             except Exception:
-                logger.error(f"Exception during update/removed for {uuid} ({name})  :")
+                logger.error(f"Exception during update/removed for proxy {proxy})  :")
                 log_traceback(logger.error)
 
-        for old_name, new_name in diff.items_renamed:
+        for proxy, old_name in diff.items_renamed:
+            new_name = proxy.data("name")
             self._data[new_name] = self._data[old_name]
-            self._data[new_name]._blenddata_path[1] = new_name
+            # TODO REMOVE self._data[new_name]._blenddata_path[1] = new_name
+            changeset.renames.append((proxy.mixer_uuid(), new_name, str(proxy)))
             del self._data[old_name]
 
-        return creations, removals
+        return changeset
 
 
 # to sort delta in the bottom up order in the hierarchy ( creation order, mesh before object, ..)
@@ -1162,15 +1221,17 @@ class BpyBlendProxy(Proxy):
 
     def update(
         self, diff: BpyBlendDiff, context: Context = safe_context, depsgraph_updates: T.bpy_prop_collection = ()
-    ) -> Tuple[List[BpyIDProxy], List[Tuple[str, str]]]:
+    ) -> Changeset:
         """ Update the proxy using the state of the Blendata collections (ID creation, deletion)
         and the depsgraph updates (ID modification)
+
+        Sender side
 
         Returns:
             A list a creations/updates and a list of removals
         """
-        updates = []
-        removals = []
+        changeset: Changeset = Changeset()
+
         # Update the bpy.data collections status and get the list of newly created bpy.data entries.
         # Updated proxies will contain the IDs to send as an initial transfer.
         # There is no difference between a creation and a subsequent update
@@ -1180,9 +1241,10 @@ class BpyBlendProxy(Proxy):
         # before objects, for instance
         deltas = sorted(diff.collection_deltas, key=_pred_by_creation_order)
         for delta_name, delta in deltas:
-            creation, removal = self._data[delta_name].update(delta, visit_state)
-            updates.extend(creation)
-            removals.extend(removal)
+            collection_changeset = self._data[delta_name].update(delta, visit_state)
+            changeset.creations.extend(collection_changeset.creations)
+            changeset.removals.extend(collection_changeset.removals)
+            changeset.renames.extend(collection_changeset.renames)
 
         # Update the ID proxies from the depsgraph update
         # this should iterate inside_out (Object.data, Object) in the adequate creation order
@@ -1212,23 +1274,56 @@ class BpyBlendProxy(Proxy):
                 logger.info("BpyBlendProxy.update(): Ignoring %s (no proxy)", id_)
                 continue
             proxy.load(id_, visit_state)
-            updates.append(proxy)
+            changeset.updates.append(proxy)
 
-        return updates, removals
+        return changeset
 
-    def update_one(self, proxy: BpyIDProxy, context: Context = safe_context) -> T.ID:
-        """ Create or update a bpy.data collection item and update the proxy accordingly
+    def create_datablock(self, proxy: BpyIDProxy, context: Context = safe_context) -> T.ID:
+        """
+        Create bpy.data collection item and update the proxy accordingly
+
+        Receiver side
         """
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
-        collection_name, _ = proxy._blenddata_path[0:2]
-        id_ = self._data[collection_name].update_one(proxy, visit_state)
+        id_ = self._data[proxy.collection_name].create_datablock(proxy, visit_state)
         return id_
 
-    def remove_one(self, collection_name: str, key: str, context: Context = safe_context):
-        """ Remove a bpy.data collection item and update the proxy accordingly
+    def update_datablock(self, proxy: BpyIDProxy, context: Context = safe_context) -> T.ID:
+        """
+        Update a bpy.data collection item and update the proxy accordingly
+
+        Receiver side
         """
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
-        self._data[collection_name].remove_one(key, visit_state)
+        id_ = self._data[proxy.collection_name].update_datablock(proxy, visit_state)
+        return id_
+
+    def remove_datablock(self, uuid: str):
+        """
+        Remove a bpy.data collection item and update the proxy accordingly
+
+        Receiver side
+        """
+        proxy = self.id_proxies.get(uuid)
+        if proxy is None:
+            logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
+        self._data[proxy.collection_name].remove_datablock(proxy)
+        id_ = self.ids[uuid]
+        self.root_ids.remove(id_)
+        del self.id_proxies[uuid]
+        del self.ids[uuid]
+
+    def rename_datablock(self, uuid: str, new_name: str):
+        """
+        Rename a bpy.data collection item and update the proxy accordingly
+
+        Receiver side
+        """
+        proxy = self.id_proxies.get(uuid)
+        if proxy is None:
+            logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
+        datablock = self.ids[uuid]
+        self._data[proxy.collection_name].rename_datablock(proxy, new_name, datablock)
 
     def clear(self):
         self._data.clear()
