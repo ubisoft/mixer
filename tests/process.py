@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import time
 from typing import Any, Callable, Iterable, List, Mapping, Optional
 
@@ -107,8 +108,13 @@ class BlenderProcess(Process):
             popen_args.append("--")
             popen_args.extend([str(arg) for arg in script_args])
 
-        popen_kwargs = {"creationflags": subprocess.CREATE_NEW_CONSOLE, "shell": False}
-        popen_kwargs.update({"env": env})
+        popen_kwargs = {
+            "creationflags": subprocess.CREATE_NEW_CONSOLE,
+            "shell": False,
+            "stdout": sys.stdout,
+            "stderr": subprocess.STDOUT,
+            "env": env,
+        }
         super().start(popen_args, popen_kwargs)
 
 
@@ -208,9 +214,12 @@ class PythonProcess(Process):
     def start(self, args: Optional[Iterable[Any]] = ()) -> str:
         popen_args = [self._python_path]
         popen_args.extend([str(arg) for arg in args])
-        popen_kwargs = {}
-        popen_kwargs.update({"creationflags": subprocess.CREATE_NEW_CONSOLE})
-        popen_kwargs.update({"shell": False})
+        popen_kwargs = {
+            "creationflags": subprocess.CREATE_NEW_CONSOLE,
+            "stdout": sys.stdout,
+            "stderr": subprocess.STDOUT,
+            "shell": False,
+        }
 
         return super().start(popen_args, popen_kwargs)
 
