@@ -133,8 +133,9 @@ class MixerTestCase(unittest.TestCase):
         server_process = ServerProcess()
         server_process.start()
 
-        host = "127.0.0.1"
-        port = int(os.environ.get("VRTIST_PORT", DEFAULT_PORT))
+        host = server_process.host
+        port = server_process.port
+
         # upload the room
         self._sender.connect_and_join_mixer("mixer_grab_sender", keep_room_open=True)
         time.sleep(1)

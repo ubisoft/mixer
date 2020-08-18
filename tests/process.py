@@ -239,7 +239,7 @@ class ServerProcess(PythonProcess):
 
     def __init__(self):
         super().__init__()
-        self.port: int = DEFAULT_PORT
+        self.port: str = os.environ.get("VRTIST_PORT", str(DEFAULT_PORT))
         self.host: str = "127.0.0.1"
 
     def start(self, server_args: Optional[List[str]] = None):
@@ -253,7 +253,7 @@ class ServerProcess(PythonProcess):
             raise RuntimeError(f"A server listening at {self.host}:{self.port} already exists. Aborting")
 
         args = ["-m", "mixer.broadcaster.apps.server"]
-        args.extend(["--port", str(self.port)])
+        args.extend(["--port", self.port])
         args.extend(["--log-level", "INFO"])
         if server_args:
             args.extend(server_args)
