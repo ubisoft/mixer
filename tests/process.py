@@ -177,12 +177,19 @@ class PythonProcess(Process):
 
     def __init__(self):
         super().__init__()
-        blender_exe = os.environ.get("MIXER_BLENDER_EXE_PATH", "blender.exe")
+        blender_exe = os.environ.get("MIXER_BLENDER_EXE_PATH")
+        if blender_exe is None:
+            raise RuntimeError(f"Environment variable MIXER_BLENDER_EXE_PATH is not set")
+
         blender_dir = Path(blender_exe).parent
         python_paths = list(blender_dir.glob("*/python/bin/python.exe"))
         if len(python_paths) != 1:
-            raise RuntimeError(f"Expected one python.exe, found {len(python_paths)} : {python_paths}")
+            raise RuntimeError(
+                f"Expected one python.exe from Blender at {blender_exe}, found {len(python_paths)} : {python_paths}. Configure MIXER_BLENDER_EXE_PATH"
+            )
+
         self._python_path = str(python_paths[0])
+        logger.info(f"Using python : {self._python_path}")
 
     def start(self, args: Optional[Iterable[Any]] = ()):
         popen_args = [self._python_path]

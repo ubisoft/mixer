@@ -8,6 +8,8 @@ tscon 5 /dest:console
 set ERROR=0
 set CURRENT_DIR=%~dp0
 
+set
+
 REM create local folders if required
 if not exist %CURRENT_DIR%\blender mkdir %CURRENT_DIR%\blender
 if not exist %CURRENT_DIR%\blender\cache mkdir %CURRENT_DIR%\blender\cache
