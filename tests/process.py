@@ -34,6 +34,13 @@ logger = logging.getLogger(__name__)
 
 current_dir = Path(__file__).parent
 
+# stdout will be a xmlrunner.result._DuplicateWriter
+# and redirecting onto it raises "io.UnsupportedOperation: fileno"
+_popen_redirect = {
+    "stdout": sys.stderr,
+    "stderr": sys.stderr,
+}
+
 
 def blender_exe_path() -> str:
     blender_exe = os.environ.get("MIXER_BLENDER_EXE_PATH")
@@ -111,10 +118,9 @@ class BlenderProcess(Process):
         popen_kwargs = {
             "creationflags": subprocess.CREATE_NEW_CONSOLE,
             "shell": False,
-            "stdout": sys.stdout,
-            "stderr": subprocess.STDOUT,
             "env": env,
         }
+        popen_kwargs.update(_popen_redirect)
         super().start(popen_args, popen_kwargs)
 
 
@@ -149,7 +155,7 @@ class BlenderServer(BlenderProcess):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setblocking(True)
         connected = False
-        max_wait = 5
+        max_wait = 10
 
         start = time.monotonic()
         while not connected and time.monotonic() - start < max_wait:
@@ -214,12 +220,14 @@ class PythonProcess(Process):
     def start(self, args: Optional[Iterable[Any]] = ()) -> str:
         popen_args = [self._python_path]
         popen_args.extend([str(arg) for arg in args])
+
+        # stdout will be a xmlrunner.result._DuplicateWriter
+        # and redirecting onto it raises "io.UnsupportedOperation: fileno"
         popen_kwargs = {
             "creationflags": subprocess.CREATE_NEW_CONSOLE,
-            "stdout": sys.stdout,
-            "stderr": subprocess.STDOUT,
             "shell": False,
         }
+        popen_kwargs.update(_popen_redirect)
 
         return super().start(popen_args, popen_kwargs)
 
