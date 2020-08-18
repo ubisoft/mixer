@@ -1,12 +1,9 @@
 from dataclasses import dataclass
 import logging
-import os
 import sys
 import time
 from typing import Iterable, List, Optional
 import unittest
-
-from mixer.broadcaster.common import DEFAULT_PORT
 
 from tests.blender_app import BlenderApp
 from tests.grabber import Grabber
