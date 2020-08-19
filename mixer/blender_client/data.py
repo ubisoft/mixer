@@ -92,11 +92,11 @@ def _build_data_update_or_create(buffer, display_name: str, func: Callable[[BpyB
     share_data.set_dirty()
 
 
-def build_data_creations(buffer):
+def build_data_create(buffer):
     _build_data_update_or_create(buffer, "build_data_create", BpyBlendProxy.create_datablock)
 
 
-def build_data_updates(buffer):
+def build_data_update(buffer):
     _build_data_update_or_create(buffer, "build_data_update", BpyBlendProxy.update_datablock)
 
 
@@ -129,7 +129,7 @@ def send_data_renames(renames: RenameChangeset):
         return
 
     for uuid, new_name, debug_info in renames:
-        logger.info("send_removal: %s %s (%s)", uuid, new_name, debug_info)
+        logger.info("send_rename: %s %s (%s)", uuid, new_name, debug_info)
         buffer = common.encode_string(uuid) + common.encode_string(new_name) + common.encode_string(debug_info)
         command = common.Command(common.MessageType.BLENDER_DATA_RENAME, buffer, 0)
         share_data.client.add_command(command)

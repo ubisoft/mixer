@@ -836,6 +836,10 @@ class BlenderClient(Client):
                         data_api.build_data_update(command.data)
                     elif command.type == MessageType.BLENDER_DATA_REMOVE:
                         data_api.build_data_remove(command.data)
+                    elif command.type == MessageType.BLENDER_DATA_CREATE:
+                        data_api.build_data_create(command.data)
+                    elif command.type == MessageType.BLENDER_DATA_RENAME:
+                        data_api.build_data_rename(command.data)
                     else:
                         # Command is ignored, so no depsgraph update can be triggered
                         command_triggers_depsgraph_update = False
