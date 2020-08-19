@@ -391,8 +391,8 @@ class ShareData:
             logger.warning("Experimental sync in ON")
             self.bpy_data_proxy = BpyBlendProxy()
         else:
+            logger.warning("Experimental sync in OFF")
             if self.bpy_data_proxy:
-                logger.warning("Experimental sync in OFF")
                 self.bpy_data_proxy = None
 
     def use_experimental_sync(self):

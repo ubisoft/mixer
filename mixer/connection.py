@@ -32,7 +32,7 @@ def set_client_attributes():
     )
 
 
-def join_room(room_name: str):
+def join_room(room_name: str, experimental_sync: bool):
     logger.info("join_room")
 
     assert share_data.client.current_room is None
@@ -57,7 +57,7 @@ def join_room(room_name: str):
     prefs = get_mixer_prefs()
     share_data.auto_save_statistics = prefs.auto_save_statistics
     share_data.statistics_directory = prefs.statistics_directory
-    share_data.set_experimental_sync(prefs.experimental_sync)
+    share_data.set_experimental_sync(experimental_sync)
     share_data.pending_test_update = False
 
     # join a room <==> want to track local changes

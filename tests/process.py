@@ -138,17 +138,21 @@ class BlenderServer(BlenderProcess):
         self._path = str(current_dir / "python_server.py")
         self._sock: socket.socket = None
 
-    def start(self, blender_args: List = None, env: Optional[Mapping[str, str]] = None):
+    def start(self, blender_args: List = None, env_override: Optional[Mapping[str, str]] = None):
         args = [f"--port={self._port}"]
         if self._ptvsd_port is not None:
             args.append(f"--ptvsd={self._ptvsd_port}")
         if self._wait_for_debugger:
             args.append("--wait_for_debugger")
 
+        env = os.environ.copy()
+        if env_override is not None:
+            env.update(env_override)
+
         # The testcase will start its own server and control its configuration.
         # If it fails we want to know and not have Blender silently start a misconfigured one
-        env = {} if env is None else env
-        env.update(dict(os.environ, MIXER_NO_START_SERVER="1"))
+        env["MIXER_NO_START_SERVER"] = "1"
+
         super().start(self._path, args, blender_args, env=env)
 
     def connect(self):

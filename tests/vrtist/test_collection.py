@@ -132,8 +132,8 @@ class TestCollection(VRtistTestCase):
         self.new_collection_instance("src", "src_instance_in_dst")
         self.link_object_to_collection("Collection", "src_instance_in_Collection")
         self.link_object_to_collection("dst", "src_instance_in_dst")
-        self._sender.connect_and_join_mixer()
-        self._receiver.connect_and_join_mixer()
+        self._sender.connect_and_join_mixer(experimental=self.experimental_sync)
+        self._receiver.connect_and_join_mixer(experimental=self.experimental_sync)
         self.assert_matches()
 
     def test_rename_collection(self):

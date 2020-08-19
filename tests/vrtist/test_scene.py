@@ -167,8 +167,8 @@ class TestSceneEmptyDoc(VRtistTestCase):
         self.new_collection_instance("src", "instance_1")
         self.link_object_to_scene("Scene", "instance_1")
 
-        self._sender.connect_and_join_mixer()
-        self._receiver.connect_and_join_mixer()
+        self._sender.connect_and_join_mixer(experimental=self.experimental_sync)
+        self._receiver.connect_and_join_mixer(experimental=self.experimental_sync)
         self.end_test()
 
 

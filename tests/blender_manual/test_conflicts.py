@@ -28,7 +28,7 @@ class ThrottledTestCase(BlenderTestCase):
         server_args = ["--latency", str(latency_ms)]
         super().setUp(blenderdescs=blenderdescs, server_args=server_args, join=False)
         for blender in self._blenders:
-            blender.connect_and_join_mixer()
+            blender.connect_and_join_mixer(experimental=self.experimental_sync)
             # if the second join is too early it is rejected with error "room not joinable yet"
             # if the test runs too early if may run before join is complete
             time.sleep(3.0)

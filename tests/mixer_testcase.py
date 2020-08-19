@@ -81,13 +81,6 @@ class MixerTestCase(unittest.TestCase):
             # start all the blenders
             window_width = int(1920 / len(blenderdescs))
 
-            # for tests parametrization
-            env = None
-            if self.experimental_sync:
-                env = {"MIXER_EXPERIMENTAL_SYNC": "1"}
-            else:
-                env = {"MIXER_EXPERIMENTAL_SYNC": "0"}
-
             for i, blenderdesc in enumerate(blenderdescs):
                 window_x = str(i * window_width)
                 args = ["--window-geometry", window_x, "0", "960", "1080"]
@@ -95,9 +88,9 @@ class MixerTestCase(unittest.TestCase):
                     args.append(str(blenderdesc.load_file))
                 blender = BlenderApp(python_port + i, ptvsd_port + i, blenderdesc.wait_for_debugger)
                 blender.set_log_level(self._log_level)
-                blender.setup(args, env=env)
+                blender.setup(args)
                 if join:
-                    blender.connect_and_join_mixer()
+                    blender.connect_and_join_mixer(experimental_sync=self.experimental_sync)
                 self._blenders.append(blender)
         except Exception:
             # mainly shutdown the server
@@ -143,7 +136,9 @@ class MixerTestCase(unittest.TestCase):
         port = server_process.port
 
         # upload the room
-        self._sender.connect_and_join_mixer("mixer_grab_sender", keep_room_open=True)
+        self._sender.connect_and_join_mixer(
+            "mixer_grab_sender", keep_room_open=True, experimental_sync=self.experimental_sync
+        )
         time.sleep(1)
         self._sender.disconnect_mixer()
 
@@ -154,7 +149,9 @@ class MixerTestCase(unittest.TestCase):
         # so sort each substream
         sender_grabber.sort()
 
-        self._receiver.connect_and_join_mixer("mixer_grab_receiver", keep_room_open=True)
+        self._receiver.connect_and_join_mixer(
+                "mixer_grab_receiver", keep_room_open=True, experimental_sync=self.experimental_sync
+        )
         time.sleep(1)
         self._receiver.disconnect_mixer()
         receiver_grabber = Grabber()
@@ -196,7 +193,7 @@ class MixerTestCase(unittest.TestCase):
         for i, blender in enumerate(self._blenders):
             if i > 0:
                 time.sleep(1)
-            blender.connect_and_join_mixer()
+            blender.connect_and_join_mixer(experimental=self.experimental_sync)
 
     def disconnect(self):
         for blender in self._blenders:
