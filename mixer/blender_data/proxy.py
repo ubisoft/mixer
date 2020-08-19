@@ -401,12 +401,33 @@ class BpyIDProxy(BpyStructProxy):
         self._data["name_full"] = new_name
 
     def __str__(self) -> str:
-        return f"BpyIDProxy for bpy.data.{self.collection_name}[{self.data('name')}] {self.mixer_uuid}"
+        return f"BpyIDProxy {self.mixer_uuid()} for bpy.data.{self.collection_name}[{self.data('name')}]"
 
-    def load(self, bl_instance: T.ID, visit_state: VisitState, bpy_data_collection_name: str = None):
+    def update_from_datablock(self, bl_instance: T.ID, visit_state: VisitState):
+        self.load(bl_instance, visit_state, is_embedded_data=False, bpy_data_collection_name=None)
+
+    def load(
+        self,
+        bl_instance: T.ID,
+        visit_state: VisitState,
+        is_embedded_data: bool = False,
+        bpy_data_collection_name: str = None,
+    ):
         """
         """
+        if is_embedded_data and bpy_data_collection_name is not None:
+            logger.error(
+                f"BpyIDProxy.load() for {bl_instance} : is_embedded_data is True and bpy_prop_collection is {bpy_data_collection_name}. Item ignored"
+            )
+            return
 
+        if is_embedded_data:
+            self._bpy_data_collection = None
+
+        if bpy_data_collection_name is not None:
+            self._bpy_data_collection = bpy_data_collection_name
+
+        self._class_name = bl_instance.__class__.__name__
         self._data.clear()
         properties = visit_state.context.properties(bl_instance)
         # this assumes that specifics.py apply only to ID, not Struct
@@ -418,8 +439,6 @@ class BpyIDProxy(BpyStructProxy):
             self._data[name] = attr_value
 
         specifics.post_save_id(self, bl_instance)
-        self._class_name = bl_instance.__class__.__name__
-        self._bpy_data_collection = bpy_data_collection_name
 
         uuid = bl_instance.get("mixer_uuid")
         if uuid:
@@ -448,17 +467,17 @@ class BpyIDProxy(BpyStructProxy):
     def collection(self) -> T.bpy_prop_collection:
         return getattr(bpy.data, self.collection_name)
 
-    def target(self, bl_instance: any, attr_name: str):
-        if isinstance(bl_instance, bpy.types.bpy_prop_collection):
-            # TODO : slow: use BlendData
-            t = bl_instance.get(attr_name)
-            if t is None:
+    def target(self, bl_instance: any, attr_name: str) -> T.ID:
+        if self.collection_name is not None:
+            # is_embedded_data is False
+            datablock = bl_instance.get(attr_name)
+            if datablock is None:
                 logger.warning(
                     f"BpyIDProxy: key '{attr_name}'' not found in bpy_prop_collection {bl_instance}. Valid keys are ... {bl_instance.keys()}"
                 )
         else:
-            t = getattr(bl_instance, attr_name)
-        return t
+            datablock = getattr(bl_instance, attr_name)
+        return datablock
 
     def save(self, bl_instance: any = None, attr_name: str = None) -> T.ID:
         """
@@ -467,31 +486,26 @@ class BpyIDProxy(BpyStructProxy):
         - an embedded ID
         """
         collection_name = self.collection_name
-        if collection_name is None:
-            # TODO ID inside ID, not BlendData collection. We will need a path
-            # do it on save
-            logger.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} has empty blenddata path: ignore")
-            return None
+        if collection_name is not None:
+            # a standalone datablock in a bpy.data collection
+            if bl_instance is None:
+                bl_instance = self.collection
+            if attr_name is None:
+                attr_name = self.data("name")
+            id_ = bl_instance.get(attr_name)
 
-        if bl_instance is None:
-            bl_instance = self.collection
-        if attr_name is None:
-            attr_name = self.data("name_full")
-
-        # 2 cases
-        # - ID in blenddata collection
-        # - ID in ID
-        # TODO slow use BlendData
-        id_ = bl_instance.get(attr_name)
-        if id_ is None:
-            id_ = specifics.bpy_data_ctor(collection_name, self)
             if id_ is None:
-                logger.warning(f"Cannot create bpy.data.{collection_name}[{attr_name}]")
-                return None
-            if DEBUG:
-                if bl_instance.get(attr_name) != id_:
-                    logger.warning(f"Name mismatch after creation of bpy.data.{collection_name}[{attr_name}] ")
-            id_.mixer_uuid = self.mixer_uuid()
+                id_ = specifics.bpy_data_ctor(collection_name, self)
+                if id_ is None:
+                    logger.warning(f"Cannot create bpy.data.{collection_name}[{attr_name}]")
+                    return None
+                if DEBUG:
+                    if bl_instance.get(attr_name) != id_:
+                        logger.warning(f"Name mismatch after creation of bpy.data.{collection_name}[{attr_name}] ")
+                id_.mixer_uuid = self.mixer_uuid()
+        else:
+            # an is_embedded_data datablock. pre_save id will retrieve it by calling target
+            pass
 
         target = specifics.pre_save_id(self, bl_instance, attr_name)
         if target is None:
@@ -501,10 +515,9 @@ class BpyIDProxy(BpyStructProxy):
         for k, v in self._data.items():
             write_attribute(target, k, v)
 
-        # TODO why not target ?
-        return id_
+        return target
 
-    def update(self, other: BpyIDProxy):
+    def update_from_proxy(self, other: BpyIDProxy):
         # Currently, we receive the full list of attributes, so replace everything.
         # Do not keep existing attribute as they may not be applicable any more to the new object. For instance
         # if a light has been morphed from POINT to SUN, the 'falloff_curve' attribute no more exists
@@ -975,7 +988,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 # if collection_name == "objects" and isinstance(item.data, T.Mesh):
                 #     continue
                 # # /HACK
-                self._data[name] = BpyIDProxy().load(item, visit_state, collection_name)
+                self._data[name] = BpyIDProxy().load(item, visit_state, bpy_data_collection_name=collection_name)
 
         return self
 
@@ -1049,7 +1062,7 @@ class BpyPropDataCollectionProxy(Proxy):
 
         # Do not replace the existing proxy by the new one as it wil no more work with
         # differential updates
-        proxy.update(incoming_proxy)
+        proxy.update_from_proxy(incoming_proxy)
 
         # the ID will have changed if the object has been morphed (change light type, for instance)
         existing_id = visit_state.ids.get(uuid)
@@ -1119,7 +1132,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 uuid = ensure_uuid(id_)
                 visit_state.root_ids.add(id_)
                 visit_state.ids[uuid] = id_
-                proxy = BpyIDProxy().load(id_, visit_state, collection_name)
+                proxy = BpyIDProxy().load(id_, visit_state, bpy_data_collection_name=collection_name)
                 visit_state.id_proxies[uuid] = proxy
                 self._data[name] = proxy
                 changeset.creations.append(proxy)
@@ -1180,6 +1193,8 @@ class BpyBlendProxy(Proxy):
 
         Call this before updading the proxy from send_scene_content. It is not needed on the
         receiver side.
+
+        TODO check is this is actually required or if we can rely upon is_embedded_data being False
         """
         # Normal operation no more involve BpyBlendProxy.load() ad initial synchronization behaves
         # like a creation. The current load_as_what() implementation relies on root_ids to determine if
@@ -1274,30 +1289,38 @@ class BpyBlendProxy(Proxy):
                 # However, it is not obvious to detect the safe cases and remove the message in such cases
                 logger.info("BpyBlendProxy.update(): Ignoring %s (no proxy)", id_)
                 continue
-            proxy.load(id_, visit_state)
+            proxy.update_from_datablock(id_, visit_state)
             changeset.updates.append(proxy)
 
         return changeset
 
-    def create_datablock(self, proxy: BpyIDProxy, context: Context = safe_context) -> T.ID:
+    def create_datablock(self, proxy: BpyIDProxy, context: Context = safe_context) -> Optional[T.ID]:
         """
         Create bpy.data collection item and update the proxy accordingly
 
         Receiver side
         """
-        visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
-        id_ = self._data[proxy.collection_name].create_datablock(proxy, visit_state)
-        return id_
+        bpy_data_collection_proxy = self._data.get(proxy.collection_name)
+        if bpy_data_collection_proxy is None:
+            logger.warning(f"create_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
+            return None
 
-    def update_datablock(self, proxy: BpyIDProxy, context: Context = safe_context) -> T.ID:
+        visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
+        return bpy_data_collection_proxy.create_datablock(proxy, visit_state)
+
+    def update_datablock(self, proxy: BpyIDProxy, context: Context = safe_context) -> Optional[T.ID]:
         """
         Update a bpy.data collection item and update the proxy accordingly
 
         Receiver side
         """
+        bpy_data_collection_proxy = self._data.get(proxy.collection_name)
+        if bpy_data_collection_proxy is None:
+            logger.warning(f"update_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
+            return None
+
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
-        id_ = self._data[proxy.collection_name].update_datablock(proxy, visit_state)
-        return id_
+        return bpy_data_collection_proxy.update_datablock(proxy, visit_state)
 
     def remove_datablock(self, uuid: str):
         """
@@ -1308,7 +1331,13 @@ class BpyBlendProxy(Proxy):
         proxy = self.id_proxies.get(uuid)
         if proxy is None:
             logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
-        self._data[proxy.collection_name].remove_datablock(proxy)
+
+        bpy_data_collection_proxy = self._data.get(proxy.collection_name)
+        if bpy_data_collection_proxy is None:
+            logger.warning(f"remove_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
+            return None
+
+        bpy_data_collection_proxy.remove_datablock(proxy)
         id_ = self.ids[uuid]
         self.root_ids.remove(id_)
         del self.id_proxies[uuid]
@@ -1323,8 +1352,14 @@ class BpyBlendProxy(Proxy):
         proxy = self.id_proxies.get(uuid)
         if proxy is None:
             logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
+
+        bpy_data_collection_proxy = self._data.get(proxy.collection_name)
+        if bpy_data_collection_proxy is None:
+            logger.warning(f"rename_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
+            return
+
         datablock = self.ids[uuid]
-        self._data[proxy.collection_name].rename_datablock(proxy, new_name, datablock)
+        bpy_data_collection_proxy.rename_datablock(proxy, new_name, datablock)
 
     def clear(self):
         self._data.clear()
