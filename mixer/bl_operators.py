@@ -12,7 +12,7 @@ import bpy
 from mixer.share_data import share_data
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.stats import save_statistics
-from mixer.broadcaster.common import RoomAttributes
+from mixer.broadcaster.common import RoomAttributes, ClientAttributes
 from mixer.connection import is_client_connected, connect, join_room, leave_current_room, disconnect
 
 logger = logging.getLogger(__name__)
@@ -304,6 +304,11 @@ class LaunchVRtistOperator(bpy.types.Operator):
                 return {"CANCELLED"}
             join_room(mixer_prefs.room)
 
+        color = share_data.client.clients_attributes[share_data.client.client_id].get(
+            ClientAttributes.USERCOLOR, (0.0, 0.0, 0.0)
+        )
+        color = (int(c * 255) for c in color)
+        color = '#' + ''.join(f'{c:02x}' for c in color)
         args = [
             mixer_prefs.VRtist,
             "--room",
@@ -314,7 +319,14 @@ class LaunchVRtistOperator(bpy.types.Operator):
             str(mixer_prefs.port),
             "--master",
             str(share_data.client.client_id),
+            "--username",
+            "VR " + share_data.client.clients_attributes[share_data.client.client_id].get(
+                ClientAttributes.USERNAME
+            ),
+            "--usercolor",
+            color
         ]
+        print(args)
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
         return {"FINISHED"}
 
