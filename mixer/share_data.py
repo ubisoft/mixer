@@ -384,19 +384,19 @@ class ShareData:
         if self.use_experimental_sync():
             # default, not safe
             # the initialisation must initialize reference target for all useful collections (except screens, ...)
-            self.bpy_data_proxy.initialize_ref_targets(test_context)
+            self.proxy.initialize_ref_targets(test_context)
 
     def set_experimental_sync(self, experimental_sync: bool):
         if experimental_sync:
             logger.warning("Experimental sync in ON")
-            self.bpy_data_proxy = BpyBlendProxy()
+            self.proxy = BpyBlendProxy()
         else:
-            if self.bpy_data_proxy:
+            if self.proxy:
                 logger.warning("Experimental sync in OFF")
-                self.bpy_data_proxy = None
+                self.proxy = None
 
     def use_experimental_sync(self):
-        return self.bpy_data_proxy is not None
+        return self.proxy is not None
 
 
 share_data = ShareData()  # Instance storing addon state, is used by most of the sub-modules.

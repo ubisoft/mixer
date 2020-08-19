@@ -771,18 +771,18 @@ def send_scene_data_to_server(scene, dummy):
             # Compute the difference between the proxy state and the Blender state
             # It is a coarse difference at the ID level(created, removed, renamed)
             diff = BpyBlendDiff()
-            diff.diff(share_data.bpy_data_proxy, safe_context)
+            diff.diff(share_data.proxy, safe_context)
 
             # Ask the proxy to compute the list of elements to synchronize and update itself
             depsgraph = bpy.context.evaluated_depsgraph_get()
-            changeset = share_data.bpy_data_proxy.update(diff, safe_context, depsgraph.updates)
+            changeset = share_data.proxy.update(diff, safe_context, depsgraph.updates)
 
             # Send the data update messages (includes serialization)
             data_api.send_data_creations(changeset.creations)
             data_api.send_data_removals(changeset.removals)
             data_api.send_data_renames(changeset.renames)
             data_api.send_data_updates(changeset.updates)
-            share_data.bpy_data_proxy.debug_check_id_proxies()
+            share_data.proxy.debug_check_id_proxies()
 
         # send the VRtist transforms after full Blender protocol has the opportunity to create the object data
         # that is not handled by VRtist protocol, otherwise the receiver creates an empty when it receives a transform
