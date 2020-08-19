@@ -22,7 +22,6 @@ class TestCollection(VRtistTestCase):
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
         blenderdescs = [sender, receiver]
-        self.set_log_level(logging.DEBUG)
         super().setUp(blenderdescs=blenderdescs)
 
     def test_create_collection_in_collection(self):

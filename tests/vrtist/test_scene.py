@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import unittest
 
@@ -21,6 +22,7 @@ class TestSceneEmptyDoc(VRtistTestCase):
         sender_blendfile = folder / "empty.blend"
         receiver_blendfile = folder / "empty.blend"
         blenderdescs = [BlenderDesc(load_file=sender_blendfile), BlenderDesc(load_file=receiver_blendfile)]
+        self._log_level = logging.INFO
         super().setUp(blenderdescs=blenderdescs)
 
     def test_create_scene(self):

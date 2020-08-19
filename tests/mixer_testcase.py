@@ -35,7 +35,7 @@ class MixerTestCase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         self.expected_counts = {}
         super().__init__(*args, **kwargs)
-        self._log_level = None
+        self._log_level = logging.INFO
         self._server_process: ServerProcess = ServerProcess()
         self._blenders: List[BlenderApp] = []
 

@@ -8,7 +8,6 @@ So far, the tests cannot really be automated on CI/CD since they require lengthy
 untill all the messages are flished and processed at the end before grabbing
 the messages from all Blender
 """
-import logging
 from pathlib import Path
 import unittest
 import time
@@ -27,7 +26,6 @@ class ThrottledTestCase(BlenderTestCase):
 
         latency_ms = 1000
         server_args = ["--latency", str(latency_ms)]
-        self.set_log_level(logging.DEBUG)
         super().setUp(blenderdescs=blenderdescs, server_args=server_args, join=False)
         for blender in self._blenders:
             blender.connect_and_join_mixer()
