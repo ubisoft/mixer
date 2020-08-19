@@ -84,7 +84,7 @@ def _build_data_update_or_create(buffer, display_name: str, func: Callable[[BpyB
 
     logger.info("%s: %s", display_name, id_proxy)
     try:
-        func(share_data.proxy, id_proxy)
+        func(share_data.bpy_data_proxy, id_proxy)
     except Exception:
         log_exception(f"processing of buffer for {id_proxy}")
 
@@ -118,7 +118,7 @@ def build_data_remove(buffer):
     uuid, index = common.decode_string(buffer, 0)
     debug_info, index = common.decode_string(buffer, index)
     logger.info("build_data_remove: %s (%s)", uuid, debug_info)
-    share_data.proxy.remove_datablock(uuid)
+    share_data.bpy_data_proxy.remove_datablock(uuid)
 
     # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
     share_data.set_dirty()
@@ -143,7 +143,7 @@ def build_data_rename(buffer):
     new_name, index = common.decode_string(buffer, index)
     debug_info, index = common.decode_string(buffer, index)
     logger.info("build_data_rename: %s (%s) into %s", uuid, debug_info, new_name)
-    share_data.proxy.rename_datablock(uuid, new_name)
+    share_data.bpy_data_proxy.rename_datablock(uuid, new_name)
 
     # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
     share_data.set_dirty()
