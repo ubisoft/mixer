@@ -51,15 +51,19 @@ class Grabber:
                             continue
                         # Ignore command serial Id, that may not match
                         command.id = 0
+                        if command.type == MessageType.SEND_ERROR:
+                            message = decode_string(command.data)
+                            raise RuntimeError(f"Received error message {message}")
                         self.streams.data[command.type].append(command.data)
+
             except ClientDisconnectedException:
-                print("Grabber: disconnected before received command stream.", file=sys.stderr)
+                raise RuntimeError("Grabber: disconnected before received command stream.")
 
             client.send_command(Command(MessageType.SET_ROOM_KEEP_OPEN, encode_string(room_name) + encode_bool(False)))
             client.send_command(Command(MessageType.LEAVE_ROOM, room_name.encode("utf8")))
 
             if not client.wait(MessageType.LEAVE_ROOM):
-                print("Grabber: disconnected before receiving LEAVE_ROOM.", file=sys.stderr)
+                raise RuntimeError("Grabber: disconnected before receiving LEAVE_ROOM.")
 
     def sort(self):
         self.streams.sort()
