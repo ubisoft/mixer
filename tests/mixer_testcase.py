@@ -70,36 +70,45 @@ class MixerTestCase(unittest.TestCase):
         Not recommended) as it is machine dependent
         """
         super().setUp()
-        python_port = 8081
-        # do not the the default ptvsd port as it will be in use when debugging the TestCase
-        ptvsd_port = 5688
+        try:
+            python_port = 8081
+            # do not the the default ptvsd port as it will be in use when debugging the TestCase
+            ptvsd_port = 5688
 
-        # start a broadcaster server
-        self._server_process.start(server_args=server_args)
+            # start a broadcaster server
+            self._server_process.start(server_args=server_args)
 
-        # start all the blenders
-        window_width = int(1920 / len(blenderdescs))
+            # start all the blenders
+            window_width = int(1920 / len(blenderdescs))
 
-        # for tests parametrization
-        env = None
-        if self.experimental_sync:
-            env = {"MIXER_EXPERIMENTAL_SYNC": "1"}
-        else:
-            env = {"MIXER_EXPERIMENTAL_SYNC": "0"}
+            # for tests parametrization
+            env = None
+            if self.experimental_sync:
+                env = {"MIXER_EXPERIMENTAL_SYNC": "1"}
+            else:
+                env = {"MIXER_EXPERIMENTAL_SYNC": "0"}
 
-        for i, blenderdesc in enumerate(blenderdescs):
-            window_x = str(i * window_width)
-            args = ["--window-geometry", window_x, "0", "960", "1080"]
-            if blenderdesc.load_file is not None:
-                args.append(str(blenderdesc.load_file))
-            blender = BlenderApp(python_port + i, ptvsd_port + i, blenderdesc.wait_for_debugger)
-            blender.set_log_level(self._log_level)
-            blender.setup(args, env=env)
-            if join:
-                blender.connect_and_join_mixer()
-            self._blenders.append(blender)
+            for i, blenderdesc in enumerate(blenderdescs):
+                window_x = str(i * window_width)
+                args = ["--window-geometry", window_x, "0", "960", "1080"]
+                if blenderdesc.load_file is not None:
+                    args.append(str(blenderdesc.load_file))
+                blender = BlenderApp(python_port + i, ptvsd_port + i, blenderdesc.wait_for_debugger)
+                blender.set_log_level(self._log_level)
+                blender.setup(args, env=env)
+                if join:
+                    blender.connect_and_join_mixer()
+                self._blenders.append(blender)
+        except Exception:
+            # mainly shutdown the server
+            self.shutdown()
+            raise
 
     def tearDown(self):
+        self.shutdown()
+        super().tearDown()
+
+    def shutdown(self):
         # quit and wait
         for blender in self._blenders:
             blender.quit()
