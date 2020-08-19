@@ -635,13 +635,11 @@ def send_animated_camera_data():
     for update in depsgraph.updates:
         obj = update.id.original
         typename = obj.bl_rna.name
-        camera_action_name = ""
         if typename == "Object":
-            if obj.data and obj.data.bl_rna.name == "Camera" and obj.animation_data is not None:
-                camera_action_name = obj.animation_data.action.name_full
-                camera_dict[camera_action_name] = obj
-        if typename == "Action" and camera_dict.get(camera_action_name):
-            animated_camera_set.add(camera_dict[camera_action_name])
+            if obj.data and obj.data.bl_rna.name == "Camera" and obj.data.animation_data is not None:
+                camera_dict[obj.data.animation_data.action.name_full] = obj
+        if typename == "Action" and camera_dict.get(obj.name_full):
+            animated_camera_set.add(camera_dict[obj.name_full])
 
     for camera in animated_camera_set:
         share_data.client.send_camera_attributes(camera)
