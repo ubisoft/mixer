@@ -131,34 +131,35 @@ class MixerTestCase(unittest.TestCase):
         # start a broadcaster server to grab the room
         server_process = ServerProcess()
         server_process.start()
+        try:
+            host = server_process.host
+            port = server_process.port
 
-        host = server_process.host
-        port = server_process.port
+            # upload the room
+            self._sender.connect_and_join_mixer(
+                "mixer_grab_sender", keep_room_open=True, experimental_sync=self.experimental_sync
+            )
+            time.sleep(1)
+            self._sender.disconnect_mixer()
 
-        # upload the room
-        self._sender.connect_and_join_mixer(
-            "mixer_grab_sender", keep_room_open=True, experimental_sync=self.experimental_sync
-        )
-        time.sleep(1)
-        self._sender.disconnect_mixer()
+            # download the room
+            sender_grabber = Grabber()
+            sender_grabber.grab(host, port, "mixer_grab_sender")
+            # HACK messages are not delivered in the same order on the receiver and the sender
+            # so sort each substream
+            sender_grabber.sort()
 
-        # download the room
-        sender_grabber = Grabber()
-        sender_grabber.grab(host, port, "mixer_grab_sender")
-        # HACK messages are not delivered in the same order on the receiver and the sender
-        # so sort each substream
-        sender_grabber.sort()
-
-        self._receiver.connect_and_join_mixer(
+            self._receiver.connect_and_join_mixer(
                 "mixer_grab_receiver", keep_room_open=True, experimental_sync=self.experimental_sync
-        )
-        time.sleep(1)
-        self._receiver.disconnect_mixer()
-        receiver_grabber = Grabber()
-        receiver_grabber.grab(host, port, "mixer_grab_receiver")
-        receiver_grabber.sort()
+            )
+            time.sleep(1)
+            self._receiver.disconnect_mixer()
+            receiver_grabber = Grabber()
+            receiver_grabber.grab(host, port, "mixer_grab_receiver")
+            receiver_grabber.sort()
 
-        server_process.kill()
+        finally:
+            server_process.kill()
 
         # TODO_ timing error : sometimes succeeds
         # TODO_ enhance comparison : check # elements, understandable comparison
