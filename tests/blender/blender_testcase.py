@@ -22,6 +22,9 @@ class BlenderTestCase(MixerTestCase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # in case @parameterized_class is missing
+        if not hasattr(self, "experimental_sync"):
+            self.experimental_sync = True
 
     def setUp(self, *args, **kwargs):
         # Same variable as set by parameterized vrtist tests

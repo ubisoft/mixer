@@ -23,6 +23,9 @@ class VRtistTestCase(MixerTestCase):
     """
 
     def __init__(self, *args, **kwargs):
+        # in case @parameterized_class is missing
+        if not hasattr(self, "experimental_sync"):
+            self.experimental_sync = False
         super().__init__(*args, **kwargs)
 
     def assert_stream_equals(self, a_stream: CommandStream, b_stream: CommandStream, msg: str = None):
