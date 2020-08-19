@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import IntEnum
 import logging
+import traceback
 from typing import Any, List, Mapping, Optional, Set, Tuple, TypeVar, Union
 from uuid import uuid4
 
@@ -21,7 +22,6 @@ from mixer.blender_data.blenddata import (
     bl_rna_to_type,
 )
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix, is_pointer_to
-from mixer.log_utils import log_traceback
 
 DEBUG = True
 
@@ -1125,7 +1125,8 @@ class BpyPropDataCollectionProxy(Proxy):
                 changeset.creations.append(proxy)
             except Exception:
                 logger.error(f"Exception during update/added for {collection_name}[{name}]:")
-                log_traceback(logger.error)
+                for line in traceback.format_exc().splitlines():
+                    logger.error(line)
 
         for proxy in diff.items_removed:
             try:
@@ -1139,7 +1140,8 @@ class BpyPropDataCollectionProxy(Proxy):
                 del visit_state.ids[uuid]
             except Exception:
                 logger.error(f"Exception during update/removed for proxy {proxy})  :")
-                log_traceback(logger.error)
+                for line in traceback.format_exc().splitlines():
+                    logger.error(line)
 
         for proxy, old_name in diff.items_renamed:
             new_name = proxy.data("name")

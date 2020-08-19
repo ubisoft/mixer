@@ -6,6 +6,7 @@ mechanism.
 """
 
 import logging
+import traceback
 from typing import Callable, Union
 
 from mixer.blender_data.json_codec import Codec
@@ -18,7 +19,6 @@ from mixer.blender_data.proxy import (
     RenameChangeset,
 )
 from mixer.broadcaster import common
-from mixer.log_utils import log_traceback
 from mixer.share_data import share_data
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,8 @@ def _send_data_create_or_update(
             encoded_proxy = codec.encode(proxy)
         except Exception:
             logger.error(f"{display_name}: encode exception for {proxy}")
-            log_traceback(logger.error)
+            for line in traceback.format_exc().splitlines():
+                logger.error(line)
             continue
 
         # For BpyIdProxy, the target is encoded in the proxy._blenddata_path
@@ -62,7 +63,8 @@ def _build_data_update_or_create(buffer, display_name: str, func: Callable[[BpyB
 
     def log_exception(when: str):
         logger.error(f"Exception during {display_name}, decode")
-        log_traceback(logger.error)
+        for line in traceback.format_exc().splitlines():
+            logger.error(line)
         logger.error(f"During {when}")
         logger.error(buffer[0:200])
         logger.error("...")
