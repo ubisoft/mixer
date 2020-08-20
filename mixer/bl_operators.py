@@ -294,12 +294,17 @@ class LaunchVRtistOperator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return os.path.isfile(get_mixer_prefs().VRtist)
+        return (
+            os.path.isfile(get_mixer_prefs().VRtist)
+            and is_client_connected()
+            and share_data.client.current_room is not None
+            and share_data.client.client_id is not None
+        )
 
     def execute(self, context):
         bpy.data.window_managers["WinMan"].mixer.send_base_meshes = False
         mixer_prefs = get_mixer_prefs()
-        if not share_data.client.current_room:
+        if not share_data.client or not share_data.client.current_room:
             if not connect():
                 return {"CANCELLED"}
             join_room(mixer_prefs.room)
@@ -309,6 +314,10 @@ class LaunchVRtistOperator(bpy.types.Operator):
         )
         color = (int(c * 255) for c in color)
         color = "#" + "".join(f"{c:02x}" for c in color)
+        name = "VR " + share_data.client.clients_attributes[share_data.client.client_id].get(
+            ClientAttributes.USERNAME, "client"
+        )
+
         args = [
             mixer_prefs.VRtist,
             "--room",
@@ -319,12 +328,11 @@ class LaunchVRtistOperator(bpy.types.Operator):
             str(mixer_prefs.port),
             "--master",
             str(share_data.client.client_id),
-            "--username",
-            "VR " + share_data.client.clients_attributes[share_data.client.client_id].get(ClientAttributes.USERNAME),
             "--usercolor",
             color,
+            "--username",
+            name,
         ]
-        print(args)
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
         return {"FINISHED"}
 
