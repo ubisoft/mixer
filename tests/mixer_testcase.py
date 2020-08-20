@@ -135,27 +135,36 @@ class MixerTestCase(unittest.TestCase):
             host = server_process.host
             port = server_process.port
 
-            # upload the room
+            # sender upload the room
             self._sender.connect_and_join_mixer(
                 "mixer_grab_sender", keep_room_open=True, experimental_sync=self.experimental_sync
             )
             time.sleep(1)
             self._sender.disconnect_mixer()
 
-            # download the room
+            # download the room from sender
             sender_grabber = Grabber()
-            sender_grabber.grab(host, port, "mixer_grab_sender")
+            try:
+                sender_grabber.grab(host, port, "mixer_grab_sender")
+            except RuntimeError as e:
+                raise self.failureException(*e.args)
             # HACK messages are not delivered in the same order on the receiver and the sender
             # so sort each substream
             sender_grabber.sort()
 
+            # receiver upload the room
             self._receiver.connect_and_join_mixer(
                 "mixer_grab_receiver", keep_room_open=True, experimental_sync=self.experimental_sync
             )
             time.sleep(1)
             self._receiver.disconnect_mixer()
+
+            # download the room from receiver
             receiver_grabber = Grabber()
-            receiver_grabber.grab(host, port, "mixer_grab_receiver")
+            try:
+                receiver_grabber.grab(host, port, "mixer_grab_receiver")
+            except RuntimeError as e:
+                raise self.failureException(*e.args)
             receiver_grabber.sort()
 
         finally:
