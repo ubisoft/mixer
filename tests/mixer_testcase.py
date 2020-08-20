@@ -1,13 +1,16 @@
 from dataclasses import dataclass
+import json
 import logging
 import sys
 import time
-from typing import Iterable, List, Optional
+from typing import Any, Iterable, List, Optional
 import unittest
 
 from tests.blender_app import BlenderApp
-from tests.grabber import Grabber
+from tests.grabber import Grabber, CommandStream
 from tests.process import ServerProcess
+
+from mixer.broadcaster.common import MessageType
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -148,9 +151,6 @@ class MixerTestCase(unittest.TestCase):
                 sender_grabber.grab(host, port, "mixer_grab_sender")
             except RuntimeError as e:
                 raise self.failureException(*e.args)
-            # HACK messages are not delivered in the same order on the receiver and the sender
-            # so sort each substream
-            sender_grabber.sort()
 
             # receiver upload the room
             self._receiver.connect_and_join_mixer(
@@ -165,7 +165,6 @@ class MixerTestCase(unittest.TestCase):
                 receiver_grabber.grab(host, port, "mixer_grab_receiver")
             except RuntimeError as e:
                 raise self.failureException(*e.args)
-            receiver_grabber.sort()
 
         finally:
             server_process.kill()
@@ -175,6 +174,92 @@ class MixerTestCase(unittest.TestCase):
         s = sender_grabber.streams
         r = receiver_grabber.streams
         self.assert_stream_equals(s, r)
+
+    def assert_any_almost_equal(self, a: Any, b: Any, msg: str = None):
+
+        # Use Assertion error.
+        # The all but last args in the resulting exception is the path into the structure to the faulting element
+        # Not that obvious to do something smarter to have a nicer display :
+        # https://stackoverflow.com/questions/1319615/proper-way-to-declare-custom-exceptions-in-modern-python
+
+        type_a = type(a)
+        type_b = type(b)
+        self.assertEqual(type_a, type_b, msg=msg)
+
+        if isinstance(a, float):
+            self.assertAlmostEqual(a, b, places=5, msg=msg)
+        elif isinstance(a, (bool, int, str, bytes)):
+            self.assertEqual(a, b, msg=msg)
+        elif isinstance(a, (list, tuple)):
+            for i, (item_a, item_b) in enumerate(zip(a, b)):
+                try:
+                    self.assert_any_almost_equal(item_a, item_b, msg=msg)
+                except AssertionError as e:
+                    raise AssertionError(i, *e.args) from None
+        else:
+            if isinstance(a, dict):
+                dict_a, dict_b = a, b
+            else:
+                dict_a, dict_b = vars(a), vars(b)
+
+            keys_a, keys_b = sorted(dict_a.keys()), sorted(dict_b.keys())
+            self.assertListEqual(keys_a, keys_b, msg=msg)
+            for k in keys_a:
+                try:
+                    self.assert_any_almost_equal(dict_a[k], dict_b[k], msg=msg)
+                except AssertionError as e:
+                    raise AssertionError(k, *e.args) from None
+
+    def assert_stream_equals(self, streams_a: CommandStream, streams_b: CommandStream, msg: str = None):
+        self.assertEqual(streams_a.commands.keys(), streams_b.commands.keys())
+
+        for k in streams_a.commands.keys():
+            commands_a, commands_b = streams_a.commands[k], streams_b.commands[k]
+            message_type = str(MessageType(k))
+            len_a, len_b = len(commands_a), len(commands_b)
+            self.assertEqual(len_a, len_b, f"command stream length mismatch for {message_type}: {len_a} and {len_b}")
+
+            if len_a != 0:
+                logger.info(f"Message count for {message_type:16} : {len_a}")
+            expected_count = self.expected_counts.get(k)
+            if expected_count is not None:
+                self.assertEqual(
+                    expected_count,
+                    len_a,
+                    f"Unexpected message count for message {message_type}. Expected {expected_count}: found {len_a}",
+                )
+
+            def decode(c):
+                return None
+
+            decoded_stream_a = [(decode(c), c) for c in commands_a]
+            decoded_stream_b = [(decode(c), c) for c in commands_b]
+
+            # sort
+            def key(a):
+                return a[1].data
+
+            decoded_stream_a.sort(key=key)
+            decoded_stream_b.sort(key=key)
+
+            for i, ((decoded_a, encoded_a), (decoded_b, encoded_b)) in enumerate(
+                zip(decoded_stream_a, decoded_stream_b)
+            ):
+                self.assertIs(type(decoded_a), type(decoded_b))
+                if decoded_a is None:
+                    # no decoder, compare the buffers, will have problems will float comparisons
+                    self.assert_any_almost_equal(
+                        encoded_a, encoded_b, f"content mismatch for {message_type} at index {i}"
+                    )
+                else:
+                    proxy_string_a = getattr(decoded_a, "proxy_string", None)
+                    proxy_string_b = getattr(decoded_b, "proxy_string", None)
+                    if proxy_string_a is not None and proxy_string_b is not None:
+                        decoded_a.proxy_string = json.loads(proxy_string_a)
+                        decoded_b.proxy_string = json.loads(proxy_string_b)
+                    self.assert_any_almost_equal(
+                        decoded_a, decoded_b, f"content mismatch for {message_type} at index {i}"
+                    )
 
     def assert_user_success(self):
         """

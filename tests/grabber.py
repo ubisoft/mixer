@@ -13,13 +13,7 @@ class CommandStream:
     """
 
     def __init__(self):
-        self.data: Mapping[int, List[Command]] = {m: [] for m in MessageType if m > MessageType.COMMAND}
-
-    def sort(self):
-        # For each command type, the comand ordering is not significant for deciding the test success
-        # and the order may be different for the server and the receiver
-        for commands in self.data.values():
-            commands.sort()
+        self.commands: Mapping[int, List[Command]] = {m: [] for m in MessageType if m > MessageType.COMMAND}
 
 
 class Grabber:
@@ -53,7 +47,7 @@ class Grabber:
                         if command.type == MessageType.SEND_ERROR:
                             message = decode_string(command.data)
                             raise RuntimeError(f"Received error message {message}")
-                        self.streams.data[command.type].append(command.data)
+                        self.streams.commands[command.type].append(command)
 
             except ClientDisconnectedException:
                 raise RuntimeError("Grabber: disconnected before received command stream.")
@@ -64,5 +58,3 @@ class Grabber:
             if not client.wait(MessageType.LEAVE_ROOM):
                 raise RuntimeError("Grabber: disconnected before receiving LEAVE_ROOM.")
 
-    def sort(self):
-        self.streams.sort()

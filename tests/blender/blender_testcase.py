@@ -1,13 +1,10 @@
 """
 Test case for the Full Blender protocol
 """
-import json
 import logging
 from pathlib import Path
 import sys
 
-from mixer.broadcaster.common import MessageType, decode_string
-from tests.grabber import CommandStream
 from tests.mixer_testcase import BlenderDesc, MixerTestCase
 
 
@@ -64,35 +61,6 @@ class BlenderTestCase(MixerTestCase):
                 item = _k
             message = f"{e.args[0]} '{item}'"
             raise exc_class(message) from None
-
-    def assert_stream_equals(self, a_stream: CommandStream, b_stream: CommandStream, msg: str = None):
-        a, b = a_stream.data, b_stream.data
-        self.assertEqual(a.keys(), b.keys())
-
-        keep = [
-            MessageType.BLENDER_DATA_REMOVE,
-            MessageType.BLENDER_DATA_RENAME,
-            MessageType.BLENDER_DATA_UPDATE,
-        ]
-        for k in a.keys():
-            if k not in keep:
-                continue
-            message_type = str(MessageType(k))
-            message_count = len(a[k])
-            # self.assertEqual(message_count, len(b[k]), f"len mismatch for {message_type}")
-            if message_count != 0:
-                logger.info(f"Message count for {message_type:16} : {message_count}")
-            expected_count = self.expected_counts.get(k)
-            if expected_count is not None:
-                self.assertEqual(
-                    expected_count,
-                    message_count,
-                    f"Unexpected message count for message {message_type}. Expected {expected_count}: found {message_count}",
-                )
-            for i, buffers in enumerate(zip(a[k], b[k])):
-                strings = [decode_string(buffer, 0)[0] for buffer in buffers]
-                dicts = [json.loads(string) for string in strings]
-                self.assertDictAlmostEqual(*dicts, f"content mismatch for {message_type} {i}")
 
 
 class TestGeneric(BlenderTestCase):
