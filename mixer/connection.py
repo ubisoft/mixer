@@ -16,7 +16,7 @@ from pathlib import Path
 from mixer.stats import save_statistics, get_stats_filename
 from mixer.blender_data.blenddata import BlendData
 from mixer.draw_handlers import remove_draw_handlers
-from mixer.blender_client import SendSceneContentFailed, BlenderClient
+from mixer.blender_client.client import SendSceneContentFailed, BlenderClient
 from mixer.handlers import HandlerManager
 
 

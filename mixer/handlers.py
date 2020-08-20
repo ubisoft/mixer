@@ -33,7 +33,7 @@ from mixer.stats import StatsTimer
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
 from mixer.draw_handlers import remove_draw_handlers
-from mixer.blender_client import update_params
+from mixer.blender_client.client import update_params
 
 logger = logging.getLogger(__name__)
 
@@ -759,14 +759,14 @@ def send_scene_data_to_server(scene, dummy):
         changed |= add_collections()
         changed |= add_objects()
 
-        # Updates from the VRtist protocol and from the full Blender protocol must be cafully intermixed
+        # Updates from the VRtist protocol and from the full Blender protocol must be carefully intermixed
         # This is an unfortunate requirements from the current coexistence status of
         # both protocols
 
         # After creation of meshes : meshes are not yet supported by full Blender protocol,
         # but needed to properly create objects
-        # Before creation of objects :  the VRtint protocol  will implicitely create objects with
-        # unappropriate default values (e.g. transform creates an object with no data)
+        # Before creation of objects :  the VRtist protocol  will implicitely create objects with
+        # inappropriate default values (e.g. transform creates an object with no data)
         if share_data.use_experimental_sync():
             # Compute the difference between the proxy state and the Blender state
             # It is a coarse difference at the ID level(created, removed, renamed)
