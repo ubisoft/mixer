@@ -96,7 +96,8 @@ class MixerTestCase(unittest.TestCase):
                     blender.connect_and_join_mixer(experimental_sync=self.experimental_sync)
                 self._blenders.append(blender)
         except Exception:
-            # mainly shutdown the server
+            for blender in self._blenders:
+                blender.kill()
             self.shutdown()
             raise
 
@@ -149,8 +150,8 @@ class MixerTestCase(unittest.TestCase):
             sender_grabber = Grabber()
             try:
                 sender_grabber.grab(host, port, "mixer_grab_sender")
-            except RuntimeError as e:
-                raise self.failureException(*e.args)
+            except Exception as e:
+                raise self.failureException("Sender grab: ", *e.args) from None
 
             # receiver upload the room
             self._receiver.connect_and_join_mixer(
@@ -163,8 +164,8 @@ class MixerTestCase(unittest.TestCase):
             receiver_grabber = Grabber()
             try:
                 receiver_grabber.grab(host, port, "mixer_grab_receiver")
-            except RuntimeError as e:
-                raise self.failureException(*e.args)
+            except Exception as e:
+                raise self.failureException("Receiver grab: ", *e.args) from None
 
         finally:
             server_process.kill()

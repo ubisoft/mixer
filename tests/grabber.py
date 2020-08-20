@@ -40,13 +40,13 @@ class Grabber:
 
                     for command in received_commands:
                         attempts = 0
+                        if command.type == MessageType.SEND_ERROR:
+                            message = decode_string(command.data, 0)
+                            raise RuntimeError(f"Received error message {message}")
                         if command.type <= MessageType.COMMAND:
                             continue
                         # Ignore command serial Id, that may not match
                         command.id = 0
-                        if command.type == MessageType.SEND_ERROR:
-                            message = decode_string(command.data)
-                            raise RuntimeError(f"Received error message {message}")
                         self.streams.commands[command.type].append(command)
 
             except ClientDisconnectedException:
