@@ -308,7 +308,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
             ClientAttributes.USERCOLOR, (0.0, 0.0, 0.0)
         )
         color = (int(c * 255) for c in color)
-        color = '#' + ''.join(f'{c:02x}' for c in color)
+        color = "#" + "".join(f"{c:02x}" for c in color)
         args = [
             mixer_prefs.VRtist,
             "--room",
