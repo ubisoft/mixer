@@ -58,3 +58,5 @@ class Grabber:
             if not client.wait(MessageType.LEAVE_ROOM):
                 raise RuntimeError("Grabber: disconnected before receiving LEAVE_ROOM.")
 
+            count = sum([len(commands) for commands in self.streams.commands.values()])
+            assert count > 0, "No message grabbed"
