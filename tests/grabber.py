@@ -1,11 +1,10 @@
 from mixer.broadcaster.common import MessageType
 from mixer.broadcaster.common import Command
 from mixer.broadcaster.common import ClientDisconnectedException
-from mixer.broadcaster.common import encode_string, encode_bool
+from mixer.broadcaster.common import decode_string, encode_string, encode_bool
 from mixer.broadcaster.client import Client
 from typing import Mapping, List
 import time
-import sys
 
 
 class CommandStream:
