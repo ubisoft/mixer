@@ -34,12 +34,23 @@ logger = logging.getLogger(__name__)
 
 current_dir = Path(__file__).parent
 
-# stdout will be a xmlrunner.result._DuplicateWriter
+# HACKS for io redirection
+# - with xmlrunner (used on Gitlab), stdout will be a xmlrunner.result._DuplicateWriter
 # and redirecting onto it raises "io.UnsupportedOperation: fileno"
-_popen_redirect = {
-    "stdout": sys.stderr,
-    "stderr": sys.stderr,
-}
+# so use stderr
+# - with VScode Test UI (Test Explorer UI), redirecting to stderr causes a deadlock
+# between Blender an the unittest during room grabbing.
+#
+# So redirect to stderr if we believe that we run in a Gitlab runner.
+# Better ideas welcome
+
+if os.getenv("CI_RUNNER_VERSION"):
+    _popen_redirect = {
+        "stdout": sys.stderr,
+        "stderr": sys.stderr,
+    }
+else:
+    _popen_redirect = {}
 
 
 def blender_exe_path() -> str:
