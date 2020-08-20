@@ -320,11 +320,9 @@ class LaunchVRtistOperator(bpy.types.Operator):
             "--master",
             str(share_data.client.client_id),
             "--username",
-            "VR " + share_data.client.clients_attributes[share_data.client.client_id].get(
-                ClientAttributes.USERNAME
-            ),
+            "VR " + share_data.client.clients_attributes[share_data.client.client_id].get(ClientAttributes.USERNAME),
             "--usercolor",
-            color
+            color,
         ]
         print(args)
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
