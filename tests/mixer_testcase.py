@@ -108,11 +108,12 @@ class MixerTestCase(unittest.TestCase):
     def shutdown(self):
         # quit and wait
         for blender in self._blenders:
-            blender.quit()
-        for blender in self._blenders:
-            blender.wait()
-        for blender in self._blenders:
-            blender.close()
+            try:
+                blender.quit()
+                blender.wait()
+                blender.close()
+            except Exception:
+                raise
 
         self._server_process.kill()
         super().tearDown()
@@ -239,7 +240,7 @@ class MixerTestCase(unittest.TestCase):
                 )
 
             def decode(c):
-                return None
+                return mixer.codec.decode(c)
 
             decoded_stream_a = [(decode(c), c) for c in commands_a]
             decoded_stream_b = [(decode(c), c) for c in commands_b]
