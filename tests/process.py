@@ -170,7 +170,9 @@ class BlenderServer(BlenderProcess):
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setblocking(True)
         connected = False
-        max_wait = 10
+
+        # anti-virus might delay if Blender is launched for the first time
+        max_wait = 20
 
         start = time.monotonic()
         while not connected and time.monotonic() - start < max_wait:
