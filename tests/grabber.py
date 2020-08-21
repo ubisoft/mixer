@@ -19,7 +19,7 @@ class CommandStream:
 class Grabber:
     """
     Grab the command stream from a server for the purpose of unit testing. Ignores protocol messages (JOIN, ...)
-    and messagae order
+    and message order
     """
 
     def __init__(self):
