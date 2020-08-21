@@ -129,7 +129,7 @@ def send_data_renames(renames: RenameChangeset):
         return
 
     for uuid, new_name, debug_info in renames:
-        logger.info("send_rename: %s %s (%s)", uuid, new_name, debug_info)
+        logger.info("send_rename: %s (%s) into %s", uuid, debug_info, new_name)
         buffer = common.encode_string(uuid) + common.encode_string(new_name) + common.encode_string(debug_info)
         command = common.Command(common.MessageType.BLENDER_DATA_RENAME, buffer, 0)
         share_data.client.add_command(command)

@@ -1146,6 +1146,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 logger.info("Perform removal for %s", proxy)
                 uuid = proxy.mixer_uuid()
                 changeset.removals.append((uuid, str(proxy)))
+                name = proxy.data("name")
                 del self._data[name]
                 id_ = visit_state.ids[uuid]
                 visit_state.root_ids.remove(id_)
@@ -1156,12 +1157,45 @@ class BpyPropDataCollectionProxy(Proxy):
                 for line in traceback.format_exc().splitlines():
                     logger.error(line)
 
-        for proxy, old_name in diff.items_renamed:
-            new_name = proxy.data("name")
-            self._data[new_name] = self._data[old_name]
-            # TODO REMOVE self._data[new_name]._blenddata_path[1] = new_name
-            changeset.renames.append((proxy.mixer_uuid(), new_name, str(proxy)))
+        #
+        # Handle spurious renames
+        #
+        # Say
+        # - local and remote are synced with 2 objects with uuid/name D7/A FC/B
+        # - local renames D7/A into B
+        #   - D7 is actually renamed into B.001 !
+        #   - we detect (D7 -> B.001)
+        #   - remote proceses normally
+        # - local renames D7/B.001 into B
+        #   - D7 is renamed into B
+        #   - FC is renamed into B.001
+        #   - we detect (D7->B, FC->B.001)
+        #   - local result is (D7/B, FC/B.001)
+        # - local repeatedly renames the item named B.001 into B
+        # - at some point on remote, the execution of a rename command will provoke a spurious rename,
+        #   resulting in a situation where remote has FC/B.001 and D7/B.002 linked to the
+        #   Master collection and also a FC/B unlinked
+        #
+
+        # TODO send a single grouped rename request, with no tmp value if only on rename is detected
+        # after this has been extensively tested
+
+        temp = []
+        for proxy, new_name in diff.items_renamed:
+            uuid = proxy.mixer_uuid()
+            old_name = proxy.data("name")
+            if uuid != self._data[old_name].mixer_uuid():
+                logger.warning(f"update() rename {proxy} into {new_name}. Uuid mismatch")
+                continue
+            tmp_name = f"__mixer__{uuid}"
+            changeset.renames.append(((uuid), tmp_name, str(proxy)))
+            proxy.rename(new_name)
+            temp.append((new_name, proxy))
             del self._data[old_name]
+
+        for new_name, proxy in temp:
+            self._data[new_name] = proxy
+            changeset.renames.append((proxy.mixer_uuid(), new_name, str(proxy)))
 
         return changeset
 

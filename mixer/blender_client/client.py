@@ -196,7 +196,16 @@ class BlenderClient(Client):
         logger.info("build_rename %s into %s", old_path, new_path)
         old_name = old_path.split("/")[-1]
         new_name = new_path.split("/")[-1]
-        share_data.blender_objects.get(old_name).name = new_name
+        old_object = share_data.blender_objects.get(old_name)
+        if old_object is not None:
+            share_data.blender_objects.get(old_name).name = new_name
+        else:
+            if share_data.use_experimental_sync():
+                # Renamed by the Blender Protocol
+                logger.info(f"build_rename(): old object {old_name} not found. Safe in experimental mode")
+            else:
+                logger.info(f"build_rename(): old object {old_name} not found.")
+
         share_data.blender_objects_dirty = True
         share_data.old_objects = share_data.blender_objects
 
