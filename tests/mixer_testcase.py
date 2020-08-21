@@ -139,11 +139,19 @@ class MixerTestCase(unittest.TestCase):
             host = server_process.host
             port = server_process.port
 
+            scene_upload_delay = 1
+            # Bumping the delay is required when running the tests from VScode text explorer
+            # in debug on a "slow" machine. Otherwise either Blender disconnects before the room
+            # content has been sent or the grabber tries to join the room before it is joinable.
+            # It probably helps solving random failures on the Gitlab runner as well.
+            vscode_debug_delay = 2
+            scene_upload_delay += vscode_debug_delay
+
             # sender upload the room
             self._sender.connect_and_join_mixer(
                 "mixer_grab_sender", keep_room_open=True, experimental_sync=self.experimental_sync
             )
-            time.sleep(1)
+            time.sleep(scene_upload_delay)
             self._sender.disconnect_mixer()
 
             # download the room from sender
@@ -157,7 +165,7 @@ class MixerTestCase(unittest.TestCase):
             self._receiver.connect_and_join_mixer(
                 "mixer_grab_receiver", keep_room_open=True, experimental_sync=self.experimental_sync
             )
-            time.sleep(1)
+            time.sleep(scene_upload_delay)
             self._receiver.disconnect_mixer()
 
             # download the room from receiver
