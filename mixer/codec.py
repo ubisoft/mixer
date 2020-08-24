@@ -17,6 +17,10 @@ class Matrix:
     pass
 
 
+class Color:
+    pass
+
+
 MessageTypes = Mapping[common.MessageType, Message]
 
 # The message types registered by "components" (VRtist, Blender protocol)
@@ -25,7 +29,10 @@ registered_message_types: MessageTypes = {}
 
 # TODO extend
 codec_functions = {
+    float: (common.encode_float, common.decode_float),
+    int: (common.encode_int, common.decode_int),
     str: (common.encode_string, common.decode_string),
+    Color: (common.encode_color, common.decode_color),
     Matrix: (common.encode_matrix, common.decode_matrix),
 }
 

@@ -7,6 +7,7 @@ from mixer.blender_client import messages
 
 message_types = {
     MessageType.TRANSFORM: messages.TransformMessage,
+    MessageType.LIGHT: messages.LightMessage,
 }
 
 
