@@ -12,7 +12,6 @@ from pathlib import Path
 import unittest
 import time
 
-
 from parameterized import parameterized_class
 
 from mixer.broadcaster.common import MessageType
@@ -155,6 +154,10 @@ class TestObjectRename(ThrottledTestCase):
     [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=ThrottledTestCase.get_class_name,
 )
 class TestSceneRename(ThrottledTestCase):
+    def setUp(self):
+        super().setUp("empty.blend")
+
+    @unittest.skip("")
     def test_add_object(self):
         self.send_strings([bl.active_layer_master_collection(), bl.ops_objects_light_add()], to=0)
         delay = 0.0
@@ -167,22 +170,21 @@ class TestSceneRename(ThrottledTestCase):
 
     def test_add_collection(self):
         self.send_strings(
-            [
-                bl.data_collections_new("data_collections_new"),
-                bl.scene_collection_children_link("data_collections_new"),
-            ],
-            to=0,
+            [bl.data_collections_new("new_collection"), bl.scene_collection_children_link("new_collection"),], to=0,
         )
         delay = 0.0
         time.sleep(delay)
         self.send_strings([bl.data_scenes_rename("Scene", "Scene_renamed")], to=1)
+        self.send_strings([bl.trigger_scene_update("Scene_renamed")], to=1)
 
         # on 1
         # - Scene and SceneRenames are present
         # - data_collections_new is linked to Scene_renamed instead of Scene
-
+        if not self.experimental_sync:
+            self.expected_counts = {MessageType.ADD_COLLECTION_TO_SCENE: 1}
         self.assert_matches()
 
+    @unittest.skip("")
     def test_data_objects_rename(self):
         self.send_strings([bl.data_objects_rename("EmptyInSceneMaster", "EmptyInSceneMaster_renamed")], to=0)
         delay = 0.0
@@ -192,6 +194,7 @@ class TestSceneRename(ThrottledTestCase):
         successful = True
         self.assertTrue(successful)
 
+    @unittest.skip("")
     def test_unlink_object(self):
         self.send_strings([bl.scene_collection_objects_unilink("EmptyInSceneMaster")], to=0)
         delay = 0.0
@@ -212,6 +215,7 @@ class TestSceneRename(ThrottledTestCase):
         successful = False
         self.assertTrue(successful)
 
+    @unittest.skip("")
     def test_unlink_collection(self):
         self.send_strings([bl.scene_collection_children_unlink("Collection1")], to=0)
         delay = 0.0

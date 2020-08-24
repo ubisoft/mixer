@@ -110,6 +110,16 @@ scene.collection.children.unlink(collection)
 """
 
 
+def trigger_scene_update(scene_name: str = "Scene") -> str:
+    # Changing anything will trigger an update
+    return f"""
+import bpy
+scene = bpy.data.scenes["{scene_name}"]
+uuid = scene.mixer_uuid
+scene.mixer_uuid = uuid
+"""
+
+
 def collection_objects_unlink(object_name: str, collection_name: str) -> str:
     return f"""
 import bpy
