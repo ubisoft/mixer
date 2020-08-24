@@ -335,7 +335,7 @@ class BlenderClient(Client):
         frame, index = common.decode_int(data, index)
         value, index = common.decode_float(data, index)
 
-        if not hasattr(ob, channel):
+        if not hasattr(ob, channel) or channel == "color":
             ob = ob.data
 
         attr = getattr(ob, channel)
@@ -355,7 +355,7 @@ class BlenderClient(Client):
         ob = share_data.blender_objects[name]
         channel, index = common.decode_string(data, index)
         channel_index, index = common.decode_int(data, index)
-        if not hasattr(ob, channel):
+        if not hasattr(ob, channel) or channel == "Color":
             ob = ob.data
         ob.keyframe_delete(channel, index=channel_index)
         return name
@@ -486,17 +486,8 @@ class BlenderClient(Client):
                         + struct.pack(f"{len(times)}i", *times)
                         + struct.pack(f"{len(values)}f", *values)
                     )
-                    self.add_command(common.Command(MessageType.CAMERA_ANIMATION, buffer, 0))
+                    self.add_command(common.Command(MessageType.ANIMATION, buffer, 0))
                     return
-
-    def send_camera_animations(self, obj):
-        self.send_animation_buffer(obj.name_full, obj.animation_data, "location", 0)
-        self.send_animation_buffer(obj.name_full, obj.animation_data, "location", 1)
-        self.send_animation_buffer(obj.name_full, obj.animation_data, "location", 2)
-        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 0)
-        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 1)
-        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
-        self.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
 
     def send_camera_attributes(self, obj):
         buffer = (
@@ -506,6 +497,14 @@ class BlenderClient(Client):
             + common.encode_float(obj.data.dof.focus_distance)
         )
         self.add_command(common.Command(MessageType.CAMERA_ATTRIBUTES, buffer, 0))
+
+    def send_light_attributes(self, obj):
+        buffer = (
+            common.encode_string(obj.name_full)
+            + common.encode_float(obj.data.energy)
+            + common.encode_color(obj.data.color)
+        )
+        self.add_command(common.Command(MessageType.LIGHT_ATTRIBUTES, buffer, 0))
 
     def send_current_camera(self, camera_name):
         buffer = common.encode_string(camera_name)
@@ -907,9 +906,14 @@ def update_params(obj):
 
     if typename == "Camera":
         send_camera(share_data.client, obj)
+        share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
 
     if typename in supported_lights:
         send_light(share_data.client, obj)
+        share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "energy")
+        share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 0)
+        share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 1)
+        share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 2)
 
     if typename == "Grease Pencil":
         for material in obj.data.materials:
@@ -920,6 +924,13 @@ def update_params(obj):
     if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
         if obj.mode == "OBJECT":
             share_data.client.send_mesh(obj)
+
+    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 0)
+    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 1)
+    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 2)
+    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 0)
+    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 1)
+    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
 
 
 def clear_scene_content():
