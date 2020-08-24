@@ -14,7 +14,7 @@ from tests.grabber import Grabber, CommandStream
 from tests.process import ServerProcess
 
 import mixer.codec
-from mixer.broadcaster.common import MessageType
+from mixer.broadcaster.common import Command, MessageType
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -226,21 +226,26 @@ class MixerTestCase(unittest.TestCase):
     def assert_stream_equals(self, streams_a: CommandStream, streams_b: CommandStream, msg: str = None):
         self.assertEqual(streams_a.commands.keys(), streams_b.commands.keys())
 
-        def decode_and_sort_messages(commands):
+        def decode_and_sort_messages(commands: List[mixer.codec.Message]) -> List[mixer.codec.Message]:
             stream = [mixer.codec.decode(c) for c in commands]
             stream.sort()
             return stream
 
-        def sort_buffers(commands):
+        def sort_buffers(commands: List[Command]) -> List[Command]:
             stream = [c.data for c in commands]
             stream.sort()
             return stream
 
-        for message_type in streams_a.commands.keys():
+        ignore = {
+            # Names do not match but not used by Blender, and scene renaming is not supported by VRtist
+            MessageType.SET_SCENE
+        }
+        message_types = streams_a.commands.keys() - ignore
+        for message_type in message_types:
             commands_a, commands_b = streams_a.commands[message_type], streams_b.commands[message_type]
-            len_a, len_b = len(commands_a), len(commands_b)
+            len_a = len(commands_a)
             message_name = str(MessageType(message_type))
-            self.assertEqual(len_a, len_b, f"command stream length mismatch for {message_name}: {len_a} and {len_b}")
+            # self.assertEqual(len_a, len_b, f"command stream length mismatch for {message_name}: {len_a} and {len_b}")
 
             expected_count = self.expected_counts.get(message_type)
             if expected_count is not None:
@@ -257,14 +262,28 @@ class MixerTestCase(unittest.TestCase):
             # Equality tests required to handle float comparison.
             # This prevents us from using raw buffer comparison if they contain floats,
             # so decode the messages that contain floats.
-            # Due to a lack of time we have defined decodable message class for all messages.
+            # Due to a lack of time not all decodable message classes are implemented.
             if mixer.codec.is_registered(message_type):
                 decoded_stream_a = decode_and_sort_messages(commands_a)
                 decoded_stream_b = decode_and_sort_messages(commands_b)
+                if len(decoded_stream_a) != len(decoded_stream_b):
+
+                    def dump(stream):
+                        return "\n".join([message.proxy_string for message in stream])
+
+                    string_a = dump(decoded_stream_a)
+                    string_b = dump(decoded_stream_b)
+                    message = f"stream_a\n{string_a}\nStream_b\n{string_b}\n"
+                    self.failureException(f"{message_type} : sequence length mismatch:{message}")
+
                 for i, (decoded_a, decoded_b) in enumerate(zip(decoded_stream_a, decoded_stream_b)):
                     # TODO there another failure case with floats as they will cause sort differences for proxies
                     # we actually need to sort on something else, that the encoded json of the proxy, maybe the uuid
-                    self.assertIs(type(decoded_a), type(decoded_b))
+                    self.assertIs(
+                        type(decoded_a),
+                        type(decoded_b),
+                        "{message_name}: Type mismatch at decoded message mismatch at index {i}",
+                    )
 
                     # HACK do not hardcode
                     proxy_string_a = getattr(decoded_a, "proxy_string", None)
@@ -272,16 +291,36 @@ class MixerTestCase(unittest.TestCase):
                     if proxy_string_a is not None and proxy_string_b is not None:
                         decoded_a.proxy_string = json.loads(proxy_string_a)
                         decoded_b.proxy_string = json.loads(proxy_string_b)
+
+                if message_type == MessageType.BLENDER_DATA_CREATE:
+                    short_a = [message.proxy_string["_data"]["name"] for message in decoded_stream_a]
+                    short_b = [message.proxy_string["_data"]["name"] for message in decoded_stream_b]
+                    self.assertListEqual(short_a, short_b, f"Mismatch for {message_name} at index {i}")
+
+                for i, (decoded_a, decoded_b) in enumerate(zip(decoded_stream_a, decoded_stream_b)):
                     self.assert_any_almost_equal(
                         decoded_a, decoded_b, f"{message_name}: decoded message mismatch at index {i}"
                     )
             else:
-                encoded_stream_a = sort_buffers(commands_a)
-                encoded_stream_b = sort_buffers(commands_b)
-                for i, (encoded_a, encoded_b) in enumerate(zip(encoded_stream_a, encoded_stream_b)):
-                    self.assertIs(type(encoded_a), type(encoded_b))
+                buffer_stream_a = sort_buffers(commands_a)
+                buffer_stream_b = sort_buffers(commands_b)
+                len_a = len(buffer_stream_a)
+                len_b = len(buffer_stream_b)
+                if len_a != len_b:
+
+                    def dump(buffers):
+                        strings = [str(b) for b in buffers]
+                        return "\n".join(strings)
+
+                    string_a = dump(buffer_stream_a)
+                    string_b = dump(buffer_stream_b)
+                    message = f"Stream_a ({len_a} elements)\n{string_a}\n\nStream_b ({len_b} elements)\n{string_b}\n"
+                    raise self.failureException(f"\n{message_name} : sequence length mismatch:\n{message}")
+
+                for i, (buffer_a, buffer_b) in enumerate(zip(buffer_stream_a, buffer_stream_b)):
+                    self.assertIs(type(buffer_a), type(buffer_b))
                     self.assert_any_almost_equal(
-                        encoded_a, encoded_b, f"{message_name}: encoded buffer mismatch at index {i}"
+                        buffer_a, buffer_b, f"{message_name}: encoded buffer mismatch at index {i}"
                     )
 
     def assert_user_success(self):
