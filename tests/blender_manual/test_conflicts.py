@@ -43,6 +43,12 @@ class ThrottledTestCase(BlenderTestCase):
             self.shutdown()
             raise
 
+    def assert_matches(self):
+        # Wait for the messages to reach the destination
+        # TODO What os just enough ?
+        time.sleep(3 * self.latency)
+        super().assert_matches()
+
 
 @parameterized_class(
     [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=ThrottledTestCase.get_class_name,
@@ -60,7 +66,6 @@ class TestSimultaneousCreate(ThrottledTestCase):
         location = "0.0, 3.0, 0.0"
         self.send_strings([bl.active_layer_master_collection() + bl.ops_objects_light_add(location=location)], to=1)
 
-        time.sleep(2 * self.latency)
         if not self.experimental_sync:
             self.expected_counts = {MessageType.LIGHT: 2}
         self.assert_matches()
@@ -146,6 +151,9 @@ class TestObjectRename(ThrottledTestCase):
         self.assertTrue(successful)
 
 
+@parameterized_class(
+    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=ThrottledTestCase.get_class_name,
+)
 class TestSceneRename(ThrottledTestCase):
     def test_add_object(self):
         self.send_strings([bl.active_layer_master_collection(), bl.ops_objects_light_add()], to=0)
@@ -172,8 +180,8 @@ class TestSceneRename(ThrottledTestCase):
         # on 1
         # - Scene and SceneRenames are present
         # - data_collections_new is linked to Scene_renamed instead of Scene
-        successful = False
-        self.assertTrue(successful)
+
+        self.assert_matches()
 
     def test_data_objects_rename(self):
         self.send_strings([bl.data_objects_rename("EmptyInSceneMaster", "EmptyInSceneMaster_renamed")], to=0)
