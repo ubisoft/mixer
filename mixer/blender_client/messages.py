@@ -26,4 +26,3 @@ class LightMessage(Message):
     energy: float
     spot_size: float
     spot_blend: float
-

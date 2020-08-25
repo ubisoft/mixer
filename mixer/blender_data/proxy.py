@@ -1266,7 +1266,7 @@ class BpyPropDataCollectionProxy(Proxy):
                     logger.error(line)
 
         #
-        # Handle spurious renames
+        # Handle spontaneous renames
         #
         # Say
         # - local and remote are synced with 2 objects with uuid/name D7/A FC/B
@@ -1280,7 +1280,7 @@ class BpyPropDataCollectionProxy(Proxy):
         #   - we detect (D7->B, FC->B.001)
         #   - local result is (D7/B, FC/B.001)
         # - local repeatedly renames the item named B.001 into B
-        # - at some point on remote, the execution of a rename command will provoke a spurious rename,
+        # - at some point on remote, the execution of a rename command will provoke a spontaneous rename,
         #   resulting in a situation where remote has FC/B.001 and D7/B.002 linked to the
         #   Master collection and also a FC/B unlinked
         #
