@@ -1111,7 +1111,6 @@ class BpyPropDataCollectionProxy(Proxy):
                 # Suppose it was created by a VRtist command in the same batch and that it refers to the same datablock
                 # as the one we predend to create.
                 pass
-                
 
         datablock = incoming_proxy.create_standalone_datablock()
         if datablock:
