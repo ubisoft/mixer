@@ -236,11 +236,7 @@ class MixerTestCase(unittest.TestCase):
             stream.sort()
             return stream
 
-        ignore = {
-            # Names do not match but not used by Blender, and scene renaming is not supported by VRtist
-            MessageType.SET_SCENE
-        }
-        message_types = streams_a.commands.keys() - ignore
+        message_types = streams_a.commands.keys()
         for message_type in message_types:
             commands_a, commands_b = streams_a.commands[message_type], streams_b.commands[message_type]
             len_a = len(commands_a)

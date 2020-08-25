@@ -9,6 +9,7 @@ until all the messages are flushed and processed at the end before grabbing
 the messages from all Blender
 """
 from pathlib import Path
+from typing import Set
 import unittest
 import time
 
@@ -45,7 +46,7 @@ class ThrottledTestCase(BlenderTestCase):
     def assert_matches(self):
         # Wait for the messages to reach the destination
         # TODO What os just enough ?
-        time.sleep(3 * self.latency)
+        time.sleep(4 * self.latency)
         super().assert_matches()
 
 
@@ -155,7 +156,7 @@ class TestObjectRename(ThrottledTestCase):
 )
 class TestSceneRename(ThrottledTestCase):
     def setUp(self):
-        super().setUp("empty.blend")
+        super().setUp("file2.blend")
 
     @unittest.skip("")
     def test_add_object(self):
@@ -168,9 +169,9 @@ class TestSceneRename(ThrottledTestCase):
         successful = False
         self.assertTrue(successful)
 
-    def test_add_collection(self):
+    def test_collection_new_and_link(self):
         self.send_strings(
-            [bl.data_collections_new("new_collection"), bl.scene_collection_children_link("new_collection"),], to=0,
+            [bl.data_collections_new("new_collection"), bl.scene_collection_children_link("new_collection")], to=0,
         )
         delay = 0.0
         time.sleep(delay)
@@ -181,7 +182,7 @@ class TestSceneRename(ThrottledTestCase):
         # - Scene and SceneRenames are present
         # - data_collections_new is linked to Scene_renamed instead of Scene
         if not self.experimental_sync:
-            self.expected_counts = {MessageType.ADD_COLLECTION_TO_SCENE: 1}
+            self.expected_counts = {MessageType.ADD_COLLECTION_TO_SCENE: 2 + 1}
         self.assert_matches()
 
     @unittest.skip("")
@@ -215,12 +216,12 @@ class TestSceneRename(ThrottledTestCase):
         successful = False
         self.assertTrue(successful)
 
-    @unittest.skip("")
-    def test_unlink_collection(self):
+    def test_collection_unlink(self):
         self.send_strings([bl.scene_collection_children_unlink("Collection1")], to=0)
         delay = 0.0
         time.sleep(delay)
         self.send_strings([bl.data_scenes_rename("Scene", "Scene_renamed")], to=1)
+        self.send_strings([bl.trigger_scene_update("Scene_renamed")], to=1)
 
         # 2020-08-14 19:15:43,081 I mixer.blender_client.scene            - build_remove_collection_from_scene Scene <- Collection1                          [.\mixer\blender_client\scene.py:110]
         # 2020-08-14 19:15:43,085 D mixer.share_data                      - Updating blender_scenes                                                          [.\mixer\share_data.py:264]
@@ -233,8 +234,9 @@ class TestSceneRename(ThrottledTestCase):
         # 2020-08-14 19:15:43,123 W mixer.blender_client                  - KeyError: 'Scene'                                                                [.\mixer\log_utils.py:62]
 
         # in 1 the collection is not unlinked
-        successful = False
-        self.assertTrue(successful)
+        if not self.experimental_sync:
+            self.expected_counts = {MessageType.ADD_COLLECTION_TO_SCENE: 2 - 1}
+        self.assert_matches()
 
 
 if __name__ == "__main__":
