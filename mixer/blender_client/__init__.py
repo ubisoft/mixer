@@ -209,6 +209,13 @@ class BlenderClient(Client):
             obj = self.get_or_create_path(src_path)
             new_obj = obj.copy()
             new_obj.name = dst_name
+
+            # copy materials
+            material_count = len(obj.material_slots)
+            if material_count == len(new_obj.material_slots):
+                for i in range(material_count):
+                    new_obj.material_slots[i].material = obj.material_slots[i].material.copy()
+
             if hasattr(obj, "data"):
                 new_obj.data = obj.data.copy()
                 new_obj.data.name = dst_name
