@@ -83,7 +83,20 @@ def build_collection_to_collection(data):
 
     parent = share_data.blender_collections[parent_name]
     child = share_data.blender_collections[child_name]
-    parent.children.link(child)
+
+    try:
+        parent.children.link(child)
+    except RuntimeError as e:
+        if share_data.use_experimental_sync():
+            # Added by the Blender Protocol
+            logger.info(f"build_collection_to_collection(): parent {parent_name}, child {child_name}...")
+            logger.info(f"... Exception during parent.children.link() ...")
+            logger.info(f"... Safe in experimental_sync ...")
+            logger.info(f"... {e}")
+        else:
+            logger.warning(f"build_collection_to_collection(): parent {parent_name}, child {child_name}...")
+            logger.warning(f"... Exception during parent.children.link() ...")
+            logger.warning(f"... {e}")
 
 
 def send_remove_collection_from_collection(client: Client, parent_collection_name, collection_name):
