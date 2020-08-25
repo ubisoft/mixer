@@ -22,6 +22,7 @@ from mixer.blender_data.blenddata import (
     bl_rna_to_type,
 )
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix, is_pointer_to
+from mixer.bl_utils import get_mixer_prefs
 
 DEBUG = True
 
@@ -257,6 +258,8 @@ class Proxy:
         if len(self._data) != len(other._data):
             return False
 
+        # TODO test same keys
+        # TODO test _bpy_collection
         for k, v in self._data.items():
             if k not in other._data.keys():
                 return False
@@ -394,7 +397,7 @@ class BpyIDProxy(BpyStructProxy):
         return BpyIDProxy()
 
     def mixer_uuid(self) -> str:
-        return self._data["mixer_uuid"]
+        return self._data.get("mixer_uuid")
 
     def rename(self, new_name: str):
         self._data["name"] = new_name
@@ -436,6 +439,8 @@ class BpyIDProxy(BpyStructProxy):
             attr = getattr(bl_instance, name)
             attr_value = read_attribute(attr, bl_rna_property, visit_state)
             # Also write None values to reset attributes like Camera.dof.focus_object
+            # TODO for scene, test difference, only send update if dirty as continuous updates to scene
+            # master collection will conflicting writes with Master Collection
             self._data[name] = attr_value
 
         specifics.post_save_id(self, bl_instance)
@@ -467,27 +472,81 @@ class BpyIDProxy(BpyStructProxy):
     def collection(self) -> T.bpy_prop_collection:
         return getattr(bpy.data, self.collection_name)
 
-    def target(self, bl_instance: any, attr_name: str) -> T.ID:
+    def target(self, bl_instance: Optional[Any] = None, attr_name: Optional[str] = None) -> T.ID:
         if self.collection_name is not None:
             # is_embedded_data is False
-            datablock = bl_instance.get(attr_name)
+            datablock = self.collection.get(self.data("name"))
             if datablock is None:
                 logger.warning(
-                    f"BpyIDProxy: key '{attr_name}'' not found in bpy_prop_collection {bl_instance}. Valid keys are ... {bl_instance.keys()}"
+                    f"BpyIDProxy: key {self.data('name')} not found in bpy_prop_collection {self.collection}. Valid keys are ... {self.collection.keys()}"
                 )
         else:
             datablock = getattr(bl_instance, attr_name)
         return datablock
 
+    def create_standalone_datablock(self) -> T.ID:
+        """
+        Save this proxy into its target standalone datablock, which may be
+        """
+        datablock = self.target()
+        if datablock:
+            if not datablock.mixer_uuid:
+                # A datablock created by VRtist command in the same command batch
+                # Not an error, make it ours
+                logger.info(f"create_standalone_datablock for {self} found existing datablock from VRtist")
+            else:
+                logger.error(f"create_standalone_datablock for {self} found existing datablock {datablock.mixer_uuid}")
+                return
+        else:
+            datablock = specifics.bpy_data_ctor(self.collection_name, self)
+
+        if datablock is None:
+            logger.warning(f"Cannot create bpy.data.{self.collection_name}[{self.data('name')}]")
+            return None
+
+        if DEBUG:
+            name = self.data("name")
+            if self.collection.get(name) != datablock:
+                logger.warning(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
+
+        datablock.mixer_uuid = self.mixer_uuid()
+        datablock = specifics.pre_save_id(self, datablock)
+        if datablock is None:
+            logger.warning(f"BpyIDProxy.save() {self} pre_save_id returns None")
+            return None
+
+        for k, v in self._data.items():
+            write_attribute(datablock, k, v)
+
+        return datablock
+
+    def update_standalone_datablock(self, datablock: T.ID) -> T.ID:
+        """
+        Save this proxy into its target standalone datablock, which may be
+        """
+        assert datablock.mixer_uuid == self.mixer_uuid()
+
+        datablock = specifics.pre_save_id(self, datablock)
+        if datablock is None:
+            logger.warning(f"BpyIDProxy.save() {self} pre_save_id returns None")
+            return None
+
+        for k, v in self._data.items():
+            write_attribute(datablock, k, v)
+
+        return datablock
+
     def save(self, bl_instance: any = None, attr_name: str = None) -> T.ID:
         """
-        Save this proxy into its target ID, which may be
+        Save this proxy into an existing datablock that may be
         - a bpy.data member item
-        - an embedded ID
+        - an embedded datablock
         """
         collection_name = self.collection_name
         if collection_name is not None:
+            logger.info(f"IDproxy save standalone {self}")
             # a standalone datablock in a bpy.data collection
+
             if bl_instance is None:
                 bl_instance = self.collection
             if attr_name is None:
@@ -495,6 +554,7 @@ class BpyIDProxy(BpyStructProxy):
             id_ = bl_instance.get(attr_name)
 
             if id_ is None:
+                logger.warning(f"IDproxy save standalone {self}, not found. Creating")
                 id_ = specifics.bpy_data_ctor(collection_name, self)
                 if id_ is None:
                     logger.warning(f"Cannot create bpy.data.{collection_name}[{attr_name}]")
@@ -504,10 +564,12 @@ class BpyIDProxy(BpyStructProxy):
                         logger.warning(f"Name mismatch after creation of bpy.data.{collection_name}[{attr_name}] ")
                 id_.mixer_uuid = self.mixer_uuid()
         else:
+            logger.info(f"IDproxy save embedded {self}")
             # an is_embedded_data datablock. pre_save id will retrieve it by calling target
+            id_ = getattr(bl_instance, attr_name)
             pass
 
-        target = specifics.pre_save_id(self, bl_instance, attr_name)
+        target = specifics.pre_save_id(self, id_)
         if target is None:
             logger.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} is None")
             return None
@@ -1014,29 +1076,71 @@ class BpyPropDataCollectionProxy(Proxy):
             # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
             return
 
-        for k, v in self._data.items():
-            write_attribute(target, k, v)
+        link = getattr(target, "link", None)
+        unlink = getattr(target, "unlink", None)
+        if link is not None and unlink is not None:
+            before = set(target.items())
+            after = {(k, v.target()) for k, v in self._data.items()}
+            added = after - before
+            deleted = before - after
+            # overkill: be smarter
+            for _, datablock in deleted:
+                unlink(datablock)
+            for _, datablock in added:
+                link(datablock)
+        else:
+            for k, v in self._data.items():
+                write_attribute(target, k, v)
 
     def find(self, key: str):
         return self._data.get(key)
 
-    def create_datablock(self, proxy: BpyIDProxy, visit_state: VisitState):
+    def create_datablock(
+        self, incoming_proxy: BpyIDProxy, visit_state: VisitState
+    ) -> Tuple[T.ID, Optional[RenameChangeset]]:
         """Create a bpy.data datablock from a received BpyIDProxy and update the proxy structures accordingly
 
         Receiver side
 
         Args:
-            proxy : this proxy contents is used to update the bpy.data collection item
+            incoming_proxy : this proxy contents is used to update the bpy.data collection item
         """
-        # only change other state after save, in case of exception
-        id_ = proxy.save()
-        name = proxy.data("name")
-        self._data[name] = proxy
-        uuid = proxy.mixer_uuid()
-        visit_state.root_ids.add(id_)
-        visit_state.ids[uuid] = id_
-        visit_state.id_proxies[uuid] = proxy
-        return id_
+
+        incoming_name = incoming_proxy.data("name")
+        # attempt to "resolve" conflicting creation, but it makes tests untractable
+
+        datablock = incoming_proxy.target()
+        if datablock:
+            if datablock.mixer_uuid:
+                # Simultaneous creation:
+                # local has already a datablock uuid_1/name_B but receives a creation for
+                # datablock uuid_2/name_B. Ideally prefix with the user name (uuid2/_remote_B),
+                # do it with the uuid currently
+                # TODO Send a rename
+                # unique_name = name + "_" + incoming_proxy.mixer_uuid()*
+                unique_name = incoming_name + "_" + get_mixer_prefs().user + "_" + incoming_proxy.mixer_uuid()
+                logger.warning(f"Simultaneous creation. Renamed {incoming_proxy.data('name')} into {unique_name}")
+                incoming_proxy.rename(unique_name)
+                name = unique_name
+            else:
+                # An existing datablock, not processed by us
+                # Suppose it was created by a VRtist command in the same batch and that it refers to the same datablock
+                # as the one we predend to create.
+                name = incoming_name
+
+        datablock = incoming_proxy.create_standalone_datablock()
+        if datablock:
+            self._data[name] = incoming_proxy
+            uuid = incoming_proxy.mixer_uuid()
+            visit_state.root_ids.add(datablock)
+            visit_state.ids[uuid] = datablock
+            visit_state.id_proxies[uuid] = incoming_proxy
+
+        renames = []
+        if name != incoming_name:
+            renames.append((uuid, name, str(incoming_proxy)))
+
+        return datablock, renames
 
     def update_datablock(self, incoming_proxy: BpyIDProxy, visit_state: VisitState):
         """Update a bpy.data item from a received BpyIDProxy and update the proxy structures accordingly
@@ -1050,31 +1154,36 @@ class BpyPropDataCollectionProxy(Proxy):
         proxy = visit_state.id_proxies.get(uuid)
         if proxy is None:
             logger.error(
-                f"update_datablock(): Missing proxy for bpy.data.{incoming_proxy.collection_name}[{incoming_proxy.name}] uuid {uuid}"
+                f"update_datablock(): Missing proxy for bpy.data.{incoming_proxy.collection_name}[{incoming_proxy.data('name')}] uuid {uuid}"
             )
             return
 
         if proxy.mixer_uuid() != incoming_proxy.mixer_uuid():
             logger.error(
-                f"update_datablock : uuid mismatch between incoming {incoming_proxy.mixer_uuid} ({incoming_proxy}) and existing {proxy.mixer_uuid} ({proxy})"
+                f"update_datablock : uuid mismatch between incoming {incoming_proxy.mixer_uuid()} ({incoming_proxy}) and existing {proxy.mixer_uuid} ({proxy})"
             )
             return
 
         # Do not replace the existing proxy by the new one as it wil no more work with
-        # differential updates
+        # differential updates.
+        # The incoming name may be stale. Do not save it
+        incoming_proxy.rename(proxy.data("name"))
         proxy.update_from_proxy(incoming_proxy)
 
         # the ID will have changed if the object has been morphed (change light type, for instance)
         existing_id = visit_state.ids.get(uuid)
         if existing_id is None:
-            logger.warning(f"Non existent uuid {uuid} while updating {proxy.collection_name}[{proxy.name}]")
+            logger.warning(f"Non existent uuid {uuid} while updating {proxy.collection_name}[{proxy.data('name')}]")
             return None
 
-        id_ = proxy.save()
+        id_ = proxy.update_standalone_datablock(existing_id)
         if existing_id != id_:
+            # Not a problem for light morphing
+            logger.warning(f"Update_datablock changes datablock {existing_id} to {id_}")
             visit_state.root_ids.remove(existing_id)
             visit_state.root_ids.add(id_)
             visit_state.ids[uuid] = id_
+
         return id_
 
     def remove_datablock(self, proxy: BpyIDProxy):
@@ -1118,7 +1227,6 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         changeset = Changeset()
         # Sort so that the tests receive the messages in deterministic order. Sad but not very harmfull
-        # TODO items_added boes not deen the collection name since it should be known by self
         added_names = sorted(diff.items_added.keys())
         for name in added_names:
             collection_name = diff.items_added[name]
@@ -1190,6 +1298,8 @@ class BpyPropDataCollectionProxy(Proxy):
             tmp_name = f"__mixer__{uuid}"
             changeset.renames.append(((uuid), tmp_name, str(proxy)))
             proxy.rename(new_name)
+            assert getattr(bpy.data, proxy.collection_name)[new_name] is visit_state.ids[uuid]
+            assert visit_state.ids[uuid] in visit_state.root_ids
             temp.append((new_name, proxy))
             del self._data[old_name]
 
@@ -1328,33 +1438,39 @@ class BpyBlendProxy(Proxy):
 
         return changeset
 
-    def create_datablock(self, proxy: BpyIDProxy, context: Context = safe_context) -> Optional[T.ID]:
+    def create_datablock(
+        self, incoming_proxy: BpyIDProxy, context: Context = safe_context
+    ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """
         Create bpy.data collection item and update the proxy accordingly
 
         Receiver side
         """
-        bpy_data_collection_proxy = self._data.get(proxy.collection_name)
+        bpy_data_collection_proxy = self._data.get(incoming_proxy.collection_name)
         if bpy_data_collection_proxy is None:
-            logger.warning(f"create_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
+            logger.warning(
+                f"create_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} "
+            )
             return None
 
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
-        return bpy_data_collection_proxy.create_datablock(proxy, visit_state)
+        return bpy_data_collection_proxy.create_datablock(incoming_proxy, visit_state)
 
-    def update_datablock(self, proxy: BpyIDProxy, context: Context = safe_context) -> Optional[T.ID]:
+    def update_datablock(self, incoming_proxy: BpyIDProxy, context: Context = safe_context) -> Optional[T.ID]:
         """
         Update a bpy.data collection item and update the proxy accordingly
 
         Receiver side
         """
-        bpy_data_collection_proxy = self._data.get(proxy.collection_name)
+        bpy_data_collection_proxy = self._data.get(incoming_proxy.collection_name)
         if bpy_data_collection_proxy is None:
-            logger.warning(f"update_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
+            logger.warning(
+                f"update_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} "
+            )
             return None
 
         visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
-        return bpy_data_collection_proxy.update_datablock(proxy, visit_state)
+        return bpy_data_collection_proxy.update_datablock(incoming_proxy, visit_state)
 
     def remove_datablock(self, uuid: str):
         """
@@ -1460,6 +1576,14 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
         #   TypeError('bpy_struct: item.attr = val: enum "" not found in (\'BEST\', \'GOOD\', \'REALTIME\')')
         logger.debug(f"write attribute skipped {bl_instance}.{key}...")
         logger.debug(f" ...Exception: {repr(e)}")
+    except AttributeError as e:
+        if isinstance(bl_instance, bpy.types.Collection) and bl_instance.name == "Master Collection" and key == "name":
+            pass
+        else:
+            logger.warning(f"write attribute skipped {bl_instance}.{key}...")
+            logger.warning(f" ...Exception: {repr(e)}")
+
     except Exception as e:
         logger.warning(f"write attribute skipped {bl_instance}.{key}...")
         logger.warning(f" ...Exception: {repr(e)}")
+        raise

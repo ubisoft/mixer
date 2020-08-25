@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 def active_layer_collection(
@@ -31,10 +31,17 @@ bpy.data.objects.remove(object)
 """
 
 
-def data_xxx_new(collection_name: str, name: str) -> str:
+def data_xxx_new(collection_name: str, *args: List[Any]) -> str:
+    def string(x: Any):
+        if isinstance(x, str):
+            return f"'{x}'"
+        else:
+            return str(x)
+
+    s = ",".join([string(x) for x in args])
     return f"""
 import bpy
-data = bpy.data.{collection_name}.new("{name}")
+data = bpy.data.{collection_name}.new({s})
 """
 
 
@@ -52,6 +59,10 @@ bpy.data.collections.remove(collection)
 
 def data_collections_rename(old_name: str, new_name: str) -> str:
     return data_xxx_rename("collections", old_name, new_name)
+
+
+def data_objects_new(*args: List[Any]) -> str:
+    return data_xxx_new("objects", *args)
 
 
 def data_objects_rename(old_name: str, new_name: str) -> str:

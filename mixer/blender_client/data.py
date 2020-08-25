@@ -84,16 +84,19 @@ def _build_data_update_or_create(buffer, display_name: str, func: Callable[[BpyB
 
     logger.info("%s: %s", display_name, id_proxy)
     try:
-        func(share_data.bpy_data_proxy, id_proxy)
+        # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
+        share_data.set_dirty()
+        return func(share_data.bpy_data_proxy, id_proxy)
     except Exception:
         log_exception(f"processing of buffer for {id_proxy}")
 
-    # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
-    share_data.set_dirty()
-
 
 def build_data_create(buffer):
-    _build_data_update_or_create(buffer, "build_data_create", BpyBlendProxy.create_datablock)
+    datablock, rename_changeset = _build_data_update_or_create(
+        buffer, "build_data_create", BpyBlendProxy.create_datablock
+    )
+    if rename_changeset:
+        send_data_renames(rename_changeset)
 
 
 def build_data_update(buffer):

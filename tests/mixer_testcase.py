@@ -6,7 +6,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List, Optional, Set
 import unittest
 
 from tests.blender_app import BlenderApp
@@ -64,6 +64,10 @@ class MixerTestCase(unittest.TestCase):
     @property
     def _receiver(self):
         return self._blenders[1]
+
+    @classmethod
+    def ignored_messages(cls) -> Set[MessageType]:
+        return set()
 
     def setUp(
         self,
@@ -236,7 +240,7 @@ class MixerTestCase(unittest.TestCase):
             stream.sort()
             return stream
 
-        message_types = streams_a.commands.keys()
+        message_types = streams_a.commands.keys() - self.ignored_messages()
         for message_type in message_types:
             commands_a, commands_b = streams_a.commands[message_type], streams_b.commands[message_type]
             len_a = len(commands_a)
@@ -289,8 +293,14 @@ class MixerTestCase(unittest.TestCase):
                         decoded_b.proxy_string = json.loads(proxy_string_b)
 
                 if message_type == MessageType.BLENDER_DATA_CREATE:
-                    short_a = [message.proxy_string["_data"]["name"] for message in decoded_stream_a]
-                    short_b = [message.proxy_string["_data"]["name"] for message in decoded_stream_b]
+                    short_a = [
+                        (message.proxy_string["_data"]["name"], message.proxy_string["_bpy_data_collection"])
+                        for message in decoded_stream_a
+                    ]
+                    short_b = [
+                        (message.proxy_string["_data"]["name"], message.proxy_string["_bpy_data_collection"])
+                        for message in decoded_stream_b
+                    ]
                     self.assertListEqual(short_a, short_b, f"Mismatch for {message_name} at index {i}")
 
                 for i, (decoded_a, decoded_b) in enumerate(zip(decoded_stream_a, decoded_stream_b)):
