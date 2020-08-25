@@ -40,17 +40,6 @@ BlenddataPath = Tuple[str, str]
 MIXER_SEQUENCE = "__mixer_sequence__"
 
 
-def debug_check_proxy(proxy: BpyIDProxy):
-    if proxy._class_name == "Object":
-        data = proxy.data("data")
-        if data is not None and not isinstance(data, BpyIDRefProxy):
-            if proxy._blenddata_path is not None:
-                collection, key = proxy._blenddata_path
-                logger.error(f"Ill formed Object proxy for {collection}[{key}] : data is {data}")
-            else:
-                logger.warning(f"Empty blenddata_path for {collection}[{key}] : data is {data}")
-
-
 def debug_check_stack_overflow(func, *args, **kwargs):
     """
     Use as a function decorator to detect probable stack overflow in case of circular references
@@ -458,7 +447,6 @@ class BpyIDProxy(BpyStructProxy):
             self._data["mixer_uuid"] = bl_instance.mixer_uuid
             visit_state.id_proxies[uuid] = self
 
-        debug_check_proxy(self)
         return self
 
     @property
@@ -476,10 +464,6 @@ class BpyIDProxy(BpyStructProxy):
         if self.collection_name is not None:
             # is_embedded_data is False
             datablock = self.collection.get(self.data("name"))
-            if datablock is None:
-                logger.warning(
-                    f"BpyIDProxy: key {self.data('name')} not found in bpy_prop_collection {self.collection}. Valid keys are ... {self.collection.keys()}"
-                )
         else:
             datablock = getattr(bl_instance, attr_name)
         return datablock
@@ -1107,7 +1091,7 @@ class BpyPropDataCollectionProxy(Proxy):
         """
 
         incoming_name = incoming_proxy.data("name")
-        # attempt to "resolve" conflicting creation, but it makes tests untractable
+        name = incoming_name
 
         datablock = incoming_proxy.target()
         if datablock:
@@ -1126,7 +1110,8 @@ class BpyPropDataCollectionProxy(Proxy):
                 # An existing datablock, not processed by us
                 # Suppose it was created by a VRtist command in the same batch and that it refers to the same datablock
                 # as the one we predend to create.
-                name = incoming_name
+                pass
+                
 
         datablock = incoming_proxy.create_standalone_datablock()
         if datablock:
@@ -1586,4 +1571,3 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
     except Exception as e:
         logger.warning(f"write attribute skipped {bl_instance}.{key}...")
         logger.warning(f" ...Exception: {repr(e)}")
-        raise
