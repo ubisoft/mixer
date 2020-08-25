@@ -17,7 +17,7 @@ from parameterized import parameterized_class
 
 from mixer.broadcaster.common import MessageType
 
-import tests.blender_manual.blender_snippets as bl
+import tests.blender_snippets as bl
 from tests.blender.blender_testcase import BlenderTestCase
 from tests.mixer_testcase import BlenderDesc
 
