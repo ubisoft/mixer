@@ -282,7 +282,7 @@ class MixerTestCase(unittest.TestCase):
                     self.assertIs(
                         type(decoded_a),
                         type(decoded_b),
-                        "{message_name}: Type mismatch at decoded message mismatch at index {i}",
+                        f"{message_name}: Type mismatch at decoded message mismatch at index {i}",
                     )
 
                     # HACK do not hardcode
