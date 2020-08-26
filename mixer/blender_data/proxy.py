@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 import logging
 import traceback
-from typing import Any, List, Mapping, Optional, Set, Tuple, TypeVar, Union
+from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, TypeVar, Union
 from uuid import uuid4
 
 import bpy
@@ -18,7 +18,6 @@ from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import (
     BlendData,
     collection_name_to_type,
-    rna_identifier_to_collection_name,
     bl_rna_to_type,
 )
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix, is_pointer_to
@@ -324,7 +323,7 @@ class StructLikeProxy(Proxy):
             self._data[name] = attr_value
         return self
 
-    def save(self, bl_instance: any, key: Union[int, str]):
+    def save(self, bl_instance: any, key: Union[int, str], visit_state: VisitState):
         """
         Save this proxy into a Blender attribute
         """
@@ -355,7 +354,7 @@ class StructLikeProxy(Proxy):
             return
 
         for k, v in self._data.items():
-            write_attribute(target, k, v)
+            write_attribute(target, k, v, visit_state)
 
 
 class BpyPropertyGroupProxy(StructLikeProxy):
@@ -464,11 +463,12 @@ class BpyIDProxy(BpyStructProxy):
         if self.collection_name is not None:
             # is_embedded_data is False
             datablock = self.collection.get(self.data("name"))
+            logger.warning(f"target(bpy.data.{self.collection_name}[{self.data('name')}] is {datablock}")
         else:
             datablock = getattr(bl_instance, attr_name)
         return datablock
 
-    def create_standalone_datablock(self) -> T.ID:
+    def create_standalone_datablock(self, visit_state: VisitState) -> T.ID:
         """
         Save this proxy into its target standalone datablock, which may be
         """
@@ -482,7 +482,7 @@ class BpyIDProxy(BpyStructProxy):
                 logger.error(f"create_standalone_datablock for {self} found existing datablock {datablock.mixer_uuid}")
                 return
         else:
-            datablock = specifics.bpy_data_ctor(self.collection_name, self)
+            datablock = specifics.bpy_data_ctor(self.collection_name, self, visit_state)
 
         if datablock is None:
             logger.warning(f"Cannot create bpy.data.{self.collection_name}[{self.data('name')}]")
@@ -500,11 +500,11 @@ class BpyIDProxy(BpyStructProxy):
             return None
 
         for k, v in self._data.items():
-            write_attribute(datablock, k, v)
+            write_attribute(datablock, k, v, visit_state)
 
         return datablock
 
-    def update_standalone_datablock(self, datablock: T.ID) -> T.ID:
+    def update_standalone_datablock(self, datablock: T.ID, visit_state: VisitState) -> T.ID:
         """
         Save this proxy into its target standalone datablock, which may be
         """
@@ -516,11 +516,11 @@ class BpyIDProxy(BpyStructProxy):
             return None
 
         for k, v in self._data.items():
-            write_attribute(datablock, k, v)
+            write_attribute(datablock, k, v, visit_state)
 
         return datablock
 
-    def save(self, bl_instance: any = None, attr_name: str = None) -> T.ID:
+    def save(self, bl_instance: any = None, attr_name: str = None, visit_state: VisitState = None) -> T.ID:
         """
         Save this proxy into an existing datablock that may be
         - a bpy.data member item
@@ -539,7 +539,7 @@ class BpyIDProxy(BpyStructProxy):
 
             if id_ is None:
                 logger.warning(f"IDproxy save standalone {self}, not found. Creating")
-                id_ = specifics.bpy_data_ctor(collection_name, self)
+                id_ = specifics.bpy_data_ctor(collection_name, self, visit_state)
                 if id_ is None:
                     logger.warning(f"Cannot create bpy.data.{collection_name}[{attr_name}]")
                     return None
@@ -559,7 +559,7 @@ class BpyIDProxy(BpyStructProxy):
             return None
 
         for k, v in self._data.items():
-            write_attribute(target, k, v)
+            write_attribute(target, k, v, visit_state)
 
         return target
 
@@ -597,7 +597,7 @@ class NodeTreeProxy(BpyIDProxy):
     def __init__(self):
         super().__init__()
 
-    def save(self, bl_instance: any, attr_name: str):
+    def save(self, bl_instance: any, attr_name: str, visit_state: VisitState):
         # see https://stackoverflow.com/questions/36185377/how-i-can-create-a-material-select-it-create-new-nodes-with-this-material-and
         # Saving NodeTree.links require access to NodeTree.nodes, so we need an implementation at the NodeTree level
 
@@ -606,7 +606,7 @@ class NodeTreeProxy(BpyIDProxy):
         # save links last
         for k, v in self._data.items():
             if k != "links":
-                write_attribute(node_tree, k, v)
+                write_attribute(node_tree, k, v, visit_state)
 
         node_tree.links.clear()
         seq = self.data("links").data(MIXER_SEQUENCE)
@@ -618,88 +618,67 @@ class NodeTreeProxy(BpyIDProxy):
 
 class BpyIDRefProxy(Proxy):
     """
-    A reference to an item of a collection in bpy.data.
+    A reference to a standalone datablock
 
     Examples of such references are :
     - Camera.dof.focus_object
     """
 
-    _blenddata_path: BlenddataPath = None
-
     def __init__(self):
-        self._data = {}
+        self._datablock_uuid: str = None
+        # Not used but "required" by the json codec
+        self._data: Dict[str, Any] = {}
 
-    def load(self, bl_instance, visit_state: VisitState):
-        # Nothing to filter here, so we do not need the context/filter
+    def load(self, datablock: T.ID, visit_state: VisitState) -> BpyIDRefProxy:
+        """
+        Load the reference to a standalone datablock
+        """
+        assert not datablock.is_embedded_data
 
-        # Walk up to child of ID
-        class_bl_rna = bl_instance.bl_rna
-        while class_bl_rna.base is not None and class_bl_rna.base != bpy.types.ID.bl_rna:
-            class_bl_rna = class_bl_rna.base
-
-        # Safety check that the instance can really be accessed from root collections with its full name
-        assert getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier], None) is not None
-        assert bl_instance.name_full in getattr(bpy.data, rna_identifier_to_collection_name[class_bl_rna.identifier])
-
-        # TODO what abut renames
-        self._blenddata_path = [
-            BlendData.instance().bl_collection_name_from_inner_identifier(class_bl_rna.identifier),
-            bl_instance.name_full,
-        ]
+        self._datablock_uuid = datablock.mixer_uuid
         return self
 
-    @property
-    def collection(self):
-        return self._blenddata_path[0]
-
-    @property
-    def key(self):
-        return self._blenddata_path[1]
-
-    def save(self, bl_instance: any, attr_name: str):
-
-        # Cannot save into an attribute, which looks like an r-value.
-        # When setting my_scene.world wen must setattr(scene, "world", data) and cannot
-        # assign scene.world
-        ref_target = self.target()
+    def save(self, container: Union[T.ID, T.bpy_prop_collection], key: str, visit_state: VisitState):
+        """
+        Save the standalone datablock reference represented by self into a datablock member (Scene.camera)
+        or a collection item (Scene.collection.children["Collection"])
+        """
+        ref_target = self.target(visit_state)
         if ref_target is None:
             logger.warning(
-                f"BpyIDRefProxy.save do not save reference (target does not exist) {bl_instance}.{attr_name} -> bpy.data.{self.collection}[{self.key}]"
+                f"BpyIDRefProxy.save do not save reference (target does not exist) {container}.{key} -> bpy.data.{self.collection}[{self.key}]"
             )
-        if isinstance(bl_instance, T.bpy_prop_collection):
-            if isinstance(attr_name, str):
+        if isinstance(container, T.bpy_prop_collection):
+            # reference stored in a collection
+            if isinstance(key, str):
                 try:
-                    bl_instance[attr_name] = ref_target
+                    container[key] = ref_target
                 except TypeError as e:
                     logger.warning(
-                        f"BpyIDRefProxy.save() exception while saving {ref_target} into {bl_instance}[{attr_name}]..."
+                        f"BpyIDRefProxy.save() exception while saving {ref_target} into {container}[{key}]..."
                     )
                     logger.warning(f"...{e}")
-
             else:
-                logger.warning(
-                    f"Not implemented: BpyIDRefProxy.save() for IDRef into collection {bl_instance}[{attr_name}]"
-                )
+                # is there a case for this ?
+                logger.warning(f"Not implemented: BpyIDRefProxy.save() for IDRef into collection {container}[{key}]")
         else:
-            if not bl_instance.bl_rna.properties[attr_name].is_readonly:
+            # reference stored in a struct
+            if not container.bl_rna.properties[key].is_readonly:
                 try:
-                    # This is what saves Camera.dof.focus_object, for instance
-                    setattr(bl_instance, attr_name, ref_target)
+                    # This is what saves Camera.dof.focus_object
+                    setattr(container, key, ref_target)
                 except Exception as e:
-                    logger.warning(f"write attribute skipped {attr_name} for {bl_instance}...")
+                    logger.warning(f"write attribute skipped {key} for {container}...")
                     logger.warning(f" ...Error: {repr(e)}")
 
-    def target(self) -> T.ID:
-        """The bpy.types.ID pointed to by this reference
+    def target(self, visit_state: VisitState) -> T.ID:
         """
-        collection = BlendData.instance().collection(self.collection)
-        if collection is None:
-            # may occur if we receive items from a more recent Blender that implements more bpy.data collections,
-            # such as bpy.data.volumes in 2.83
-            return None
-        key = self.key
-        id_ = collection[key]
-        return id_
+        The datablock referenced
+        """
+        datablock = visit_state.ids.get(self._datablock_uuid)
+        if datablock is None:
+            logger.warning(f"BpyIDRef. No datablock for uuid {self._datablock_uuid}")
+        return datablock
 
 
 def ensure_uuid(item: bpy.types.ID) -> str:
@@ -858,9 +837,9 @@ class SoaElement(Proxy):
         bl_collection.foreach_set(attr_name, self._data)
 
 
-# TODO make thses functions generic after enough sequences have been seen
+# TODO make these functions generic after enough sequences have been seen
 # TODO move to specifics.py
-def write_curvemappoints(target, src_sequence):
+def write_curvemappoints(target, src_sequence, visit_state: VisitState):
     src_length = len(src_sequence)
 
     # CurveMapPoints specific (alas ...)
@@ -875,7 +854,7 @@ def write_curvemappoints(target, src_sequence):
     # extend dst
     while src_length > len(target):
         # .new() parameters are CurveMapPoints specific
-        # for CurvamapPoint, we can initilaize to anything then overwrite. Not sure this is doable for other types
+        # for CurvemapPoint, we can initialize to anything then overwrite. Not sure this is doable for other types
         # new inserts in head !
         # Not optimal for big arrays, but much simpler given that the new() parameters depend on the collection
         # in a way that cannot be determined automatically
@@ -883,10 +862,10 @@ def write_curvemappoints(target, src_sequence):
 
     assert src_length == len(target)
     for i in range(src_length):
-        write_attribute(target, i, src_sequence[i])
+        write_attribute(target, i, src_sequence[i], visit_state)
 
 
-def write_metaballelements(target, src_sequence):
+def write_metaballelements(target, src_sequence, visit_state: VisitState):
     src_length = len(src_sequence)
 
     # truncate dst
@@ -900,7 +879,7 @@ def write_metaballelements(target, src_sequence):
 
     assert src_length == len(target)
     for i in range(src_length):
-        write_attribute(target, i, src_sequence[i])
+        write_attribute(target, i, src_sequence[i], visit_state)
 
 
 class BpyPropStructCollectionProxy(Proxy):
@@ -951,7 +930,7 @@ class BpyPropStructCollectionProxy(Proxy):
 
         return self
 
-    def save(self, bl_instance: any, attr_name: str):
+    def save(self, bl_instance: any, attr_name: str, visit_state: VisitState):
         """
         Save this proxy into a Blender object
         """
@@ -966,9 +945,9 @@ class BpyPropStructCollectionProxy(Proxy):
             srna = bl_instance.bl_rna.properties[attr_name].srna
             if srna:
                 if srna.bl_rna is bpy.types.CurveMapPoints.bl_rna:
-                    write_curvemappoints(target, sequence)
+                    write_curvemappoints(target, sequence, visit_state)
                 elif srna.bl_rna is bpy.types.MetaBallElements.bl_rna:
-                    write_metaballelements(target, sequence)
+                    write_metaballelements(target, sequence, visit_state)
 
             elif len(target) == len(sequence):
                 for i, v in enumerate(sequence):
@@ -979,7 +958,7 @@ class BpyPropStructCollectionProxy(Proxy):
                     # - NodeTreeOutputs uses: .new(type, name), .remove(socket), has .clear()
                     # - ActionFCurves uses: .new(data_path, index=0, action_group=""), .remove(fcurve)
                     # - GPencilStrokePoints: .add(count), .pop()
-                    write_attribute(target, i, v)
+                    write_attribute(target, i, v, visit_state)
             else:
                 logger.warning(
                     f"Not implemented: write sequence of different length (incoming: {len(sequence)}, existing: {len(target)})for {bl_instance}.{attr_name}"
@@ -988,7 +967,7 @@ class BpyPropStructCollectionProxy(Proxy):
             # dictionary
             specifics.truncate_collection(target, self._data.keys())
             for k, v in self._data.items():
-                write_attribute(target, k, v)
+                write_attribute(target, k, v, visit_state)
 
 
 CreationChangeset = List[BpyIDProxy]
@@ -1047,7 +1026,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 self._data[name] = BpyIDRefProxy().load(item, visit_state)
         return self
 
-    def save(self, bl_instance: Any, attr_name: str):
+    def save(self, bl_instance: Any, attr_name: str, visit_state: VisitState):
         """
         Load a Blender object into this proxy
         """
@@ -1074,7 +1053,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 link(datablock)
         else:
             for k, v in self._data.items():
-                write_attribute(target, k, v)
+                write_attribute(target, k, v, visit_state)
 
     def find(self, key: str):
         return self._data.get(key)
@@ -1103,7 +1082,9 @@ class BpyPropDataCollectionProxy(Proxy):
                 # TODO Send a rename
                 # unique_name = name + "_" + incoming_proxy.mixer_uuid()*
                 unique_name = incoming_name + "_" + get_mixer_prefs().user + "_" + incoming_proxy.mixer_uuid()
-                logger.warning(f"Simultaneous creation. Renamed {incoming_proxy.data('name')} into {unique_name}")
+                logger.warning(
+                    f"Simultaneous creation. Renamed incoming {incoming_proxy.data('name')} into {unique_name}"
+                )
                 incoming_proxy.rename(unique_name)
                 name = unique_name
             else:
@@ -1112,7 +1093,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 # as the one we predend to create.
                 pass
 
-        datablock = incoming_proxy.create_standalone_datablock()
+        datablock = incoming_proxy.create_standalone_datablock(visit_state)
         if datablock:
             self._data[name] = incoming_proxy
             uuid = incoming_proxy.mixer_uuid()
@@ -1160,7 +1141,7 @@ class BpyPropDataCollectionProxy(Proxy):
             logger.warning(f"Non existent uuid {uuid} while updating {proxy.collection_name}[{proxy.data('name')}]")
             return None
 
-        id_ = proxy.update_standalone_datablock(existing_id)
+        id_ = proxy.update_standalone_datablock(existing_id, visit_state)
         if existing_id != id_:
             # Not a problem for light morphing
             logger.warning(f"Update_datablock changes datablock {existing_id} to {id_}")
@@ -1529,7 +1510,7 @@ proxy_classes = [
 ]
 
 
-def write_attribute(bl_instance, key: Union[str, int], value: Any):
+def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: VisitState):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
     """
@@ -1553,7 +1534,7 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any):
             if not prop.is_readonly:
                 setattr(bl_instance, key, value)
         else:
-            value.save(bl_instance, key)
+            value.save(bl_instance, key, visit_state)
     except TypeError as e:
         # common for enum that have unsupported default values, such as FFmpegSettings.ffmpeg_preset,
         # which seems initialized at "" and triggers :
