@@ -9,7 +9,6 @@ until all the messages are flushed and processed at the end before grabbing
 the messages from all Blender
 """
 from pathlib import Path
-from typing import Set
 import unittest
 import time
 
@@ -48,62 +47,6 @@ class ThrottledTestCase(BlenderTestCase):
         # TODO What os just enough ?
         time.sleep(4 * self.latency)
         super().assert_matches()
-
-
-@parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=ThrottledTestCase.get_class_name,
-)
-class TestSimultaneousCreate(ThrottledTestCase):
-    def setUp(self):
-        self.ignore: Set[MessageType] = set()
-        super().setUp("empty.blend")
-
-    def ignored_messages(self) -> Set[MessageType]:
-        return super().ignored_messages() | self.ignore
-
-    def test_empty_unlinked(self):
-        create_empty = bl.data_objects_new("Empty", None)
-        self.send_strings([create_empty], to=0)
-        time.sleep(0.0)
-        self.send_strings([create_empty], to=1)
-
-        self.assert_matches()
-        pass
-
-    def test_empty_unlinked_many(self):
-        create_empty = bl.data_objects_new("Empty", None)
-        create_empties = [create_empty] * 5
-        self.send_strings(create_empties, to=0)
-        time.sleep(0.0)
-        self.send_strings(create_empties, to=1)
-
-        self.assert_matches()
-        pass
-
-    def test_object_in_master_collection(self):
-
-        # these are broken
-        self.ignore = {
-            MessageType.LIGHT,
-            MessageType.OBJECT_VISIBILITY,
-            MessageType.ADD_OBJECT_TO_VRTIST,
-        }
-
-        location = "0.0, -3.0, 0.0"
-        self.send_strings([bl.active_layer_master_collection() + bl.ops_objects_light_add(location=location)], to=0)
-
-        # with a delay > latency all the messages are transmitted and the problem does not occur
-        # delay = 2.0
-
-        time.sleep(0.0)
-
-        location = "0.0, 3.0, 0.0"
-        self.send_strings([bl.active_layer_master_collection() + bl.ops_objects_light_add(location=location)], to=1)
-
-        if not self.experimental_sync:
-            self.expected_counts = {MessageType.LIGHT: 2}
-        self.assert_matches()
-        pass
 
 
 class TestCollectionInMasterRename(ThrottledTestCase):
