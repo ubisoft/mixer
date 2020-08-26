@@ -54,8 +54,12 @@ class MixerTestCase(unittest.TestCase):
         """
         Tweak test case name for parameterized (from parameterized doc)
         """
-        experimental = str(params_dict["experimental_sync"])
-        return f"{test_class.__name__}_Experimental_{experimental}"
+        if params_dict["experimental_sync"]:
+            suffix = "_FullBlender"
+        else:
+            suffix = "_VRtist"
+
+        return test_class.__name__ + suffix
 
     @property
     def _sender(self):
