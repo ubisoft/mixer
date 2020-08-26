@@ -89,9 +89,9 @@ class TestWriteAttribute(unittest.TestCase):
         expected_energy = 666
         light_proxy._data["energy"] = expected_energy
         light_type = light_proxy._data["type"]
-        light_proxy._data["name"] = clone_name
+        light_proxy.rename(clone_name)
         clone_light = D.lights.new(clone_name, light_type)
-        light_proxy.save(D.lights, clone_name)
+        light_proxy.save()
         self.assertEqual(clone_light.energy, expected_energy)
 
     def test_write_world(self):
@@ -100,8 +100,8 @@ class TestWriteAttribute(unittest.TestCase):
         clone_name = f"Clone of {world_name}"
         world_clone = D.worlds.new(clone_name)
         world_proxy = self.proxy._data["worlds"]._data[world_name]
-        world_proxy._data["name"] = clone_name
-        world_proxy.save(D.worlds, clone_name)
+        world_proxy.rename(clone_name)
+        world_proxy.save()
         self.assertEqual(world_clone, D.worlds[world_name])
 
     def test_write_array_curvemap(self):
@@ -119,9 +119,9 @@ class TestWriteAttribute(unittest.TestCase):
         clone_name = f"Clone of {light_name}"
         light_proxy = self.proxy._data["lights"]._data[light_name]
         light_type = light_proxy._data["type"]
-        light_proxy._data["name"] = clone_name
+        light_proxy.rename(clone_name)
         clone_light = D.lights.new(clone_name, light_type)
-        light_proxy.save(D.lights, clone_name)
+        light_proxy.save()
         clone_curve = clone_light.falloff_curve.curves[0]
         for i, point in enumerate(points):
             for clone, expected in zip(clone_curve.points[i].location, point):
@@ -146,9 +146,9 @@ class TestWriteAttribute(unittest.TestCase):
         dst_camera = D.cameras.new(dst_camera_name)
 
         # patch the light name to restore the proxy into dst_light
-        camera_proxy._data["name"] = dst_camera_name
+        camera_proxy.rename(dst_camera_name)
         # save() needs to shrink the dst curvemap
-        camera_proxy.save(D.cameras, dst_camera_name)
+        camera_proxy.save(D.cameras)
         self.assertEqual(dst_camera.dof.focus_object, focus_object)
 
     def test_shrink_array_curvemap(self):
@@ -177,7 +177,7 @@ class TestWriteAttribute(unittest.TestCase):
             curve0.points[i].location = point
 
         # patch the light name to restore the proxy into dst_light
-        light_proxy._data["name"] = dst_light_name
+        light_proxy.rename(dst_light_name)
         # save() needs to shrink the dst curvemap
         light_proxy.save(D.lights, dst_light_name)
         dst_curve = dst_light.falloff_curve.curves[0]
@@ -207,7 +207,7 @@ class TestWriteAttribute(unittest.TestCase):
         dst_light_name = "Dst Light"
         dst_light = D.lights.new(dst_light_name, light_type)
         # patch the light name to restore the proxy into dst_light
-        light_proxy._data["name"] = dst_light_name
+        light_proxy.rename(dst_light_name)
         # the dst curvemap has 2 points by default
         # save() needs to extend
         light_proxy.save(D.lights, dst_light_name)
@@ -222,7 +222,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene = D.scenes[scene_name]
         clone_name = f"Clone of {scene_name}"
         scene_proxy = self.proxy._data["scenes"]._data[scene_name]
-        scene_proxy._data["name"] = clone_name
+        scene_proxy.rename(clone_name)
         clone = D.scenes.new(clone_name)
         scene_proxy.save(D.scenes, clone_name)
         self.assertEqual(scene, clone)
