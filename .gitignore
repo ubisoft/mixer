@@ -49,6 +49,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# Windows archive file extensions
 *.zip
 *.7z
 *.rar
