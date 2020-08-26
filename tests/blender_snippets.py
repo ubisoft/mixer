@@ -61,6 +61,14 @@ def data_collections_rename(old_name: str, new_name: str) -> str:
     return data_xxx_rename("collections", old_name, new_name)
 
 
+def data_lights_update(name: str, property_update: str) -> str:
+    return data_xxx_update("objects", name, property_update)
+
+
+def data_lights_rename(old_name: str, new_name: str) -> str:
+    return data_xxx_rename("lights", old_name, new_name)
+
+
 def data_objects_new(*args: List[Any]) -> str:
     return data_xxx_new("objects", *args)
 
@@ -70,10 +78,7 @@ def data_objects_rename(old_name: str, new_name: str) -> str:
 
 
 def data_objects_update(name: str, property_update: str) -> str:
-    return f"""
-import bpy
-bpy.data.objects["{name}"]{property_update}
-"""
+    return data_xxx_update("objects", name, property_update)
 
 
 def data_scenes_rename(old_name: str, new_name: str) -> str:
@@ -84,6 +89,13 @@ def data_xxx_rename(collection_name: str, old_name: str, new_name: str) -> str:
     return f"""
 import bpy
 bpy.data.{collection_name}["{old_name}"].name = "{new_name}"
+"""
+
+
+def data_xxx_update(collection_name: str, name: str, property_update: str) -> str:
+    return f"""
+import bpy
+bpy.data.{collection_name}["{name}"]{property_update}
 """
 
 
