@@ -4,6 +4,7 @@ import time
 from typing import Dict, Any, Mapping, Optional, List, Callable
 
 import mixer.broadcaster.common as common
+from mixer.broadcaster.socket import Socket
 from mixer.broadcaster.common import MessageType
 from mixer.broadcaster.common import update_attributes_and_get_diff, update_named_attributes
 
@@ -19,11 +20,11 @@ class Client:
     - maintain an updated view of clients and room states from server's inputs
     """
 
-    def __init__(self, host=common.DEFAULT_HOST, port=common.DEFAULT_PORT):
+    def __init__(self, host: str = common.DEFAULT_HOST, port: int = common.DEFAULT_PORT):
         self.host = host
         self.port = port
         self.pending_commands: List[common.Command] = []
-        self.socket = None
+        self.socket: Socket = None
 
         self.client_id: Optional[str] = None  # Will be filled with a unique string identifying this client
         self.current_custom_attributes: Dict[str, Any] = {}
@@ -48,7 +49,8 @@ class Client:
             raise RuntimeError("Client.connect : already connected")
 
         try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket = Socket(sock)
             self.socket.settimeout(5.0)
             self.socket.connect((self.host, self.port))
 
@@ -190,6 +192,11 @@ class Client:
         logger.info("Join room %s confirmed by server", room_name)
         self.current_room = room_name
 
+    def _handle_send_error(self, command: common.Command):
+        error_message, _ = common.decode_string(command.data, 0)
+
+        logger.error("Received error message : %s", error_message)
+
     _default_command_handlers: Mapping[MessageType, Callable[[common.Command], None]] = {
         MessageType.LIST_CLIENTS: _handle_list_client,
         MessageType.LIST_ROOMS: _handle_list_rooms,
@@ -199,6 +206,7 @@ class Client:
         MessageType.CLIENT_UPDATE: _handle_client_update,
         MessageType.CLIENT_DISCONNECTED: _handle_client_disconnected,
         MessageType.JOIN_ROOM: _handle_join_room,
+        MessageType.SEND_ERROR: _handle_send_error,
     }
 
     def has_default_handler(self, message_type: MessageType):

@@ -1,23 +1,23 @@
-import unittest
-from tests.vrtist.testcase import VRtistTestCase
 from pathlib import Path
-import logging
+import unittest
+
+from parameterized import parameterized_class
+from tests.mixer_testcase import BlenderDesc
+from tests.vrtist.vrtist_testcase import VRtistTestCase
 
 
-class TestCollectionDefaultDoc(VRtistTestCase):
+@parameterized_class(
+    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=VRtistTestCase.get_class_name,
+)
+class TestCollection(VRtistTestCase):
     def setUp(self):
         folder = Path(__file__).parent.parent
         sender_blendfile = folder / "basic.blend"
         receiver_blendfile = folder / "empty.blend"
-        sender_wait_for_debugger = False
-        receiver_wait_for_debugger = False
-        self.set_log_level(logging.DEBUG)
-        super().setUp(
-            sender_blendfile,
-            receiver_blendfile,
-            sender_wait_for_debugger=sender_wait_for_debugger,
-            receiver_wait_for_debugger=receiver_wait_for_debugger,
-        )
+        sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
+        receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
+        blenderdescs = [sender, receiver]
+        super().setUp(blenderdescs=blenderdescs)
 
     def test_create_collection_in_collection(self):
         self.new_collection("plop")
@@ -132,8 +132,8 @@ class TestCollectionDefaultDoc(VRtistTestCase):
         self.new_collection_instance("src", "src_instance_in_dst")
         self.link_object_to_collection("Collection", "src_instance_in_Collection")
         self.link_object_to_collection("dst", "src_instance_in_dst")
-        self._sender.connect_and_join_mixer()
-        self._receiver.connect_and_join_mixer()
+        self._sender.connect_and_join_mixer(experimental=self.experimental_sync)
+        self._receiver.connect_and_join_mixer(experimental=self.experimental_sync)
         self.assert_matches()
 
     def test_rename_collection(self):

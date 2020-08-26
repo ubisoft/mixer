@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import List
+from typing import List, Optional, Mapping
 import sys
 
 import tests.blender_lib as bl
@@ -22,16 +22,16 @@ class BlenderApp:
     def set_log_level(self, log_level: int):
         self._log_level = log_level
 
-    def setup(self, blender_args: List = None):
+    def setup(self, blender_args: List = None, env: Optional[Mapping[str, str]] = None):
         self._blender = BlenderServer(self._port, self._ptvsd_port, self._wait_for_debugger)
-        self._blender.start(blender_args)
+        self._blender.start(blender_args, env)
         self._blender.connect()
 
-    def connect_and_join_mixer(self, room_name="mixer_unittest", keep_room_open=False):
+    def connect_and_join_mixer(self, room_name="mixer_unittest", keep_room_open=False, experimental_sync: bool = False):
         if self._log_level is not None:
             self._blender.send_function(mixer_lib.set_log_level, self._log_level)
         self._blender.send_function(mixer_lib.connect)
-        self._blender.send_function(mixer_lib.join_room, room_name)
+        self._blender.send_function(mixer_lib.join_room, room_name, experimental_sync)
         self._blender.send_function(mixer_lib.keep_room_open, room_name, keep_room_open)
 
     def disconnect_mixer(self):

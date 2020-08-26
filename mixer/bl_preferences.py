@@ -99,7 +99,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
     )
 
     experimental_sync: bpy.props.BoolProperty(
-        name="Experimental sync", default=os.environ.get("MIXER_EXPERIMENTAL_SYNC") is not None
+        name="Experimental sync", default=os.environ.get("MIXER_EXPERIMENTAL_SYNC") == "1"
     )
 
     show_server_console: bpy.props.BoolProperty(name="Show Server Console", default=False)
@@ -116,7 +116,9 @@ class MixerPreferences(bpy.types.AddonPreferences):
     # Allow to quickly iterate debugging/test on large scenes with only one client in room
     # Main usage: optimization of client timers to check if updates are required
     no_send_scene_content: bpy.props.BoolProperty(default=False)
-
+    no_start_server: bpy.props.BoolProperty(
+        name="Do not start server", default=os.environ.get("MIXER_NO_START_SERVER") is not None
+    )
     send_base_meshes: bpy.props.BoolProperty(default=True)
     send_baked_meshes: bpy.props.BoolProperty(default=True)
 
