@@ -115,8 +115,7 @@ class TestLoadProxy(unittest.TestCase):
         cam_proxy = self.proxy.data("cameras").data("Camera_0")
         focus_object_proxy = cam_proxy.data("dof").data("focus_object")
         self.assertIsInstance(focus_object_proxy, BpyIDRefProxy)
-        self.assertEqual(focus_object_proxy.collection, "objects")
-        self.assertEqual(focus_object_proxy.key, "Cube")
+        self.assertEqual(focus_object_proxy._datablock_uuid, D.objects["Cube"].mixer_uuid)
 
     def test_camera_focus_object_none(self):
         # test_misc.TestLoadProxy.test_camera_focus_object_none

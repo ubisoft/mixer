@@ -3,10 +3,7 @@ import unittest
 import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from mixer.blender_data.proxy import (
-    BpyBlendProxy,
-    write_attribute,
-)
+from mixer.blender_data.proxy import BpyBlendProxy, BpyIDProxy, BpyIDRefProxy, write_attribute
 from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
 from mixer.blender_data.filter import test_context
@@ -44,7 +41,7 @@ class TestWriteAttribute(unittest.TestCase):
             (object_, "matrix_world", Matrix(matrix2)),
         ]
         for bl_instance, name, value in values:
-            write_attribute(bl_instance, name, value)
+            write_attribute(bl_instance, name, value, self.proxy.visit_state())
             stored_value = getattr(bl_instance, name)
             stored_type = type(stored_value)
             self.assertEqual(stored_type(value), stored_value)
@@ -53,7 +50,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene = D.scenes[0]
         eevee_proxy = self.proxy._data["scenes"]._data["Scene_0"]._data["eevee"]
         eevee_proxy._data["gi_cubemap_resolution"] = "64"
-        eevee_proxy.save(scene, "eevee")
+        eevee_proxy.save(scene, "eevee", self.proxy.visit_state())
         self.assertEqual("64", scene.eevee.gi_cubemap_resolution)
 
     def test_write_bpy_property_group_scene_cycles(self):
@@ -61,7 +58,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene = D.scenes[0]
         cycles_proxy = self.proxy._data["scenes"]._data["Scene_0"]._data["cycles"]
         cycles_proxy._data["shading_system"] = True
-        cycles_proxy.save(scene, "cycles")
+        cycles_proxy.save(scene, "cycles", self.proxy.visit_state())
         self.assertEqual(True, scene.cycles.shading_system)
 
     def test_write_array_of_struct_with_vec(self):
@@ -77,7 +74,7 @@ class TestWriteAttribute(unittest.TestCase):
         co_proxy[1] *= 2
         co_proxy[2] *= 2
 
-        vertices_proxy.save(cube, "vertices")
+        vertices_proxy.save(cube, "vertices", self.proxy.visit_state())
         self.assertListEqual(list(cube.vertices[0].co[0:3]), co_proxy[0:3].tolist())
 
     # explicit test per data type , including addition in collections
@@ -126,30 +123,6 @@ class TestWriteAttribute(unittest.TestCase):
         for i, point in enumerate(points):
             for clone, expected in zip(clone_curve.points[i].location, point):
                 self.assertAlmostEqual(clone, expected)
-
-    def test_write_camera_dof_target(self):
-        # test_write.TestWriteAttribute.test_write_camera_dof_target
-        # write an ID ref
-        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
-
-        src_camera_name = "Camera_0"
-        src_camera = D.cameras[src_camera_name]
-        focus_object = D.objects["Cube"]
-        src_camera.dof.focus_object = focus_object
-
-        self.proxy = BpyBlendProxy()
-        self.proxy.load(context)
-        camera_proxy = self.proxy.data("cameras").data(src_camera_name)
-
-        # Create a light then restore src_light into it
-        dst_camera_name = "Dst Camera"
-        dst_camera = D.cameras.new(dst_camera_name)
-
-        # patch the light name to restore the proxy into dst_light
-        camera_proxy.rename(dst_camera_name)
-        # save() needs to shrink the dst curvemap
-        camera_proxy.save(D.cameras)
-        self.assertEqual(dst_camera.dof.focus_object, focus_object)
 
     def test_shrink_array_curvemap(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
@@ -217,22 +190,49 @@ class TestWriteAttribute(unittest.TestCase):
             for dst, expected in zip(dst_curve.points[i].location, point):
                 self.assertAlmostEqual(dst, expected)
 
-    def test_write_scene(self):
+    def test_write_datablock_scene(self):
+        # Write a whole scene datablock
         scene_name = "Scene_0"
         scene = D.scenes[scene_name]
-        clone_name = f"Clone of {scene_name}"
-        scene_proxy = self.proxy._data["scenes"]._data[scene_name]
-        scene_proxy.rename(clone_name)
-        clone = D.scenes.new(clone_name)
-        scene_proxy.save(D.scenes, clone_name)
-        self.assertEqual(scene, clone)
+        scene_proxy = self.proxy.data("scenes").data(scene_name)
+        self.assertIsInstance(scene_proxy, BpyIDProxy)
 
-    def test_write_scene_world(self):
+        scene.name = "scene_bak"
+        scene_bak = D.scenes["scene_bak"]
+
+        scene_proxy.save(D.scenes, scene_name, self.proxy.visit_state())
+        self.assertEqual(D.scenes[scene_name], scene_bak)
+
+    def test_write_datablock_reference_scene_world(self):
+        # just write the Scene.world attribute
         scene_name = "Scene_0"
         scene = D.scenes[scene_name]
-        # scene.world = D.worlds["World_1"]
-        clone_name = f"Clone of {scene_name}"
-        world_proxy = self.proxy._data["scenes"]._data[scene_name]._data["world"]
-        clone = D.scenes.new(clone_name)
-        world_proxy.save(clone, "world")
-        self.assertEqual(scene.world, clone.world)
+        expected_world = scene.world
+        assert expected_world is not None
+
+        world_ref_proxy = self.proxy.data("scenes").data(scene_name).data("world")
+        self.assertIsInstance(world_ref_proxy, BpyIDRefProxy)
+
+        scene.world = None
+        assert scene.world != expected_world
+
+        world_ref_proxy.save(scene, "world", self.proxy.visit_state())
+        self.assertEqual(scene.world, expected_world)
+
+    def test_write_datablock_with_reference_camera_dof_target(self):
+        # Write the whole camera datablock, including its reference to dof target
+
+        camera_name = "Camera_0"
+        camera = D.cameras[camera_name]
+
+        # setup the scene and reload
+        focus_object = D.objects["Cube"]
+        camera.dof.focus_object = focus_object
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(context)
+
+        camera.name = "camera_bak"
+
+        camera_proxy = self.proxy.data("cameras").data(camera_name)
+        camera_proxy.save(D.cameras, camera_name, self.proxy.visit_state())
+        self.assertEqual(D.cameras[camera_name].dof.focus_object, focus_object)
