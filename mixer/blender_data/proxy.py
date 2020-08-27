@@ -495,15 +495,7 @@ class BpyIDProxy(BpyStructProxy):
                 logger.warning(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
         datablock.mixer_uuid = self.mixer_uuid()
-        datablock = specifics.pre_save_id(self, datablock)
-        if datablock is None:
-            logger.warning(f"BpyIDProxy.save() {self} pre_save_id returns None")
-            return None
-
-        for k, v in self._data.items():
-            write_attribute(datablock, k, v, visit_state)
-
-        return datablock
+        return self.update_standalone_datablock(datablock, visit_state)
 
     def update_standalone_datablock(self, datablock: T.ID, visit_state: VisitState) -> T.ID:
         """
@@ -513,7 +505,7 @@ class BpyIDProxy(BpyStructProxy):
 
         datablock = specifics.pre_save_id(self, datablock)
         if datablock is None:
-            logger.warning(f"BpyIDProxy.save() {self} pre_save_id returns None")
+            logger.warning(f"BpyIDProxy.update_standalone_datablock() {self} pre_save_id returns None")
             return None
 
         for k, v in self._data.items():
