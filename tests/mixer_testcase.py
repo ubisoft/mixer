@@ -6,7 +6,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, Iterable, List, Optional, Set
+from typing import Any, Iterable, List, Optional
 import unittest
 
 from tests.blender_app import BlenderApp
