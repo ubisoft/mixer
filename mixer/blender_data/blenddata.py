@@ -22,6 +22,10 @@ collection_name_to_type = {
     if p.bl_rna.identifier == "CollectionProperty"
 }
 
+# Map object type name to root collection
+# e.g. "Object" -> "objects", "Light" -> "lights"
+rna_identifier_to_collection_name = {value.bl_rna.identifier: key for key, value in collection_name_to_type.items()}
+
 
 class BlendDataCollection:
     """

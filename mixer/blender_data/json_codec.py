@@ -24,7 +24,7 @@ collection_classes = [
 _classes = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
 
-options = ["_bpy_data_collection", "_blenddata_path", "_class_name", "_datablock_uuid"]
+options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name"]
 
 
 def default_optional(obj, option_name: str) -> Mapping[str, Any]:

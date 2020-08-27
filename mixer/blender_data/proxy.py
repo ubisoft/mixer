@@ -18,9 +18,10 @@ from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import (
     BlendData,
     collection_name_to_type,
+    rna_identifier_to_collection_name,
     bl_rna_to_type,
 )
-from mixer.blender_data.types import is_builtin, is_vector, is_matrix, is_pointer_to
+from mixer.blender_data.types import bases_of, is_builtin, is_vector, is_matrix, is_pointer_to
 from mixer.bl_utils import get_mixer_prefs
 
 DEBUG = True
@@ -628,6 +629,13 @@ class BpyIDRefProxy(Proxy):
         self._datablock_uuid: str = None
         # Not used but "required" by the json codec
         self._data: Dict[str, Any] = {}
+        self._bpy_data_collection: str = None
+        self._initial_name: str = None
+
+        self._debug_name = None
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({self._datablock_uuid}, bpy.data.{self._bpy_data_collection}, name at creation: {self._initial_name})"
 
     def load(self, datablock: T.ID, visit_state: VisitState) -> BpyIDRefProxy:
         """
@@ -635,7 +643,16 @@ class BpyIDRefProxy(Proxy):
         """
         assert not datablock.is_embedded_data
 
+        # see HACK in target()
+        # Base type closest to ID (e.g. Light for Point)
+        type_ = bases_of(type(datablock).bl_rna)[-2]
+        type_name = type_.bl_rna.identifier
+        self._bpy_data_collection = rna_identifier_to_collection_name[type_name]
+        self._initial_name = datablock.name
+
         self._datablock_uuid = datablock.mixer_uuid
+
+        self._debug_name = str(datablock)
         return self
 
     def save(self, container: Union[T.ID, T.bpy_prop_collection], key: str, visit_state: VisitState):
@@ -645,9 +662,7 @@ class BpyIDRefProxy(Proxy):
         """
         ref_target = self.target(visit_state)
         if ref_target is None:
-            logger.warning(
-                f"BpyIDRefProxy.save do not save reference (target does not exist) {container}.{key} -> bpy.data.{self.collection}[{self.key}]"
-            )
+            logger.warning(f"BpyIDRefProxy. Target of {container}.{key} not found. Last known name {self._debug_name}")
         if isinstance(container, T.bpy_prop_collection):
             # reference stored in a collection
             if isinstance(key, str):
@@ -677,7 +692,26 @@ class BpyIDRefProxy(Proxy):
         """
         datablock = visit_state.ids.get(self._datablock_uuid)
         if datablock is None:
-            logger.warning(f"BpyIDRef. No datablock for uuid {self._datablock_uuid}")
+            # HACK
+            # We are trying to find the target of a datablock reference like Object.mesh and the datablock
+            # is not known to the proxy state (visit_state). This occurs when the target datablock is of
+            # un unsynchronized type (Mesh, currently). If the datablock can be found by name, consider
+            # it was created under the hood by a VRtist command and register it.
+            collection = getattr(bpy.data, self._bpy_data_collection, None)
+            if collection is None:
+                logger.warning(f"{self}: reference to unknown collection bpy.data.{self.collection_name}")
+                return None
+
+            datablock = collection.get(self._initial_name)
+            if datablock is None:
+                logger.warning(f"{self}: target unknown")
+                return None
+
+            assert datablock.mixer_uuid == ""
+            datablock.mixer_uuid = self._datablock_uuid
+            visit_state.ids[self._datablock_uuid] = datablock
+            logger.warning(f"{self}: registering {datablock}")
+
         return datablock
 
 
