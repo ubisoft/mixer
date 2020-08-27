@@ -52,11 +52,7 @@ class ThrottledTestCase(BlenderTestCase):
 )
 class TestSimultaneousCreate(ThrottledTestCase):
     def setUp(self):
-        self.ignore: Set[MessageType] = set()
         super().setUp("empty.blend")
-
-    def ignored_messages(self) -> Set[MessageType]:
-        return super().ignored_messages() | self.ignore
 
     def test_empty_unlinked(self):
         empties = 2
@@ -101,7 +97,7 @@ class TestSimultaneousCreate(ThrottledTestCase):
         else:
             scenes = 1
             # these are broken
-            self.ignore = {
+            self.ignored_messages |= {
                 MessageType.ADD_OBJECT_TO_VRTIST,
             }
             self.expected_counts = {MessageType.BLENDER_DATA_CREATE: lights + scenes}

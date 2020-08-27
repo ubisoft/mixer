@@ -45,6 +45,7 @@ class MixerTestCase(unittest.TestCase):
         self._log_level = logging.INFO
         self._server_process: ServerProcess = ServerProcess()
         self._blenders: List[BlenderApp] = []
+        self.ignored_messages = set()
 
     def set_log_level(self, log_level):
         self._log_level = log_level
@@ -68,10 +69,6 @@ class MixerTestCase(unittest.TestCase):
     @property
     def _receiver(self):
         return self._blenders[1]
-
-    @classmethod
-    def ignored_messages(cls) -> Set[MessageType]:
-        return set()
 
     def setUp(
         self,
@@ -244,7 +241,7 @@ class MixerTestCase(unittest.TestCase):
             stream.sort()
             return stream
 
-        message_types = streams_a.commands.keys() - self.ignored_messages()
+        message_types = streams_a.commands.keys() - self.ignored_messages
         for message_type in message_types:
             commands_a, commands_b = streams_a.commands[message_type], streams_b.commands[message_type]
             len_a = len(commands_a)
