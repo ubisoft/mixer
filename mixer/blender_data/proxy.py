@@ -782,7 +782,7 @@ class AosElement(Proxy):
         # ]
         # return self
 
-    def save(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str):
+    def save(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str, visit_state: VisitState):
 
         logger.warning(f"Not implemented. Save AOS  element for {bl_collection}.{attr_name} ")
 
@@ -832,7 +832,7 @@ class SoaElement(Proxy):
         self._data = buffer
         return self
 
-    def save(self, bl_collection, attr_name):
+    def save(self, bl_collection, attr_name, visit_state: VisitState):
         # TODO : serialization currently not performed
         bl_collection.foreach_set(attr_name, self._data)
 
@@ -1028,7 +1028,7 @@ class BpyPropDataCollectionProxy(Proxy):
 
     def save(self, bl_instance: Any, attr_name: str, visit_state: VisitState):
         """
-        Load a Blender object into this proxy
+        Save this Proxy into a Blender property
         """
         if not self._data:
             return
@@ -1294,6 +1294,9 @@ class BpyBlendProxy(Proxy):
             name: BpyPropDataCollectionProxy() for name in BlendData.instance().collection_names()
         }
 
+    def visit_state(self, context: Context = safe_context):
+        return VisitState(self.root_ids, self.id_proxies, self.ids, context)
+
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}
 
@@ -1512,7 +1515,7 @@ proxy_classes = [
 
 def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: VisitState):
     """
-    Load a property into a python object of the appropriate type, be it a Proxy or a native python object
+    Write a value into a Blender property
     """
 
     if bl_instance is None:
