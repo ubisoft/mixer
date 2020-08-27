@@ -56,7 +56,7 @@ class MixerTestCase(unittest.TestCase):
         Tweak test case name for parameterized (from parameterized doc)
         """
         if params_dict["experimental_sync"]:
-            suffix = "_FullBlender"
+            suffix = "_Generic"
         else:
             suffix = "_VRtist"
 
