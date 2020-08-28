@@ -245,19 +245,10 @@ class MixerTestCase(unittest.TestCase):
         for message_type in message_types:
             commands_a, commands_b = streams_a.commands[message_type], streams_b.commands[message_type]
             len_a = len(commands_a)
-            message_name = str(MessageType(message_type))
-            # self.assertEqual(len_a, len_b, f"command stream length mismatch for {message_name}: {len_a} and {len_b}")
-
-            expected_count = self.expected_counts.get(message_type)
-            if expected_count is not None:
-                self.assertEqual(
-                    expected_count,
-                    len_a,
-                    f"Unexpected message count for message {message_name}. Expected {expected_count}: found {len_a}",
-                )
             if len_a == 0:
                 continue
 
+            message_name = str(MessageType(message_type))
             logger.info(f"Message count for {message_name:16} : {len_a}")
 
             # Equality tests required to handle float comparison.
@@ -267,15 +258,24 @@ class MixerTestCase(unittest.TestCase):
             if mixer.codec.is_registered(message_type):
                 decoded_stream_a = decode_and_sort_messages(commands_a)
                 decoded_stream_b = decode_and_sort_messages(commands_b)
+                if message_type in {MessageType.BLENDER_DATA_CREATE, MessageType.BLENDER_DATA_UPDATE}:
+                    string_a = "\n".join([message.proxy_string for message in decoded_stream_a])
+                    string_b = "\n".join([message.proxy_string for message in decoded_stream_b])
+                else:
+                    string_a = "\n".join([str(message) for message in decoded_stream_a])
+                    string_b = "\n".join([str(message) for message in decoded_stream_b])
+                detail_message = f"Stream_a\n{string_a}\nStream_b\n{string_b}\n"
+
                 if len(decoded_stream_a) != len(decoded_stream_b):
+                    self.failureException(f"{message_type} : sequence length mismatch:\n{detail_message}")
 
-                    def dump(stream):
-                        return "\n".join([message.proxy_string for message in stream])
-
-                    string_a = dump(decoded_stream_a)
-                    string_b = dump(decoded_stream_b)
-                    message = f"stream_a\n{string_a}\nStream_b\n{string_b}\n"
-                    self.failureException(f"{message_type} : sequence length mismatch:{message}")
+                expected_count = self.expected_counts.get(message_type)
+                if expected_count is not None:
+                    self.assertEqual(
+                        expected_count,
+                        len_a,
+                        f"Unexpected message count for message {message_name}. Expected {expected_count}: found {len_a}\n{detail_message}",
+                    )
 
                 for i, (decoded_a, decoded_b) in enumerate(zip(decoded_stream_a, decoded_stream_b)):
                     # TODO there another failure case with floats as they will cause sort differences for proxies
