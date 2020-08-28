@@ -1,10 +1,10 @@
-from pathlib import Path
 import unittest
 
 from parameterized import parameterized_class
 
 from mixer.broadcaster.common import MessageType
 
+from tests import files_folder
 from tests.vrtist.vrtist_testcase import VRtistTestCase
 from tests.mixer_testcase import BlenderDesc
 from tests import blender_snippets as bl
@@ -15,9 +15,8 @@ from tests import blender_snippets as bl
 )
 class TestSpontaneousRename(VRtistTestCase):
     def setUp(self):
-        folder = Path(__file__).parent.parent
-        sender_blendfile = folder / "empty.blend"
-        receiver_blendfile = folder / "empty.blend"
+        sender_blendfile = files_folder() / "empty.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
         blenderdescs = [sender, receiver]
@@ -58,9 +57,8 @@ class TestReferencedDatablock(VRtistTestCase):
     """
 
     def setUp(self):
-        folder = Path(__file__).parent.parent
-        sender_blendfile = folder / "empty.blend"
-        receiver_blendfile = folder / "empty.blend"
+        sender_blendfile = files_folder() / "empty.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
         blenderdescs = [sender, receiver]
@@ -109,9 +107,8 @@ class TestRenameDatablock(VRtistTestCase):
     """
 
     def setUp(self):
-        folder = Path(__file__).parent.parent
-        sender_blendfile = folder / "empty.blend"
-        receiver_blendfile = folder / "empty.blend"
+        sender_blendfile = files_folder() / "empty.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
         blenderdescs = [sender, receiver]

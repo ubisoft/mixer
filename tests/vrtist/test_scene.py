@@ -1,10 +1,11 @@
 import logging
-from pathlib import Path
 import unittest
 
 from parameterized import parameterized_class
 
 from mixer.broadcaster.common import MessageType
+
+from tests import files_folder
 from tests.mixer_testcase import BlenderDesc
 from tests.vrtist.vrtist_testcase import VRtistTestCase
 
@@ -14,9 +15,8 @@ from tests.vrtist.vrtist_testcase import VRtistTestCase
 )
 class TestSceneEmptyDoc(VRtistTestCase):
     def setUp(self):
-        folder = Path(__file__).parent.parent
-        sender_blendfile = folder / "empty.blend"
-        receiver_blendfile = folder / "empty.blend"
+        sender_blendfile = files_folder() / "empty.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
         blenderdescs = [BlenderDesc(load_file=sender_blendfile), BlenderDesc(load_file=receiver_blendfile)]
         self._log_level = logging.INFO
         super().setUp(blenderdescs=blenderdescs)

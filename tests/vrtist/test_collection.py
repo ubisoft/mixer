@@ -1,7 +1,8 @@
-from pathlib import Path
 import unittest
 
 from parameterized import parameterized_class
+
+from tests import files_folder
 from tests.mixer_testcase import BlenderDesc
 from tests.vrtist.vrtist_testcase import VRtistTestCase
 
@@ -11,9 +12,8 @@ from tests.vrtist.vrtist_testcase import VRtistTestCase
 )
 class TestCollection(VRtistTestCase):
     def setUp(self):
-        folder = Path(__file__).parent.parent
-        sender_blendfile = folder / "basic.blend"
-        receiver_blendfile = folder / "empty.blend"
+        sender_blendfile = files_folder() / "basic.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
         blenderdescs = [sender, receiver]

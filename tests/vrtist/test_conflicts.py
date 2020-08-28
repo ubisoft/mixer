@@ -5,14 +5,14 @@ for instance rename a collection on one side and add to collection on the other 
 Such conflits need a server with throttling control to reproduce the problem reliably.
 
 """
-from pathlib import Path
-import unittest
 import time
+import unittest
 
 from parameterized import parameterized_class
 
 from mixer.broadcaster.common import MessageType
 
+from tests import files_folder
 import tests.blender_snippets as bl
 from tests.blender.blender_testcase import BlenderTestCase
 from tests.mixer_testcase import BlenderDesc
@@ -21,8 +21,7 @@ from tests.mixer_testcase import BlenderDesc
 class ThrottledTestCase(BlenderTestCase):
     def setUp(self, startup_file: str = "file2.blend"):
         try:
-            files_folder = Path(__file__).parent / "files"
-            file = files_folder / startup_file
+            file = files_folder() / startup_file
             blenderdesc = BlenderDesc(load_file=file)
             blenderdescs = [blenderdesc, BlenderDesc()]
 
