@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 import traceback
-from typing import ItemsView, List, TypeVar, Union
+from typing import Any, ItemsView, List, Optional, TypeVar
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -16,7 +16,7 @@ Proxy = TypeVar("Proxy")
 BpyIDProxy = TypeVar("BpyIDProxy")
 
 
-def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
+def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy, visit_state: Any) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     BlendData.instance().collection(collection_name).set_dirty
     if collection_name == "images":
@@ -54,7 +54,7 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
                 )
                 logger.warning("... loaded as Empty")
             else:
-                target = target_proxy.target()
+                target = target_proxy.target(visit_state)
         object_ = collection.new(name, target)
         return object_
 
@@ -155,8 +155,8 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
     return properties
 
 
-def pre_save_id(proxy: Proxy, collection: T.bpy_prop_collection, key: str) -> T.Struct:
-    """Process attributes that must be saved first and return a possibily updated reference to the target
+def pre_save_id(proxy: Proxy, target: T.ID) -> T.ID:
+    """Process attributes that must be saved first and return a possibly updated reference to the target
 
     Args:
         bpy_struct: The collection that contgains the ID
@@ -165,7 +165,6 @@ def pre_save_id(proxy: Proxy, collection: T.bpy_prop_collection, key: str) -> T.
     Returns:
         [bpy.types.ID]: a possibly new ID
     """
-    target = proxy.target(collection, key)
     if isinstance(target, T.Scene):
         # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
         use_nodes = proxy.data("use_nodes")
@@ -180,7 +179,7 @@ def pre_save_id(proxy: Proxy, collection: T.bpy_prop_collection, key: str) -> T.
         if light_type is not None and light_type != target.type:
             target.type = light_type
             # must reload the reference
-            target = proxy.target(collection, key)
+            target = proxy.target()
     elif isinstance(target, T.ColorManagedViewSettings):
         use_curve_mapping = proxy.data("use_curve_mapping")
         if use_curve_mapping:

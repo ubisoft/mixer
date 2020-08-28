@@ -13,8 +13,9 @@ from mixer.blender_data.diff import BpyBlendDiff
 
 class TestWorld(unittest.TestCase):
     def setUp(self):
-        self.proxy = BpyBlendProxy()
+        self.bpy_data_proxy = BpyBlendProxy()
         self.diff = BpyBlendDiff()
+        bpy.data.worlds[0].name = "World"
         register_bl_equals(self, safe_context)
 
     def test_world(self):
@@ -22,17 +23,18 @@ class TestWorld(unittest.TestCase):
         world.use_nodes = True
         self.assertGreaterEqual(len(world.node_tree.nodes), 2)
 
-        self.diff.diff(self.proxy, safe_context)
+        self.diff.diff(self.bpy_data_proxy, safe_context)
         sent_ids = {}
         sent_ids.update({("worlds", world.name): world})
 
-        updates, _ = self.proxy.update(self.diff, safe_context)
+        changeset = self.bpy_data_proxy.update(self.diff, safe_context)
+        updates = changeset.creations
         # avoid clash on restore
         world.name = world.name + "_bak"
 
         codec = Codec()
         for update in updates:
-            key = (update.collection_name(), update.collection_key())
+            key = (update.collection_name, update.data("name"))
             sent_id = sent_ids.get(key)
             if sent_id is None:
                 continue
@@ -42,23 +44,24 @@ class TestWorld(unittest.TestCase):
             #######################
             # receiver side
             decoded = codec.decode(encoded)
-            created = self.proxy.update_one(decoded)
+            created = self.bpy_data_proxy.update_datablock(decoded)
             self.assertEqual(created, sent_id)
 
     def test_non_existing(self):
         world = bpy.data.worlds[0]
 
-        self.diff.diff(self.proxy, safe_context)
+        self.diff.diff(self.bpy_data_proxy, safe_context)
         sent_ids = {}
         sent_ids.update({("worlds", world.name): world})
 
-        updates, _ = self.proxy.update(self.diff, safe_context)
+        changeset = self.bpy_data_proxy.update(self.diff, safe_context)
+        creations = changeset.creations
         # avoid clash on restore
         world.name = world.name + "_bak"
 
         codec = Codec()
-        for update in updates:
-            key = (update.collection_name(), update.collection_key())
+        for update in creations:
+            key = (update.collection_name, update.data("name"))
             sent_id = sent_ids.get(key)
             if sent_id is None:
                 continue
@@ -74,5 +77,5 @@ class TestWorld(unittest.TestCase):
             #######################
             # receiver side
             decoded = codec.decode(encoded)
-            created = self.proxy.update_one(decoded)
+            created = self.bpy_data_proxy.update_datablock(decoded)
             self.assertEqual(created, sent_id)

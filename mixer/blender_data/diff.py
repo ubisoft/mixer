@@ -1,5 +1,5 @@
 import logging
-from typing import Any, List, Mapping, Tuple, TypeVar
+from typing import List, Mapping, Tuple
 
 import bpy
 import bpy.types as T  # noqa
@@ -9,27 +9,24 @@ from mixer.blender_data.filter import Context, skip_bpy_data_item
 from mixer.blender_data.proxy import (
     BpyBlendProxy,
     BpyIDProxy,
-    BpyStructProxy,
     BpyPropDataCollectionProxy,
     ensure_uuid,
-    Proxy,
 )
 
 logger = logging.getLogger(__name__)
-
 Uuid = str
 BlendDataCollectionName = str
-Name = str
-BpyIDDiff = TypeVar("BpyIDDiff")
-# Item name : collection name
-ItemsAdded = Mapping[Name, Name]
-ItemsRemoved = List[Tuple[Name, Uuid]]
-ItemsRenamed = List[Tuple[Name, Name]]
-ItemsUpdated = Mapping[Name, BpyIDDiff]
+ItemsAdded = Mapping[str, str]
+# Item_name : collection_name
+
+ItemsRemoved = List[BpyIDProxy]
+
+ItemsRenamed = List[Tuple[BpyIDProxy, str]]
+# (proxy, old_name)
 
 
 def find_renamed(
-    proxy_items: Mapping[Uuid, Name], blender_items: Mapping[Uuid, Tuple[Name, T.bpy_prop_collection]]
+    proxy_items: Mapping[Uuid, BpyIDProxy], blender_items: Mapping[Uuid, Tuple[str, str]]
 ) -> Tuple[ItemsAdded, ItemsRemoved, ItemsRenamed]:
     """
     Split before/after mappings into added/removed/renamed
@@ -39,12 +36,16 @@ def find_renamed(
     proxy_uuids = set(proxy_items.keys())
     blender_uuids = set(blender_items.keys())
 
-    renamed_uuids = {uuid for uuid in blender_uuids & proxy_uuids if proxy_items[uuid] != blender_items[uuid][0]}
+    renamed_uuids = {
+        uuid for uuid in blender_uuids & proxy_uuids if proxy_items[uuid].data("name") != blender_items[uuid][0]
+    }
     added_uuids = blender_uuids - proxy_uuids - renamed_uuids
     removed_uuids = proxy_uuids - blender_uuids - renamed_uuids
 
     added_items = {blender_items[uuid][0]: blender_items[uuid][1] for uuid in added_uuids}
-    removed_items = [(proxy_items[uuid], uuid) for uuid in removed_uuids]
+    removed_items = [proxy_items[uuid] for uuid in removed_uuids]
+
+    # (proxy, old_name)
     renamed_items = [(proxy_items[uuid], blender_items[uuid][0]) for uuid in renamed_uuids]
 
     return added_items, removed_items, renamed_items
@@ -52,40 +53,6 @@ def find_renamed(
 
 class BpyDiff:
     pass
-
-
-class BpyStructDiff(BpyDiff):
-    """Perform a diff between a BpyStructProxy and a Blender item.
-
-    Provides a result that can be used to update the proxy and can also be serialized
-    """
-
-    deltas: {Name, Any} = {}
-
-    def diff(self, proxy: BpyStructProxy, bl_struct: T.bpy_struct):
-
-        # TODO untested draft
-
-        self.deltas.clear()
-        # updated only, suppose the names are the same
-        # peoperties have already been filtered when loading the proxy, so use the
-        # proxy keys. This probably misses new properties loaded from a plugin
-        for attr_name, proxy_value in proxy._data.items():
-            bl_value = getattr(bl_struct, attr_name)
-            proxy_value = BpyStructProxy.read(attr_name)
-            if issubclass(proxy_value, Proxy):
-                # TODO find the Differ
-                pass
-            else:
-                # TODO optimize for arrays
-                if proxy_value != bl_value:
-                    self.deltas[attr_name] = (proxy_value, bl_value)
-
-
-class BpyIDDiff(BpyStructDiff):
-    def diff(self, proxy: BpyIDProxy, bl_id: T.ID):
-        # if is a struct otherwise(collection, array, ...)
-        super().diff(proxy, bl_id)
 
 
 class BpyPropCollectionDiff(BpyDiff):
@@ -101,7 +68,7 @@ class BpyPropCollectionDiff(BpyDiff):
         self.items_added.clear()
         self.items_removed.clear()
         self.items_renamed.clear()
-        proxy_items = {item.mixer_uuid(): name for name, item in proxy._data.items()}
+        proxy_items = {id_proxy.mixer_uuid(): id_proxy for id_proxy in proxy._data.values()}
         bl_collection = getattr(bpy.data, collection_name)
         blender_items = {}
         for name, item in bl_collection.items():
@@ -136,7 +103,7 @@ class BpyBlendDiff(BpyDiff):
     Diff for the whole bpy.data
     """
 
-    # A list of deltas per bpy.data collection. Use a list bacause if will be sorted later
+    # A list of deltas per bpy.data collection. Use a list because if will be sorted later
     collection_deltas: List[Tuple[BlendDataCollectionName, BpyPropCollectionDiff]] = []
 
     # TODO cleanup: not used.
@@ -152,3 +119,14 @@ class BpyBlendDiff(BpyDiff):
             delta.diff(blend_proxy._data[collection_name], collection_name, context)
             if not delta.empty():
                 self.collection_deltas.append((collection_name, delta))
+
+        # Before this change:
+        # Only datablocks handled by the generic synchronization system get a uuid, either from
+        # BpyBlendProxy.initialize_ref_targets() during room creation, or later during diff processing.
+        # Datablocks of unhandled types get no uuid and BpyIDRefProxy references to them are incorrect.
+        # What is more, this means trouble for tests since datablocks of unhandled types are assigned
+        # a uuid during the message grabbing, which means that they get different uuids on both ends.
+        for collection_name in context.unhandled_bpy_data_collection_names:
+            collection = getattr(bpy.data, collection_name)
+            for datablock in collection.values():
+                ensure_uuid(datablock)

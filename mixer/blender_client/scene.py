@@ -90,10 +90,28 @@ def build_collection_to_scene(data):
     collection_name, _ = common.decode_string(data, index)
     logger.info("build_collection_to_scene %s <- %s", scene_name, collection_name)
 
-    scene = share_data.blender_scenes[scene_name]
-    collection = share_data.blender_collections[collection_name]
-    scene.collection.children.link(collection)
+    try:
+        scene = share_data.blender_scenes[scene_name]
+    except KeyError:
+        if share_data.use_experimental_sync():
+            # Removed by the Blender Protocol
+            logger.info(f"build_collection_to_scene(): scene not found {scene_name}. Safe in experimental_sync ...")
+            return
+        else:
+            raise
 
+    collection = share_data.blender_collections[collection_name]
+    try:
+        scene.collection.children.link(collection)
+    except RuntimeError as e:
+        if share_data.use_experimental_sync():
+            # Added by the Blender Protocol
+            logger.info(f"build_collection_to_scene(): scene {scene_name}, collection {collection_name}...")
+            logger.info(f"... Exception during scene.collection.children.link() ...")
+            logger.info(f"... Safe in experimental_sync ...")
+            logger.info(f"... {e}")
+        else:
+            raise
     share_data.update_collection_temporary_visibility(collection_name)
 
 

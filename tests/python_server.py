@@ -21,7 +21,7 @@ https://blender.stackexchange.com/questions/41533/how-to-remotely-run-a-python-s
 """
 
 logger = logging.getLogger("tests")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 # hardcoded to avoid control from a remote machine
 HOST = "127.0.0.1"
 STRING_MAX = 1024 * 1024
@@ -33,10 +33,11 @@ async def exec_buffer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
         if not buffer:
             break
         addr = writer.get_extra_info("peername")
-        logger.info("-- Received %s bytes from %s", len(buffer), addr)
+        logger.debug("-- Received %s bytes from %s", len(buffer), addr)
         logger.debug(buffer.decode("utf-8"))
+        buffer_string = buffer.decode("utf-8")
         try:
-            code = compile(buffer, "<string>", "exec")
+            code = compile(buffer_string, "<string>", "exec")
             share_data.pending_test_update = True
             exec(code, {})
         except Exception:
@@ -44,8 +45,11 @@ async def exec_buffer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
 
             logger.error("Exception")
             logger.error(traceback.format_exc())
+            logger.error("While processing: ")
+            for line in buffer_string.splitlines():
+                logger.error(line)
 
-        logger.info("-- Done")
+        logger.debug("-- Done")
 
 
 async def serve(port: int):

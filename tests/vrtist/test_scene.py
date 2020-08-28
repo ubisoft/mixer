@@ -1,17 +1,25 @@
-from pathlib import Path
+import logging
 import unittest
 
+from parameterized import parameterized_class
+
 from mixer.broadcaster.common import MessageType
-from tests.vrtist.testcase import VRtistTestCase
+
+from tests import files_folder
+from tests.mixer_testcase import BlenderDesc
+from tests.vrtist.vrtist_testcase import VRtistTestCase
 
 
+@parameterized_class(
+    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=VRtistTestCase.get_class_name,
+)
 class TestSceneEmptyDoc(VRtistTestCase):
     def setUp(self):
-        folder = Path(__file__).parent.parent
-        sender_blendfile = folder / "empty.blend"
-        receiver_blendfile = folder / "empty.blend"
-        # super().setUp(sender_blendfile, receiver_blendfile, receiver_wait_for_debugger=True)
-        super().setUp(sender_blendfile, receiver_blendfile)
+        sender_blendfile = files_folder() / "empty.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
+        blenderdescs = [BlenderDesc(load_file=sender_blendfile), BlenderDesc(load_file=receiver_blendfile)]
+        self._log_level = logging.INFO
+        super().setUp(blenderdescs=blenderdescs)
 
     def test_create_scene(self):
         self.new_scene("scene_1")
@@ -159,8 +167,8 @@ class TestSceneEmptyDoc(VRtistTestCase):
         self.new_collection_instance("src", "instance_1")
         self.link_object_to_scene("Scene", "instance_1")
 
-        self._sender.connect_and_join_mixer()
-        self._receiver.connect_and_join_mixer()
+        self._sender.connect_and_join_mixer(experimental=self.experimental_sync)
+        self._receiver.connect_and_join_mixer(experimental=self.experimental_sync)
         self.end_test()
 
 

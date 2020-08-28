@@ -1,8 +1,13 @@
 # WIP
 
+## Documentation
+- update release.md (#206)
+
+# 0.15.0 (2020-08-12)
+
 ## Features
 
-- Independant time between clients of a same room & Blender - VRtist time sync (#195)
+- Independent time between clients of a same room & Blender - VRtist time sync (#195)
 
 # 0.14.1 (2020-08-07)
 

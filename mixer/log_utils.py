@@ -5,8 +5,6 @@ Logging utility methods and classes
 import logging
 from pathlib import Path
 import os
-import traceback
-from typing import Callable
 
 from mixer.os_utils import getuser
 
@@ -55,8 +53,3 @@ def get_log_file():
     from mixer.share_data import share_data
 
     return os.path.join(get_logs_directory(), f"mixer_logs_{share_data.run_id}.log")
-
-
-def log_traceback(log_func: Callable[[str], None]):
-    for line in traceback.format_exc().splitlines():
-        log_func(line)

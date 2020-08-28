@@ -115,8 +115,7 @@ class TestLoadProxy(unittest.TestCase):
         cam_proxy = self.proxy.data("cameras").data("Camera_0")
         focus_object_proxy = cam_proxy.data("dof").data("focus_object")
         self.assertIsInstance(focus_object_proxy, BpyIDRefProxy)
-        self.assertEqual(focus_object_proxy.collection, "objects")
-        self.assertEqual(focus_object_proxy.key, "Cube")
+        self.assertEqual(focus_object_proxy._datablock_uuid, D.objects["Cube"].mixer_uuid)
 
     def test_camera_focus_object_none(self):
         # test_misc.TestLoadProxy.test_camera_focus_object_none
@@ -132,11 +131,52 @@ class TestProperties(unittest.TestCase):
     def test_one(self):
         context = test_context
         camera = D.cameras[0]
-        props = dict(context.properties(camera))
-        self.assertEqual(len(props), 39)
-        self.assertIn("cycles", props.keys())
-        item = D.cameras[0]
-        props = context.properties(item)
+
+        # for 2.83.4
+        expected_names = {
+            "name",
+            "name_full",
+            "is_embedded_data",
+            "type",
+            "sensor_fit",
+            "passepartout_alpha",
+            "angle_x",
+            "angle_y",
+            "angle",
+            "clip_start",
+            "clip_end",
+            "lens",
+            "sensor_width",
+            "sensor_height",
+            "ortho_scale",
+            "display_size",
+            "shift_x",
+            "shift_y",
+            "stereo",
+            "show_limits",
+            "show_mist",
+            "show_passepartout",
+            "show_safe_areas",
+            "show_safe_center",
+            "show_name",
+            "show_sensor",
+            "show_background_images",
+            "lens_unit",
+            "show_composition_center",
+            "show_composition_center_diagonal",
+            "show_composition_thirds",
+            "show_composition_golden",
+            "show_composition_golden_tria_a",
+            "show_composition_golden_tria_b",
+            "show_composition_harmony_tri_a",
+            "show_composition_harmony_tri_b",
+            "dof",
+            "background_images",
+            "animation_data",
+            "cycles",
+        }
+        names = {prop[0] for prop in context.properties(camera)}
+        self.assertSetEqual(names, expected_names, "Expected list from 2.83.4, check version")
 
 
 class TestBlendData(unittest.TestCase):

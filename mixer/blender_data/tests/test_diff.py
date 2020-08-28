@@ -7,8 +7,8 @@ from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import test_context
 
 
-def sort_pred(x):
-    return x[0]
+def sort_renamed_item(x):
+    return x[1]
 
 
 class TestDiff(unittest.TestCase):
@@ -58,9 +58,9 @@ class TestDiff(unittest.TestCase):
             self.assertEqual(0, len(delta.items_renamed), f"renamed count mismatch for {name}")
             if name == "worlds":
                 self.assertEqual(len(removed), len(delta.items_removed), f"removed count mismatch for {name}")
-                found = [name for name, _ in delta.items_removed]
-                found.sort()
-                self.assertEqual(removed, found, f"removed count mismatch for {name}")
+                items_removed = [proxy.data("name") for proxy in delta.items_removed]
+                items_removed.sort()
+                self.assertEqual(removed, items_removed, f"removed count mismatch for {name}")
             else:
                 self.assertEqual(0, len(delta.items_added), f"added count mismatch for {name}")
 
@@ -74,7 +74,7 @@ class TestDiff(unittest.TestCase):
         self.proxy.load(test_context)
 
         renamed = [("W0", "W00"), ("W2", "W22")]
-        renamed.sort(key=sort_pred)
+        renamed.sort(key=sort_renamed_item)
         for old_name, new_name in renamed:
             D.worlds[old_name].name = new_name
 
@@ -85,9 +85,10 @@ class TestDiff(unittest.TestCase):
             self.assertEqual(0, len(delta.items_removed), f"removed count mismatch for {name}")
             if name == "worlds":
                 self.assertEqual(len(renamed), len(delta.items_renamed), f"renamed count mismatch for {name}")
-                found = list(delta.items_renamed)
-                found.sort(key=sort_pred)
-                self.assertEqual(renamed, found, f"removed count mismatch for {name}")
+                items_renamed = list(delta.items_renamed)
+                items_renamed.sort(key=sort_renamed_item)
+                items_renamed = [(proxy.data("name"), new_name) for proxy, new_name in items_renamed]
+                self.assertEqual(renamed, items_renamed, f"removed count mismatch for {name}")
             else:
                 self.assertEqual(0, len(delta.items_added), f"added count mismatch for {name}")
 
@@ -101,7 +102,7 @@ class TestDiff(unittest.TestCase):
         self.proxy.load(test_context)
 
         renamed = [("W0", "W00"), ("W2", "W22"), ("W4", "W44")]
-        renamed.sort(key=sort_pred)
+        renamed.sort(key=sort_renamed_item)
         for old_name, new_name in renamed:
             D.worlds[old_name].name = new_name
 
@@ -122,10 +123,13 @@ class TestDiff(unittest.TestCase):
                 items_added = list(delta.items_added.keys())
                 items_added.sort()
                 self.assertEqual(items_added, ["W0", "W5"], f"added count mismatch for {name}")
+
                 items_renamed = delta.items_renamed
-                items_renamed.sort(key=sort_pred)
+                items_renamed.sort(key=sort_renamed_item)
+                items_renamed = [(proxy.data("name"), new_name) for proxy, new_name in items_renamed]
                 self.assertEqual(items_renamed, [("W2", "W22"), ("W4", "W44")], f"renamed count mismatch for {name}")
-                items_removed = [name for name, _ in delta.items_removed]
+
+                items_removed = [proxy.data("name") for proxy in delta.items_removed]
                 items_removed.sort()
                 self.assertEqual(items_removed, ["W0", "W1"], f"removed count mismatch for {name}")
             else:
