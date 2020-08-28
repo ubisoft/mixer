@@ -42,7 +42,6 @@ def _send_data_create_or_update(
                 logger.error(line)
             continue
 
-        # For BpyIdProxy, the target is encoded in the proxy._blenddata_path
         buffer = common.encode_string(encoded_proxy)
         command = common.Command(message, buffer, 0)
         share_data.client.add_command(command)

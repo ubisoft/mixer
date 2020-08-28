@@ -2,9 +2,9 @@
 Test case for the Full Blender protocol
 """
 import logging
-from pathlib import Path
 import sys
 
+from tests import files_folder
 from tests.mixer_testcase import BlenderDesc, MixerTestCase
 
 
@@ -66,9 +66,8 @@ class TestGeneric(BlenderTestCase):
     """
 
     def setUp(self, join: bool = True):
-        folder = Path(__file__).parent.parent
-        sender_blendfile = folder / "empty.blend"
-        receiver_blendfile = folder / "empty.blend"
+        sender_blendfile = files_folder() / "empty.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
         blenderdescs = [sender, receiver]

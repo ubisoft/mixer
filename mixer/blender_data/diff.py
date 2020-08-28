@@ -103,7 +103,7 @@ class BpyBlendDiff(BpyDiff):
     Diff for the whole bpy.data
     """
 
-    # A list of deltas per bpy.data collection. Use a list bacause if will be sorted later
+    # A list of deltas per bpy.data collection. Use a list because if will be sorted later
     collection_deltas: List[Tuple[BlendDataCollectionName, BpyPropCollectionDiff]] = []
 
     # TODO cleanup: not used.
@@ -119,3 +119,14 @@ class BpyBlendDiff(BpyDiff):
             delta.diff(blend_proxy._data[collection_name], collection_name, context)
             if not delta.empty():
                 self.collection_deltas.append((collection_name, delta))
+
+        # Before this change:
+        # Only datablocks handled by the generic synchronization system get a uuid, either from
+        # BpyBlendProxy.initialize_ref_targets() during room creation, or later during diff processing.
+        # Datablocks of unhandled types get no uuid and BpyIDRefProxy references to them are incorrect.
+        # What is more, this means trouble for tests since datablocks of unhandled types are assigned
+        # a uuid during the message grabbing, which means that they get different uuids on both ends.
+        for collection_name in context.unhandled_bpy_data_collection_names:
+            collection = getattr(bpy.data, collection_name)
+            for datablock in collection.values():
+                ensure_uuid(datablock)

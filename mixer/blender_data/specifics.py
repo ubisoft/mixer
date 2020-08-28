@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 import traceback
-from typing import ItemsView, List, TypeVar, Union
+from typing import Any, ItemsView, List, Optional, TypeVar
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -16,7 +16,7 @@ Proxy = TypeVar("Proxy")
 BpyIDProxy = TypeVar("BpyIDProxy")
 
 
-def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
+def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy, visit_state: Any) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     BlendData.instance().collection(collection_name).set_dirty
     if collection_name == "images":
@@ -54,7 +54,7 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy) -> Union[T.ID, None]:
                 )
                 logger.warning("... loaded as Empty")
             else:
-                target = target_proxy.target()
+                target = target_proxy.target(visit_state)
         object_ = collection.new(name, target)
         return object_
 
