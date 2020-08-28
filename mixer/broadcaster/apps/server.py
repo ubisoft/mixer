@@ -44,7 +44,6 @@ class Connection:
 
         self._command_queue: queue.Queue = queue.Queue()  # Pending commands to send to the client
         self._server = server
-        self._latency: float = 0.0  # seconds
 
         self.thread: threading.Thread = threading.Thread(None, self.run)
 
@@ -182,17 +181,12 @@ class Connection:
         self._server.handle_client_disconnect(self)
 
     def fetch_outgoing_commands(self):
-        waited_once = False
         while True:
             try:
                 command = self._command_queue.get_nowait()
             except queue.Empty:
                 break
 
-            if not waited_once:
-                waited_once = True
-                # dowstream
-                time.sleep(self._latency)
             self.send_command(command)
             self._command_queue.task_done()
 
