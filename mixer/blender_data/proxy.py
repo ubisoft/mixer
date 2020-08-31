@@ -218,23 +218,15 @@ def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState
             logger.warning("Not implemented: attribute %s", attr)
             return None
 
-        assert issubclass(attr_type, T.PropertyGroup) == issubclass(attr_type, T.PropertyGroup)
         if issubclass(attr_type, T.PropertyGroup):
             return BpyPropertyGroupProxy().load(attr, visit_state)
 
-        load_as = load_as_what(attr_property, attr, visit_state.root_ids)
-        # TODO for scene master collection, it is an iddef not inside bpy.data, so treat it as a struct ?
-        if load_as == LoadElementAs.STRUCT:
-            return BpyStructProxy().load(attr, visit_state)
-        elif load_as == LoadElementAs.ID_REF:
-            return BpyIDRefProxy().load(attr, visit_state)
-        elif load_as == LoadElementAs.ID_DEF:
-            return BpyIDProxy.make(attr_property).load(attr, visit_state)
-
-        # assert issubclass(attr_type, T.bpy_struct) == issubclass(attr_type, T.bpy_struct)
-        raise AssertionError("unexpected code path")
-        # should be handled above
-        if issubclass(attr_type, T.bpy_struct):
+        if issubclass(attr_type, T.ID):
+            if attr.is_embedded_data:
+                return BpyIDProxy.make(attr_property).load(attr, visit_state)
+            else:
+                return BpyIDRefProxy().load(attr, visit_state)
+        elif issubclass(attr_type, T.bpy_struct):
             return BpyStructProxy().load(attr, visit_state)
 
         raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
