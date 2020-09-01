@@ -26,6 +26,12 @@ def send_collection(client: Client, collection: bpy.types.Collection):
 
 
 def build_collection(data):
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        return
+
+    # Blender/Blender in VRtist (non generic) mode
     name_full, index = common.decode_string(data, 0)
     visible, index = common.decode_bool(data, index)
     hide_viewport = not visible
@@ -56,6 +62,12 @@ def send_collection_removed(client: Client, collection_name):
 
 
 def build_collection_removed(data):
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        return
+
+    # Blender/Blender in VRtist (non generic) mode
     name_full, index = common.decode_string(data, 0)
     logger.info("build_collectionRemove %s", name_full)
     collection = share_data.blender_collections.get(name_full)
