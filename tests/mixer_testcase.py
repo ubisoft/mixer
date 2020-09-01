@@ -277,6 +277,16 @@ class MixerTestCase(unittest.TestCase):
                         f"Unexpected message count for message {message_name}. Expected {expected_count}: found {len_a}\n{detail_message}",
                     )
 
+                def decode_proxy_strings(stream):
+                    for decoded in stream:
+                        # HACK do not hardcode
+                        proxy_string = getattr(decoded, "proxy_string", None)
+                        if proxy_string is not None:
+                            decoded.proxy_string = json.loads(proxy_string)
+
+                decode_proxy_strings(decoded_stream_a)
+                decode_proxy_strings(decoded_stream_b)
+
                 for i, (decoded_a, decoded_b) in enumerate(zip(decoded_stream_a, decoded_stream_b)):
                     # TODO there another failure case with floats as they will cause sort differences for proxies
                     # we actually need to sort on something else, that the encoded json of the proxy, maybe the uuid
@@ -285,13 +295,6 @@ class MixerTestCase(unittest.TestCase):
                         type(decoded_b),
                         f"{message_name}: Type mismatch at decoded message mismatch at index {i}",
                     )
-
-                    # HACK do not hardcode
-                    proxy_string_a = getattr(decoded_a, "proxy_string", None)
-                    proxy_string_b = getattr(decoded_b, "proxy_string", None)
-                    if proxy_string_a is not None and proxy_string_b is not None:
-                        decoded_a.proxy_string = json.loads(proxy_string_a)
-                        decoded_b.proxy_string = json.loads(proxy_string_b)
 
                 if message_type == MessageType.BLENDER_DATA_CREATE:
                     short_a = [
