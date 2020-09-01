@@ -195,7 +195,7 @@ def network_consumer_timer():
             raise
 
     # Run every 1 / 100 seconds
-    return 0.01
+    return 0.001
 
 
 def create_main_client(host: str, port: int):

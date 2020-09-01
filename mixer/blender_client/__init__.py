@@ -384,8 +384,8 @@ class BlenderClient(Client):
         index = 0
         montage, index = common.decode_bool(data, index)
         winman = bpy.data.window_managers["WinMan"]
-        if hasattr(winman, "UAS_shot_manager_handler_toggle"):
-            winman.UAS_shot_manager_handler_toggle = montage
+        if hasattr(winman, "UAS_shot_manager_shots_play_mode"):
+            winman.UAS_shot_manager_shots_play_mode = montage
 
     def send_group_begin(self):
         # The integer sent is for future use: the server might fill it with the group size once all messages
@@ -584,13 +584,15 @@ class BlenderClient(Client):
     def build_play(self, command):
         ctx = self.override_context()
         if ctx:
-            if not ctx["screen"].is_animation_playing:
+            screen_ctx = ctx["screen"]
+            if hasattr(screen_ctx, "is_animation_playing") and not screen_ctx.is_animation_playing:
                 bpy.ops.screen.animation_play(ctx)
 
     def build_pause(self, command):
         ctx = self.override_context()
         if ctx:
-            if ctx["screen"].is_animation_playing:
+            screen_ctx = ctx["screen"]
+            if hasattr(screen_ctx, "is_animation_playing") and screen_ctx.is_animation_playing:
                 bpy.ops.screen.animation_play(ctx)
 
     def query_object_data(self, object_name):
@@ -913,14 +915,14 @@ def update_params(obj):
 
     if typename == "Camera":
         send_camera(share_data.client, obj)
-        share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
+        # share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
 
     if typename in supported_lights:
         send_light(share_data.client, obj)
-        share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "energy")
-        share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 0)
-        share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 1)
-        share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 2)
+        # share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "energy")
+        # share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 0)
+        # share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 1)
+        # share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 2)
 
     if typename == "Grease Pencil":
         for material in obj.data.materials:
