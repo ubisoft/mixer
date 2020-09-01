@@ -355,7 +355,7 @@ safe_filter = FilterStack()
 # objects is needed to items not created by VRtist
 safe_blenddata_collections = [
     "cameras",
-    "collection",
+    "collections",
     "images",
     "lights",
     "metaballs",
