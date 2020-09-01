@@ -115,6 +115,8 @@ class BpyBlendDiff(BpyDiff):
         self.id_deltas.clear()
 
         for collection_name, _ in context.properties(bpy_type=T.BlendData):
+            if collection_name not in blend_proxy._data:
+                continue
             delta = BpyPropCollectionDiff()
             delta.diff(blend_proxy._data[collection_name], collection_name, context)
             if not delta.empty():

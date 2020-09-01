@@ -161,6 +161,8 @@ class Context:
         bl_rna_properties = self._properties.get(bl_rna)
         if bl_rna_properties is None:
             filtered_properties = self._filter_stack.apply(bl_rna, list(bl_rna.properties))
+            # Differential update requires that the properties are delivered in the same order
+            # as Blender delivers them
             bl_rna_properties = {p.identifier: p for p in filtered_properties}
             self._properties[bl_rna] = bl_rna_properties
         return bl_rna_properties.items()
@@ -219,7 +221,9 @@ default_exclusions = {
     # makes a loop
     T.Bone: [NameFilterOut("parent")],
     # TODO temporary ?
+    T.Collection: [NameFilterOut("all_objects")],
     T.CompositorNodeRLayers: [NameFilterOut("scene")],
+    T.CurveMapPoint: [NameFilterOut("select")],
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foerach_get()
@@ -272,11 +276,11 @@ default_exclusions = {
         ),
         # TODO triggers an error on metaballs
         #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
-        #   looks like a bpy_prop_collection and the key is and empy string
+        #   looks like a bpy_prop_collection and the key is and empty string
         NameFilterOut("material_slots"),
         # TODO temporary, has a seed member that makes some tests fail
         NameFilterOut("field"),
-        # TODO temporary, waiting for shkape_key support
+        # TODO temporary, waiting for shape_key support
         # there is a loop in active_shape_key/relative_key
         NameFilterOut("active_shape_key"),
     ],
@@ -294,7 +298,6 @@ default_exclusions = {
                 "tool_settings",
                 # TODO temporary, not implemented
                 "node_tree",
-                "collection",
                 "view_layers",
                 "rigidbody_world",
             ]
@@ -344,13 +347,23 @@ safe_exclusions = {}
 # Scene
 # Also do not blindly update what is already updated in VRtist code without checking that
 # they do not interfere
-safe_depsgraph_updates = [T.Camera, T.Image, T.Light, T.MetaBall, T.NodeTree, T.Scene, T.Sound, T.World]
+safe_depsgraph_updates = [T.Camera, T.Collection, T.Image, T.Light, T.MetaBall, T.NodeTree, T.Scene, T.Sound, T.World]
 
 safe_filter = FilterStack()
 # The collections in this list are tested by BpyBlendDiff collection update
 # they will be included in creation messages.
 # objects is needed to items not created by VRtist
-safe_blenddata_collections = ["cameras", "images", "lights", "metaballs", "objects", "scenes", "sounds", "worlds"]
+safe_blenddata_collections = [
+    "cameras",
+    "collection",
+    "images",
+    "lights",
+    "metaballs",
+    "objects",
+    "scenes",
+    "sounds",
+    "worlds",
+]
 
 # mostly works
 # safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]

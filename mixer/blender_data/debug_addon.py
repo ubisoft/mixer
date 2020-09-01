@@ -25,6 +25,9 @@ def timeit(func):
     return wrapper
 
 
+proxy = None
+
+
 class BuildProxyOperator(bpy.types.Operator):
     """Build proxy from current file"""
 
@@ -42,6 +45,8 @@ class BuildProxyOperator(bpy.types.Operator):
         import pstats
         from pstats import SortKey
 
+        global proxy
+
         profile_cumulative = get_props().profile_cumulative
         profile_callers = get_props().profile_callers
         profile = profile_callers or profile_cumulative
@@ -51,6 +56,54 @@ class BuildProxyOperator(bpy.types.Operator):
             pr.enable()
         t1 = time.time()
         proxy.load(test_context)
+        t2 = time.time()
+        if profile:
+            pr.disable()
+            s = io.StringIO()
+            sortby = SortKey.CUMULATIVE
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            if profile_cumulative:
+                ps.print_stats()
+            if profile_callers:
+                ps.print_callers()
+            print(s.getvalue())
+
+        logger.warning(f"Elapse: {t2 - t1} s.")
+        non_empty = proxy.get_non_empty_collections()
+        logger.info(f"Number of non empty collections in proxy: {len(non_empty)}")
+
+        # Put breakpoint here and examinate non_empty dictionnary
+        return {"FINISHED"}
+
+
+class DiffProxyOperator(bpy.types.Operator):
+    """Diff proxy """
+
+    bl_idname = "mixer.diff_proxy"
+    bl_label = "Mixer diff proxy"
+    bl_options = {"REGISTER"}
+
+    def execute(self, context):
+        # Cannot import at module level, since it requires access to bpy.data which is not
+        # accessible during module load
+        from mixer.blender_data.proxy import BpyBlendProxy
+        from mixer.blender_data.filter import test_context
+        import cProfile
+        import io
+        import pstats
+        from pstats import SortKey
+
+        global proxy
+
+        profile_cumulative = get_props().profile_cumulative
+        profile_callers = get_props().profile_callers
+        profile = profile_callers or profile_cumulative
+        if profile:
+            pr = cProfile.Profile()
+            pr.enable()
+        t1 = time.time()
+        scene_delta = proxy.data("scenes").data("Scene").diff(bpy.data.scenes, "Scene", proxy.visit_state())
+        diff = proxy.diff(test_context)
         t2 = time.time()
         if profile:
             pr.disable()
@@ -109,6 +162,7 @@ class DebugDataPanel(bpy.types.Panel):
 
         row = layout.column()
         row.operator(BuildProxyOperator.bl_idname, text="Build Proxy")
+        row.operator(DiffProxyOperator.bl_idname, text="Diff Proxy")
         row.prop(get_props(), "profile_cumulative", text="Profile Cumulative")
         row.prop(get_props(), "profile_callers", text="Profile callers")
         row.operator(DebugDataTestOperator.bl_idname, text="Test")
@@ -118,6 +172,7 @@ class DebugDataPanel(bpy.types.Panel):
 
 classes = (
     BuildProxyOperator,
+    DiffProxyOperator,
     DebugDataTestOperator,
     DebugDataPanel,
     DebugDataProperties,
