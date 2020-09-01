@@ -12,7 +12,7 @@ flake8:
   image: python:3
   stage: pre_release
   script:
-    - pip install flake8==3.7.9 flake8-black pep8-naming flake8-bugbear
+    - pip install black==19.10b0 flake8==3.7.9 flake8-black pep8-naming flake8-bugbear
     - flake8 -v
 
 zip:
@@ -58,8 +58,8 @@ unittest:
     variables:
       - $CI_COMMIT_MESSAGE =~ /\[skip-tests\]/
   variables:
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.82a-windows64
-    MIXER_BLENDER_VERSION_BASE: "2.82"
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.83.4-windows64
+    MIXER_BLENDER_VERSION_BASE: "2.83"
     MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
     VRTIST_PORT: 25600 # In case a server is already running on our default port on the test computer
     MIXER_TEST_OUTPUT: logs\tests

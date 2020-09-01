@@ -167,6 +167,7 @@ def draw_developer_settings_ui(layout: bpy.types.UILayout):
     layout.operator(bl_operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
     layout.prop(mixer_prefs, "auto_save_statistics", text="Auto Save Statistics")
     layout.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
+    layout.prop(mixer_prefs, "no_start_server", text="Do not start server on connect")
     layout.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
     layout.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
     layout.prop(mixer_prefs, "commands_send_interval")

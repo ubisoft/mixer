@@ -30,10 +30,10 @@ def set_log_level(log_level):
     set_log_level(None, log_level)
 
 
-def join_room(room_name: str = "mixer_unittest"):
+def join_room(room_name: str = "mixer_unittest", experimental_sync: bool = False):
     from mixer.connection import join_room
 
-    join_room(room_name)
+    join_room(room_name, experimental_sync)
 
 
 def keep_room_open(room_name: str = "mixer_unittest", keep_open: bool = False):

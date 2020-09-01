@@ -49,6 +49,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# Windows archive file extensions
 *.zip
 *.7z
 *.rar
@@ -65,3 +66,4 @@ $RECYCLE.BIN/
 # Blender for unit tests
 gitlab/blender
 logs/
+*.blend1

@@ -1,15 +1,13 @@
 import unittest
+
+from tests import files_folder
 from tests.mixer_testcase import MixerTestCase
-from pathlib import Path
 
 
 class TestTest(MixerTestCase):
     def setUp(self):
-        # Everything will apply to the whole testcase
-
-        folder = Path(__file__).parent
-        sender_blendfile = folder / "basic.blend"
-        receiver_blendfile = folder / "empty.blend"
+        sender_blendfile = files_folder() / "basic.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
 
         super().setUp(
             sender_blendfile, receiver_blendfile, sender_wait_for_debugger=False, receiver_wait_for_debugger=False

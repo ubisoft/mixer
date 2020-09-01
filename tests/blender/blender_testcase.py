@@ -1,13 +1,11 @@
-import json
+"""
+Test case for the Full Blender protocol
+"""
 import logging
-from pathlib import Path
-import time
 import sys
 
-from mixer.broadcaster.common import MessageType, decode_string
-from tests.grabber import Grabber
-from tests.grabber import CommandStream
-from tests.mixer_testcase import MixerTestCase
+from tests import files_folder
+from tests.mixer_testcase import BlenderDesc, MixerTestCase
 
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
@@ -15,8 +13,18 @@ logger = logging.getLogger(__name__)
 
 
 class BlenderTestCase(MixerTestCase):
+    """
+    Test case for the Full Blender protocol
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def setUp(self, *args, **kwargs):
+        # in case @parameterized_class is missing
+        if not hasattr(self, "experimental_sync"):
+            self.experimental_sync = True
+        super().setUp(*args, **kwargs)
 
     def assertDictAlmostEqual(self, a, b, msg=None):  # noqa N802
         def sort(d):
@@ -24,6 +32,13 @@ class BlenderTestCase(MixerTestCase):
 
         self.assertIs(type(a), type(b), msg=msg)
         self.assertIsInstance(a, dict, msg=msg)
+
+        ignore = ["mixer_uuid"]
+        for k in ignore:
+            if k in a.keys() and k in b.keys():
+                del a[k]
+                del b[k]
+
         a_sorted = sort(a)
         b_sorted = sort(b)
         self.assertSequenceEqual(a.keys(), b.keys(), msg=msg)
@@ -45,86 +60,19 @@ class BlenderTestCase(MixerTestCase):
             message = f"{e.args[0]} '{item}'"
             raise exc_class(message) from None
 
-    def assert_stream_equals(self, a_stream: CommandStream, b_stream: CommandStream, msg: str = None):
-        a, b = a_stream.data, b_stream.data
-        self.assertEqual(a.keys(), b.keys())
-
-        keep = [
-            MessageType.BLENDER_DATA_REMOVE,
-            MessageType.BLENDER_DATA_RENAME,
-            MessageType.BLENDER_DATA_UPDATE,
-        ]
-        for k in a.keys():
-            if k not in keep:
-                continue
-            message_type = str(MessageType(k))
-            message_count = len(a[k])
-            # self.assertEqual(message_count, len(b[k]), f"len mismatch for {message_type}")
-            if message_count != 0:
-                logger.info(f"Message count for {message_type:16} : {message_count}")
-            expected_count = self.expected_counts.get(k)
-            if expected_count is not None:
-                self.assertEqual(
-                    expected_count,
-                    message_count,
-                    f"Unexpected message count for message {message_type}. Expected {expected_count}: found {message_count}",
-                )
-            for i, buffers in enumerate(zip(a[k], b[k])):
-                strings = [decode_string(buffer, 0)[0] for buffer in buffers]
-                dicts = [json.loads(string) for string in strings]
-                self.assertDictAlmostEqual(*dicts, f"content mismatch for {message_type} {i}")
-
-    def assert_matches(self):
-        # TODO add message cout dict as param
-
-        self._sender.disconnect_mixer()
-        # time.sleep(1)
-        self._receiver.disconnect_mixer()
-        # time.sleep(1)
-
-        host = "127.0.0.1"
-        port = 12800
-        self._sender.connect_and_join_mixer("mixer_grab_sender", keep_room_open=True)
-        time.sleep(1)
-        self._sender.disconnect_mixer()
-        sender_grabber = Grabber()
-        sender_grabber.grab(host, port, "mixer_grab_sender")
-
-        self._receiver.connect_and_join_mixer("mixer_grab_receiver", keep_room_open=True)
-        time.sleep(1)
-        self._receiver.disconnect_mixer()
-        receiver_grabber = Grabber()
-        receiver_grabber.grab(host, port, "mixer_grab_receiver")
-
-        # TODO_ timing error : sometimes succeeds
-        # TODO_ enhance comparison : check # elements, understandable comparison
-        s = sender_grabber.streams
-        r = receiver_grabber.streams
-        self.assert_stream_equals(s, r)
-
-    def end_test(self):
-        time.sleep(0.5)
-        self.assert_matches()
-
 
 class TestGeneric(BlenderTestCase):
     """Unittest that joins a room before message creation
     """
 
     def setUp(self, join: bool = True):
-        folder = Path(__file__).parent.parent
-        sender_blendfile = folder / "empty.blend"
-        receiver_blendfile = folder / "empty.blend"
-        sender_wait_for_debugger = False
-        receiver_wait_for_debugger = False
+        sender_blendfile = files_folder() / "empty.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
+        sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
+        receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
+        blenderdescs = [sender, receiver]
         self.set_log_level(logging.DEBUG)
-        super().setUp(
-            sender_blendfile,
-            receiver_blendfile,
-            sender_wait_for_debugger=sender_wait_for_debugger,
-            receiver_wait_for_debugger=receiver_wait_for_debugger,
-            join=join,
-        )
+        super().setUp(blenderdescs=blenderdescs, join=join)
 
 
 class TestGenericJoinBefore(TestGeneric):

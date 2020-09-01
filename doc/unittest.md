@@ -1,5 +1,14 @@
 # Unit tests
 
+## Running unit test on the developer workstation
+
+Unit tests use the `unittest` package. Most of them will start a `broadcaster` server and two instances of Blender. The tests will remotely execute python scripts in the Blender instances, so that they connect to the server and execute  Blender python code scripts to modify the current document, and thus automatically synchronize. After all command are completed, the test grabs the miser command stream from each Blender and compares them.
+
+Running the unit test require the `MIXER_BLENDER_EXE_PATH` environment variable to be set with the absolute path to the Blender that will be used for testing.
+
+To start the tests from VScode, make sure that the addon is installed in the Blender instance that will be started, possibly by launching it once via VScode [Blender development addon](https://github.com/JacquesLucke/blender_vscode)
+
+
 ## CI/CD on unit tests
 
 For a first simple setup, we rely on an interactive gitlab runner setup. Issues related to service-based runners are described below.

@@ -4,6 +4,7 @@ from typing import Any, ItemsView, Iterable, List, Mapping, Union
 from bpy import types as T  # noqa
 
 from mixer.blender_data.types import is_pointer_to
+from mixer.blender_data.blenddata import collection_name_to_type
 
 DEBUG = True
 logger = logging.getLogger(__name__)
@@ -146,6 +147,7 @@ class Context:
     def __init__(self, filter_stack):
         self._properties: Mapping[BlRna, Properties] = {}
         self._filter_stack: FilterStack = filter_stack
+        self._unhandled_bpy_data_collection_names: List[str] = None
 
     def properties(self, bl_rna_property: T.Property = None, bpy_type=None) -> ItemsView:
         if (bl_rna_property is None) and (bpy_type is None):
@@ -162,6 +164,17 @@ class Context:
             bl_rna_properties = {p.identifier: p for p in filtered_properties}
             self._properties[bl_rna] = bl_rna_properties
         return bl_rna_properties.items()
+
+    @property
+    def unhandled_bpy_data_collection_names(self) -> List[str]:
+        """
+        Returns the list of bpy.data collection names not handled (synchronized) by this context
+        """
+        if self._unhandled_bpy_data_collection_names is None:
+            handled = {item[0] for item in self.properties(bpy_type=T.BlendData)}
+            self._unhandled_bpy_data_collection_names = list(collection_name_to_type.keys() - handled)
+
+        return self._unhandled_bpy_data_collection_names
 
 
 test_filter = FilterStack()

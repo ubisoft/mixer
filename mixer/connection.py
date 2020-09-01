@@ -16,7 +16,7 @@ from pathlib import Path
 from mixer.stats import save_statistics, get_stats_filename
 from mixer.blender_data.blenddata import BlendData
 from mixer.draw_handlers import remove_draw_handlers
-from mixer.blender_client import SendSceneContentFailed, BlenderClient
+from mixer.blender_client.client import SendSceneContentFailed, BlenderClient
 from mixer.handlers import HandlerManager
 
 
@@ -32,7 +32,7 @@ def set_client_attributes():
     )
 
 
-def join_room(room_name: str):
+def join_room(room_name: str, experimental_sync: bool):
     logger.info("join_room")
 
     assert share_data.client.current_room is None
@@ -57,7 +57,7 @@ def join_room(room_name: str):
     prefs = get_mixer_prefs()
     share_data.auto_save_statistics = prefs.auto_save_statistics
     share_data.statistics_directory = prefs.statistics_directory
-    share_data.set_experimental_sync(prefs.experimental_sync)
+    share_data.set_experimental_sync(experimental_sync)
     share_data.pending_test_update = False
 
     # join a room <==> want to track local changes
@@ -128,19 +128,19 @@ def connect():
     prefs = get_mixer_prefs()
     if not create_main_client(prefs.host, prefs.port):
         if is_localhost(prefs.host):
+            if prefs.no_start_server:
+                raise RuntimeError(
+                    f"Cannot connect to existing server at {prefs.host}:{prefs.port} and MIXER_NO_START_SERVER environment variable exists"
+                )
             start_local_server()
             if not wait_for_server(prefs.host, prefs.port):
-                logger.error("Unable to start local server")
-                return False
+                raise RuntimeError("Unable to start local server")
         else:
-            logger.error("Unable to connect to remote server %s:%s", prefs.host, prefs.port)
-            return False
+            raise RuntimeError(f"Unable to connect to remote server {prefs.host}:{prefs.port}")
 
     assert is_client_connected()
 
     set_client_attributes()
-
-    return True
 
 
 def disconnect():
