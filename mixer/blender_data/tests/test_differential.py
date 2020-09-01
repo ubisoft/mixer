@@ -30,6 +30,7 @@ class DifferentialCompute(unittest.TestCase):
         self.proxy.load(test_context)
         self.scene_proxy = self.proxy.data("scenes").data("Scene")
         self.scene = bpy.data.scenes["Scene"]
+        self.scenes_property = bpy.data.bl_rna.properties["scenes"]
 
     def generate_all_uuids(self):
         # as a side effect, BpyBlendDiff generates the uuids
@@ -39,10 +40,10 @@ class DifferentialCompute(unittest.TestCase):
 
 class Datablock(DifferentialCompute):
     def test_datablock_builtin(self):
-        # test_differential.DifferentialCompute.test_datablock_builtin
+        # test_differential.Datablock.test_datablock_builtin
         expected_float = 0.5
         self.scene.audio_volume = expected_float
-        diff = self.scene_proxy.diff(bpy.data.scenes, "Scene", self.proxy.visit_state())
+        diff = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
         self.assertSetEqual(set(diff.value._data.keys()), {"audio_volume"})
         delta = diff.value._data["audio_volume"]
         self.assertIsInstance(delta, DeltaUpdate)
@@ -53,7 +54,7 @@ class Datablock(DifferentialCompute):
     def test_datablock_struct_builtin(self):
         expected_bool = not self.scene.eevee.use_bloom
         self.scene.eevee.use_bloom = expected_bool
-        diff = self.scene_proxy.diff(bpy.data.scenes, "Scene", self.proxy.visit_state())
+        diff = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
         self.assertSetEqual(set(diff.value._data.keys()), {"eevee"})
         delta_eevee = diff.value._data["eevee"]
         self.assertIsInstance(delta_eevee, DeltaUpdate)
@@ -75,7 +76,7 @@ class StructDatablockRef(DifferentialCompute):
         world = bpy.data.worlds.new("W")
         self.scene.world = world
         self.generate_all_uuids()
-        scene_delta = self.scene_proxy.diff(bpy.data.scenes, "Scene", self.proxy.visit_state())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
         self.assertIsInstance(scene_delta, DeltaUpdate)
         world_delta = scene_delta.value.data("world")
         self.assertIsInstance(world_delta, DeltaUpdate)
@@ -93,7 +94,7 @@ class StructDatablockRef(DifferentialCompute):
         self.proxy.load(test_context)
         self.scene.world = world2
         self.generate_all_uuids()
-        scene_delta = self.scene_proxy.diff(bpy.data.scenes, "Scene", self.proxy.visit_state())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
         self.assertIsInstance(scene_delta, DeltaUpdate)
         world_delta = scene_delta.value.data("world")
         self.assertIsInstance(world_delta, DeltaUpdate)
@@ -111,7 +112,7 @@ class StructDatablockRef(DifferentialCompute):
         self.proxy.load(test_context)
         self.scene.world = None
         self.generate_all_uuids()
-        scene_delta = self.scene_proxy.diff(bpy.data.scenes, "Scene", self.proxy.visit_state())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
         # TODO fails. should a null ref be implemented as a BpyIDRefProxy
         # with a null ref (uuid is None)
         # or what else
@@ -123,7 +124,7 @@ class StructDatablockRef(DifferentialCompute):
 class Collection(DifferentialCompute):
     # test_differential.Collection
 
-    @unittest.skip("AttributeError: 'CollectionObjects' object has no attribute 'fixed_type'")
+    # @unittest.skip("AttributeError: 'CollectionObjects' object has no attribute 'fixed_type'")
     def test_datablock_collection(self):
         # Scene.collection.objects
         # A collection of references to standalone datablocks
@@ -147,7 +148,7 @@ class Collection(DifferentialCompute):
 
         self.generate_all_uuids()
 
-        scene_delta = self.scene_proxy.diff(bpy.data.scenes, "Scene", self.proxy.visit_state())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
 
         self.assertIsInstance(scene_delta, DeltaUpdate)
         scene_update = scene_delta.value
@@ -198,7 +199,7 @@ class Collection(DifferentialCompute):
 
         self.generate_all_uuids()
 
-        scene_delta = self.scene_proxy.diff(bpy.data.scenes, "Scene", self.proxy.visit_state())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
 
         self.assertIsInstance(scene_delta, DeltaUpdate)
         scene_update = scene_delta.value
@@ -254,7 +255,7 @@ class Collection(DifferentialCompute):
 
         self.generate_all_uuids()
 
-        scene_delta = self.scene_proxy.diff(bpy.data.scenes, "Scene", self.proxy.visit_state())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
 
         points_remove_proxy = (
             scene_delta.value.data("view_settings")
@@ -296,4 +297,3 @@ class Collection(DifferentialCompute):
         location = point.data("location")
         self.assertAlmostEqual(location[0], 2.0)
         self.assertAlmostEqual(location[1], 2.0)
-
