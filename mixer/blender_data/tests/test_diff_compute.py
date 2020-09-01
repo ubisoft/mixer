@@ -28,7 +28,7 @@ class DifferentialCompute(unittest.TestCase):
         bpy.ops.wm.open_mainfile(filepath=file)
         self.proxy = BpyBlendProxy()
         self.proxy.load(test_context)
-        self.scene_proxy = self.proxy.data("scenes").data("Scene")
+        self.scene_proxy: BpyIDProxy = self.proxy.data("scenes").data("Scene")
         self.scene = bpy.data.scenes["Scene"]
         self.scenes_property = bpy.data.bl_rna.properties["scenes"]
 
