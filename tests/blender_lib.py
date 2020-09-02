@@ -52,7 +52,7 @@ def create_collection_in_collection(parent_name: str, child_name: str):
     parent.children.link(child)
 
 
-def remove_collection_from_collection(parent_name: str, child_name: str):
+def unlink_collection_from_collection(parent_name: str, child_name: str):
     import bpy
 
     parent = bpy.data.collections[parent_name]
@@ -76,7 +76,7 @@ def link_object_to_collection(parent_name: str, child_name: str):
     parent.objects.link(child)
 
 
-def remove_object_from_collection(parent_name: str, child_name: str):
+def unlink_object_from_collection(parent_name: str, child_name: str):
     import bpy
 
     parent = bpy.data.collections[parent_name]

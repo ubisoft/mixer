@@ -34,8 +34,8 @@ class VRtistTestCase(MixerTestCase):
     def create_collection_in_collection(self, parent_name: str, child_name: str):
         self._sender.send_function(bl.create_collection_in_collection, parent_name, child_name)
 
-    def remove_collection_from_collection(self, parent_name: str, child_name: str):
-        self._sender.send_function(bl.remove_collection_from_collection, parent_name, child_name)
+    def unlink_collection_from_collection(self, parent_name: str, child_name: str):
+        self._sender.send_function(bl.unlink_collection_from_collection, parent_name, child_name)
 
     def remove_collection(self, collection_name: str):
         self._sender.send_function(bl.remove_collection, collection_name)
@@ -49,8 +49,8 @@ class VRtistTestCase(MixerTestCase):
     def link_object_to_collection(self, collection_name: str, object_name: str):
         self._sender.send_function(bl.link_object_to_collection, collection_name, object_name)
 
-    def remove_object_from_collection(self, collection_name: str, object_name: str):
-        self._sender.send_function(bl.remove_object_from_collection, collection_name, object_name)
+    def unlink_object_from_collection(self, collection_name: str, object_name: str):
+        self._sender.send_function(bl.unlink_object_from_collection, collection_name, object_name)
 
     def new_collection_instance(self, collection_name: str, instance_name: str):
         self._sender.send_function(bl.new_collection_instance, collection_name, instance_name)

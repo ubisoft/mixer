@@ -84,23 +84,23 @@ class TestCollection(VRtistTestCase):
         self.create_object_in_collection("sub_collection_1", "new_object_1_0")
         self.create_object_in_collection("sub_collection_1", "new_object_1_1")
 
-        self.remove_object_from_collection("Collection", "new_object_0_0")
-        self.remove_object_from_collection("Collection", "new_object_0_1")
-        self.remove_object_from_collection("sub_collection_1", "new_object_1_0")
-        self.remove_object_from_collection("sub_collection_1", "new_object_1_1")
+        self.unlink_object_from_collection("Collection", "new_object_0_0")
+        self.unlink_object_from_collection("Collection", "new_object_0_1")
+        self.unlink_object_from_collection("sub_collection_1", "new_object_1_0")
+        self.unlink_object_from_collection("sub_collection_1", "new_object_1_1")
         self.assert_matches()
 
     def test_remove_collection_from_collection(self):
         self.create_collection_in_collection("Collection", "plaf0")
         self.create_collection_in_collection("Collection", "plaf1")
-        self.remove_collection_from_collection("Collection", "plaf0")
-        self.remove_collection_from_collection("Collection", "plaf1")
+        self.unlink_collection_from_collection("Collection", "plaf0")
+        self.unlink_collection_from_collection("Collection", "plaf1")
 
         self.remove_collection("plaf0")
         self.remove_collection("plaf1")
 
         self.create_collection_in_collection("Collection", "plaf1")
-        self.remove_collection_from_collection("Collection", "plaf1")
+        self.unlink_collection_from_collection("Collection", "plaf1")
         self.assert_matches()
 
     def test_create_instance_in_collection_after_join(self):
