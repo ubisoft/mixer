@@ -118,14 +118,14 @@ def is_localhost(host):
 
 
 def connect():
-    logger.info("connect")
+    prefs = get_mixer_prefs()
+    logger.info(f"connect to {prefs.host}:{prefs.port}")
     BlendData.instance().reset()
     if share_data.client is not None:
         # a server shutdown was not processed
         logger.debug("connect: share_data.client is not None")
         share_data.client = None
 
-    prefs = get_mixer_prefs()
     if not create_main_client(prefs.host, prefs.port):
         if is_localhost(prefs.host):
             if prefs.no_start_server:
