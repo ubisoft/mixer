@@ -164,7 +164,8 @@ def load_as_what(attr_property: bpy.types.Property, attr: any, root_ids: RootIds
 
 
 class Delta:
-    pass
+    def __str__(self):
+        return f"<{self.__class__.__name__}>"
 
 
 class DeltaAddition(Delta):
@@ -173,7 +174,10 @@ class DeltaAddition(Delta):
 
 
 class DeltaDeletion(Delta):
-    pass
+    def __init__(self, value: Any):
+        # TODO it is overkill to have the deleted value in DeltaDeletion in all cases.
+        # we mostly need it if it is a BpyIDRefProxy
+        self.value = value
 
 
 class DeltaUpdate(Delta):
@@ -306,6 +310,9 @@ class Proxy:
         """
         logger.warning(f"Not implemented: save() for {self.__class__} {bl_instance}.{attr_name}")
 
+    def apply(self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], visit_state: VisitState) -> Proxy:
+        raise NotImplementedError(f"Proxy.apply() for {parent}[{key}]")
+
     def diff(
         self, container: Union[T.bpy_prop_collection, T.Struct], key: Union[str, int], visit_state: VisitState
     ) -> Optional[ProxyDiff]:
@@ -364,11 +371,12 @@ class StructLikeProxy(Proxy):
             self._data[name] = attr_value
         return self
 
-    def save(self, bl_instance: any, key: Union[int, str], visit_state: VisitState):
+    def save(self, bl_instance: Any, key: Union[int, str], visit_state: VisitState):
         """
         Save this proxy into a Blender attribute
         """
-        assert isinstance(key, int) or isinstance(key, str)
+        assert isinstance(key, (int, str))
+
         if isinstance(key, int):
             target = bl_instance[key]
         elif isinstance(bl_instance, T.bpy_prop_collection):
@@ -397,7 +405,55 @@ class StructLikeProxy(Proxy):
         for k, v in self._data.items():
             write_attribute(target, k, v, visit_state)
 
-    def diff(self, struct: T.Struct, struct_property: T.Property, visit_state: VisitState) -> Optional[ProxyDiff]:
+    def apply(
+        self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], visit_state: VisitState
+    ) -> StructLikeProxy:
+        """
+        Apply diff to the Blender attribute at parent[key] or parent.key and update accordingly this proxy entry
+        at key.
+
+        Args:
+            parent ([type]): [description]
+            key ([type]): [description]
+            delta ([type]): [description]
+            visit_state ([type]): [description]
+
+        Returns:
+            [type]: [description]
+        """
+        if delta is None:
+            return
+
+        assert isinstance(key, (int, str))
+
+        # TODO factozize with save
+
+        if isinstance(key, int):
+            struct = parent[key]
+        elif isinstance(parent, T.bpy_prop_collection):
+            # TODO append an element :
+            # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
+            struct = parent.get(key)
+            if struct is None:
+                struct = specifics.add_element(self, parent, key)
+        else:
+            specifics.pre_save_struct(self, parent, key)
+            struct = getattr(parent, key, None)
+
+        update = delta.value
+        assert type(update) == type(self)
+        for k, delta in update._data.items():
+            try:
+                self._data[k] = apply_attribute(struct, k, self._data[k], delta, visit_state)
+            except Exception as e:
+                logger.warning(f"StructLike.apply(). Processing {delta}")
+                logger.warning(f"... for {struct}.{k}")
+                logger.warning(f"... Exception: {e}")
+                logger.warning(f"... Update ignored")
+                continue
+        return self
+
+    def diff(self, struct: T.Struct, struct_property: T.Property, visit_state: VisitState) -> Optional[DeltaUpdate]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
 
@@ -804,6 +860,17 @@ class BpyIDRefProxy(Proxy):
 
         return datablock
 
+    def apply(
+        self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], visit_state: VisitState
+    ) -> StructLikeProxy:
+        update: BpyIDRefProxy = delta.value
+        assert type(update) == type(self)
+        assert self._bpy_data_collection == update._bpy_data_collection
+
+        datablock = visit_state.ids.get(update._datablock_uuid)
+        setattr(parent, key, datablock)
+        return update
+
     def diff(self, datablock: T.ID, datablock_property: T.Property, visit_state: VisitState) -> Optional[ProxyDiff]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
@@ -820,7 +887,7 @@ class BpyIDRefProxy(Proxy):
 
         value = read_attribute(datablock, datablock_property, visit_state)
         assert isinstance(value, BpyIDRefProxy)
-        if value._datablock_uuid != datablock.mixer_uuid:
+        if value._datablock_uuid != self._datablock_uuid:
             return DeltaUpdate(value)
         else:
             return None
@@ -1118,6 +1185,89 @@ class BpyPropStructCollectionProxy(Proxy):
             for k, v in self._data.items():
                 write_attribute(target, k, v, visit_state)
 
+    def apply(
+        self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], visit_state: VisitState
+    ) -> StructLikeProxy:
+
+        assert isinstance(key, (int, str))
+
+        # TODO factozize with save
+
+        if isinstance(key, int):
+            collection = parent[key]
+        elif isinstance(parent, T.bpy_prop_collection):
+            # TODO append an element :
+            # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
+            collection = parent.get(key)
+            if collection is None:
+                collection = specifics.add_element(self, parent, key)
+        else:
+            specifics.pre_save_struct(self, parent, key)
+            collection = getattr(parent, key, None)
+
+        update = delta.value
+        assert type(update) == type(self)
+
+        sequence = self._data.get(MIXER_SEQUENCE)
+        if sequence:
+
+            # input validity assertions
+            add_indices = [i for i, delta in enumerate(update._data.values()) if isinstance(delta, DeltaAddition)]
+            del_indices = [i for i, delta in enumerate(update._data.values()) if isinstance(delta, DeltaDeletion)]
+            if add_indices or del_indices:
+                # Cannot have deletions and additions
+                assert not add_indices or not del_indices
+                indices = add_indices if add_indices else del_indices
+                # Check that adds and deleted are at the end
+                assert not indices or indices[-1] == len(update._data) - 1
+                # check that adds and deletes are contiguous
+                assert all(a + 1 == b for a, b in zip(indices, iter(indices[1:])))
+
+            for k, delta in update._data.items():
+                try:
+                    if isinstance(delta, DeltaUpdate):
+                        sequence[k] = apply_attribute(collection, k, sequence[k], delta, visit_state)
+                    elif isinstance(delta, DeltaDeletion):
+                        item = collection[k]
+                        collection.remove(item)
+                        del sequence[k]
+                    else:  # DeltaAddition
+                        raise NotImplementedError("Not implemented: DeltaAddition for array")
+                        # TODO pre save for use_curves
+                        # since ordering does not include this requirement
+                        write_attribute(collection, k, delta.value, visit_state)
+                        sequence[k] = delta.value
+
+                except Exception as e:
+                    logger.warning(f"BpyPropStructCollectionProxy.apply(). Processing {delta}")
+                    logger.warning(f"... for {collection}[{k}]")
+                    logger.warning(f"... Exception: {e}")
+                    logger.warning(f"... Update ignored")
+                    continue
+        else:
+            for k, delta in update._data.items():
+                try:
+                    if isinstance(delta, DeltaDeletion):
+                        # TODO do all collections have remove ?
+                        item = collection[k]
+                        collection.remove(item)
+                        del self._data[k]
+                    elif isinstance(delta, DeltaAddition):
+                        # TODO pre save for use_curves
+                        # since ordering does not include this requirement
+                        write_attribute(collection, k, delta.value, visit_state)
+                        self._data[k] = delta.value
+                    else:
+                        self._data[k] = apply_attribute(collection, k, self._data[k], delta, visit_state)
+                except Exception as e:
+                    logger.warning(f"BpyPropStructCollectionProxy.apply(). Processing {delta}")
+                    logger.warning(f"... for {collection}[{k}]")
+                    logger.warning(f"... Exception: {e}")
+                    logger.warning(f"... Update ignored")
+                    continue
+
+        return self
+
     def diff(
         self, collection: T.bpy_prop_collection, collection_property: T.Property, visit_state: VisitState
     ) -> Optional[ProxyDiff]:
@@ -1127,7 +1277,7 @@ class BpyPropStructCollectionProxy(Proxy):
         This proxy tracks a collection of items indexed by string (e.g Scene.render.views) or int.
         The result will be a ProxyDiff that contains a Delta item per added, deleted or updated item
 
-        Args: 
+        Args:
             collection; the collection that must be diffed agains this proxy
             collection_property; the property os collection as found in its enclosing object
         """
@@ -1141,13 +1291,13 @@ class BpyPropStructCollectionProxy(Proxy):
             # TODO This produces one DeltaDeletion by removed item. Produce a range in case may items are
             # deleted
 
-            # since the diff sequence is hollow, we cannot store it in a lis,; use a dict with int keys instead
+            # since the diff sequence is hollow, we cannot store it in a list. Use a dict with int keys instead
             for i, (proxy_value, blender_value) in enumerate(itertools.zip_longest(sequence, collection)):
                 if proxy_value is None:
                     value = read_attribute(collection[i], item_property, visit_state)
                     diff._data[i] = DeltaAddition(value)
                 elif blender_value is None:
-                    diff._data[i] = DeltaDeletion()
+                    diff._data[i] = DeltaDeletion(self.data(i))
                 else:
                     delta = diff_attribute(collection[i], item_property, proxy_value, visit_state)
                     if delta is not None:
@@ -1168,7 +1318,7 @@ class BpyPropStructCollectionProxy(Proxy):
 
             deleted_keys = proxy_keys - blender_keys
             for k in deleted_keys:
-                diff._data[k] = DeltaDeletion()
+                diff._data[k] = DeltaDeletion(self.data(k))
 
             maybe_updated_keys = proxy_keys & blender_keys
             for k in maybe_updated_keys:
@@ -1492,6 +1642,42 @@ class BpyPropDataCollectionProxy(Proxy):
 
         return changeset
 
+    def apply(
+        self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], visit_state: VisitState
+    ) -> BpyPropDataCollectionProxy:
+        update: BpyPropDataCollectionProxy = delta.value
+        assert type(update) == type(self)
+        collection = getattr(parent, key)
+        for k, delta in update._data.items():
+            try:
+                # TODO another case for rename trouble ik k remains the name
+                # should be fixed automatically if the key is the uuid at
+                # BpyPropDataCollectionProxy load
+                assert isinstance(delta, (DeltaAddition, DeltaDeletion))
+                update: BpyIDRefProxy = delta.value
+                assert isinstance(update, BpyIDRefProxy)
+                uuid = update._datablock_uuid
+                datablock = visit_state.ids.get(uuid)
+                if datablock is None:
+                    logger.warning(
+                        f"delta apply for {parent}[{key}]: unregistered uuid {uuid} for {update._debug_name}"
+                    )
+                    continue
+                if isinstance(delta, DeltaAddition):
+                    collection.link(datablock)
+                    self._data[k] = update
+                else:
+                    collection.unlink(datablock)
+                    del self._data[k]
+            except Exception as e:
+                logger.warning(f"BpyPropDataCollectionProxy.apply(). Processing {delta}")
+                logger.warning(f"... for {collection}[{k}]")
+                logger.warning(f"... Exception: {e}")
+                logger.warning(f"... Update ignored")
+                continue
+
+        return self
+
     def diff(
         self, collection: T.bpy_prop_collection, collection_property: T.Property, visit_state: VisitState
     ) -> Optional[ProxyDiff]:
@@ -1525,7 +1711,7 @@ class BpyPropDataCollectionProxy(Proxy):
 
         deleted_keys = proxy_keys - blender_keys
         for k in deleted_keys:
-            diff._data[k] = DeltaDeletion()
+            diff._data[k] = DeltaDeletion(self._data[k])
 
         maybe_updated_keys = proxy_keys & blender_keys
         for k in maybe_updated_keys:
@@ -1566,9 +1752,9 @@ class BpyBlendProxy(Proxy):
         return {key: value for key, value in self._data.items() if len(value) > 0}
 
     def initialize_ref_targets(self, context: Context):
-        """Keep track of all bpy.data items so that loading recognises references to them
+        """Keep track of all bpy.data items so that loading recognizes references to them
 
-        Call this before updading the proxy from send_scene_content. It is not needed on the
+        Call this before updating the proxy from send_scene_content. It is not needed on the
         receiver side.
 
         TODO check is this is actually required or if we can rely upon is_embedded_data being False
@@ -1590,7 +1776,7 @@ class BpyBlendProxy(Proxy):
                     self.ids[uuid] = item
 
     def load(self, context: Context):
-        """Load the current scene into thjis proxy
+        """Load the current scene into this proxy
 
         Only used for test. The initial load is performed by update()
         """
@@ -1800,16 +1986,16 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: 
     """
     Write a value into a Blender property
     """
-
+    # Like in apply_attribute parent and key are needed to specify a L-value
     if bl_instance is None:
         logger.warning(f"unexpected write None attribute")
         return
 
     try:
-        if not isinstance(value, Proxy):
-            if type(key) is not str:
-                logger.warning(f"Unexpected type {type(key)} for {bl_instance}.{key} : skipped")
-                return
+        if isinstance(value, Proxy):
+            value.save(bl_instance, key, visit_state)
+        else:
+            assert type(key) is str
 
             prop = bl_instance.bl_rna.properties.get(key)
             if prop is None:
@@ -1819,8 +2005,7 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: 
 
             if not prop.is_readonly:
                 setattr(bl_instance, key, value)
-        else:
-            value.save(bl_instance, key, visit_state)
+
     except TypeError as e:
         # common for enum that have unsupported default values, such as FFmpegSettings.ffmpeg_preset,
         # which seems initialized at "" and triggers :
@@ -1839,14 +2024,52 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: 
         logger.warning(f" ...Exception: {repr(e)}")
 
 
+def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, visit_state: VisitState):
+    """
+    Applies a delta to the Blender attribute identified by bl_instance.key or bl_instance[key]
+
+    Args:
+        parent:
+        key:
+        proxy_value:
+        delta:
+
+    Returns: a value to store into the updated proxy
+    """
+
+    # Like in write_attribute parent and key are needed to specify a L-value
+    assert type(delta) == DeltaUpdate
+
+    value = delta.value
+    assert proxy_value is None or type(proxy_value) == type(value)
+
+    try:
+        if isinstance(proxy_value, Proxy):
+            return proxy_value.apply(parent, key, delta, visit_state)
+
+        prop = parent.bl_rna.properties.get(key)
+        if prop is None:
+            # Don't log this, too many messages
+            # f"Attempt to write to non-existent attribute {bl_instance}.{key} : skipped"
+            return
+
+        if not prop.is_readonly:
+            setattr(parent, key, value)
+        return value
+
+    except Exception as e:
+        logger.warning(f"diff exception for attr: {e}")
+        raise
+
+
 def diff_attribute(item: Any, item_property: T.Property, value: Any, visit_state: VisitState) -> Optional[Delta]:
     """
     Computes a difference between a blender item and a proxy value
 
     Args:
-        item: tha blender item
+        item: the blender item
         item_property: the property of item as found in its enclosing object
-        value: a proxy value, 
+        value: a proxy value
 
     """
     try:

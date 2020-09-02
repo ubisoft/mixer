@@ -284,6 +284,12 @@ default_exclusions = {
         # there is a loop in active_shape_key/relative_key
         NameFilterOut("active_shape_key"),
     ],
+    T.RenderSettings: [
+        NameFilterOut(
+            # just a view of "right" and "left" from RenderSettings.views
+            "stereo_views"
+        )
+    ],
     T.Scene: [
         NameFilterOut(
             [
