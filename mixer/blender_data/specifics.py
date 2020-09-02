@@ -9,8 +9,6 @@ import bpy
 import bpy.types as T  # noqa N812
 import bpy.path
 
-from mixer.blender_data.blenddata import BlendData
-
 logger = logging.getLogger(__name__)
 Proxy = TypeVar("Proxy")
 BpyIDProxy = TypeVar("BpyIDProxy")
@@ -18,7 +16,6 @@ BpyIDProxy = TypeVar("BpyIDProxy")
 
 def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy, visit_state: Any) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
-    BlendData.instance().collection(collection_name).set_dirty
     if collection_name == "images":
         is_packed = proxy.data("packed_file") is not None
         image = None

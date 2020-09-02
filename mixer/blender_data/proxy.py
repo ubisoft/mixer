@@ -1528,9 +1528,7 @@ class BpyPropDataCollectionProxy(Proxy):
             uuid: the mixer_uuid of the datablock
         """
         # TODO scene and last_scene_ ...
-        # TODO do we need BlendData as a cache ?
         logger.info("Perform removal for %s", proxy)
-        BlendData.instance().collection(proxy.collection_name).remove(proxy.key)
         name = proxy.data("name")
         del self._data[name]
 
@@ -1548,7 +1546,6 @@ class BpyPropDataCollectionProxy(Proxy):
         if self._data[old_name] is not proxy:
             logger.warning(f"rename_datablock(): self._data[{old_name}] is not {proxy}")
             return
-        BlendData.instance().collection(proxy.collection_name).set_dirty()
         proxy.rename(new_name)
         self._data[new_name] = proxy
         del self._data[old_name]
