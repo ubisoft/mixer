@@ -1519,7 +1519,7 @@ class BpyPropDataCollectionProxy(Proxy):
 
         return id_
 
-    def remove_datablock(self, proxy: BpyIDProxy):
+    def remove_datablock(self, proxy: BpyIDProxy, datablock: T.ID):
         """Remove a bpy.data collection item and update the proxy structures
 
         Receiver side
@@ -1529,6 +1529,8 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         # TODO scene and last_scene_ ...
         logger.info("Perform removal for %s", proxy)
+        collection = getattr(bpy.data, proxy.collection_name)
+        collection.remove(datablock)
         name = proxy.data("name")
         del self._data[name]
 
@@ -1919,9 +1921,9 @@ class BpyBlendProxy(Proxy):
             logger.warning(f"remove_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
             return None
 
-        bpy_data_collection_proxy.remove_datablock(proxy)
-        id_ = self.ids[uuid]
-        self.root_ids.remove(id_)
+        datablock = self.ids[uuid]
+        bpy_data_collection_proxy.remove_datablock(proxy, datablock)
+        self.root_ids.remove(datablock)
         del self.id_proxies[uuid]
         del self.ids[uuid]
 
