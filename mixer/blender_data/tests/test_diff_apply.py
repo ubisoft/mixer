@@ -236,6 +236,7 @@ class Collection(DifferentialApply):
         self.assertEqual(views["left"].file_suffix, "new_suffix")
         self.assertNotIn("right", views)
 
+    @unittest.skip("Not implemented: addition in array")
     def test_key_int(self):
         # Scene.view_settings.curve_mapping.curves
         # A bpy_prop_collection with string keys
