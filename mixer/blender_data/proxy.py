@@ -1842,23 +1842,31 @@ class BpyBlendProxy(Proxy):
         #   - __hash__() returns the same value
 
         depsgraph_updated_ids = reversed([update.id.original for update in depsgraph_updates])
-        for id_ in depsgraph_updated_ids:
-            if not any((isinstance(id_, t) for t in safe_depsgraph_updates)):
+        for datablock in depsgraph_updated_ids:
+            if not isinstance(datablock, safe_depsgraph_updates):
+                logger.info("depsgraph update: ignoring untracked type %s", datablock)
                 continue
-            logger.info("Updating %s", id_)
-            proxy = self.id_proxies.get(id_.mixer_uuid)
+            logger.info("depsgraph update: testing %s", datablock)
+            proxy = self.id_proxies.get(datablock.mixer_uuid)
             if proxy is None:
                 # Not an error for embedded IDs.
+                assert datablock.is_embedded_data
+
                 # For instance Scene.node_tree is not a reference to a bpy.data collection element
                 # but a "pointer" to a NodeTree owned by Scene. In such a case, the update list contains
                 # scene.node_tree, then scene. We can ignore the scene.node_tree update since the
                 # processing of scene will process scene.node_tree.
                 # However, it is not obvious to detect the safe cases and remove the message in such cases
-                logger.info("BpyBlendProxy.update(): Ignoring %s (no proxy)", id_)
+                logger.info("depsgraph update: Ignoring embedded %s", datablock)
                 continue
-            proxy.update_from_datablock(id_, visit_state)
-            # returns a DiffProxy
-            changeset.updates.append(proxy)
+            delta = proxy.diff(datablock, None, visit_state)
+            if delta:
+                logger.info("depsgraph update: update %s", datablock)
+                # TODO add an apply mode to diff instead to avoid two traversals ?
+                proxy.update_from_datablock(datablock, visit_state)
+                changeset.updates.append(proxy)
+            else:
+                logger.info("depsgraph update: ignore empty delta %s", datablock)
 
         return changeset
 

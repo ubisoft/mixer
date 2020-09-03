@@ -353,7 +353,7 @@ safe_exclusions = {}
 # Scene
 # Also do not blindly update what is already updated in VRtist code without checking that
 # they do not interfere
-safe_depsgraph_updates = [
+safe_depsgraph_updates = (
     T.Camera,
     T.Collection,
     T.Image,
@@ -364,7 +364,7 @@ safe_depsgraph_updates = [
     T.Scene,
     T.Sound,
     T.World,
-]
+)
 
 safe_filter = FilterStack()
 # The collections in this list are tested by BpyBlendDiff collection update
