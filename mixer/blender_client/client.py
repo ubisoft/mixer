@@ -334,10 +334,11 @@ class BlenderClient(Client):
                 path = bpy.path.abspath(image.filepath)
                 path = path.replace("\\", "/")
                 if pack:
-                    self.send_texture_data(path, pack.data)
+                    self.send_texture_data(image.name_full, pack.data)
+                    return image.name_full
                 else:
                     self.send_texture_file(path)
-                return path
+                    return path
         return None
 
     def build_add_keyframe(self, data):

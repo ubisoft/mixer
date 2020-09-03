@@ -33,6 +33,7 @@ def get_shot_manager():
     sm_props = None
     try:
         sm_props = shot_manager.get_shot_manager(bpy.context.scene)
+        shot_manager.initialize_shot_manager(sm_props)
     except Exception:
         pass
     return sm_props
