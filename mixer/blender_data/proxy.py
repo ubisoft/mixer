@@ -1723,8 +1723,15 @@ class BpyPropDataCollectionProxy(Proxy):
         return None
 
 
-# to sort delta in the bottom up order in the hierarchy ( creation order, mesh before object, ..)
-_creation_order = {"scenes": 20, "objects": 10}
+# to sort delta in the bottom up order in the reference hierarchy
+# TODO this is flawed. Scene cross reference each others in sequencer
+# Proably needs a two pâss creation on the receiver
+_creation_order = {
+    # anything before objects (meshes, lights, cameras)
+    "objects": 10,
+    "collections": 20,
+    "scenes": 30,
+}
 
 
 def _pred_by_creation_order(item: Tuple[str, Any]):

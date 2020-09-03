@@ -347,13 +347,24 @@ safe_exclusions = {}
 
 # depsgraph updates not in this ist are not handled by BpyBlendProxy.update()
 # more types are just waiting to be tested
-# A specific proble for Scene as the depsgraph reports numerous meaningless Scene updates
+# A specific problem for Scene as the depsgraph reports numerous meaningless Scene updates
 # that will probably hurt performance. We may have to find another way to update Scene or maybe
-# ignore scene updates when it is the only update in the despgrtaph update + a timer update just for
+# ignore scene updates when it is the only update in the depsgraph update + a timer update just for
 # Scene
 # Also do not blindly update what is already updated in VRtist code without checking that
 # they do not interfere
-safe_depsgraph_updates = [T.Camera, T.Collection, T.Image, T.Light, T.MetaBall, T.NodeTree, T.Scene, T.Sound, T.World]
+safe_depsgraph_updates = [
+    T.Camera,
+    T.Collection,
+    T.Image,
+    T.Light,
+    T.MetaBall,
+    T.NodeTree,
+    T.Object,
+    T.Scene,
+    T.Sound,
+    T.World,
+]
 
 safe_filter = FilterStack()
 # The collections in this list are tested by BpyBlendDiff collection update
