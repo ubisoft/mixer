@@ -172,7 +172,8 @@ class BlenderServer(BlenderProcess):
         connected = False
 
         # anti-virus might delay if Blender is launched for the first time
-        max_wait = 20
+        # allow time to attach debugger
+        max_wait = 120
 
         start = time.monotonic()
         while not connected and time.monotonic() - start < max_wait:
