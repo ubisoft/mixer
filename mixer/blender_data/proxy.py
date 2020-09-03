@@ -22,7 +22,7 @@ from mixer.blender_data.blenddata import (
     rna_identifier_to_collection_name,
     bl_rna_to_type,
 )
-from mixer.blender_data.types import bases_of, is_builtin, is_vector, is_matrix, is_pointer_to
+from mixer.blender_data.types import bases_of, is_builtin, is_vector, is_matrix, is_pointer_to, sub_id_type
 from mixer.bl_utils import get_mixer_prefs
 
 DEBUG = True
@@ -524,7 +524,7 @@ class BpyIDProxy(BpyStructProxy):
     def init(self, datablock: T.ID):
         if datablock is not None:
             if not datablock.is_embedded_data:
-                type_name = datablock.bl_rna.identifier
+                type_name = sub_id_type(type(datablock)).bl_rna.identifier
                 self._bpy_data_collection = rna_identifier_to_collection_name[type_name]
             self._class_name = datablock.__class__.__name__
 
