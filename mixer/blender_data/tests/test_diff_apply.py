@@ -8,13 +8,6 @@ from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.proxy import (
     BpyBlendProxy,
     BpyIDProxy,
-    BpyIDRefProxy,
-    BpyPropDataCollectionProxy,
-    BpyPropStructCollectionProxy,
-    BpyStructProxy,
-    DeltaAddition,
-    DeltaDeletion,
-    DeltaUpdate,
 )
 
 from mixer.blender_data.filter import test_context
@@ -139,7 +132,7 @@ class StructDatablockRef(DifferentialApply):
         self.proxy.load(test_context)
         self.scene.world = None
         self.generate_all_uuids()
-        delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
+        _ = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
         # delta - > None
 
 

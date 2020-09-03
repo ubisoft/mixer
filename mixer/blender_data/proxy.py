@@ -238,13 +238,10 @@ def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState
             assert load_as != LoadElementAs.ID_DEF
             if load_as == LoadElementAs.STRUCT:
                 return BpyPropStructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
-            elif load_as == LoadElementAs.ID_REF:
+            else:
+                # LoadElementAs.ID_REF:
                 # References into Blenddata collection, for instance D.scenes[0].objects
                 return BpyPropDataCollectionProxy().load_as_IDref(attr, visit_state)
-            elif load_as == LoadElementAs.ID_DEF:
-                assert False
-                # is  BlendData collection, for instance D.objects
-                return BpyPropDataCollectionProxy().load_as_ID(attr, visit_state)
 
         # TODO merge with previous case
         if isinstance(attr_property, T.CollectionProperty):
