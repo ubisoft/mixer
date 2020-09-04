@@ -378,10 +378,11 @@ def encode_base_mesh(obj):
     verts_per_group = {}
     for vertex_group in obj.vertex_groups:
         verts_per_group[vertex_group.index] = []
-
     for vert in mesh_data.vertices:
         for vg in vert.groups:
-            verts_per_group[vg.group].append((vert.index, vg.weight))
+            weighted_vertices = verts_per_group.get(vg.group, None)
+            if weighted_vertices:
+                weighted_vertices.append((vert.index, vg.weight))
 
     binary_buffer += common.encode_int(len(obj.vertex_groups))
     for vertex_group in obj.vertex_groups:
