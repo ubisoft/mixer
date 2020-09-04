@@ -96,6 +96,12 @@ def build_collection_to_collection(data):
     child_name, _ = common.decode_string(data, index)
     logger.info("build_collection_to_collection %s <- %s", parent_name, child_name)
 
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning("build_collection_to_collection %s <- %s, ignore in experimental mode", parent_name, child_name)
+        return
+
     parent = share_data.blender_collections[parent_name]
     child = share_data.blender_collections[child_name]
 
@@ -125,6 +131,14 @@ def build_remove_collection_from_collection(data):
     parent_name, index = common.decode_string(data, 0)
     child_name, _ = common.decode_string(data, index)
     logger.info("build_remove_collection_from_collection %s <- %s", parent_name, child_name)
+
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning(
+            "build_remove_collection_from_collection %s <- %s, ignore in experimental mode", parent_name, child_name
+        )
+        return
 
     parent = share_data.blender_collections[parent_name]
     child = share_data.blender_collections[child_name]
