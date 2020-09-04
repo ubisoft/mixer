@@ -178,11 +178,60 @@ class Collection(DifferentialCompute):
         object_delta = objects_update.data("Deleted0")
         self.assertIsInstance(object_delta, DeltaDeletion)
 
+    def test_bpy_collection(self):
+        # bpy.data.collections[x].objects
+        # A collection of references to standalone datablocks
+
+        # test_diff_compute.Collection.test_bpy_collection
+        collection = bpy.data.collections.new("Collection")
+        for i in range(2):
+            empty = bpy.data.objects.new(f"Unchanged{i}", None)
+            collection.objects.link(empty)
+        for i in range(2):
+            empty = bpy.data.objects.new(f"Unlinked{i}", None)
+            collection.objects.link(empty)
+        self.proxy = BpyBlendProxy()
+        self.proxy.load(test_context)
+        self.collection_proxy = self.proxy.data("collections").data("Collection")
+        self.collection = bpy.data.collections["Collection"]
+        for i in range(2):
+            empty = bpy.data.objects.new(f"Added{i}", None)
+            collection.objects.link(empty)
+        for i in range(2):
+            collection.objects.unlink(bpy.data.objects[f"Unlinked{i}"])
+
+        self.generate_all_uuids()
+        collections_property = bpy.data.bl_rna.properties["scenes"]
+
+        collection_delta = self.collection_proxy.diff(self.collection, collections_property, self.proxy.visit_state())
+
+        self.assertIsInstance(collection_delta, DeltaUpdate)
+        collection_update = collection_delta.value
+        self.assertIsInstance(collection_update, BpyIDProxy)
+        self.assertTrue(collection_update.is_standalone_datablock)
+
+        objects_delta = collection_update.data("objects")
+        self.assertIsInstance(objects_delta, DeltaUpdate)
+        objects_update = objects_delta.value
+        self.assertIsInstance(objects_update, BpyPropDataCollectionProxy)
+
+        for name in ("Added0", "Added1"):
+            self.assertIn(name, objects_update)
+            object_delta = objects_update.data(name)
+            self.assertIsInstance(object_delta, DeltaAddition)
+            object_update = object_delta.value
+            self.assertIsInstance(object_update, BpyIDRefProxy)
+
+        for name in ("Unlinked0", "Unlinked1"):
+            self.assertIn(name, objects_update)
+            object_delta = objects_update.data(name)
+            self.assertIsInstance(object_delta, DeltaDeletion)
+
     def test_key_str(self):
         # Scene.render.views
         # A bpy_prop_collection with string keys
 
-        # test_differential.Collection.test_key_str
+        # test_diff_compute.Collection.test_key_str
 
         self.proxy = BpyBlendProxy()
         self.proxy.load(test_context)
