@@ -1426,6 +1426,7 @@ class BpyPropDataCollectionProxy(Proxy):
     """
 
     def __init__(self):
+        # On item per datablock. The key is the uuid, which eases rename management
         self._data: Mapping[str, BpyIDProxy] = {}
 
     def __len__(self):
@@ -1440,14 +1441,14 @@ class BpyPropDataCollectionProxy(Proxy):
             if skip_bpy_data_item(collection_name, item):
                 continue
             with visit_state.debug_context.enter(name, item):
-                ensure_uuid(item)
+                uuid = ensure_uuid(item)
                 # # HACK: Skip objects with a mesh in order to process D.objects withtout processing D.meshes
                 # # - writing meshes is not currently implemented and we must avoid double processing with VRtist
                 # # - reading objects is required for metaballs
                 # if collection_name == "objects" and isinstance(item.data, T.Mesh):
                 #     continue
                 # # /HACK
-                self._data[name] = BpyIDProxy().load(item, visit_state, bpy_data_collection_name=collection_name)
+                self._data[uuid] = BpyIDProxy().load(item, visit_state, bpy_data_collection_name=collection_name)
 
         return self
 
@@ -1457,7 +1458,8 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         for name, item in bl_collection.items():
             with visit_state.debug_context.enter(name, item):
-                self._data[name] = BpyIDRefProxy().load(item, visit_state)
+                uuid = item.mixer_uuid
+                self._data[uuid] = BpyIDRefProxy().load(item, visit_state)
         return self
 
     def save(self, parent: Any, key: str, visit_state: VisitState):
@@ -1533,8 +1535,8 @@ class BpyPropDataCollectionProxy(Proxy):
 
         datablock = incoming_proxy.create_standalone_datablock(visit_state)
         if datablock:
-            self._data[name] = incoming_proxy
             uuid = incoming_proxy.mixer_uuid()
+            self._data[uuid] = incoming_proxy
             visit_state.root_ids.add(datablock)
             visit_state.ids[uuid] = datablock
             visit_state.id_proxies[uuid] = incoming_proxy
@@ -1614,8 +1616,8 @@ class BpyPropDataCollectionProxy(Proxy):
             # Alternatively we could try to sort messages on the sender side
             logger.warning(f"Exception during remove_datablock for {proxy}")
             logger.warning(f"... {e}")
-        name = proxy.data("name")
-        del self._data[name]
+        uuid = proxy.mixer_uuid()
+        del self._data[uuid]
 
     def rename_datablock(self, proxy: BpyIDProxy, new_name: str, datablock: T.ID):
         """
@@ -1627,13 +1629,7 @@ class BpyPropDataCollectionProxy(Proxy):
             uuid: the mixer_uuid of the datablock
         """
         logger.info("Perform rename %s into %s", proxy, new_name)
-        old_name = proxy.data("name")
-        if self._data[old_name] is not proxy:
-            logger.warning(f"rename_datablock(): self._data[{old_name}] is not {proxy}")
-            return
         proxy.rename(new_name)
-        self._data[new_name] = proxy
-        del self._data[old_name]
         datablock.name = new_name
 
     def update(self, diff: BpyPropCollectionDiff, visit_state: VisitState) -> Changeset:
@@ -1647,6 +1643,7 @@ class BpyPropDataCollectionProxy(Proxy):
             collection_name = diff.items_added[name]
             logger.info("Perform update/creation for %s[%s]", collection_name, name)
             try:
+                # TODO could have a datablock directly
                 collection = getattr(bpy.data, collection_name)
                 id_ = collection.get(name)
                 if id_ is None:
@@ -1657,7 +1654,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 visit_state.ids[uuid] = id_
                 proxy = BpyIDProxy().load(id_, visit_state, bpy_data_collection_name=collection_name)
                 visit_state.id_proxies[uuid] = proxy
-                self._data[name] = proxy
+                self._data[uuid] = proxy
                 changeset.creations.append(proxy)
             except Exception:
                 logger.error(f"Exception during update/added for {collection_name}[{name}]:")
@@ -1669,8 +1666,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 logger.info("Perform removal for %s", proxy)
                 uuid = proxy.mixer_uuid()
                 changeset.removals.append((uuid, str(proxy)))
-                name = proxy.data("name")
-                del self._data[name]
+                del self._data[uuid]
                 id_ = visit_state.ids[uuid]
                 visit_state.root_ids.remove(id_)
                 del visit_state.id_proxies[uuid]
@@ -1706,20 +1702,16 @@ class BpyPropDataCollectionProxy(Proxy):
         temp = []
         for proxy, new_name in diff.items_renamed:
             uuid = proxy.mixer_uuid()
-            old_name = proxy.data("name")
-            if uuid != self._data[old_name].mixer_uuid():
-                logger.warning(f"update() rename {proxy} into {new_name}. Uuid mismatch")
-                continue
-            tmp_name = f"__mixer__{uuid}"
+            tmp_name = f"__tmp_mixer__{uuid}"
             changeset.renames.append(((uuid), tmp_name, str(proxy)))
             proxy.rename(new_name)
-            assert getattr(bpy.data, proxy.collection_name)[new_name] is visit_state.ids[uuid]
-            assert visit_state.ids[uuid] in visit_state.root_ids
+            if proxy.collection[new_name] is visit_state.ids[uuid]:
+                logger.error(f"update rename : {proxy.collection}[{new_name}] is not {visit_state.ids[uuid]} for {proxy}, {uuid}")
+            if visit_state.ids[uuid] in visit_state.root_ids:
+                logger.error(f"update rename : {visit_state.ids[uuid]} in visit_state.root_ids for {proxy}, {uuid}")
             temp.append((new_name, proxy))
-            del self._data[old_name]
 
         for new_name, proxy in temp:
-            self._data[new_name] = proxy
             changeset.renames.append((proxy.mixer_uuid(), new_name, str(proxy)))
 
         return changeset
@@ -1800,23 +1792,26 @@ class BpyPropDataCollectionProxy(Proxy):
 
         diff = self.__class__()
 
-        # TODO use uuids as keys !
         item_property = collection_property.fixed_type
+
+        # keys are uuids
         proxy_keys = self._data.keys()
-        blender_keys = collection.keys()
+        blender_items = {item.mixer_uuid: item for item in collection.values()}
+        blender_keys = blender_items.keys()
         added_keys = blender_keys - proxy_keys
+        deleted_keys = proxy_keys - blender_keys
+        maybe_updated_keys = proxy_keys & blender_keys
+
         for k in added_keys:
-            value = read_attribute(collection[k], item_property, visit_state)
+            value = read_attribute(blender_items[k], item_property, visit_state)
             assert isinstance(value, (BpyIDProxy, BpyIDRefProxy))
             diff._data[k] = DeltaAddition(value)
 
-        deleted_keys = proxy_keys - blender_keys
         for k in deleted_keys:
             diff._data[k] = DeltaDeletion(self._data[k])
 
-        maybe_updated_keys = proxy_keys & blender_keys
         for k in maybe_updated_keys:
-            delta = diff_attribute(collection[k], item_property, self.data(k), visit_state)
+            delta = diff_attribute(blender_items[k], item_property, self.data(k), visit_state)
             if delta is not None:
                 assert isinstance(delta, DeltaUpdate)
                 diff._data[k] = delta
@@ -1827,9 +1822,8 @@ class BpyPropDataCollectionProxy(Proxy):
         return None
 
 
-# to sort delta in the bottom up order in the reference hierarchy
-# TODO this is flawed. Scene cross reference each others in sequencer
-# Proably needs a two pâss creation on the receiver
+# to sort delta in the bottom up order in rough reference hierarchy
+# TODO useless since unresolved references are handled
 _creation_order = {
     # anything before objects (meshes, lights, cameras)
     "objects": 10,

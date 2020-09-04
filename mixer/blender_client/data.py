@@ -43,7 +43,7 @@ def send_data_updates(updates: UpdateChangeset):
 
     codec = Codec()
     for update in updates:
-        logger.info("%s %s", "send_data_create", update)
+        logger.info("%s %s", "send_data_update", update)
 
         try:
             encoded_update = codec.encode(update)

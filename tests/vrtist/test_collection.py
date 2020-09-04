@@ -150,5 +150,134 @@ class TestCollection(VRtistTestCase):
         self.assert_matches()
 
 
+@parameterized_class(
+    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=VRtistTestCase.get_class_name,
+)
+class TestCollectionFromEmpty(VRtistTestCase):
+    def setUp(self):
+        sender_blendfile = files_folder() / "empty.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
+        sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
+        receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
+        blenderdescs = [sender, receiver]
+        super().setUp(blenderdescs=blenderdescs)
+
+    def test_rename_collection_2(self):
+        # need to be linked to master collection in order to get depsgraph updates
+        s = """
+import bpy
+c1 = bpy.data.collections.new("c1")
+master = bpy.data.scenes[0].view_layers[0].layer_collection.collection
+master.children.link(c1)
+c2 = bpy.data.collections.new("c2")
+c1.children.link(c2)
+"""
+        self.send_string(s)
+
+        s = """
+import bpy
+c1 = bpy.data.collections["c1"]
+c1.name = "c1_updated"
+"""
+        self.send_string(s)
+
+        self.assert_matches()
+
+    def test_rename_unlink_object(self):
+        s = """
+import bpy
+c1 = bpy.data.collections.new("c1")
+master = bpy.data.scenes[0].view_layers[0].layer_collection.collection
+master.children.link(c1)
+c2 = bpy.data.collections.new("c2")
+obj = bpy.data.objects.new("obj", None)
+c1.children.link(c2)
+c2.objects.link(obj)
+"""
+        self.send_string(s)
+
+        s = """
+import bpy
+c1 = bpy.data.collections["c1"]
+c2 = bpy.data.collections["c2"]
+obj = bpy.data.objects["obj"]
+c1.name = "c1_updated"
+c1.objects.unlink(obj)
+"""
+        self.send_string(s)
+
+        self.assert_matches()
+
+    def test_rename_unlink_object_2(self):
+        s = """
+import bpy
+c1 = bpy.data.collections.new("c1")
+master = bpy.data.scenes[0].view_layers[0].layer_collection.collection
+master.children.link(c1)
+c2 = bpy.data.collections.new("c2")
+obj = bpy.data.objects.new("obj", None)
+c1.children.link(c2)
+c2.objects.link(obj)
+"""
+        self.send_string(s)
+
+        s = """
+import bpy
+c2 = bpy.data.collections["c2"]
+obj = bpy.data.objects["obj"]
+c2.name = "c2_updated"
+c2.objects.unlink(obj)
+"""
+        self.send_string(s)
+
+        # on receiver c2_updated exists but is not linked to c1
+        self.assert_matches()
+
+    def test_collection_unlink_object_4(self):
+        s = """
+import bpy
+c1 = bpy.data.collections.new("c1")
+c2 = bpy.data.collections.new("c2")
+c3 = bpy.data.collections.new("c3")
+c1.children.link(c2)
+c2.children.link(c3)
+"""
+        self.send_string(s)
+
+        s = """
+import bpy
+c2 = bpy.data.collections["c2"]
+c3 = bpy.data.collections["c3"]
+c2.name = "c2_updated"
+"""
+        self.send_string(s)
+
+    def test_rename_unlink_object3(self):
+        s = """
+import bpy
+c1 = bpy.data.collections.new("c1")
+c2 = bpy.data.collections.new("c2")
+c3 = bpy.data.collections.new("c3")
+obj = bpy.data.objects.new("obj", None)
+c1.children.link(c2)
+c2.children.link(c3)
+c2.objects.link(obj)
+"""
+        self.send_string(s)
+
+        s = """
+import bpy
+c2 = bpy.data.collections["c2"]
+c3 = bpy.data.collections["c3"]
+obj = bpy.data.objects["obj"]
+c2.name = "c2_updated"
+c2.objects.unlink(obj)
+"""
+        # obj is not unlinked on receiver
+        self.send_string(s)
+
+        self.assert_matches()
+
+
 if __name__ == "__main__":
     unittest.main()
