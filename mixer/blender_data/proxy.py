@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import array
 from contextlib import contextmanager
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import IntEnum
 import itertools
@@ -89,11 +90,23 @@ class DebugContext:
         return ".".join([p[0] for p in self.property_stack])
 
 
-# TODO useless after IDProxies addition
-# Warning, unusable to retrieve proxies from depsgraph update
+@dataclass
+class UnresolvedRef:
+    """A datablock reference that could not be resolved when target.init() needed to be called
+    because the referenced datablock was not yet received.
+
+    No suitable ordering can easily be provided by the sender for many reasons including Collection.children
+    referencing other collections and Scene.sequencer strips that can reference other scenes
+    """
+
+    target: T.bpy_prop_collection
+    proxy: BpyIDRefProxy
+
+
 RootIds = Set[T.ID]
 IDProxies = Mapping[str, BpyIDProxy]
 IDs = Mapping[str, T.ID]
+UnresolvedRefs = Dict[str, UnresolvedRef]
 
 
 @dataclass
@@ -101,6 +114,7 @@ class VisitState:
     root_ids: RootIds
     id_proxies: IDProxies
     ids: IDs
+    unresolved_refs: UnresolvedRefs
     context: Context
     debug_context: DebugContext = DebugContext()
 
@@ -1446,14 +1460,14 @@ class BpyPropDataCollectionProxy(Proxy):
                 self._data[name] = BpyIDRefProxy().load(item, visit_state)
         return self
 
-    def save(self, bl_instance: Any, attr_name: str, visit_state: VisitState):
+    def save(self, parent: Any, key: str, visit_state: VisitState):
         """
         Save this Proxy into a Blender property
         """
         if not self._data:
             return
 
-        target = getattr(bl_instance, attr_name, None)
+        target = getattr(parent, key, None)
         if target is None:
             # Don't log this, too many messages
             # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
@@ -1462,18 +1476,19 @@ class BpyPropDataCollectionProxy(Proxy):
         link = getattr(target, "link", None)
         unlink = getattr(target, "unlink", None)
         if link is not None and unlink is not None:
-            # TODO with differential update, before is always empty
-            # TODO un resolved dataclock refs (add in visit_state, resolve in create datablock)
-
-            before = set(target.items())
-            after = {(k, v.target(visit_state)) for k, v in self._data.items()}
-            added = after - before
-            deleted = before - after
-            # overkill: be smarter
-            for _, datablock in deleted:
-                unlink(datablock)
-            for _, datablock in added:
-                link(datablock)
+            if not len(target):
+                for _, ref_proxy in self._data.items():
+                    datablock = ref_proxy.target(visit_state)
+                    if datablock:
+                        link(datablock)
+                    else:
+                        # The reference will be resolved when the referenced datablock will be loaded
+                        uuid = ref_proxy._datablock_uuid
+                        logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy}")
+                        unresolved_list = visit_state.unresolved_refs[uuid]
+                        unresolved_list.append((target, ref_proxy))
+            else:
+                logger.warning(f"Saving into non empty collection: {target}. Ignored")
         else:
             for k, v in self._data.items():
                 write_attribute(target, k, v, visit_state)
@@ -1523,6 +1538,16 @@ class BpyPropDataCollectionProxy(Proxy):
             visit_state.root_ids.add(datablock)
             visit_state.ids[uuid] = datablock
             visit_state.id_proxies[uuid] = incoming_proxy
+
+        unresolved_refs = visit_state.unresolved_refs.get(uuid)
+        if unresolved_refs:
+            for collection, ref_proxy in unresolved_refs:
+                ref_target = ref_proxy.target(visit_state)
+                logger.info(f"create_datablock: resolving reference {collection}.link({ref_target}")
+                # TODO for other than collection scene cross references, ...)
+                # TODO even remove ordering
+                collection.link(ref_target)
+            del visit_state.unresolved_refs[uuid]
 
         renames = []
         if name != incoming_name:
@@ -1814,15 +1839,27 @@ class BpyBlendProxy(Proxy):
     def __init__(self, *args, **kwargs):
         # ID elements stored in bpy.data.* collections, computed before recursive visit starts:
         self.root_ids: RootIds = set()
+
         self.id_proxies: IDProxies = {}
+
         # Only needed to cleanup root_ids and id_proxies on ID removal
         self.ids: IDs = {}
+
         self._data: Mapping[str, BpyPropDataCollectionProxy] = {
             name: BpyPropDataCollectionProxy() for name in BlendData.instance().collection_names()
         }
 
+        # Pending unresolved references.
+        self._unresolved_refs: UnresolvedRefs = defaultdict(list)
+
+    def clear(self):
+        self._data.clear()
+        self.root_ids.clear()
+        self.id_proxies.clear()
+        self.ids.clear()
+
     def visit_state(self, context: Context = safe_context):
-        return VisitState(self.root_ids, self.id_proxies, self.ids, context)
+        return VisitState(self.root_ids, self.id_proxies, self.ids, self._unresolved_refs, context)
 
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}
@@ -1857,7 +1894,7 @@ class BpyBlendProxy(Proxy):
         Only used for test. The initial load is performed by update()
         """
         self.initialize_ref_targets(context)
-        visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
+        visit_state = self.visit_state(context)
 
         for name, _ in context.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
@@ -1890,7 +1927,7 @@ class BpyBlendProxy(Proxy):
         # Update the bpy.data collections status and get the list of newly created bpy.data entries.
         # Updated proxies will contain the IDs to send as an initial transfer.
         # There is no difference between a creation and a subsequent update
-        visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
+        visit_state = self.visit_state(context)
 
         # sort the updates deppmost first so that the receiver will create meshes and lights
         # before objects, for instance
@@ -1957,7 +1994,7 @@ class BpyBlendProxy(Proxy):
             )
             return None
 
-        visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
+        visit_state = self.visit_state(context)
         return bpy_data_collection_proxy.create_datablock(incoming_proxy, visit_state)
 
     def update_datablock(self, update: DeltaUpdate, context: Context = safe_context) -> Optional[T.ID]:
@@ -1975,7 +2012,7 @@ class BpyBlendProxy(Proxy):
             )
             return None
 
-        visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
+        visit_state = self.visit_state(context)
         return bpy_data_collection_proxy.update_datablock(update, visit_state)
 
     def remove_datablock(self, uuid: str):
@@ -2017,12 +2054,6 @@ class BpyBlendProxy(Proxy):
         datablock = self.ids[uuid]
         bpy_data_collection_proxy.rename_datablock(proxy, new_name, datablock)
 
-    def clear(self):
-        self._data.clear()
-        self.root_ids.clear()
-        self.id_proxies.clear()
-        self.ids.clear()
-
     def debug_check_id_proxies(self):
         return 0
         # try to find stale entries ASAP: access them all
@@ -2041,7 +2072,7 @@ class BpyBlendProxy(Proxy):
     def diff(self, context: Context) -> Optional[BpyBlendProxy]:
         # Currently for tests only
         diff = self.__class__()
-        visit_state = VisitState(self.root_ids, self.id_proxies, self.ids, context)
+        visit_state = self.visit_state(context)
         for name, proxy in self._data.items():
             collection = getattr(bpy.data, name, None)
             if collection is None:
@@ -2113,9 +2144,10 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: 
             logger.warning(f"write attribute skipped {bl_instance}.{key}...")
             logger.warning(f" ...Exception: {repr(e)}")
 
-    except Exception as e:
+    except Exception:
         logger.warning(f"write attribute skipped {bl_instance}.{key}...")
-        logger.warning(f" ...Exception: {repr(e)}")
+        for line in traceback.format_exc().splitlines():
+            logger.warning(f" ... {line}")
 
 
 def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, visit_state: VisitState, to_blender=True):
