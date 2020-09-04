@@ -1605,8 +1605,15 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         # TODO scene and last_scene_ ...
         logger.info("Perform removal for %s", proxy)
-        collection = getattr(bpy.data, proxy.collection_name)
-        collection.remove(datablock)
+        try:
+            proxy.collection.remove(datablock)
+        except ReferenceError as e:
+            # We probably have processed previously the deletion of a datablock referenced by Object.data (e.g. Light).
+            # On both sides it deletes the Object as well. So the sender issues a message for object deletion
+            # but deleting the light on this side has already deleted the object.
+            # Alternatively we could try to sort messages on the sender side
+            logger.warning(f"Exception during remove_datablock for {proxy}")
+            logger.warning(f"... {e}")
         name = proxy.data("name")
         del self._data[name]
 
