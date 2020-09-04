@@ -5,7 +5,7 @@ from bpy import data as D  # noqa
 from bpy import types as T  # noqa
 from mixer.blender_data.json_codec import Codec
 from mixer.blender_data.proxy import BpyBlendProxy, BpyIDProxy, BpyStructProxy
-from mixer.blender_data.tests.utils import register_bl_equals
+from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
 from mixer.blender_data.filter import safe_context
 from mixer.blender_data.diff import BpyBlendDiff
@@ -13,6 +13,7 @@ from mixer.blender_data.diff import BpyBlendDiff
 
 class TestWorld(unittest.TestCase):
     def setUp(self):
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
         self.bpy_data_proxy = BpyBlendProxy()
         self.diff = BpyBlendDiff()
         bpy.data.worlds[0].name = "World"
@@ -44,10 +45,11 @@ class TestWorld(unittest.TestCase):
             #######################
             # receiver side
             decoded = codec.decode(encoded)
-            created = self.bpy_data_proxy.update_datablock(decoded)
+            created, _ = self.bpy_data_proxy.create_datablock(decoded)
             self.assertEqual(created, sent_id)
 
     def test_non_existing(self):
+        # test_end_to_end.TestWorld.test_non_existing
         world = bpy.data.worlds[0]
 
         self.diff.diff(self.bpy_data_proxy, safe_context)
@@ -77,5 +79,5 @@ class TestWorld(unittest.TestCase):
             #######################
             # receiver side
             decoded = codec.decode(encoded)
-            created = self.bpy_data_proxy.update_datablock(decoded)
+            created, _ = self.bpy_data_proxy.create_datablock(decoded)
             self.assertEqual(created, sent_id)
