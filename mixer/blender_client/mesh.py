@@ -136,6 +136,9 @@ def encode_baked_mesh(obj):
         # This happens for empty curves
         return bytes()
 
+    original_bm = bmesh.new()
+    original_bm.from_mesh(mesh)
+
     bm = bmesh.new()
     bm.from_mesh(mesh)
     bmesh.ops.triangulate(bm, faces=bm.faces)
@@ -180,6 +183,9 @@ def encode_baked_mesh(obj):
 
     if obj.type != "MESH":
         obj.to_mesh_clear()
+
+    original_bm.to_mesh(mesh)
+    original_bm.free()
 
     stats_timer.checkpoint("make_buffers")
 
@@ -444,7 +450,7 @@ def encode_mesh(obj, do_encode_base_mesh, do_encode_baked_mesh):
 
 
 @stats_timer(share_data)
-def decode_bakes_mesh(obj, data, index):
+def decode_baked_mesh(obj, data, index):
     # Note: Blender should not load a baked mesh but we have this function to debug the encoding part
     # and as an exemple for implementations that load baked meshes
     byte_size, index = common.decode_int(data, index)
@@ -647,7 +653,7 @@ def decode_mesh(client, obj, data, index):
     byte_size, index = common.decode_int(data, index)
     if byte_size == 0:
         # No base mesh, lets read the baked mesh
-        index = decode_bakes_mesh(obj, data, index)
+        index = decode_baked_mesh(obj, data, index)
     else:
         index = decode_base_mesh(client, obj, data, index)
         # Skip the baked mesh (its size is encoded here)
