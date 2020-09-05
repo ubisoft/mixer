@@ -110,18 +110,29 @@ class BlenderClient(Client):
         self._received_command_count: int = 0
         self._received_byte_size: int = 0
 
+        self.command_pack = None
+
+    def send_command_pack(self):
+        if self.command_pack is not None:
+            command = self.command_pack
+            self.command_pack = None
+            super().add_command(command)
+
     def add_command(self, command: common.Command):
         # A wrapped message is a message emitted from a frame change event.
         # Right now we wrap this kind of messages adding the client_id.
         # In the future we will probably always add the client_id to all messages. But the difference
         # between synced time messages and the other must remain.
         if self.synced_time_messages:
-            command = common.Command(
-                MessageType.CLIENT_ID_WRAPPER,
-                common.encode_string(self.client_id) + common.encode_int(command.type.value) + command.data,
-                0,
-            )
-        super().add_command(command)
+            command = common.encode_int(command.type.value) + command.data
+            if self.command_pack is None:
+                self.command_pack = common.Command(
+                    MessageType.CLIENT_ID_WRAPPER, common.encode_string(self.client_id), 0
+                )
+
+            self.command_pack.data += common.encode_int(len(command)) + command
+        else:
+            super().add_command(command)
 
     # returns the path of an object
     def get_object_path(self, obj):

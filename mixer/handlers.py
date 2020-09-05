@@ -111,6 +111,7 @@ def handler_send_frame_changed(scene):
         send_frame_changed(scene)
     finally:
         share_data.client.synced_time_messages = False
+        share_data.client.send_command_pack()
 
 
 @persistent

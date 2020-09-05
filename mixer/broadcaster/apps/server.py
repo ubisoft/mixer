@@ -315,8 +315,9 @@ class Room:
                     ):
                         self._commands.pop()
                         self.byte_size -= stored_command.byte_size()
-            self._commands.append(command)
-            self.byte_size += command.byte_size()
+            if command_type != common.MessageType.CLIENT_ID_WRAPPER:
+                self._commands.append(command)
+                self.byte_size += command.byte_size()
 
         with self._commands_mutex:
             current_byte_size = self.byte_size
