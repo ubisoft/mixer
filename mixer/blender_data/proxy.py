@@ -231,53 +231,52 @@ def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState
             logger.error(debug_context.property_fullpath())
         return
 
-    with debug_context.enter(attr_property.identifier, attr):
-        attr_type = type(attr)
+    attr_type = type(attr)
 
-        if is_builtin(attr_type):
-            return attr
-        if is_vector(attr_type):
-            return list(attr)
-        if is_matrix(attr_type):
-            return [list(col) for col in attr.col]
+    if is_builtin(attr_type):
+        return attr
+    if is_vector(attr_type):
+        return list(attr)
+    if is_matrix(attr_type):
+        return [list(col) for col in attr.col]
 
-        # We have tested the types that are usefully reported by the python binding, now harder work.
-        # These were implemented first and may be better implemented with the bl_rna property of the parent struct
-        if attr_type == T.bpy_prop_array:
-            return [e for e in attr]
+    # We have tested the types that are usefully reported by the python binding, now harder work.
+    # These were implemented first and may be better implemented with the bl_rna property of the parent struct
+    if attr_type == T.bpy_prop_array:
+        return [e for e in attr]
 
-        if attr_type == T.bpy_prop_collection:
-            # need to know for each element if it is a ref or id
-            load_as = load_as_what(attr_property, attr, visit_state.root_ids)
-            assert load_as != LoadElementAs.ID_DEF
-            if load_as == LoadElementAs.STRUCT:
-                return BpyPropStructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
-            else:
-                # LoadElementAs.ID_REF:
-                # References into Blenddata collection, for instance D.scenes[0].objects
-                return BpyPropDataCollectionProxy().load_as_IDref(attr, visit_state)
+    if attr_type == T.bpy_prop_collection:
+        # need to know for each element if it is a ref or id
+        load_as = load_as_what(attr_property, attr, visit_state.root_ids)
+        assert load_as != LoadElementAs.ID_DEF
+        if load_as == LoadElementAs.STRUCT:
+            return BpyPropStructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
+        else:
+            # LoadElementAs.ID_REF:
+            # References into Blenddata collection, for instance D.scenes[0].objects
+            return BpyPropDataCollectionProxy().load_as_IDref(attr, visit_state)
 
-        # TODO merge with previous case
-        if isinstance(attr_property, T.CollectionProperty):
-            return BpyPropStructCollectionProxy().load(attr, attr_property, visit_state)
+    # TODO merge with previous case
+    if isinstance(attr_property, T.CollectionProperty):
+        return BpyPropStructCollectionProxy().load(attr, attr_property, visit_state)
 
-        bl_rna = attr_property.bl_rna
-        if bl_rna is None:
-            logger.warning("Not implemented: attribute %s", attr)
-            return None
+    bl_rna = attr_property.bl_rna
+    if bl_rna is None:
+        logger.warning("Not implemented: attribute %s", attr)
+        return None
 
-        if issubclass(attr_type, T.PropertyGroup):
-            return BpyPropertyGroupProxy().load(attr, visit_state)
+    if issubclass(attr_type, T.PropertyGroup):
+        return BpyPropertyGroupProxy().load(attr, visit_state)
 
-        if issubclass(attr_type, T.ID):
-            if attr.is_embedded_data:
-                return BpyIDProxy.make(attr_property).load(attr, visit_state)
-            else:
-                return BpyIDRefProxy().load(attr, visit_state)
-        elif issubclass(attr_type, T.bpy_struct):
-            return BpyStructProxy().load(attr, visit_state)
+    if issubclass(attr_type, T.ID):
+        if attr.is_embedded_data:
+            return BpyIDProxy.make(attr_property).load(attr, visit_state)
+        else:
+            return BpyIDRefProxy().load(attr, visit_state)
+    elif issubclass(attr_type, T.bpy_struct):
+        return BpyStructProxy().load(attr, visit_state)
 
-        raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
+    raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
 
 
 class Proxy:
@@ -495,11 +494,13 @@ class StructLikeProxy(Proxy):
         # as opposed as the dense self
         diff = self.__class__()
         diff.init(struct)
-        debug_break_on = {"eevee", "objects"}
-        for k, v in self._data.items():
-            if k in debug_break_on:
-                _ = True
 
+        # PERF accessing the properties from the context is **far** cheaper that iterating over
+        # _data and the getting the properties with
+        #   member_property = struct.bl_rna.properties[k]
+        # line to which py-spy attributes 20% of the total diff !
+
+        for k, member_property in visit_state.context.properties(struct):
             # TODO in test_differential.StructDatablockRef.test_remove
             # target et a scene, k is world and v (current world value) is None
             # so diff fails. v should be a BpyIDRefNoneProxy
@@ -511,8 +512,7 @@ class StructLikeProxy(Proxy):
                 logger.warning(f"diff: unknown attribute {k} in {struct}")
                 continue
 
-            member_property = struct.bl_rna.properties[k]
-            delta = diff_attribute(member, member_property, v, visit_state)
+            delta = diff_attribute(member, member_property, self._data[k], visit_state)
             if delta is not None:
                 diff._data[k] = delta
 
@@ -2175,14 +2175,11 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, vis
             return proxy_value.apply(parent, key, delta, visit_state, to_blender)
 
         if to_blender:
-            prop = parent.bl_rna.properties.get(key)
-            if prop is None:
-                # Don't log this, too many messages
-                # f"Attempt to write to non-existent attribute {bl_instance}.{key} : skipped"
-                return
-
-            if not prop.is_readonly:
+            try:
+                # try is less costly than fetching the property to find if the attribute is readonly
                 setattr(parent, key, value)
+            except Exception:
+                pass
         return value
 
     except Exception as e:
