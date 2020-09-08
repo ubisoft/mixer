@@ -25,8 +25,6 @@ bl_info = {
     "category": "Collaboration",
 }
 
-__version__ = f"v{bl_info['version'][0]}.{bl_info['version'][1]}.{bl_info['version'][2]}"
-
 logger = logging.getLogger(__name__)
 logger.propagate = False
 MODULE_PATH = Path(__file__).parent.parent

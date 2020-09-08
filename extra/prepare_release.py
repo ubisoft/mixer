@@ -24,8 +24,8 @@ def main():
     parser.add_argument("major", type=int, help="Major version number")
     parser.add_argument("minor", type=int, help="Minor version number")
     parser.add_argument("bugfix", type=int, help="Bugfix version number")
-    parser.add_argument("prerelease", type=str, default="", help="Prerelease (optional)")
-    parser.add_argument("build", type=str, default="", help="Build suffix (optional)")
+    parser.add_argument("--prerelease", type=str, default="", help="Prerelease (optional)")
+    parser.add_argument("--build", type=str, default="", help="Build suffix (optional)")
     parser.add_argument("--skip-tests", action="store_true", help="If specified, skip tests for the tagged commit.")
 
     args = parser.parse_args()
