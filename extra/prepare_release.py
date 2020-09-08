@@ -2,6 +2,7 @@ from extra.inject_version import main as inject_version, get_version
 from extra.get_release_description import get_release_description
 
 import argparse
+import re
 import subprocess
 
 
@@ -30,11 +31,20 @@ def main():
 
     args = parser.parse_args()
 
+    pattern = "^[0-9A-Za-z-]+$"
+
     tag_name = f"v{args.major}.{args.minor}.{args.bugfix}"
     if args.prerelease:
+        if not re.match(pattern, args.prerelease):
+            print(f'--prerelease argument "{args.prerelease}" does not match pattern {pattern}')
+            exit(1)
         tag_name += f"-{args.prerelease}"
     if args.build:
+        if not re.match(pattern, args.build):
+            print(f'--build argument "{args.build}" does not match pattern {pattern}')
+            exit(1)
         tag_name += f"+{args.build}"
+
     version_string = tag_name[1:]
 
     if tag_name in all_tags:

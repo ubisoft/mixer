@@ -17,24 +17,19 @@ def parse(version) -> Tuple[Tuple[int], str]:
     # tested with https://regoio.herokuapp.com/
 
     # vMAJOR.MINOR.PATCH-PRERELEASE+BUILD as in https://semver.org/
-    re_string = r"^v([0-9]+)\.([0-9]+)\.([0-9]+)((?:\-[0-9A-Za-z-]+)?(?:\+[0-9A-Za-z-]+))?$"
+    re_string = r"^v([0-9]+)\.([0-9]+)\.([0-9]+)((?:\-[0-9A-Za-z-]+)?(?:\+[0-9A-Za-z-]+)?)?$"
     match = re.match(re_string, version)
     groups = match.groups()
 
     # ([0-9]+)\.([0-9]+)\.([0-9]+)
-    # 0.15.15
+    # e.g. 0.15.15
     version = tuple((int(s) for s in groups[0:3]))
 
-    # ((?:\-[0-9A-Za-z-]+)?(?:\+[0-9A-Za-z-]+))?
-    # "" or "-xxx" or "+yyy" or "-xxx+yyy"
+    # ((?:\-[0-9A-Za-z-]+)?(?:\+[0-9A-Za-z-]+)?)?
+    # e.g. "" or "-xxx" or "+yyy" or "-xxx+yyy"
     prerelease_build = "" if len(groups) < 4 else groups[3]
 
     return version, prerelease_build
-
-
-def test():
-    v = get_version()
-    return parse(v)
 
 
 def main():
