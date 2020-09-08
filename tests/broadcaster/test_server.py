@@ -6,6 +6,8 @@ from mixer.broadcaster.apps.server import Server
 from mixer.broadcaster.client import Client
 import mixer.broadcaster.common as common
 
+from tests.process import ServerProcess
+
 
 class Delegate:
     def __init__(self):
