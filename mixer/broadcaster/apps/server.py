@@ -315,7 +315,11 @@ class Room:
                     ):
                         self._commands.pop()
                         self.byte_size -= stored_command.byte_size()
-            if command_type != common.MessageType.CLIENT_ID_WRAPPER:
+            if (
+                command_type != common.MessageType.CLIENT_ID_WRAPPER
+                and command_type != common.MessageType.FRAME
+                and command_type != common.MessageType.QUERY_OBJECT_DATA
+            ):
                 self._commands.append(command)
                 self.byte_size += command.byte_size()
 
