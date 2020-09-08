@@ -9,6 +9,9 @@ import faulthandler
 import logging
 from pathlib import Path
 
+__version__ = ""
+display_version = ""
+
 bl_info = {
     "name": "Mixer",
     "author": "Ubisoft Animation Studio",

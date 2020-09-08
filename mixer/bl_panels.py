@@ -14,7 +14,7 @@ from mixer.bl_properties import UserItem
 from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientAttributes
 from mixer.blender_data.debug_addon import DebugDataPanel
-from mixer import __version__
+from mixer import display_version
 
 if TYPE_CHECKING:
     from mixer.bl_preferences import MixerPreferences
@@ -204,7 +204,7 @@ def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Contex
 
 
 class MixerSettingsPanel(bpy.types.Panel):
-    bl_label = f"Mixer {__version__}"
+    bl_label = f"Mixer {display_version}"
     bl_idname = "MIXER_PT_mixer_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"

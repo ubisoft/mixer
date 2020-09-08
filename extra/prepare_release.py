@@ -20,14 +20,21 @@ def main():
 
     parser = argparse.ArgumentParser(description="Set a new version number for the project.")
 
+    # See https://semver.org/ in mind
     parser.add_argument("major", type=int, help="Major version number")
     parser.add_argument("minor", type=int, help="Minor version number")
     parser.add_argument("bugfix", type=int, help="Bugfix version number")
-    parser.add_argument("--skip-tests", action="store_true", help="If specified, skip tests for the taggued commit.")
+    parser.add_argument("prerelease", type=str, default="", help="Prerelease (optional)")
+    parser.add_argument("build", type=str, default="", help="Build suffix (optional)")
+    parser.add_argument("--skip-tests", action="store_true", help="If specified, skip tests for the tagged commit.")
 
     args = parser.parse_args()
 
     tag_name = f"v{args.major}.{args.minor}.{args.bugfix}"
+    if args.prerelease:
+        tag_name += f"-{args.prerelease}"
+    if args.build:
+        tag_name += f"+{args.build}"
     version_string = tag_name[1:]
 
     if tag_name in all_tags:
