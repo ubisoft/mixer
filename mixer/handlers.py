@@ -334,6 +334,11 @@ def update_object_state(old_objects: dict, new_objects: dict):
         share_data.objects_removed.clear()
         return
 
+    if len(share_data.objects_added) > 1 and len(share_data.objects_removed) > 1:
+        logger.error(
+            f"more than one object renamed: unsupported{share_data.objects_added} {share_data.objects_removed}"
+        )
+
     for obj_name in share_data.objects_removed:
         if obj_name in share_data.old_objects:
             del share_data.old_objects[obj_name]
