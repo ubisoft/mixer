@@ -7,6 +7,7 @@ Register/unregister functions and logging setup.
 import atexit
 import faulthandler
 import logging
+import os
 from pathlib import Path
 
 __version__ = ""
@@ -55,8 +56,20 @@ def register():
     from mixer.log_utils import Formatter, get_log_file
 
     if len(logger.handlers) == 0:
+        # Add the pid to the log. Just enough for the tests, that merge the logs and need to distinguish
+        # two Blender on the same machine. Pids might collide during regular networked operation
+        old_factory = logging.getLogRecordFactory()
+        pid = str(os.getpid())
+
+        def record_factory(*args, **kwargs):
+            record = old_factory(*args, **kwargs)
+            record.custom_attribute = pid
+            return record
+
+        logging.setLogRecordFactory(record_factory)
+
         logger.setLevel(logging.WARNING)
-        formatter = Formatter("{asctime} {levelname[0]} {name:<36}  - {message:<80}", style="{")
+        formatter = Formatter("{asctime} {custom_attribute:<6} {levelname[0]} {name:<36}  - {message:<80}", style="{")
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         logger.addHandler(handler)
