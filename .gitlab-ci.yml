@@ -12,7 +12,7 @@ flake8:
   image: python:3
   stage: pre_release
   script:
-    - pip install black flake8 flake8-black pep8-naming flake8-bugbear --contraint requirements-dev.txt
+    - pip install black flake8 flake8-black pep8-naming flake8-bugbear --constraint requirements-dev.txt
     - flake8 -v mixer tests extra
 
 zip:
