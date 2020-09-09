@@ -5,6 +5,7 @@ The goal for Mixer is to replace all code specific to entities (camera, light, m
 mechanism.
 """
 
+import itertools
 import logging
 import traceback
 
@@ -135,25 +136,36 @@ def build_data_remove(buffer):
 
 
 def send_data_renames(renames: RenameChangeset):
+    if not renames:
+        return
     if not share_data.use_experimental_sync():
         return
 
-    for uuid, new_name, debug_info in renames:
+    items = []
+    for uuid, old_name, new_name, debug_info in renames:
         logger.info("send_rename: %s (%s) into %s", uuid, debug_info, new_name)
-        buffer = common.encode_string(uuid) + common.encode_string(new_name) + common.encode_string(debug_info)
-        command = common.Command(common.MessageType.BLENDER_DATA_RENAME, buffer, 0)
-        share_data.client.add_command(command)
+        items.extend([uuid, old_name, new_name])
+
+    buffer = common.encode_string_array(items)
+    command = common.Command(common.MessageType.BLENDER_DATA_RENAME, buffer, 0)
+    share_data.client.add_command(command)
 
 
 def build_data_rename(buffer):
     if not share_data.use_experimental_sync():
         return
 
-    uuid, index = common.decode_string(buffer, 0)
-    new_name, index = common.decode_string(buffer, index)
-    debug_info, index = common.decode_string(buffer, index)
-    logger.info("build_data_rename: %s (%s) into %s", uuid, debug_info, new_name)
-    share_data.bpy_data_proxy.rename_datablock(uuid, new_name)
+    strings, _ = common.decode_string_array(buffer, 0)
+
+    # (uuid1, old1, new1, uuid2, old2, new2, ...) to ((uuid1, old1, new1), (uuid2, old2, new2), ...)
+    args = [iter(strings)] * 3
+    # do not consume the iterator on the log loop !
+    items = list(itertools.zip_longest(*args))
+
+    for uuid, old_name, new_name in items:
+        logger.info("build_data_rename: %s (%s) into %s", uuid, old_name, new_name)
+
+    share_data.bpy_data_proxy.rename_datablocks(items)
 
     # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
     share_data.set_dirty()

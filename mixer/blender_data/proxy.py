@@ -512,7 +512,8 @@ class StructLikeProxy(Proxy):
                 logger.warning(f"diff: unknown attribute {k} in {struct}")
                 continue
 
-            delta = diff_attribute(member, member_property, self._data[k], visit_state)
+            proxy_data = self._data.get(k)
+            delta = diff_attribute(member, member_property, proxy_data, visit_state)
             if delta is not None:
                 diff._data[k] = delta
 
@@ -643,6 +644,7 @@ class BpyIDProxy(BpyStructProxy):
 
     def target(self, bl_instance: Optional[Any] = None, attr_name: Optional[str] = None) -> T.ID:
         if self.collection_name is not None:
+            # TODO wrong; query by uuid instead
             # is_embedded_data is False
             datablock = self.collection.get(self.data("name"))
             logger.warning(f"target(bpy.data.{self.collection_name}[{self.data('name')}] is {datablock}")
@@ -1411,8 +1413,8 @@ CreationChangeset = List[BpyIDProxy]
 UpdateChangeset = List[DeltaUpdate]
 # uuid, debug_display
 RemovalChangeset = List[Tuple[str, str]]
-# uuid, new_name, debug_display
-RenameChangeset = List[Tuple[str, str, str]]
+# uuid, old_name, new_name, debug_display
+RenameChangeset = List[Tuple[str, str, str, str]]
 
 
 class Changeset:
@@ -1535,6 +1537,7 @@ class BpyPropDataCollectionProxy(Proxy):
                     f"Simultaneous creation. Renamed incoming {incoming_proxy.data('name')} into {unique_name}"
                 )
                 incoming_proxy.rename(unique_name)
+                old_name = datablock.name
                 name = unique_name
             else:
                 # An existing datablock, not processed by us
@@ -1555,14 +1558,12 @@ class BpyPropDataCollectionProxy(Proxy):
             for collection, ref_proxy in unresolved_refs:
                 ref_target = ref_proxy.target(visit_state)
                 logger.info(f"create_datablock: resolving reference {collection}.link({ref_target}")
-                # TODO for other than collection scene cross references, ...)
-                # TODO even remove ordering
                 collection.link(ref_target)
             del visit_state.unresolved_refs[uuid]
 
         renames = []
         if name != incoming_name:
-            renames.append((uuid, name, str(incoming_proxy)))
+            renames.append((uuid, old_name, name, str(incoming_proxy)))
 
         return datablock, renames
 
@@ -1637,7 +1638,7 @@ class BpyPropDataCollectionProxy(Proxy):
         Args:
             uuid: the mixer_uuid of the datablock
         """
-        logger.info("Perform rename %s into %s", proxy, new_name)
+        logger.info("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
         proxy.rename(new_name)
         datablock.name = new_name
 
@@ -1704,26 +1705,18 @@ class BpyPropDataCollectionProxy(Proxy):
         #   resulting in a situation where remote has FC/B.001 and D7/B.002 linked to the
         #   Master collection and also a FC/B unlinked
         #
-
-        # TODO send a single grouped rename request, with no tmp value if only on rename is detected
-        # after this has been extensively tested
-
-        temp = []
         for proxy, new_name in diff.items_renamed:
             uuid = proxy.mixer_uuid()
-            tmp_name = f"__tmp_mixer__{uuid}"
-            changeset.renames.append(((uuid), tmp_name, str(proxy)))
-            proxy.rename(new_name)
-            if proxy.collection[new_name] is visit_state.ids[uuid]:
+            if proxy.collection[new_name] is not visit_state.ids[uuid]:
                 logger.error(
                     f"update rename : {proxy.collection}[{new_name}] is not {visit_state.ids[uuid]} for {proxy}, {uuid}"
                 )
-            if visit_state.ids[uuid] in visit_state.root_ids:
-                logger.error(f"update rename : {visit_state.ids[uuid]} in visit_state.root_ids for {proxy}, {uuid}")
-            temp.append((new_name, proxy))
+            if visit_state.ids[uuid] not in visit_state.root_ids:
+                logger.error(f"update rename : {visit_state.ids[uuid]} not in visit_state.root_ids for {proxy}, {uuid}")
 
-        for new_name, proxy in temp:
-            changeset.renames.append((proxy.mixer_uuid(), new_name, str(proxy)))
+            old_name = proxy.data("name")
+            changeset.renames.append((proxy.mixer_uuid(), old_name, new_name, str(proxy)))
+            proxy.rename(new_name)
 
         return changeset
 
@@ -1968,10 +1961,13 @@ class BpyBlendProxy(Proxy):
                 logger.info("depsgraph update: ignoring untracked type %s", datablock)
                 continue
             logger.info("depsgraph update: testing %s", datablock)
+            if isinstance(datablock, T.Scene) and datablock.name == "__last_scene_to_be_removed__":
+                continue
             proxy = self.id_proxies.get(datablock.mixer_uuid)
             if proxy is None:
                 # Not an error for embedded IDs.
-                assert datablock.is_embedded_data
+                if not datablock.is_embedded_data:
+                    logger.warning(f"depsgraph update for {datablock} : no proxy and not datablock.is_embedded_data")
 
                 # For instance Scene.node_tree is not a reference to a bpy.data collection element
                 # but a "pointer" to a NodeTree owned by Scene. In such a case, the update list contains
@@ -2048,23 +2044,42 @@ class BpyBlendProxy(Proxy):
         del self.id_proxies[uuid]
         del self.ids[uuid]
 
-    def rename_datablock(self, uuid: str, new_name: str):
+    def rename_datablocks(self, items: List[str, str, str]):
         """
         Rename a bpy.data collection item and update the proxy accordingly
 
-        Receiver side
+        Args:
+            items: list of (uuid, new_name) tuples
         """
-        proxy = self.id_proxies.get(uuid)
-        if proxy is None:
-            logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
+        renames = []
+        for uuid, old_name, new_name in items:
+            proxy = self.id_proxies.get(uuid)
+            if proxy is None:
+                logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
 
-        bpy_data_collection_proxy = self._data.get(proxy.collection_name)
-        if bpy_data_collection_proxy is None:
-            logger.warning(f"rename_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
-            return
+            bpy_data_collection_proxy = self._data.get(proxy.collection_name)
+            if bpy_data_collection_proxy is None:
+                logger.warning(f"rename_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
+                continue
 
-        datablock = self.ids[uuid]
-        bpy_data_collection_proxy.rename_datablock(proxy, new_name, datablock)
+            datablock = self.ids[uuid]
+            tmp_name = f"_mixer_tmp_{uuid}"
+            if datablock.name != old_name:
+                # We are receiving a rename but our datablock has not the same name as the datablock on the
+                # sender side. This means that we have renamed or processed another rename that the
+                # sender has not yet processed.
+                new_name = f"_mixer_rename_conflict_{uuid}"
+                logger.warning(f"rename_datablocks: conflict for existing {datablock} and incoming old name {old_name}")
+                logger.warning(f"... using {new_name}")
+            renames.append([bpy_data_collection_proxy, proxy, old_name, tmp_name, new_name, datablock])
+
+        # The rename process is handled in two phases to avoid spontaneous renames from Blender
+        # see BpyPropDataCollectionProxy.update() for explanation
+        for bpy_data_collection_proxy, proxy, _, tmp_name, _, datablock in renames:
+            bpy_data_collection_proxy.rename_datablock(proxy, tmp_name, datablock)
+
+        for bpy_data_collection_proxy, proxy, old_name, _, new_name, datablock in renames:
+            bpy_data_collection_proxy.rename_datablock(proxy, new_name, datablock)
 
     def debug_check_id_proxies(self):
         return 0

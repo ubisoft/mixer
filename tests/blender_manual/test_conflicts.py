@@ -33,6 +33,14 @@ class ThrottledTestCase(BlenderTestCase):
             latency_ms = 1000 * self.latency
             server_args = ["--latency", str(latency_ms)]
             super().setUp(blenderdescs=blenderdescs, server_args=server_args)
+            if self.experimental_sync:
+                self.ignored_messages |= {
+                    # TODO clarify this
+                    MessageType.ADD_OBJECT_TO_VRTIST,
+                    # set to the scene displayed, which is not important as VRtist supports one scene only
+                    MessageType.SET_SCENE,
+                }
+
         except Exception:
             self.shutdown()
             raise
@@ -40,98 +48,135 @@ class ThrottledTestCase(BlenderTestCase):
     def assert_matches(self):
         # Wait for the messages to reach the destination
         # TODO What os just enough ?
-        time.sleep(4 * self.latency)
+        time.sleep(5 * self.latency)
         super().assert_matches()
-
-
-class TestCollectionInMasterRename(ThrottledTestCase):
-    def test_add_object(self):
-        self.send_strings([bl.active_layer_collection("Collection1"), bl.ops_objects_light_add()], to=0)
-        delay = 0.0
-        time.sleep(delay)
-        self.send_strings([bl.data_collections_rename("Collection1", "Collection1_renamed")], to=1)
-
-        # 2020-08-13 21:24:20,703 W mixer.blender_client                  -     collection = share_data.blender_collections[collection_name]                 [.\mixer\log_utils.py:62]
-        # 2020-08-13 21:24:20,706 W mixer.blender_client                  - KeyError: 'Collection1'                                                         [.\mixer\log_utils.py:62]
-        # The point light is in no collection
-        successful = False
-        self.assertTrue(successful)
-
-    def test_unlink_object(self):
-        self.send_strings([bl.collection_objects_unlink("EmptyInCollection1", "Collection1")], to=0)
-        delay = 0.0
-        time.sleep(delay)
-        self.send_strings([bl.data_collections_rename("Collection1", "Collection1_renamed")], to=1)
-
-        # 2020-08-13 21:24:20,703 W mixer.blender_client                  -     collection = share_data.blender_collections[collection_name]                 [.\mixer\log_utils.py:62]
-        # 2020-08-13 21:24:20,706 W mixer.blender_client                  - KeyError: 'Collection1'                                                         [.\mixer\log_utils.py:62]
-        # The object is not removed
-        successful = False
-        self.assertTrue(successful)
-
-    def test_data_collections_rename_same_name(self):
-        self.send_strings([bl.data_collections_rename("Collection1", "Collection1_renamed")], to=0)
-        delay = 0.0
-        time.sleep(delay)
-        self.send_strings([bl.data_collections_rename("Collection1", "Collection1_renamed")], to=1)
-
-        # exceptions
-        successful = False
-        self.assertTrue(successful)
-        pass
-
-    def test_data_collections_rename_different_names(self):
-        self.send_strings([bl.data_collections_rename("Collection1", "Collection1_renamed")], to=0)
-        delay = 0.0
-        time.sleep(delay)
-        self.send_strings([bl.data_collections_rename("Collection1", "Collection1_renamed2")], to=1)
-
-        # fails: collection is duplicated
-        successful = False
-        self.assertTrue(successful)
-
-    def test_remove_collection(self):
-        self.send_strings([bl.data_collections_rename("Collection1", "Collection1_renamed")], to=0)
-        delay = 0.0
-        time.sleep(delay)
-        self.send_strings(bl.data_collections_remove("Collection1"), to=1)
-
-        # No problem
-        successful = True
-        self.assertTrue(successful)
-
-    def test_remove_child(self):
-        self.send_strings([bl.data_collections_rename("Collection1", "Collection1_renamed")], to=0)
-        delay = 0.0
-        time.sleep(delay)
-        self.send_strings([bl.data_collections_remove("Collection11")], to=1)
-
-        # Exception, scene OK
-        successful = False
-        self.assertTrue(successful)
-
-
-class TestObjectRename(ThrottledTestCase):
-    def test_update_object(self):
-        self.send_strings([bl.data_objects_rename("A", "B")], to=0)
-        delay = 0.0
-        time.sleep(delay)
-        self.send_strings([bl.data_objects_update("B", ".location[1] = 2.")], to=1)
-
-        # wrong object updated
-        successful = False
-        self.assertTrue(successful)
 
 
 @parameterized_class(
     [{"experimental_sync": True}, {"experimental_sync": False}],
     class_name_func=ThrottledTestCase.get_class_name,
 )
-class TestSceneRename(ThrottledTestCase):
+class TestCollectionInMasterRenameGeneric(ThrottledTestCase):
+    def setUp(self):
+        if not self.experimental_sync:
+            self.skipTest("Fails in VRtist")
+        super().setUp()
+
+    def send_string(self, s: str, to: int, sleep=0):
+        super().send_string(s, to=to, sleep=sleep)
+
+    def test_add_object(self):
+        add_object = """\
+import bpy
+light = bpy.data.lights.new(name="point", type="POINT")
+obj = bpy.data.objects.new("point", light)
+bpy.data.collections["Collection1"].objects.link(obj)
+"""
+        rename = """\
+import bpy
+bpy.data.collections["Collection1"].name = "C1_renamed"
+"""
+
+        self.send_string(add_object, to=0)
+        self.send_string(rename, to=1)
+
+        self.assert_matches()
+
+    def test_unlink_object(self):
+        unlink = """\
+import bpy
+obj = bpy.data.objects["EmptyInCollection1"]
+bpy.data.collections["Collection1"].objects.unlink(obj)
+"""
+        rename = """\
+import bpy
+bpy.data.collections["Collection1"].name = "Collection1_renamed"
+"""
+        self.send_string(unlink, to=0)
+        self.send_string(rename, to=1)
+
+        # 2020-08-13 21:24:20,703 W mixer.blender_client                  -     collection = share_data.blender_collections[collection_name]                 [.\mixer\log_utils.py:62]
+        # 2020-08-13 21:24:20,706 W mixer.blender_client                  - KeyError: 'Collection1'                                                         [.\mixer\log_utils.py:62]
+        # The object is not removed
+        self.assert_matches()
+
+    def test_data_collections_rename_same_name(self):
+        rename = """\
+import bpy
+bpy.data.collections["Collection1"].name = "Collection1_renamed"
+"""
+        self.send_string(rename, to=0)
+        self.send_string(rename, to=1)
+
+        self.assert_matches()
+
+    def test_data_collections_rename_different_names(self):
+        rename = """\
+import bpy
+bpy.data.collections["Collection1"].name = "Collection1_renamed"
+"""
+        rename2 = """\
+import bpy
+bpy.data.collections["Collection1"].name = "Collection1_renamed2"
+"""
+        self.send_string(rename, to=0)
+        self.send_string(rename2, to=1)
+
+        # fails: collection has different names
+        self.assert_matches()
+
+    def test_remove_collection(self):
+        rename = """\
+import bpy
+bpy.data.collections["Collection1"].name = "Collection1_renamed"
+"""
+        remove = f"""
+import bpy
+collection = bpy.data.collections["Collection1"]
+bpy.data.collections.remove(collection)
+"""
+
+        self.send_string(rename, to=0)
+        self.send_string(remove, to=1)
+
+        # No problem
+        self.assert_matches()
+
+    def test_remove_child(self):
+        remove = f"""
+import bpy
+collection = bpy.data.collections["Collection1"]
+bpy.data.collections.remove(collection)
+"""
+        self.send_string(remove, to=0)
+        delay = 0.0
+        time.sleep(delay)
+        remove_child = f"""
+import bpy
+collection = bpy.data.collections["Collection11"]
+bpy.data.collections.remove(collection)
+"""
+        self.send_string(remove_child, to=1)
+
+        # Exception, scene OK
+        self.assert_matches()
+
+
+class TestObjectRenameGeneric(ThrottledTestCase):
+    def test_update_object(self):
+        self.send_strings([bl.data_objects_rename("A", "B")], to=0)
+        delay = 0.0
+        time.sleep(delay)
+        self.send_strings([bl.data_objects_update("B", ".location[1] = 2.")], to=1)
+        time.sleep(1.0)
+        # wrong object updated
+        self.assert_matches()
+
+
+class TestSceneRenameGeneric(ThrottledTestCase):
     def setUp(self):
         super().setUp("file2.blend")
 
-    @unittest.skip("")
     def test_add_object(self):
         self.send_strings([bl.active_layer_master_collection(), bl.ops_objects_light_add()], to=0)
         delay = 0.0
@@ -139,8 +184,7 @@ class TestSceneRename(ThrottledTestCase):
         self.send_strings([bl.data_scenes_rename("Scene", "Scene_renamed")], to=1)
 
         # on 1 The light is in the scene but not in the master collection of the renamed scene
-        successful = False
-        self.assertTrue(successful)
+        self.assert_matches()
 
     def test_collection_new_and_link(self):
         self.send_strings(
@@ -159,17 +203,16 @@ class TestSceneRename(ThrottledTestCase):
             self.expected_counts = {MessageType.ADD_COLLECTION_TO_SCENE: 2 + 1}
         self.assert_matches()
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_data_objects_rename(self):
         self.send_strings([bl.data_objects_rename("EmptyInSceneMaster", "EmptyInSceneMaster_renamed")], to=0)
         delay = 0.0
         time.sleep(delay)
         self.send_strings([bl.data_scenes_rename("Scene", "Scene_renamed")], to=1)
 
-        successful = True
-        self.assertTrue(successful)
+        self.assert_matches()
 
-    @unittest.skip("")
+    # @unittest.skip("")
     def test_unlink_object(self):
         self.send_strings([bl.scene_collection_objects_unilink("EmptyInSceneMaster")], to=0)
         delay = 0.0
@@ -187,8 +230,9 @@ class TestSceneRename(ThrottledTestCase):
         # 2020-08-14 19:07:04,226 W mixer.blender_client                  - KeyError: 'Scene'                                                                [.\mixer\log_utils.py:62]
 
         # in 1 the object is not removed
-        successful = False
-        self.assertTrue(successful)
+        # successful = False
+        # self.assertTrue(successful)
+        self.assert_matches()
 
     def test_collection_unlink(self):
         self.send_strings([bl.scene_collection_children_unlink("Collection1")], to=0)
