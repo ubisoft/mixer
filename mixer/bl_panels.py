@@ -204,7 +204,7 @@ def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Contex
 
 
 class MixerSettingsPanel(bpy.types.Panel):
-    bl_label = f"Mixer {display_version}"
+    bl_label = f"Mixer {display_version or '(Unknown version)'}"
     bl_idname = "MIXER_PT_mixer_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
