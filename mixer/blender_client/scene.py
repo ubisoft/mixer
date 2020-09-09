@@ -56,6 +56,8 @@ def send_scene_removed(client: Client, scene_name: str):
 
 
 def build_scene_removed(data):
+
+    # TODO check if obsolete
     scene_name, _ = common.decode_string(data, 0)
     logger.info("build_scene_removed %s", scene_name)
     scene = share_data.blender_scenes.get(scene_name)
@@ -70,8 +72,17 @@ def send_scene_renamed(client: Client, old_name: str, new_name: str):
 
 
 def build_scene_renamed(data):
+    # TODO check if obsolete
+
     old_name, index = common.decode_string(data, 0)
     new_name, _ = common.decode_string(data, index)
+
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning("build_scene_renamed  %s to %s", old_name, new_name)
+        return
+
     logger.info("build_scene_renamed %s to %s", old_name, new_name)
     scene = share_data.blender_scenes.get(old_name)
     scene.name = new_name
@@ -88,6 +99,13 @@ def send_add_collection_to_scene(client: Client, scene_name: str, collection_nam
 def build_collection_to_scene(data):
     scene_name, index = common.decode_string(data, 0)
     collection_name, _ = common.decode_string(data, index)
+
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning("build_scene_renamed %s <- %s", scene_name, collection_name)
+        return
+
     logger.info("build_collection_to_scene %s <- %s", scene_name, collection_name)
 
     try:
@@ -125,6 +143,13 @@ def send_remove_collection_from_scene(client: Client, scene_name: str, collectio
 def build_remove_collection_from_scene(data):
     scene_name, index = common.decode_string(data, 0)
     collection_name, _ = common.decode_string(data, index)
+
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning("build_remove_collection_from_scene  %s <- %s", scene_name, collection_name)
+        return
+
     logger.info("build_remove_collection_from_scene %s <- %s", scene_name, collection_name)
     scene = share_data.blender_scenes[scene_name]
     collection = share_data.blender_collections.get(collection_name)
@@ -154,7 +179,16 @@ def build_add_object_to_scene(data):
     object_name, _ = common.decode_string(data, index)
     logger.info("build_add_object_to_scene %s <- %s", scene_name, object_name)
 
-    scene = share_data.blender_scenes[scene_name]
+    try:
+        scene = share_data.blender_scenes[scene_name]
+    except KeyError:
+        if share_data.use_experimental_sync():
+            # Removed by the Blender Protocol
+            logger.info(f"build_collection_to_scene(): scene not found {scene_name}. Safe in experimental_sync ...")
+            return
+        else:
+            raise
+
     # We may have received an object creation message before this collection link message
     # and object creation will have created and linked the collecetion if needed
     if scene.collection.objects.get(object_name) is None:
@@ -169,6 +203,8 @@ def send_remove_object_from_scene(client: Client, scene_name: str, object_name: 
 
 
 def build_remove_object_from_scene(data):
+
+    # TODO ckeck if obsolete
     scene_name, index = common.decode_string(data, 0)
     object_name, _ = common.decode_string(data, index)
     logger.info("build_remove_object_from_scene %s <- %s", scene_name, object_name)
