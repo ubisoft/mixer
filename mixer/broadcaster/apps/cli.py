@@ -150,7 +150,7 @@ def interactive_loop(args):
                 if client is None or not client.is_connected():
                     client = CliClient(args)
                 else:
-                    print(f"Error : already connected. Use disconnect first")
+                    print("Error : already connected. Use disconnect first")
             elif command == "exit":
                 done = True
             elif command == "help":

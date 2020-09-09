@@ -76,7 +76,7 @@ class Connection:
 
         def _leave_room(command: common.Command):
             if self.room is None:
-                _send_error(f"Received leave_room but no room is joined")
+                _send_error("Received leave_room but no room is joined")
                 return
             _ = command.data.decode()  # todo remove room_name from protocol
             self._server.leave_room(self)
