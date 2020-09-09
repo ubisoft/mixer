@@ -405,8 +405,7 @@ class BpyIDProxy(BpyStructProxy):
         is_embedded_data: bool = False,
         bpy_data_collection_name: str = None,
     ):
-        """
-        """
+        """"""
         if is_embedded_data and bpy_data_collection_name is not None:
             logger.error(
                 f"BpyIDProxy.load() for {bl_instance} : is_embedded_data is True and bpy_prop_collection is {bpy_data_collection_name}. Item ignored"
@@ -785,7 +784,11 @@ class AosElement(Proxy):
         self._data: Mapping[str, List] = {}
 
     def load(
-        self, bl_collection: bpy.types.bpy_prop_collection, item_bl_rna, attr_name: str, visit_state: VisitState,
+        self,
+        bl_collection: bpy.types.bpy_prop_collection,
+        item_bl_rna,
+        attr_name: str,
+        visit_state: VisitState,
     ):
         """
         - bl_collection: a collection of structure, e.g. T.Mesh.vertices
@@ -1376,7 +1379,7 @@ class BpyBlendProxy(Proxy):
     def update(
         self, diff: BpyBlendDiff, context: Context = safe_context, depsgraph_updates: T.bpy_prop_collection = ()
     ) -> Changeset:
-        """ Update the proxy using the state of the Blendata collections (ID creation, deletion)
+        """Update the proxy using the state of the Blendata collections (ID creation, deletion)
         and the depsgraph updates (ID modification)
 
         Sender side

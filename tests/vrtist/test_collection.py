@@ -8,7 +8,8 @@ from tests.vrtist.vrtist_testcase import VRtistTestCase
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=VRtistTestCase.get_class_name,
+    [{"experimental_sync": True}, {"experimental_sync": False}],
+    class_name_func=VRtistTestCase.get_class_name,
 )
 class TestCollection(VRtistTestCase):
     def setUp(self):

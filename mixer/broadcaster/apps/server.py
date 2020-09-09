@@ -430,7 +430,10 @@ class Server:
             return
 
         self.broadcast_to_all_clients(
-            common.Command(common.MessageType.ROOM_UPDATE, common.encode_json({room.name: attributes}),)
+            common.Command(
+                common.MessageType.ROOM_UPDATE,
+                common.encode_json({room.name: attributes}),
+            )
         )
 
     def set_room_custom_attributes(self, room_name: str, custom_attributes: Mapping[str, Any]):

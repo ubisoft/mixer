@@ -65,7 +65,10 @@ def encode(message: Message) -> bytes:
     raise NotImplementedError("encode")
     buffer = b""
     fields = ((f.name, f.type) for f in dataclasses.fields(message))
-    for name, type_, in fields:
+    for (
+        name,
+        type_,
+    ) in fields:
         if type_ not in codec_functions:
             raise NotImplementedError(f"No codec_func for {type_}")
         encode = codec_functions[type_][0]

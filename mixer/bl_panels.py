@@ -104,7 +104,11 @@ def collapsable_panel(
 ):
     row = layout.row()
     row.prop(
-        data, property, icon="TRIA_DOWN" if getattr(data, property) else "TRIA_RIGHT", icon_only=True, emboss=False,
+        data,
+        property,
+        icon="TRIA_DOWN" if getattr(data, property) else "TRIA_RIGHT",
+        icon_only=True,
+        emboss=False,
     )
     if alert:
         row.alert = True
