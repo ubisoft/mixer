@@ -40,6 +40,7 @@ class MixerTestCase(unittest.TestCase):
     """
 
     def __init__(self, *args, **kwargs):
+        self.latency = 0
         self.expected_counts = {}
         super().__init__(*args, **kwargs)
         self._log_level = logging.INFO
@@ -109,6 +110,10 @@ class MixerTestCase(unittest.TestCase):
                         blender.join_room(experimental_sync=self.experimental_sync)
 
                 self._blenders.append(blender)
+
+            # join_room waits for the room to be joinable before issuing join room, but it
+            # cannot wait for the reception of the room contents
+            time.sleep(10 * self.latency)
 
             mixer.codec.register()
         except Exception:
