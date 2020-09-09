@@ -1,17 +1,9 @@
-# WIP
+# 0.15.0+modifiers-1
 
 ## Features
 
-- Put back sync of `proxy_storage` and `proxy_dir` fields of SequenceEditor (#146)
+- Experimental support of modifiers (breaks all rename operations)
 
-## Bugfix
-
-- Fix mesh being triangulated after leaving edit mode. (#191)
-- Fix crash occuring when vertex group data is inconsistent (#121)
-
-## Documentation
-
-- update release.md (#206)
 
 # 0.15.0 (2020-08-12)
 
