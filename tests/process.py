@@ -10,7 +10,7 @@ from typing import Any, Callable, Iterable, List, Mapping, Optional
 
 import tests.blender_lib as blender_lib
 
-from mixer.broadcaster.common import DEFAULT_PORT
+from mixer.broadcaster.common import DEFAULT_PORT, encode_int
 
 """
 The idea is to automate Blender / Blender tests
@@ -195,7 +195,13 @@ class BlenderServer(BlenderProcess):
             self._sock.close()
 
     def send_string(self, script: str):
-        self._sock.send(script.encode("utf-8"))
+        # ensure that Blender processes the scripts one by one,
+        # otherwise they get buffered here on startup and Blender gets all the scripts at once before
+        # the initial synchronization is done
+        buffer = script.encode("utf-8")
+        length_buffer = encode_int(len(buffer))
+        self._sock.send(length_buffer)
+        self._sock.send(buffer)
 
     def send_function(self, f: Callable, *args, **kwargs):
         """
