@@ -9,6 +9,9 @@ import faulthandler
 import logging
 from pathlib import Path
 
+__version__ = ""
+display_version = ""
+
 bl_info = {
     "name": "Mixer",
     "author": "Ubisoft Animation Studio",
@@ -21,8 +24,6 @@ bl_info = {
     "tracker_url": "",
     "category": "Collaboration",
 }
-
-__version__ = f"v{bl_info['version'][0]}.{bl_info['version'][1]}.{bl_info['version'][2]}"
 
 logger = logging.getLogger(__name__)
 logger.propagate = False
