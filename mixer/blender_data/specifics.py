@@ -12,6 +12,7 @@ import bpy.path
 logger = logging.getLogger(__name__)
 Proxy = TypeVar("Proxy")
 BpyIDProxy = TypeVar("BpyIDProxy")
+VisitState = TypeVar("VisitState")
 
 
 def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy, visit_state: Any) -> Optional[T.ID]:
@@ -152,7 +153,7 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
     return properties
 
 
-def pre_save_id(proxy: Proxy, target: T.ID) -> T.ID:
+def pre_save_id(proxy: Proxy, target: T.ID, visit_state: VisitState) -> T.ID:
     """Process attributes that must be saved first and return a possibly updated reference to the target
 
     Args:
@@ -176,7 +177,7 @@ def pre_save_id(proxy: Proxy, target: T.ID) -> T.ID:
         if light_type is not None and light_type != target.type:
             target.type = light_type
             # must reload the reference
-            target = proxy.target()
+            target = proxy.target(visit_state)
     elif isinstance(target, T.ColorManagedViewSettings):
         use_curve_mapping = proxy.data("use_curve_mapping")
         if use_curve_mapping:
@@ -220,7 +221,7 @@ non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP",
 effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - non_effect_sequences
 
 
-def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
+def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, visit_state: VisitState):
     """Add an element to a bpy_prop_collection using the collection specific API"""
 
     bl_rna = getattr(collection, "bl_rna", None)
@@ -246,7 +247,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
             if target_ref is None:
                 target = None
             else:
-                target = target_ref.target()
+                target = target_ref.target(visit_state)
             data_path = proxy.data("data_path")
             index = proxy.data("array_index")
             group_method = proxy.data("group_method")
@@ -270,7 +271,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
                 return collection.new_effect(name, type_, channel, frame_start, frame_end=frame_end)
             if type_ == "SOUND":
                 sound = proxy.data("sound")
-                target = sound.target()
+                target = sound.target(visit_state)
                 if not target:
                     logger.warning(f"missing target ID block for bpy.data.{sound.collection}[{sound.key}] ")
                     return None

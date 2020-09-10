@@ -111,6 +111,9 @@ UnresolvedRefs = Dict[str, UnresolvedRef]
 
 @dataclass
 class VisitState:
+    # This class remains from an early implementation. It gathers BpyBlendProxy state encapsulated
+    # so that it can be used during the data traversal
+    # This parts need refactoring and simplification (some items are now useless)
     root_ids: RootIds
     id_proxies: IDProxies
     ids: IDs
@@ -301,18 +304,30 @@ class Proxy:
     def init(self, _):
         pass
 
-    def data(self, key: Union[str, int]) -> Any:
+    def data(self, key: Union[str, int], resolve_delta=True) -> Any:
+        """Return the data at key, which may be a struct member, a dict value or an array value,
+
+        Args:
+            key: Integer or string to be used as index or key to the data
+            resolve_delta: If True, and the data is a Delta, will return the delta value
+        """
+
+        def resolve(data):
+            if isinstance(data, Delta) and resolve_delta:
+                return data.value
+            return data
+
         if isinstance(key, int):
             if MIXER_SEQUENCE in self._data:
                 try:
-                    return self._data[MIXER_SEQUENCE][key]
+                    return resolve(self._data[MIXER_SEQUENCE][key])
                 except IndexError:
                     return None
             else:
                 # used by the diff mode that generates a dict with int keys
-                return self._data.get(key)
+                return resolve(self._data.get(key))
         else:
-            return self._data.get(key)
+            return resolve(self._data.get(key))
 
     def save(self, bl_instance: any, attr_name: str):
         """
@@ -401,7 +416,7 @@ class StructLikeProxy(Proxy):
             # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             target = bl_instance.get(key)
             if target is None:
-                target = specifics.add_element(self, bl_instance, key)
+                target = specifics.add_element(self, bl_instance, key, visit_state)
         else:
             specifics.pre_save_struct(self, bl_instance, key)
             target = getattr(bl_instance, key, None)
@@ -457,7 +472,7 @@ class StructLikeProxy(Proxy):
             # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             struct = parent.get(key)
             if struct is None:
-                struct = specifics.add_element(self, parent, key)
+                struct = specifics.add_element(self, parent, key, visit_state)
         else:
             specifics.pre_save_struct(self, parent, key)
             struct = getattr(parent, key, None)
@@ -466,7 +481,8 @@ class StructLikeProxy(Proxy):
         assert type(struct_update) == type(self)
         for k, member_delta in struct_update._data.items():
             try:
-                self._data[k] = apply_attribute(struct, k, self._data[k], member_delta, visit_state, to_blender)
+                current_value = self._data.get(k)
+                self._data[k] = apply_attribute(struct, k, current_value, member_delta, visit_state, to_blender)
             except Exception as e:
                 logger.warning(f"StructLike.apply(). Processing {member_delta}")
                 logger.warning(f"... for {struct}.{k}")
@@ -642,29 +658,45 @@ class BpyIDProxy(BpyStructProxy):
     def collection(self) -> T.bpy_prop_collection:
         return getattr(bpy.data, self.collection_name)
 
-    def target(self, bl_instance: Optional[Any] = None, attr_name: Optional[str] = None) -> T.ID:
-        if self.collection_name is not None:
-            # TODO wrong; query by uuid instead
-            # is_embedded_data is False
-            datablock = self.collection.get(self.data("name"))
-            logger.warning(f"target(bpy.data.{self.collection_name}[{self.data('name')}] is {datablock}")
-        else:
-            datablock = getattr(bl_instance, attr_name)
-        return datablock
+    def target(self, visit_state: VisitState) -> T.ID:
+        return visit_state.ids.get(self.mixer_uuid())
 
-    def create_standalone_datablock(self, visit_state: VisitState) -> T.ID:
+    def create_standalone_datablock(self, visit_state: VisitState) -> Tuple[T.ID, str]:
         """
-        Save this proxy into its target standalone datablock, which may be
+        Save this proxy into its target standalone datablock
         """
-        datablock = self.target()
+        if self.target(visit_state):
+            logger.warning(f"create_standalone_datablock: but already registered {self}")
+            logger.warning(f"... update ignored")
+            return
+
+        old_name = None
+        incoming_name = self.data("name")
+        datablock = self.collection.get(incoming_name)
         if datablock:
             if not datablock.mixer_uuid:
                 # A datablock created by VRtist command in the same command batch
-                # Not an error, make it ours
+                # Not an error, we will make it ours by adding the uuid and registering it
                 logger.info(f"create_standalone_datablock for {self} found existing datablock from VRtist")
             else:
-                logger.error(f"create_standalone_datablock for {self} found existing datablock {datablock.mixer_uuid}")
-                return
+                if datablock.mixer_uuid != self.mixer_uuid():
+                    # We have a datablock with teh requested name but a different uuid.
+                    # It is a simultaneous creation :
+                    # local has already a datablock uuid_1/name_B but receives a creation for
+                    # datablock uuid_2/name_B.
+                    # Rename ours
+                    unique_name = f"_mixer_conflict_duplicate_name_{get_mixer_prefs().user}_{self.mixer_uuid()}"
+                    logger.warning(f"Creation name conflict. Renamed incoming {self.data('name')} into {unique_name}")
+                    self.rename(unique_name)
+                    old_name = datablock.name
+                    name = unique_name
+
+                    datablock = specifics.bpy_data_ctor(self.collection_name, self, visit_state)
+                else:
+                    # a creation for a datablock that we already have. This should not happen
+                    logger.error(f"create_standalone_datablock: unregistered uuid for {self}")
+                    logger.error(f"... update ignored")
+                    return
         else:
             datablock = specifics.bpy_data_ctor(self.collection_name, self, visit_state)
 
@@ -679,7 +711,7 @@ class BpyIDProxy(BpyStructProxy):
 
         datablock.mixer_uuid = self.mixer_uuid()
 
-        datablock = specifics.pre_save_id(self, datablock)
+        datablock = specifics.pre_save_id(self, datablock, visit_state)
         if datablock is None:
             logger.warning(f"BpyIDProxy.update_standalone_datablock() {self} pre_save_id returns None")
             return None
@@ -687,13 +719,13 @@ class BpyIDProxy(BpyStructProxy):
         for k, v in self._data.items():
             write_attribute(datablock, k, v, visit_state)
 
-        return datablock
+        return datablock, old_name
 
     def update_standalone_datablock(self, datablock: T.ID, delta: DeltaUpdate, visit_state: VisitState) -> T.ID:
         """
         Update this proxy and datablock according to delta
         """
-        datablock = specifics.pre_save_id(delta.value, datablock)
+        datablock = specifics.pre_save_id(delta.value, datablock, visit_state)
         if datablock is None:
             logger.warning(f"BpyIDProxy.update_standalone_datablock() {self} pre_save_id returns None")
             return None
@@ -734,7 +766,7 @@ class BpyIDProxy(BpyStructProxy):
             id_ = getattr(bl_instance, attr_name)
             pass
 
-        target = specifics.pre_save_id(self, id_)
+        target = specifics.pre_save_id(self, id_, visit_state)
         if target is None:
             logger.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} is None")
             return None
@@ -777,7 +809,8 @@ class BpyIDProxy(BpyStructProxy):
         assert type(update) == type(self)
         for k, delta in update._data.items():
             try:
-                self._data[k] = apply_attribute(datablock, k, self._data[k], delta, visit_state, to_blender=False)
+                current_value = self._data.get(k)
+                self._data[k] = apply_attribute(datablock, k, current_value, delta, visit_state, to_blender=False)
             except Exception as e:
                 logger.warning(f"StructLike.apply(). Processing {delta}")
                 logger.warning(f"... for {datablock}.{k}")
@@ -1277,7 +1310,7 @@ class BpyPropStructCollectionProxy(Proxy):
             # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             collection = parent.get(key)
             if collection is None:
-                collection = specifics.add_element(self, parent, key)
+                collection = specifics.add_element(self, parent, key, visit_state)
         else:
             specifics.pre_save_struct(self, parent, key)
             collection = getattr(parent, key, None)
@@ -1521,37 +1554,15 @@ class BpyPropDataCollectionProxy(Proxy):
         """
 
         incoming_name = incoming_proxy.data("name")
-        name = incoming_name
+        datablock, old_name = incoming_proxy.create_standalone_datablock(visit_state)
+        if not datablock:
+            return
 
-        datablock = incoming_proxy.target()
-        if datablock:
-            if datablock.mixer_uuid and datablock.mixer_uuid != incoming_proxy.mixer_uuid():
-                # Simultaneous creation:
-                # local has already a datablock uuid_1/name_B but receives a creation for
-                # datablock uuid_2/name_B. Ideally prefix with the user name (uuid2/_remote_B),
-                # do it with the uuid currently
-                # TODO Send a rename
-                # unique_name = name + "_" + incoming_proxy.mixer_uuid()*
-                unique_name = incoming_name + "_" + get_mixer_prefs().user + "_" + incoming_proxy.mixer_uuid()
-                logger.warning(
-                    f"Simultaneous creation. Renamed incoming {incoming_proxy.data('name')} into {unique_name}"
-                )
-                incoming_proxy.rename(unique_name)
-                old_name = datablock.name
-                name = unique_name
-            else:
-                # An existing datablock, not processed by us
-                # Suppose it was created by a VRtist command in the same batch and that it refers to the same datablock
-                # as the one we predend to create.
-                pass
-
-        datablock = incoming_proxy.create_standalone_datablock(visit_state)
-        if datablock:
-            uuid = incoming_proxy.mixer_uuid()
-            self._data[uuid] = incoming_proxy
-            visit_state.root_ids.add(datablock)
-            visit_state.ids[uuid] = datablock
-            visit_state.id_proxies[uuid] = incoming_proxy
+        uuid = incoming_proxy.mixer_uuid()
+        self._data[uuid] = incoming_proxy
+        visit_state.root_ids.add(datablock)
+        visit_state.ids[uuid] = datablock
+        visit_state.id_proxies[uuid] = incoming_proxy
 
         unresolved_refs = visit_state.unresolved_refs.get(uuid)
         if unresolved_refs:
@@ -1562,8 +1573,9 @@ class BpyPropDataCollectionProxy(Proxy):
             del visit_state.unresolved_refs[uuid]
 
         renames = []
-        if name != incoming_name:
-            renames.append((uuid, old_name, name, str(incoming_proxy)))
+        if datablock.name != incoming_name:
+            # Means that a datablock with the requested name was found, so the existing datablock was renamed
+            renames.append((uuid, old_name, datablock.name, str(incoming_proxy)))
 
         return datablock, renames
 
@@ -1960,7 +1972,6 @@ class BpyBlendProxy(Proxy):
             if not isinstance(datablock, safe_depsgraph_updates):
                 logger.info("depsgraph update: ignoring untracked type %s", datablock)
                 continue
-            logger.info("depsgraph update: testing %s", datablock)
             if isinstance(datablock, T.Scene) and datablock.name == "__last_scene_to_be_removed__":
                 continue
             proxy = self.id_proxies.get(datablock.mixer_uuid)

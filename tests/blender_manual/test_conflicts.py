@@ -130,7 +130,7 @@ bpy.data.collections["Collection1"].name = "Collection1_renamed2"
 import bpy
 bpy.data.collections["Collection1"].name = "Collection1_renamed"
 """
-        remove = f"""
+        remove = """
 import bpy
 collection = bpy.data.collections["Collection1"]
 bpy.data.collections.remove(collection)
@@ -143,7 +143,7 @@ bpy.data.collections.remove(collection)
         self.assert_matches()
 
     def test_remove_child(self):
-        remove = f"""
+        remove = """
 import bpy
 collection = bpy.data.collections["Collection1"]
 bpy.data.collections.remove(collection)
@@ -151,7 +151,7 @@ bpy.data.collections.remove(collection)
         self.send_string(remove, to=0)
         delay = 0.0
         time.sleep(delay)
-        remove_child = f"""
+        remove_child = """
 import bpy
 collection = bpy.data.collections["Collection11"]
 bpy.data.collections.remove(collection)
