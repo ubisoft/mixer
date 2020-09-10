@@ -62,8 +62,7 @@ class BlenderTestCase(MixerTestCase):
 
 
 class TestGeneric(BlenderTestCase):
-    """Unittest that joins a room before message creation
-    """
+    """Unittest that joins a room before message creation"""
 
     def setUp(self, join: bool = True):
         sender_blendfile = files_folder() / "empty.blend"
@@ -76,16 +75,14 @@ class TestGeneric(BlenderTestCase):
 
 
 class TestGenericJoinBefore(TestGeneric):
-    """Unittest that joins a room before message creation
-    """
+    """Unittest that joins a room before message creation"""
 
     def setUp(self):
         super().setUp(join=True)
 
 
 class TestGenericJoinAfter(TestGeneric):
-    """Unittest that does not join a room before message creation
-    """
+    """Unittest that does not join a room before message creation"""
 
     def setUp(self):
         super().setUp(join=False)

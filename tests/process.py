@@ -56,7 +56,7 @@ else:
 def blender_exe_path() -> str:
     blender_exe = os.environ.get("MIXER_BLENDER_EXE_PATH")
     if blender_exe is None:
-        raise RuntimeError(f"Environment variable MIXER_BLENDER_EXE_PATH is not set")
+        raise RuntimeError("Environment variable MIXER_BLENDER_EXE_PATH is not set")
     return blender_exe
 
 
@@ -70,16 +70,16 @@ class Process:
         self.command_line: str = None
 
     def start(self, args, kwargs):
-        logger.info(f"Running subprocess.Popen()")
+        logger.info("Running subprocess.Popen()")
         logger.info(f"args:   {args}")
         logger.info(f"kwargs: {kwargs}")
         self.command_line = " ".join(args)
         logger.info(f"command line: {self.command_line}")
         try:
             self._process = subprocess.Popen(args, **kwargs)
-            logger.info(f"subprocess.popen: success")
+            logger.info("subprocess.popen: success")
         except Exception as e:
-            logger.error(f"Python.start(): Exception raised during subprocess.Popen(): ")
+            logger.error("Python.start(): Exception raised during subprocess.Popen(): ")
             logger.error(f"{e}")
             logger.error(f"args:   {args}")
             logger.error(f"kwargs: {kwargs}")

@@ -68,7 +68,7 @@ def _build_data_update_or_create(buffer, display_name: str, func: Callable[[BpyB
         logger.error(buffer[0:200])
         logger.error("...")
         logger.error(buffer[-200:0])
-        logger.error(f"ignored")
+        logger.error("ignored")
 
     if not share_data.use_experimental_sync():
         return

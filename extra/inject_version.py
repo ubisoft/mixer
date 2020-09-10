@@ -5,14 +5,17 @@ from typing import Tuple
 
 
 def get_version():
-    cp = subprocess.run(["git", "describe", "--tags", "--dirty", "--match=v*"], stdout=subprocess.PIPE, check=True,)
+    cp = subprocess.run(
+        ["git", "describe", "--tags", "--dirty", "--match=v*"],
+        stdout=subprocess.PIPE,
+        check=True,
+    )
     version = str(cp.stdout, encoding="utf8").strip()
     return version
 
 
 def parse(version) -> Tuple[Tuple[int], str]:
-    """Parse version string like "v1.0.4-14-g241472-dirty" into ((0,14,0), "-g241472-dirty")
-    """
+    """Parse version string like "v1.0.4-14-g241472-dirty" into ((0,14,0), "-g241472-dirty")"""
     # similar regexp in gitlab .yml files
     # tested with https://regoio.herokuapp.com/
 

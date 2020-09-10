@@ -4,7 +4,7 @@ from tests.blender.blender_testcase import TestGenericJoinBefore
 
 class TestMetaBall(TestGenericJoinBefore):
     def test_bpy_data_new(self):
-        create_metaball = f"""
+        create_metaball = """
 import bpy
 name = "mb1"
 mb = bpy.data.metaballs.new(name)
@@ -21,7 +21,7 @@ e2.type = "PLANE"
         self.end_test()
 
     def test_bpy_ops_object_add(self):
-        action = f"""
+        action = """
 import bpy
 bpy.ops.object.metaball_add(type='PLANE', location=(1.0, 1.0, 1.0))
 o1 = bpy.context.active_object
@@ -32,14 +32,14 @@ bpy.ops.object.metaball_add(type='BALL', location=(-1.0, -1.0, -1.0))
         self.end_test()
 
     def test_add_remove(self):
-        action = f"""
+        action = """
 import bpy
 bpy.ops.object.metaball_add(type='CAPSULE', location=(0.0, 0.0, 0.0))
 bpy.ops.object.metaball_add(type='PLANE', location=(1.0, 1.0, 1.0))
 bpy.ops.object.metaball_add(type='BALL', location=(-1.0, -1.0, -1.0))
 """
         self.send_string(action)
-        action = f"""
+        action = """
 name = "Mball.001"
 import bpy
 D=bpy.data
@@ -53,7 +53,7 @@ D.metaballs.remove(D.metaballs[name])
 
 class TestLight(TestGenericJoinBefore):
     def test_bpy_ops_object_add(self):
-        action = f"""
+        action = """
 import bpy
 bpy.ops.object.light_add(type='POINT', location=(0.0, 0.0, 0.0))
 bpy.ops.object.light_add(type='SUN', location=(2.0, 0.0, 0.0))
@@ -63,12 +63,12 @@ bpy.ops.object.light_add(type='AREA', location=(4.0, 0.0, 0.0))
         self.end_test()
 
     def test_change_area_attrs(self):
-        action = f"""
+        action = """
 import bpy
 bpy.ops.object.light_add(type='AREA', location=(4.0, 0.0, 0.0))
 """
         self.send_string(action)
-        action = f"""
+        action = """
 import bpy
 D=bpy.data
 area = D.lights["Area"]
@@ -79,12 +79,12 @@ area.shape = 'DISK'
         self.end_test()
 
     def test_morph_light(self):
-        action = f"""
+        action = """
 import bpy
 bpy.ops.object.light_add(type='AREA', location=(4.0, 0.0, 0.0))
 """
         self.send_string(action)
-        action = f"""
+        action = """
 import bpy
 D=bpy.data
 light = D.lights["Area"]
