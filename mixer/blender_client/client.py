@@ -973,21 +973,16 @@ def update_params(obj):
         if obj.mode == "OBJECT":
             share_data.client.send_mesh(obj)
 
-    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 0)
-    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 1)
-    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 2)
-    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 0)
-    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 1)
-    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
+    # update_animation_params(obj)
 
 
 def update_animation_params(obj):
     share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 0)
     share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 1)
     share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 2)
-    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 0)
-    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 1)
-    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
+    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 0)
+    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 1)
+    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
 
 
 def clear_scene_content():
