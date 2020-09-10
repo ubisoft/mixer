@@ -49,8 +49,7 @@ def is_pointer_to(rna_property: T.Property, base: type) -> bool:
 
 @functools.lru_cache(maxsize=None)
 def sub_id_type(type_):
-    """Returns the base closest to ID (e.g Light for PointLight)
-    """
+    """Returns the base closest to ID (e.g Light for PointLight)"""
     sub_id_list = [t for t in type_.mro() if issubclass(t, T.ID) and t != T.ID]
     if sub_id_list:
         return sub_id_list[-1]

@@ -667,7 +667,7 @@ class BpyIDProxy(BpyStructProxy):
         """
         if self.target(visit_state):
             logger.warning(f"create_standalone_datablock: but already registered {self}")
-            logger.warning(f"... update ignored")
+            logger.warning("... update ignored")
             return
 
         old_name = None
@@ -695,7 +695,7 @@ class BpyIDProxy(BpyStructProxy):
                 else:
                     # a creation for a datablock that we already have. This should not happen
                     logger.error(f"create_standalone_datablock: unregistered uuid for {self}")
-                    logger.error(f"... update ignored")
+                    logger.error("... update ignored")
                     return
         else:
             datablock = specifics.bpy_data_ctor(self.collection_name, self, visit_state)
@@ -2089,7 +2089,7 @@ class BpyBlendProxy(Proxy):
         for bpy_data_collection_proxy, proxy, _, tmp_name, _, datablock in renames:
             bpy_data_collection_proxy.rename_datablock(proxy, tmp_name, datablock)
 
-        for bpy_data_collection_proxy, proxy, old_name, _, new_name, datablock in renames:
+        for bpy_data_collection_proxy, proxy, _, _, new_name, datablock in renames:
             bpy_data_collection_proxy.rename_datablock(proxy, new_name, datablock)
 
     def debug_check_id_proxies(self):
