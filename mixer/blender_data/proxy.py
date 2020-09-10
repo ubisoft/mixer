@@ -1837,6 +1837,21 @@ class BpyPropDataCollectionProxy(Proxy):
 
         return None
 
+    def search(self, name: str) -> [BpyIDProxy]:
+        """Convenience method to find proxies by name instead of uuid (for tests only)"""
+        results = []
+        for uuid in self._data.keys():
+            proxy_or_update = self.data(uuid)
+            proxy = proxy_or_update if isinstance(proxy_or_update, Proxy) else proxy_or_update.value
+            if proxy.data("name") == name:
+                results.append(proxy)
+        return results
+
+    def search_one(self, name: str) -> BpyIDProxy:
+        """Convenience method to find a proxy by name instead of uuid (for tests only)"""
+        results = self.search(name)
+        return None if not results else results[0]
+
 
 # to sort delta in the bottom up order in rough reference hierarchy
 # TODO useless since unresolved references are handled

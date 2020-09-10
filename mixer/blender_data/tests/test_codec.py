@@ -33,7 +33,7 @@ class TestCodec(unittest.TestCase):
         self.proxy.load(test_context)
 
         # patch the name so that it does not get mixed up as we restore later in the same scene
-        cam_proxy_sent = self.proxy.data("cameras").data("Camera_0")
+        cam_proxy_sent = self.proxy.data("cameras").search_one("Camera_0")
         cam_proxy_sent._data["name"] = transmit_name
         self.assertIsInstance(cam_proxy_sent, BpyIDProxy)
 

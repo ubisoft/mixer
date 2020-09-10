@@ -21,7 +21,7 @@ class DifferentialApply(unittest.TestCase):
         bpy.ops.wm.open_mainfile(filepath=file)
         self.proxy = BpyBlendProxy()
         self.proxy.load(test_context)
-        self.scene_proxy: BpyIDProxy = self.proxy.data("scenes").data("Scene")
+        self.scene_proxy: BpyIDProxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
         self.scenes_property = bpy.data.bl_rna.properties["scenes"]
 
@@ -58,7 +58,7 @@ class Datablock(DifferentialApply):
         self.scene.eevee.use_bloom = False
         self.proxy = BpyBlendProxy()
         self.proxy.load(test_context)
-        self.scene_proxy: BpyIDProxy = self.proxy.data("scenes").data("Scene")
+        self.scene_proxy: BpyIDProxy = self.proxy.data("scenes").search_one("Scene")
         self.scene.eevee.use_bloom = True
 
         delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
@@ -85,7 +85,7 @@ class StructDatablockRef(DifferentialApply):
         self.scene.world = None
         self.proxy = BpyBlendProxy()
         self.proxy.load(test_context)
-        self.scene_proxy: BpyIDProxy = self.proxy.data("scenes").data("Scene")
+        self.scene_proxy: BpyIDProxy = self.proxy.data("scenes").search_one("Scene")
 
         world = bpy.data.worlds.new("W")
         self.scene.world = world
@@ -108,7 +108,7 @@ class StructDatablockRef(DifferentialApply):
         self.scene.world = world1
         self.proxy = BpyBlendProxy()
         self.proxy.load(test_context)
-        self.scene_proxy: BpyIDProxy = self.proxy.data("scenes").data("Scene")
+        self.scene_proxy: BpyIDProxy = self.proxy.data("scenes").search_one("Scene")
 
         self.scene.world = world2
         self.generate_all_uuids()
@@ -153,7 +153,7 @@ class Collection(DifferentialApply):
             self.scene.collection.objects.link(empty)
         self.proxy = BpyBlendProxy()
         self.proxy.load(test_context)
-        self.scene_proxy = self.proxy.data("scenes").data("Scene")
+        self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
         for i in range(2):
             empty = bpy.data.objects.new(f"Added{i}", None)
@@ -198,7 +198,7 @@ class Collection(DifferentialApply):
 
         self.proxy = BpyBlendProxy()
         self.proxy.load(test_context)
-        self.scene_proxy = self.proxy.data("scenes").data("Scene")
+        self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
 
         view_right = self.scene.render.views["right"]
@@ -244,7 +244,7 @@ class Collection(DifferentialApply):
 
         self.proxy = BpyBlendProxy()
         self.proxy.load(test_context)
-        self.scene_proxy = self.proxy.data("scenes").data("Scene")
+        self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
 
         points0.remove(points0[1])

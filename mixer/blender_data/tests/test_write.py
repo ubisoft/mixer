@@ -48,7 +48,7 @@ class TestWriteAttribute(unittest.TestCase):
 
     def test_write_bpy_struct_scene_eevee(self):
         scene = D.scenes[0]
-        eevee_proxy = self.proxy._data["scenes"]._data["Scene_0"]._data["eevee"]
+        eevee_proxy = self.proxy._data["scenes"].search_one("Scene_0")._data["eevee"]
         eevee_proxy._data["gi_cubemap_resolution"] = "64"
         eevee_proxy.save(scene, "eevee", self.proxy.visit_state())
         self.assertEqual("64", scene.eevee.gi_cubemap_resolution)
@@ -56,7 +56,7 @@ class TestWriteAttribute(unittest.TestCase):
     def test_write_bpy_property_group_scene_cycles(self):
         # Not very useful it derives from struct
         scene = D.scenes[0]
-        cycles_proxy = self.proxy._data["scenes"]._data["Scene_0"]._data["cycles"]
+        cycles_proxy = self.proxy._data["scenes"].search_one("Scene_0")._data["cycles"]
         cycles_proxy._data["shading_system"] = True
         cycles_proxy.save(scene, "cycles", self.proxy.visit_state())
         self.assertEqual(True, scene.cycles.shading_system)
@@ -64,7 +64,7 @@ class TestWriteAttribute(unittest.TestCase):
     def test_write_array_of_struct_with_vec(self):
         # self.addTypeEqualityFunc(D.bpy_struct, bl_equalityfunc)
         cube = D.meshes["Cube"]
-        vertices_proxy = self.proxy._data["meshes"]._data["Cube"]._data["vertices"]
+        vertices_proxy = self.proxy._data["meshes"].search_one("Cube")._data["vertices"]
 
         # loaded as SOA into array.array
         co_proxy = vertices_proxy._data["co"]._data
@@ -84,7 +84,7 @@ class TestWriteAttribute(unittest.TestCase):
         light_name = "Light"
         light = D.lights[light_name]
         light_type = light.type
-        light_proxy = self.proxy.data("lights").data(light_name)
+        light_proxy = self.proxy.data("lights").search_one(light_name)
 
         light.name = "light_bak"
         light_bak = D.lights["light_bak"]
@@ -97,7 +97,7 @@ class TestWriteAttribute(unittest.TestCase):
         # Write a whole scene datablock
         world_name = "World"
         world = D.worlds[world_name]
-        world_proxy = self.proxy.data("worlds").data(world_name)
+        world_proxy = self.proxy.data("worlds").search_one(world_name)
 
         world.name = "world_bak"
         world_bak = D.worlds["world_bak"]
@@ -123,7 +123,7 @@ class TestWriteAttribute(unittest.TestCase):
         light_bak = D.lights["light_bak"]
         light = None
 
-        light_proxy = self.proxy.data("lights").data(light_name)
+        light_proxy = self.proxy.data("lights").search_one(light_name)
         light_proxy.save(D.lights, light_name, self.proxy.visit_state())
         light = D.lights[light_name]
         curve = light.falloff_curve.curves[0]
@@ -149,7 +149,7 @@ class TestWriteAttribute(unittest.TestCase):
         light.name = "light_bak"
         light = None
 
-        light_proxy = self.proxy.data("lights").data(light_name)
+        light_proxy = self.proxy.data("lights").search_one(light_name)
 
         light_proxy.save(D.lights, light_name, self.proxy.visit_state())
         light = D.lights[light_name]
@@ -197,7 +197,7 @@ class TestWriteAttribute(unittest.TestCase):
 
         # the dst curvemap has 2 points by default
         # save() needs to extend
-        light_proxy = self.proxy.data("lights").data(light_name)
+        light_proxy = self.proxy.data("lights").search_one(light_name)
         light_proxy.save(D.lights, light_name, self.proxy.visit_state())
         dst_curve = light.falloff_curve.curves[0]
         self.assertEqual(len(src_points), len(dst_curve.points))
@@ -209,7 +209,7 @@ class TestWriteAttribute(unittest.TestCase):
         # Write a whole scene datablock
         scene_name = "Scene_0"
         scene = D.scenes[scene_name]
-        scene_proxy = self.proxy.data("scenes").data(scene_name)
+        scene_proxy = self.proxy.data("scenes").search_one(scene_name)
         self.assertIsInstance(scene_proxy, BpyIDProxy)
 
         scene.name = "scene_bak"
@@ -225,7 +225,7 @@ class TestWriteAttribute(unittest.TestCase):
         expected_world = scene.world
         assert expected_world is not None
 
-        world_ref_proxy = self.proxy.data("scenes").data(scene_name).data("world")
+        world_ref_proxy = self.proxy.data("scenes").search_one(scene_name).data("world")
         self.assertIsInstance(world_ref_proxy, BpyIDRefProxy)
 
         scene.world = None
@@ -248,6 +248,6 @@ class TestWriteAttribute(unittest.TestCase):
 
         camera.name = "camera_bak"
 
-        camera_proxy = self.proxy.data("cameras").data(camera_name)
+        camera_proxy = self.proxy.data("cameras").search_one(camera_name)
         camera_proxy.save(D.cameras, camera_name, self.proxy.visit_state())
         self.assertEqual(D.cameras[camera_name].dof.focus_object, focus_object)
