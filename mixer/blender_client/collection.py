@@ -81,7 +81,7 @@ def build_collection_removed(data):
             del share_data.blender_collections[name_full]
             bpy.data.collections.remove(collection)
         except Exception as e:
-            logger.info(f"build_remove_collection_from_scene: exception during unlink... ")
+            logger.info("build_remove_collection_from_scene: exception during unlink... ")
             logger.info(f"... {e} ")
 
 
@@ -113,12 +113,12 @@ def build_collection_to_collection(data):
         if share_data.use_experimental_sync():
             # Added by the Blender Protocol
             logger.info(f"build_collection_to_collection(): parent {parent_name}, child {child_name}...")
-            logger.info(f"... Exception during parent.children.link() ...")
-            logger.info(f"... Safe in experimental_sync ...")
+            logger.info("... Exception during parent.children.link() ...")
+            logger.info("... Safe in experimental_sync ...")
             logger.info(f"... {e}")
         else:
             logger.warning(f"build_collection_to_collection(): parent {parent_name}, child {child_name}...")
-            logger.warning(f"... Exception during parent.children.link() ...")
+            logger.warning("... Exception during parent.children.link() ...")
             logger.warning(f"... {e}")
 
 
@@ -203,7 +203,7 @@ def build_remove_object_from_collection(data):
         try:
             collection.objects.unlink(object_)
         except Exception as e:
-            logger.info(f"build_remove_object_from_collection: exception during unlink... ")
+            logger.info("build_remove_object_from_collection: exception during unlink... ")
             logger.info(f"... {e} ")
 
 

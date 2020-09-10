@@ -513,8 +513,8 @@ def decode_baked_mesh(obj, data, index):
 
     # hack ! Since bmesh cannot be used to set custom normals
     normals2 = []
-    for l in me.loops:
-        normals2.append(normals[l.vertex_index])
+    for loop in me.loops:
+        normals2.append(normals[loop.vertex_index])
     me.normals_split_custom_set(normals2)
     me.use_auto_smooth = True
 

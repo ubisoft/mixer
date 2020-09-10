@@ -12,8 +12,8 @@ flake8:
   image: python:3
   stage: pre_release
   script:
-    - pip install black==19.10b0 flake8==3.7.9 flake8-black pep8-naming flake8-bugbear
-    - flake8 -v
+    - pip install black flake8 flake8-black pep8-naming flake8-bugbear --constraint requirements-dev.txt
+    - flake8 -v mixer tests extra
 
 zip:
   tags:
@@ -30,7 +30,9 @@ zip:
 .on_version_tag: &tpl_on_version_tag
   only:
     refs:
-      - /^v[0-9]+.[0-9]+.[0-9]+$/
+      # see inject_version.py
+      - /^v([0-9]+)\.([0-9]+)\.([0-9]+)(\-[0-9A-Za-z-]+)?(\+[0-9A-Za-z-]+)?$/
+
 
 release:
   <<: *tpl_on_version_tag

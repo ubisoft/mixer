@@ -6,6 +6,8 @@ from mixer.broadcaster.apps.server import Server
 from mixer.broadcaster.client import Client
 import mixer.broadcaster.common as common
 
+from tests.process import ServerProcess
+
 
 class Delegate:
     def __init__(self):
@@ -175,6 +177,28 @@ class TestServer(unittest.TestCase):
         self.assertEqual(len(d0.name_room), 1)
         self.assertCountEqual(d0.name_room, expected)
         self.assertListEqual(d0.name_room, d1.name_room)
+
+
+class TestClient(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_client_is_disconnected_when_server_process_is_killed(self):
+        server_process = ServerProcess()
+        server_process.start()
+
+        with Client(server_process.host, server_process.port) as client:
+            self.assertTrue(client.is_connected())
+            client.fetch_commands()
+
+            server_process.kill()
+
+            self.assertRaises(common.ClientDisconnectedException, client.fetch_commands)
+
+            self.assertTrue(not client.is_connected())
 
 
 if __name__ == "__main__":

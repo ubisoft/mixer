@@ -189,8 +189,7 @@ def pre_save_id(proxy: Proxy, target: T.ID) -> T.ID:
 
 
 def pre_save_struct(proxy: Proxy, bpy_struct: T.Struct, attr_name: str):
-    """Process attributes that must be saved first
-    """
+    """Process attributes that must be saved first"""
     target = getattr(bpy_struct, attr_name, None)
     if target is None:
         return None
@@ -201,8 +200,7 @@ def pre_save_struct(proxy: Proxy, bpy_struct: T.Struct, attr_name: str):
 
 
 def post_save_id(proxy: Proxy, bpy_id: T.ID):
-    """Apply type specific patches after loading bpy_struct into proxy
-    """
+    """Apply type specific patches after loading bpy_struct into proxy"""
     if isinstance(bpy_id, T.Image):
         # So far, the receiver has no valid "current file", so he cannot load relative files
         for attr_name in ("filepath", "filepath_raw"):
@@ -223,8 +221,7 @@ effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.key
 
 
 def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
-    """Add an element to a bpy_prop_collection using the collection specific API
-    """
+    """Add an element to a bpy_prop_collection using the collection specific API"""
 
     bl_rna = getattr(collection, "bl_rna", None)
     if bl_rna is not None:

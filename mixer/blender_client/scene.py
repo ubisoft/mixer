@@ -107,8 +107,8 @@ def build_collection_to_scene(data):
         if share_data.use_experimental_sync():
             # Added by the Blender Protocol
             logger.info(f"build_collection_to_scene(): scene {scene_name}, collection {collection_name}...")
-            logger.info(f"... Exception during scene.collection.children.link() ...")
-            logger.info(f"... Safe in experimental_sync ...")
+            logger.info("... Exception during scene.collection.children.link() ...")
+            logger.info("... Safe in experimental_sync ...")
             logger.info(f"... {e}")
         else:
             raise
@@ -133,7 +133,7 @@ def build_remove_collection_from_scene(data):
         try:
             scene.collection.children.unlink(collection)
         except Exception as e:
-            logger.info(f"build_remove_collection_from_scene: exception during unlink... ")
+            logger.info("build_remove_collection_from_scene: exception during unlink... ")
             logger.info(f"... {e} ")
 
 
@@ -179,5 +179,5 @@ def build_remove_object_from_scene(data):
         try:
             scene.collection.objects.unlink(object_)
         except Exception as e:
-            logger.info(f"build_remove_object_from_scene: exception during unlink... ")
+            logger.info("build_remove_object_from_scene: exception during unlink... ")
             logger.info(f"... {e} ")

@@ -227,7 +227,7 @@ def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState
         # if we arrive here, we have cyclical data references that should be excluded in filter.py
         if not debug_context.limit_notified:
             debug_context.limit_notified = True
-            logger.error(f"Maximum property depth exceeded. Deeper properties ignored. Path :")
+            logger.error("Maximum property depth exceeded. Deeper properties ignored. Path :")
             logger.error(debug_context.property_fullpath())
         return
 
@@ -409,7 +409,7 @@ class StructLikeProxy(Proxy):
         if target is None:
             if isinstance(bl_instance, T.bpy_prop_collection):
                 logger.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist.")
-                logger.warning(f"Note: Not implemented write to dict")
+                logger.warning("Note: Not implemented write to dict")
             else:
                 # Don't log this because it produces too many log messages when participants have plugins
                 # f"Note: May be due to a plugin used by the sender and not on this Blender"
@@ -1706,7 +1706,9 @@ class BpyPropDataCollectionProxy(Proxy):
             changeset.renames.append(((uuid), tmp_name, str(proxy)))
             proxy.rename(new_name)
             if proxy.collection[new_name] is visit_state.ids[uuid]:
-                logger.error(f"update rename : {proxy.collection}[{new_name}] is not {visit_state.ids[uuid]} for {proxy}, {uuid}")
+                logger.error(
+                    f"update rename : {proxy.collection}[{new_name}] is not {visit_state.ids[uuid]} for {proxy}, {uuid}"
+                )
             if visit_state.ids[uuid] in visit_state.root_ids:
                 logger.error(f"update rename : {visit_state.ids[uuid]} in visit_state.root_ids for {proxy}, {uuid}")
             temp.append((new_name, proxy))
@@ -1915,7 +1917,7 @@ class BpyBlendProxy(Proxy):
     def update(
         self, diff: BpyBlendDiff, context: Context = safe_context, depsgraph_updates: T.bpy_prop_collection = ()
     ) -> Changeset:
-        """ Update the proxy using the state of the Blendata collections (ID creation, deletion)
+        """Update the proxy using the state of the Blendata collections (ID creation, deletion)
         and the depsgraph updates (ID modification)
 
         Sender side
@@ -2106,7 +2108,7 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: 
     """
     # Like in apply_attribute parent and key are needed to specify a L-value
     if bl_instance is None:
-        logger.warning(f"unexpected write None attribute")
+        logger.warning("unexpected write None attribute")
         return
 
     try:
