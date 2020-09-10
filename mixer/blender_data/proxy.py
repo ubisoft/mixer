@@ -471,7 +471,7 @@ class StructLikeProxy(Proxy):
                 logger.warning(f"StructLike.apply(). Processing {member_delta}")
                 logger.warning(f"... for {struct}.{k}")
                 logger.warning(f"... Exception: {e}")
-                logger.warning(f"... Update ignored")
+                logger.warning("... Update ignored")
                 continue
         return self
 
@@ -582,10 +582,12 @@ class BpyIDProxy(BpyStructProxy):
         self.load(bl_instance, visit_state, bpy_data_collection_name=None)
 
     def load(
-        self, bl_instance: T.ID, visit_state: VisitState, bpy_data_collection_name: str = None,
+        self,
+        bl_instance: T.ID,
+        visit_state: VisitState,
+        bpy_data_collection_name: str = None,
     ):
-        """
-        """
+        """"""
         if bl_instance.is_embedded_data and bpy_data_collection_name is not None:
             logger.error(
                 f"BpyIDProxy.load() for {bl_instance} : is_embedded_data is True and bpy_prop_collection is {bpy_data_collection_name}. Item ignored"
@@ -749,7 +751,10 @@ class BpyIDProxy(BpyStructProxy):
         self._data = other._data
 
     def apply_to_proxy(
-        self, datablock: T.ID, delta: Optional[DeltaUpdate], visit_state: VisitState,
+        self,
+        datablock: T.ID,
+        delta: Optional[DeltaUpdate],
+        visit_state: VisitState,
     ):
         """
         Apply diff to this proxy entry, but do not update Blender
@@ -775,7 +780,7 @@ class BpyIDProxy(BpyStructProxy):
                 logger.warning(f"StructLike.apply(). Processing {delta}")
                 logger.warning(f"... for {datablock}.{k}")
                 logger.warning(f"... Exception: {e}")
-                logger.warning(f"... Update ignored")
+                logger.warning("... Update ignored")
                 continue
 
 
@@ -1037,7 +1042,11 @@ class AosElement(Proxy):
         self._data: Mapping[str, List] = {}
 
     def load(
-        self, bl_collection: bpy.types.bpy_prop_collection, item_bl_rna, attr_name: str, visit_state: VisitState,
+        self,
+        bl_collection: bpy.types.bpy_prop_collection,
+        item_bl_rna,
+        attr_name: str,
+        visit_state: VisitState,
     ):
         """
         - bl_collection: a collection of structure, e.g. T.Mesh.vertices
@@ -1308,7 +1317,7 @@ class BpyPropStructCollectionProxy(Proxy):
                     logger.warning(f"BpyPropStructCollectionProxy.apply(). Processing {delta}")
                     logger.warning(f"... for {collection}[{k}]")
                     logger.warning(f"... Exception: {e}")
-                    logger.warning(f"... Update ignored")
+                    logger.warning("... Update ignored")
                     continue
         else:
             for k, delta in update._data.items():
@@ -1329,7 +1338,7 @@ class BpyPropStructCollectionProxy(Proxy):
                     logger.warning(f"BpyPropStructCollectionProxy.apply(). Processing {delta}")
                     logger.warning(f"... for {collection}[{k}]")
                     logger.warning(f"... Exception: {e}")
-                    logger.warning(f"... Update ignored")
+                    logger.warning("... Update ignored")
                     continue
 
         return self
@@ -1768,7 +1777,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 logger.warning(f"BpyPropDataCollectionProxy.apply(). Processing {ref_delta}")
                 logger.warning(f"... for {collection}[{k}]")
                 logger.warning(f"... Exception: {e}")
-                logger.warning(f"... Update ignored")
+                logger.warning("... Update ignored")
                 continue
 
         return self

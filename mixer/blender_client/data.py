@@ -73,14 +73,14 @@ def build_data_create(buffer):
         share_data.set_dirty()
         _, rename_changeset = share_data.bpy_data_proxy.create_datablock(id_proxy)
     except Exception:
-        logger.error(f"Exception during build_data_create")
+        logger.error("Exception during build_data_create")
         for line in traceback.format_exc().splitlines():
             logger.error(line)
         logger.error(f"During processing of buffer for {id_proxy}")
         logger.error(buffer[0:200])
         logger.error("...")
         logger.error(buffer[-200:0])
-        logger.error(f"ignored")
+        logger.error("ignored")
 
     if rename_changeset:
         send_data_renames(rename_changeset)
@@ -100,14 +100,14 @@ def build_data_update(buffer):
         share_data.set_dirty()
         share_data.bpy_data_proxy.update_datablock(delta)
     except Exception:
-        logger.error(f"Exception during build_data_update")
+        logger.error("Exception during build_data_update")
         for line in traceback.format_exc().splitlines():
             logger.error(line)
         logger.error(f"During processing of buffer for {delta}")
         logger.error(buffer[0:200])
         logger.error("...")
         logger.error(buffer[-200:0])
-        logger.error(f"ignored")
+        logger.error("ignored")
 
 
 def send_data_removals(removals: RemovalChangeset):
