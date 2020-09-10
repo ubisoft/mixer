@@ -40,6 +40,7 @@ class MixerTestCase(unittest.TestCase):
     """
 
     def __init__(self, *args, **kwargs):
+        self.latency = 0
         self.expected_counts = {}
         super().__init__(*args, **kwargs)
         self._log_level = logging.INFO
@@ -102,8 +103,18 @@ class MixerTestCase(unittest.TestCase):
                 blender.set_log_level(self._log_level)
                 blender.setup(args)
                 if join:
-                    blender.connect_and_join_mixer(experimental_sync=self.experimental_sync)
+                    blender.connect_mixer()
+                    if i == 0:
+                        blender.create_room(experimental_sync=self.experimental_sync)
+                    else:
+                        blender.join_room(experimental_sync=self.experimental_sync)
+
                 self._blenders.append(blender)
+
+            # join_room waits for the room to be joinable before issuing join room, but it
+            # cannot wait for the reception of the room contents
+            time.sleep(10 * self.latency)
+
             mixer.codec.register()
         except Exception:
             self.shutdown()
@@ -157,9 +168,8 @@ class MixerTestCase(unittest.TestCase):
             scene_upload_delay += vscode_debug_delay
 
             # sender upload the room
-            self._sender.connect_and_join_mixer(
-                "mixer_grab_sender", keep_room_open=True, experimental_sync=self.experimental_sync
-            )
+            self._sender.connect_mixer()
+            self._sender.create_room("mixer_grab_sender", keep_room_open=True, experimental_sync=self.experimental_sync)
             time.sleep(scene_upload_delay)
             self._sender.disconnect_mixer()
 
@@ -171,7 +181,8 @@ class MixerTestCase(unittest.TestCase):
                 raise self.failureException("Sender grab: ", *e.args) from None
 
             # receiver upload the room
-            self._receiver.connect_and_join_mixer(
+            self._receiver.connect_mixer()
+            self._receiver.create_room(
                 "mixer_grab_receiver", keep_room_open=True, experimental_sync=self.experimental_sync
             )
             time.sleep(scene_upload_delay)
@@ -355,9 +366,11 @@ class MixerTestCase(unittest.TestCase):
 
     def connect(self):
         for i, blender in enumerate(self._blenders):
-            if i > 0:
-                time.sleep(1)
-            blender.connect_and_join_mixer(experimental=self.experimental_sync)
+            blender.connect_mixer()
+            if i == 0:
+                blender.create_room_mixer(experimental=self.experimental_sync)
+            else:
+                blender.join_room(experimental=self.experimental_sync)
 
     def disconnect(self):
         for blender in self._blenders:

@@ -32,12 +32,7 @@ class ThrottledTestCase(BlenderTestCase):
             self.latency = 1
             latency_ms = 1000 * self.latency
             server_args = ["--latency", str(latency_ms)]
-            super().setUp(blenderdescs=blenderdescs, server_args=server_args, join=False)
-            for blender in self._blenders:
-                blender.connect_and_join_mixer(experimental_sync=self.experimental_sync)
-                # if the second join is too early it is rejected with error "room not joinable yet"
-                # if the test runs too early if may run before join is complete
-                time.sleep(3.0)
+            super().setUp(blenderdescs=blenderdescs, server_args=server_args)
         except Exception:
             self.shutdown()
             raise
@@ -129,7 +124,8 @@ class TestObjectRename(ThrottledTestCase):
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=ThrottledTestCase.get_class_name,
+    [{"experimental_sync": True}, {"experimental_sync": False}],
+    class_name_func=ThrottledTestCase.get_class_name,
 )
 class TestSceneRename(ThrottledTestCase):
     def setUp(self):
@@ -148,7 +144,8 @@ class TestSceneRename(ThrottledTestCase):
 
     def test_collection_new_and_link(self):
         self.send_strings(
-            [bl.data_collections_new("new_collection"), bl.scene_collection_children_link("new_collection")], to=0,
+            [bl.data_collections_new("new_collection"), bl.scene_collection_children_link("new_collection")],
+            to=0,
         )
         delay = 0.0
         time.sleep(delay)

@@ -14,7 +14,7 @@ from mixer.bl_properties import UserItem
 from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientAttributes
 from mixer.blender_data.debug_addon import DebugDataPanel
-from mixer import __version__
+from mixer import display_version
 
 if TYPE_CHECKING:
     from mixer.bl_preferences import MixerPreferences
@@ -104,7 +104,11 @@ def collapsable_panel(
 ):
     row = layout.row()
     row.prop(
-        data, property, icon="TRIA_DOWN" if getattr(data, property) else "TRIA_RIGHT", icon_only=True, emboss=False,
+        data,
+        property,
+        icon="TRIA_DOWN" if getattr(data, property) else "TRIA_RIGHT",
+        icon_only=True,
+        emboss=False,
     )
     if alert:
         row.alert = True
@@ -204,7 +208,7 @@ def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Contex
 
 
 class MixerSettingsPanel(bpy.types.Panel):
-    bl_label = f"Mixer {__version__}"
+    bl_label = f"Mixer {display_version or '(Unknown version)'}"
     bl_idname = "MIXER_PT_mixer_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -261,7 +265,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                     user_layout.separator(factor=0.2)
 
         if collapsable_panel(
-            layout, mixer_props, "display_snapping_options", alert=True, text=f"Sync Options - Not implemented yet"
+            layout, mixer_props, "display_snapping_options", alert=True, text="Sync Options - Not implemented yet"
         ):
             box = layout.box().column()
             if share_data.client.current_room is None:
@@ -313,7 +317,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                     text=f"Room: {share_data.client.current_room}{(' (experimental sync)' if mixer_prefs.experimental_sync else '')}"
                 )
                 split.label(text=f"Join: {get_mixer_props().joining_percentage * 100:.2f} %")
-                split.operator(bl_operators.LeaveRoomOperator.bl_idname, text=f"Leave Room")
+                split.operator(bl_operators.LeaveRoomOperator.bl_idname, text="Leave Room")
 
             self.draw_rooms(layout)
             self.draw_users(layout)

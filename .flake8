@@ -2,10 +2,11 @@
 max-line-length = 120
 ignore = E203, E501, W503 # Incompatible with black
 
-exclude =
-  .git
-  .history
-  .venv
-  .vscode
-  __pycache__
-  gitlab/blender
+per-file-ignores =
+  mixer/bl_preferences.py:F821,F722
+  mixer/bl_operators.py:F821,F722
+  mixer/bl_properties.py:F821,F722
+  mixer/blender_data/debug_addon.py:F821
+  tests/python_server.py:F821,F722
+# F821 produces "'undefined name 'XXX'" when we write things like 'member_variable: bpy.props.StringProperty(subtype="XXX")'
+# F722 produces "syntax error in forward annotation 'XXX'" when we write things like  'member_variable: bpy.props.IntProperty(name="XXX")'

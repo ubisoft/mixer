@@ -136,6 +136,9 @@ def encode_baked_mesh(obj):
         # This happens for empty curves
         return bytes()
 
+    original_bm = bmesh.new()
+    original_bm.from_mesh(mesh)
+
     bm = bmesh.new()
     bm.from_mesh(mesh)
     bmesh.ops.triangulate(bm, faces=bm.faces)
@@ -180,6 +183,9 @@ def encode_baked_mesh(obj):
 
     if obj.type != "MESH":
         obj.to_mesh_clear()
+
+    original_bm.to_mesh(mesh)
+    original_bm.free()
 
     stats_timer.checkpoint("make_buffers")
 
@@ -372,10 +378,11 @@ def encode_base_mesh(obj):
     verts_per_group = {}
     for vertex_group in obj.vertex_groups:
         verts_per_group[vertex_group.index] = []
-
     for vert in mesh_data.vertices:
         for vg in vert.groups:
-            verts_per_group[vg.group].append((vert.index, vg.weight))
+            weighted_vertices = verts_per_group.get(vg.group, None)
+            if weighted_vertices:
+                weighted_vertices.append((vert.index, vg.weight))
 
     binary_buffer += common.encode_int(len(obj.vertex_groups))
     for vertex_group in obj.vertex_groups:
@@ -444,7 +451,7 @@ def encode_mesh(obj, do_encode_base_mesh, do_encode_baked_mesh):
 
 
 @stats_timer(share_data)
-def decode_bakes_mesh(obj, data, index):
+def decode_baked_mesh(obj, data, index):
     # Note: Blender should not load a baked mesh but we have this function to debug the encoding part
     # and as an exemple for implementations that load baked meshes
     byte_size, index = common.decode_int(data, index)
@@ -506,8 +513,8 @@ def decode_bakes_mesh(obj, data, index):
 
     # hack ! Since bmesh cannot be used to set custom normals
     normals2 = []
-    for l in me.loops:
-        normals2.append(normals[l.vertex_index])
+    for loop in me.loops:
+        normals2.append(normals[loop.vertex_index])
     me.normals_split_custom_set(normals2)
     me.use_auto_smooth = True
 
@@ -647,7 +654,7 @@ def decode_mesh(client, obj, data, index):
     byte_size, index = common.decode_int(data, index)
     if byte_size == 0:
         # No base mesh, lets read the baked mesh
-        index = decode_bakes_mesh(obj, data, index)
+        index = decode_baked_mesh(obj, data, index)
     else:
         index = decode_base_mesh(client, obj, data, index)
         # Skip the baked mesh (its size is encoded here)
