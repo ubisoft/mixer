@@ -116,6 +116,7 @@ class BlenderClient(Client):
         if self.command_pack is not None:
             command = self.command_pack
             self.command_pack = None
+            self.synced_time_messages = False
             super().add_command(command)
 
     def add_command(self, command: common.Command):
@@ -388,10 +389,10 @@ class BlenderClient(Client):
         ob.keyframe_delete(channel, index=channel_index)
         return name
 
-    def build_query_object_data(self, data):
+    def build_query_animation_data(self, data):
         index = 0
         name, index = common.decode_string(data, index)
-        self.query_object_data(name)
+        self.query_animation_data(name)
 
     def build_clear_animations(self, data):
         index = 0
@@ -625,14 +626,16 @@ class BlenderClient(Client):
             if hasattr(screen_ctx, "is_animation_playing") and screen_ctx.is_animation_playing:
                 bpy.ops.screen.animation_play(ctx)
 
-    def query_object_data(self, object_name):
+    def query_animation_data(self, object_name):
         previous_value = share_data.client.skip_next_depsgraph_update
         share_data.client.skip_next_depsgraph_update = False
 
         if object_name not in share_data.blender_objects:
             return
         ob = share_data.blender_objects[object_name]
-        update_params(ob)
+        self.synced_time_messages = True
+        update_animation_params(ob)
+        self.send_command_pack()
 
         share_data.client.skip_next_depsgraph_update = previous_value
 
@@ -860,8 +863,8 @@ class BlenderClient(Client):
                         self.build_add_keyframe(command.data)
                     elif command.type == MessageType.REMOVE_KEYFRAME:
                         self.build_remove_keyframe(command.data)
-                    elif command.type == MessageType.QUERY_OBJECT_DATA:
-                        self.build_query_object_data(command.data)
+                    elif command.type == MessageType.QUERY_ANIMATION_DATA:
+                        self.build_query_animation_data(command.data)
 
                     elif command.type == MessageType.CLEAR_ANIMATIONS:
                         self.build_clear_animations(command.data)
@@ -970,6 +973,15 @@ def update_params(obj):
         if obj.mode == "OBJECT":
             share_data.client.send_mesh(obj)
 
+    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 0)
+    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 1)
+    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 2)
+    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 0)
+    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 1)
+    # share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
+
+
+def update_animation_params(obj):
     share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 0)
     share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 1)
     share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 2)
