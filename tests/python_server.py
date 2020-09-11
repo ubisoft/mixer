@@ -1,11 +1,13 @@
 import argparse
 import asyncio
 import logging
+import struct
 import sys
 
 import bpy
 
 from mixer.share_data import share_data
+from mixer.broadcaster.common import decode_int
 
 """
 Socket server for Blender that receives python strings, compiles
@@ -25,11 +27,14 @@ logger.setLevel(logging.INFO)
 # hardcoded to avoid control from a remote machine
 HOST = "127.0.0.1"
 STRING_MAX = 1024 * 1024
+INT_SIZE = struct.calcsize("i")
 
 
 async def exec_buffer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
     while True:
-        buffer = await reader.read(STRING_MAX)
+        buffer = await reader.read(INT_SIZE)
+        length, _ = decode_int(buffer, 0)
+        buffer = await reader.read(length)
         if not buffer:
             break
         addr = writer.get_extra_info("peername")

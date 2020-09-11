@@ -11,7 +11,8 @@ from tests import blender_snippets as bl
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=VRtistTestCase.get_class_name,
+    [{"experimental_sync": True}, {"experimental_sync": False}],
+    class_name_func=VRtistTestCase.get_class_name,
 )
 class TestSpontaneousRename(VRtistTestCase):
     def setUp(self):
@@ -49,7 +50,8 @@ class TestSpontaneousRename(VRtistTestCase):
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=VRtistTestCase.get_class_name,
+    [{"experimental_sync": True}, {"experimental_sync": False}],
+    class_name_func=VRtistTestCase.get_class_name,
 )
 class TestReferencedDatablock(VRtistTestCase):
     """
@@ -99,7 +101,8 @@ obj.active_material = mat
 
 
 @parameterized_class(
-    [{"experimental_sync": True}], class_name_func=VRtistTestCase.get_class_name,
+    [{"experimental_sync": True}],
+    class_name_func=VRtistTestCase.get_class_name,
 )
 class TestRenameDatablock(VRtistTestCase):
     """

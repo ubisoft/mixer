@@ -34,11 +34,15 @@ def join_room(room_name: str = "mixer_unittest", experimental_sync: bool = False
     from mixer.connection import join_room
     from mixer.broadcaster.common import RoomAttributes
     from mixer.share_data import share_data
+    from mixer.blender_client.client import clear_scene_content
     import sys
     import time
 
+    # prevent sending our contents in case of cross join. Easier to diagnose the problem
+    clear_scene_content()
+
     start = time.monotonic()
-    max_wait = 20
+    max_wait = 30
 
     def wait_joinable():
         share_data.client.send_list_rooms()
@@ -56,6 +60,7 @@ def join_room(room_name: str = "mixer_unittest", experimental_sync: bool = False
         join_room(room_name, experimental_sync)
     else:
         print(f"ERROR: Cannot join room after {max_wait} seconds. Abort")
+        time.sleep(5)
         sys.exit(1)
 
 

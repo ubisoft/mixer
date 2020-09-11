@@ -178,7 +178,7 @@ def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState
         # if we arrive here, we have cyclical data references that should be excluded in filter.py
         if not debug_context.limit_notified:
             debug_context.limit_notified = True
-            logger.error(f"Maximum property depth exceeded. Deeper properties ignored. Path :")
+            logger.error("Maximum property depth exceeded. Deeper properties ignored. Path :")
             logger.error(debug_context.property_fullpath())
         return
 
@@ -344,7 +344,7 @@ class StructLikeProxy(Proxy):
         if target is None:
             if isinstance(bl_instance, T.bpy_prop_collection):
                 logger.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist.")
-                logger.warning(f"Note: Not implemented write to dict")
+                logger.warning("Note: Not implemented write to dict")
             else:
                 # Don't log this because it produces too many log messages when participants have plugins
                 # f"Note: May be due to a plugin used by the sender and not on this Blender"
@@ -405,8 +405,7 @@ class BpyIDProxy(BpyStructProxy):
         is_embedded_data: bool = False,
         bpy_data_collection_name: str = None,
     ):
-        """
-        """
+        """"""
         if is_embedded_data and bpy_data_collection_name is not None:
             logger.error(
                 f"BpyIDProxy.load() for {bl_instance} : is_embedded_data is True and bpy_prop_collection is {bpy_data_collection_name}. Item ignored"
@@ -785,7 +784,11 @@ class AosElement(Proxy):
         self._data: Mapping[str, List] = {}
 
     def load(
-        self, bl_collection: bpy.types.bpy_prop_collection, item_bl_rna, attr_name: str, visit_state: VisitState,
+        self,
+        bl_collection: bpy.types.bpy_prop_collection,
+        item_bl_rna,
+        attr_name: str,
+        visit_state: VisitState,
     ):
         """
         - bl_collection: a collection of structure, e.g. T.Mesh.vertices
@@ -1376,7 +1379,7 @@ class BpyBlendProxy(Proxy):
     def update(
         self, diff: BpyBlendDiff, context: Context = safe_context, depsgraph_updates: T.bpy_prop_collection = ()
     ) -> Changeset:
-        """ Update the proxy using the state of the Blendata collections (ID creation, deletion)
+        """Update the proxy using the state of the Blendata collections (ID creation, deletion)
         and the depsgraph updates (ID modification)
 
         Sender side
@@ -1545,7 +1548,7 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: 
     """
 
     if bl_instance is None:
-        logger.warning(f"unexpected write None attribute")
+        logger.warning("unexpected write None attribute")
         return
 
     try:

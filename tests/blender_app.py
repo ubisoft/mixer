@@ -27,7 +27,9 @@ class BlenderApp:
         self._blender.start(blender_args, env)
         self._blender.connect()
 
-    def connect_mixer(self,):
+    def connect_mixer(
+        self,
+    ):
         if self._log_level is not None:
             self._blender.send_function(mixer_lib.set_log_level, self._log_level)
         self._blender.send_function(mixer_lib.connect)

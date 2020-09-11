@@ -42,7 +42,8 @@ class ThrottledTestCase(BlenderTestCase):
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=ThrottledTestCase.get_class_name,
+    [{"experimental_sync": True}, {"experimental_sync": False}],
+    class_name_func=ThrottledTestCase.get_class_name,
 )
 class TestSimultaneousCreate(ThrottledTestCase):
     def setUp(self):

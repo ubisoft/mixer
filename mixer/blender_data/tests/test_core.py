@@ -101,7 +101,8 @@ class TestCore(unittest.TestCase):
             load_as_what(T.Scene.bl_rna.properties["objects"], bpy.data.scenes[0].objects, root_ids),
         )
         self.assertEqual(
-            LoadElementAs.ID_REF, load_as_what(T.Scene.bl_rna.properties["world"], bpy.data.scenes[0].world, root_ids),
+            LoadElementAs.ID_REF,
+            load_as_what(T.Scene.bl_rna.properties["world"], bpy.data.scenes[0].world, root_ids),
         )
         self.assertEqual(
             LoadElementAs.ID_DEF,

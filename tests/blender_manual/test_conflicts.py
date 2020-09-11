@@ -124,7 +124,8 @@ class TestObjectRename(ThrottledTestCase):
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=ThrottledTestCase.get_class_name,
+    [{"experimental_sync": True}, {"experimental_sync": False}],
+    class_name_func=ThrottledTestCase.get_class_name,
 )
 class TestSceneRename(ThrottledTestCase):
     def setUp(self):
@@ -143,7 +144,8 @@ class TestSceneRename(ThrottledTestCase):
 
     def test_collection_new_and_link(self):
         self.send_strings(
-            [bl.data_collections_new("new_collection"), bl.scene_collection_children_link("new_collection")], to=0,
+            [bl.data_collections_new("new_collection"), bl.scene_collection_children_link("new_collection")],
+            to=0,
         )
         delay = 0.0
         time.sleep(delay)

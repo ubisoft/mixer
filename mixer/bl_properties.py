@@ -191,7 +191,8 @@ class MixerProperties(bpy.types.PropertyGroup):
         return self.snap_view_areas_values
 
     snap_view_user: bpy.props.EnumProperty(
-        items=get_snap_view_users, name="Snap View User",
+        items=get_snap_view_users,
+        name="Snap View User",
     )
     # todo: this cannot work, it depends on the 3d view panel
     # todo: so it should be a property of bpy.types.SpaceView3D probably.
@@ -199,17 +200,19 @@ class MixerProperties(bpy.types.PropertyGroup):
 
     snap_time_user_enabled: bpy.props.BoolProperty(default=False)
     snap_time_user: bpy.props.EnumProperty(
-        items=get_snap_view_users, name="Snap Time User",
+        items=get_snap_view_users,
+        name="Snap Time User",
     )
 
     snap_3d_cursor_user_enabled: bpy.props.BoolProperty(default=False)
     snap_3d_cursor_user: bpy.props.EnumProperty(
-        items=get_snap_view_users, name="Snap 3D Cursor User",
+        items=get_snap_view_users,
+        name="Snap 3D Cursor User",
     )
 
     display_advanced_room_control: bpy.props.BoolProperty(default=False)
     upload_room_name: bpy.props.StringProperty(default=f"{getuser()}_uploaded_room", name="Upload Room Name")
-    upload_room_filepath: bpy.props.StringProperty(default=f"", subtype="FILE_PATH", name="Upload Room File")
+    upload_room_filepath: bpy.props.StringProperty(default="", subtype="FILE_PATH", name="Upload Room File")
 
     joining_percentage: bpy.props.FloatProperty(default=0, name="Joining Percentage")
 
