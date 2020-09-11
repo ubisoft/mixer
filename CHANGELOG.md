@@ -1,9 +1,14 @@
-# 0.15.0+modifiers-1
+# 0.15.0+modifiers-2 (2020-09-11)
+
+## Bugfix
+
+- Fix CI to get back release generation on Gitlab.com
+
+# 0.15.0+modifiers-1 (2020-09-09)
 
 ## Features
 
 - Experimental support of modifiers (breaks all rename operations)
-
 
 # 0.15.0 (2020-08-12)
 
