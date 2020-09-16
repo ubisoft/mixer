@@ -112,8 +112,6 @@ def build_shot_manager_action(data):
             shot.set_end(s, end)
         if len(camera) > 0:
             shot.set_camera(s, bpy.data.objects[camera])
-        # if color[0] > -1:
-        #    shot.set_color(s, color)
         if enabled != -1:
             shot.set_enable_state(s, enabled)
 

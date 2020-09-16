@@ -954,14 +954,9 @@ def update_params(obj):
 
     if typename == "Camera":
         send_camera(share_data.client, obj)
-        # share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
 
     if typename in supported_lights:
         send_light(share_data.client, obj)
-        # share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "energy")
-        # share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 0)
-        # share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 1)
-        # share_data.client.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 2)
 
     if typename == "Grease Pencil":
         for material in obj.data.materials:
@@ -972,8 +967,6 @@ def update_params(obj):
     if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
         if obj.mode == "OBJECT":
             share_data.client.send_mesh(obj)
-
-    # update_animation_params(obj)
 
 
 def update_animation_params(obj):
