@@ -617,6 +617,7 @@ class BlenderClient(Client):
         if ctx:
             screen_ctx = ctx["screen"]
             if hasattr(screen_ctx, "is_animation_playing") and not screen_ctx.is_animation_playing:
+                share_data.current_camera = ""
                 bpy.ops.screen.animation_play(ctx)
 
     def build_pause(self, command):
