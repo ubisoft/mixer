@@ -43,7 +43,6 @@ def send_camera(client: Client, obj):
     camera_buffer = get_camera_buffer(obj)
     if camera_buffer:
         client.add_command(common.Command(common.MessageType.CAMERA, camera_buffer, 0))
-    client.send_camera_animations(obj)
 
 
 def build_camera(data):
