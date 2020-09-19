@@ -4,6 +4,7 @@ This module define Blender Operators types for the addon.
 
 import logging
 import os
+import sys
 import socket
 import subprocess
 
@@ -365,7 +366,11 @@ class OpenStatsDirOperator(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     def execute(self, context):
-        os.startfile(get_mixer_prefs().statistics_directory)
+        if sys.platform == 'win32':
+            os.startfile(get_mixer_prefs().statistics_directory)
+        else:
+            opener = "open" if sys.platform == "darwin" else "xdg-open"
+            subprocess.call([opener, get_mixer_prefs().statistics_directory])
         return {"FINISHED"}
 
 
