@@ -1,4 +1,5 @@
 import copy
+from typing import Iterable, Set
 import unittest
 
 import bpy
@@ -21,6 +22,7 @@ from mixer.blender_data.filter import (
 
 
 class TestLoadProxy(unittest.TestCase):
+    # test_misc.TestLoadProxy
     def setUp(self):
         file = test_blend_file
         # file = r"D:\work\data\test_files\BlenderSS 2_82.blend"
@@ -31,18 +33,31 @@ class TestLoadProxy(unittest.TestCase):
     def check(self, item, expected_elements):
         self.assertSetEqual(set(item._data.keys()), set(expected_elements))
 
+    def expected_uuids(self, collection: bpy.types.Collection, names: Iterable[str]) -> Set[str]:
+        return {collection[name].mixer_uuid for name in names}
+
     # @unittest.skip("")
     def test_blenddata(self):
+        # test_misc.TestLoadProxy.test_blenddata
         blend_data = self.proxy._data
         expected_data = {"scenes", "collections", "objects", "materials", "lights"}
         self.assertTrue(all([e in blend_data.keys() for e in expected_data]))
 
-        self.check(self.proxy._data["scenes"], {"Scene_0", "Scene_1"})
-        self.check(self.proxy._data["cameras"], {"Camera_0", "Camera_1"})
-        self.check(self.proxy._data["objects"], {"Camera_obj_0", "Camera_obj_1", "Cone", "Cube", "Light"})
-        self.check(
-            self.proxy._data["collections"], {"Collection_0_0", "Collection_0_1", "Collection_0_0_0", "Collection_1_0"}
+        expected_uuids = self.expected_uuids(bpy.data.scenes, ["Scene_0", "Scene_1"])
+        self.check(self.proxy._data["scenes"], expected_uuids)
+
+        expected_uuids = self.expected_uuids(bpy.data.cameras, ["Camera_0", "Camera_1"])
+        self.check(self.proxy._data["cameras"], expected_uuids)
+
+        expected_uuids = self.expected_uuids(
+            bpy.data.objects, ["Camera_obj_0", "Camera_obj_1", "Cone", "Cube", "Light"]
         )
+        self.check(self.proxy._data["objects"], expected_uuids)
+
+        expected_uuids = self.expected_uuids(
+            bpy.data.collections, ["Collection_0_0", "Collection_0_1", "Collection_0_0_0", "Collection_1_0"]
+        )
+        self.check(self.proxy._data["collections"], expected_uuids)
 
     def test_blenddata_filtered(self):
         blend_data = self.proxy._data
@@ -61,7 +76,7 @@ class TestLoadProxy(unittest.TestCase):
     def test_scene(self):
         # test_misc.TestLoadProxy.test_scene
         scene = self.proxy._data["scenes"].search_one("Scene_0")._data
-        # will vary slightly during tiune tuning of the default filter
+        # will vary slightly during tuning of the default filter
         self.assertGreaterEqual(len(scene), 45)
         self.assertLessEqual(len(scene), 55)
 
@@ -90,20 +105,22 @@ class TestLoadProxy(unittest.TestCase):
         # self.assertIsInstance(master_collection, BpyIDProxy)
 
     def test_collections(self):
+        # test_misc.TestLoadProxy.test_collections
         collections = self.proxy._data["collections"]
         coll_0_0 = collections.search_one("Collection_0_0")._data
 
         coll_0_0_children = coll_0_0["children"]
-        self.check(coll_0_0_children, {"Collection_0_0_0"})
+
+        expected_uuids = self.expected_uuids(bpy.data.collections, ["Collection_0_0_0"])
+        self.check(coll_0_0_children, expected_uuids)
         for c in coll_0_0_children._data.values():
             self.assertIsInstance(c, BpyIDRefProxy)
 
         coll_0_0_objects = coll_0_0["objects"]
-        self.check(coll_0_0_objects, {"Camera_obj_0", "Camera_obj_1", "Cube", "Light"})
+        expected_uuids = self.expected_uuids(bpy.data.objects, ["Camera_obj_0", "Camera_obj_1", "Cube", "Light"])
+        self.check(coll_0_0_objects, expected_uuids)
         for o in coll_0_0_objects._data.values():
             self.assertIsInstance(o, BpyIDRefProxy)
-
-        pass
 
     def test_camera_focus_object_idref(self):
         # test_misc.TestLoadProxy.test_camera_focus_object_idref
