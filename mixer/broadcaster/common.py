@@ -362,6 +362,7 @@ def decode_int_array(data, index):
     count = bytes_to_int(data[index : index + 4])
     start = index + 4
     values = []
+    end = start
     for _ in range(count):
         end = start + 4
         values.extend(struct.unpack("I", data[start:end]))
