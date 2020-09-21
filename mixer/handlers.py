@@ -572,6 +572,8 @@ def create_vrtist_objects():
     changed = False
     for obj_name in share_data.objects_added:
         if obj_name in bpy.context.scene.objects:
+            # This requires careful handling in tests, since in multi scene tests, the active scene may not be the same
+            # on all Blender
             obj = bpy.context.scene.objects[obj_name]
             scene_api.send_add_object_to_vrtist(share_data.client, bpy.context.scene.name_full, obj.name_full)
             changed = True

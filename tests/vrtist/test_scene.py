@@ -15,6 +15,16 @@ from tests.vrtist.vrtist_testcase import VRtistTestCase
     class_name_func=VRtistTestCase.get_class_name,
 )
 class TestSceneEmptyDoc(VRtistTestCase):
+    """
+    Scene-related tests starting with an "empty" document with a single "Scene"
+
+    Caveats for collections in generic mode:
+    - collection creation do not trigger a depsgraph update, so VRtistTestCase.flush_collections() does
+    a trick for this
+    - the trick works if the collection is created in the active scene, so call remove_scene() so that
+    the collection are created in the active scene
+    """
+
     def setUp(self):
         sender_blendfile = files_folder() / "empty.blend"
         receiver_blendfile = files_folder() / "empty.blend"
@@ -35,6 +45,7 @@ class TestSceneEmptyDoc(VRtistTestCase):
         self.new_collection("collection_0_0")
         self.link_collection_to_scene("Scene", "collection_0_0")
         self.new_scene("scene_1")
+        self.remove_scene("Scene")
         self.new_collection("collection_1_0")
         self.new_collection("collection_1_1")
         self.link_collection_to_scene("scene_1", "collection_1_0")
@@ -47,6 +58,7 @@ class TestSceneEmptyDoc(VRtistTestCase):
         self.new_collection("UNLINKED_collection_1_0")
         self.new_collection("LINKED_collection_1_1")
         self.new_scene("scene_1")
+        self.remove_scene("Scene")
         self.link_collection_to_scene("scene_1", "UNLINKED_collection_1_0")
         self.link_collection_to_scene("scene_1", "LINKED_collection_1_1")
         self.unlink_collection_from_scene("scene_1", "UNLINKED_collection_1_0")
@@ -58,6 +70,7 @@ class TestSceneEmptyDoc(VRtistTestCase):
         self.new_object("object_0_0")
         self.link_object_to_scene("Scene", "object_0_0")
         self.new_scene("scene_1")
+        self.remove_scene("Scene")
         self.new_object("object_1_0")
         self.new_object("object_1_1")
         self.link_object_to_scene("scene_1", "object_1_0")
@@ -69,6 +82,7 @@ class TestSceneEmptyDoc(VRtistTestCase):
         self.new_object("object")
         self.link_object_to_scene("Scene", "object")
         self.new_scene("scene_1")
+        self.remove_scene("Scene")
         self.link_object_to_scene("scene_1", "object")
         self.end_test()
 
@@ -84,6 +98,8 @@ class TestSceneEmptyDoc(VRtistTestCase):
         self.new_object("UNLINKED_object_1_0")
         self.new_object("LINKED_object_1_1")
         self.new_scene("scene_1")
+        self.remove_scene("Scene")
+
         self.link_object_to_scene("scene_1", "UNLINKED_object_1_0")
         self.link_object_to_scene("scene_1", "LINKED_object_1_1")
         self.unlink_object_from_scene("scene_1", "UNLINKED_object_1_0")
@@ -97,6 +113,8 @@ class TestSceneEmptyDoc(VRtistTestCase):
         self.new_object("object_1_0")
         self.new_object("OLD_object_1_1")
         self.new_scene("scene_1")
+        self.remove_scene("Scene")
+
         self.link_object_to_scene("scene_1", "object_1_0")
         self.link_object_to_scene("scene_1", "OLD_object_1_1")
         self.rename_object("OLD_object_1_1", "NEW_object_1_1")
@@ -108,6 +126,8 @@ class TestSceneEmptyDoc(VRtistTestCase):
         self.new_collection("collection_1_0")
         self.new_collection("OLD_collection_1_1")
         self.new_scene("scene_1")
+        self.remove_scene("Scene")
+
         self.link_collection_to_scene("scene_1", "collection_1_0")
         self.link_collection_to_scene("scene_1", "OLD_collection_1_1")
         self.rename_collection("OLD_collection_1_1", "NEW_collection_1_1")
@@ -119,6 +139,8 @@ class TestSceneEmptyDoc(VRtistTestCase):
 
     def test_rename_scene(self):
         self.new_scene("old_scene_1")
+        self.remove_scene("Scene")
+
         self.new_object("REMOVED_object_1_0")
         self.new_collection("REMOVED_collection_1_0")
         self.link_object_to_scene("old_scene_1", "REMOVED_object_1_0")
@@ -141,6 +163,7 @@ class TestSceneEmptyDoc(VRtistTestCase):
 
     def test_create_instance_in_scene_after_join(self):
         self.new_scene("scene_1")
+        self.remove_scene("Scene")
         self.new_collection("src")
         self.link_collection_to_scene("scene_1", "src")
         self.create_object_in_collection("src", "object_0")
@@ -162,6 +185,7 @@ class TestSceneEmptyDoc(VRtistTestCase):
         time.sleep(1)
 
         self.new_scene("scene_1")
+        self.remove_scene("Scene")
         self.new_collection("src")
         self.link_collection_to_scene("scene_1", "src")
         self.create_object_in_collection("src", "object_0")

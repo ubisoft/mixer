@@ -4,7 +4,7 @@ Test case for the VRTist protocol
 import logging
 import sys
 
-
+from mixer.broadcaster.common import MessageType
 import tests.blender_lib as bl
 from tests.mixer_testcase import MixerTestCase
 
@@ -25,7 +25,31 @@ class VRtistTestCase(MixerTestCase):
             self.experimental_sync = False
         super().__init__(*args, **kwargs)
 
+    def set_active_scene(self, name: str):
+        """
+        Set the active scene, so that flush_collection() triggers an update.
+        """
+        s = f"""
+import bpy
+bpy.context.window.scene = bpy.data.scenes["{name}"]
+"""
+        self.send_string(s)
+
+    def flush_collections(self):
+        """
+        Create a dummy object in order to generate a depsgraph update that catches collection creation
+        in the active scene (see set_active_scene()) (HACK)
+        """
+
+        flush = """
+import bpy
+o = bpy.data.objects.new("empty_created_to_flush", None)
+bpy.data.scenes[0].collection.objects.link(o)
+"""
+        self.send_string(flush)
+
     def end_test(self):
+        self.flush_collections()
         self.assert_matches()
 
     def link_collection_to_collection(self, parent_name: str, child_name: str):
