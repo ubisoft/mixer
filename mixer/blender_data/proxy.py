@@ -661,14 +661,14 @@ class BpyIDProxy(BpyStructProxy):
     def target(self, visit_state: VisitState) -> T.ID:
         return visit_state.ids.get(self.mixer_uuid())
 
-    def create_standalone_datablock(self, visit_state: VisitState) -> Tuple[T.ID, str]:
+    def create_standalone_datablock(self, visit_state: VisitState) -> Tuple[Optional[T.ID], Optional[str]]:
         """
         Save this proxy into its target standalone datablock
         """
         if self.target(visit_state):
-            logger.warning(f"create_standalone_datablock: but already registered {self}")
+            logger.warning(f"create_standalone_datablock: datablock already registered : {self}")
             logger.warning("... update ignored")
-            return
+            return None, None
 
         old_name = None
         incoming_name = self.data("name")
@@ -696,13 +696,13 @@ class BpyIDProxy(BpyStructProxy):
                     # a creation for a datablock that we already have. This should not happen
                     logger.error(f"create_standalone_datablock: unregistered uuid for {self}")
                     logger.error("... update ignored")
-                    return
+                    return None, None
         else:
             datablock = specifics.bpy_data_ctor(self.collection_name, self, visit_state)
 
         if datablock is None:
             logger.warning(f"Cannot create bpy.data.{self.collection_name}[{self.data('name')}]")
-            return None
+            return None, None
 
         if DEBUG:
             name = self.data("name")
@@ -714,7 +714,7 @@ class BpyIDProxy(BpyStructProxy):
         datablock = specifics.pre_save_id(self, datablock, visit_state)
         if datablock is None:
             logger.warning(f"BpyIDProxy.update_standalone_datablock() {self} pre_save_id returns None")
-            return None
+            return None, None
 
         for k, v in self._data.items():
             write_attribute(datablock, k, v, visit_state)
@@ -1544,7 +1544,7 @@ class BpyPropDataCollectionProxy(Proxy):
 
     def create_datablock(
         self, incoming_proxy: BpyIDProxy, visit_state: VisitState
-    ) -> Tuple[T.ID, Optional[RenameChangeset]]:
+    ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """Create a bpy.data datablock from a received BpyIDProxy and update the proxy structures accordingly
 
         Receiver side
@@ -1556,7 +1556,7 @@ class BpyPropDataCollectionProxy(Proxy):
         incoming_name = incoming_proxy.data("name")
         datablock, old_name = incoming_proxy.create_standalone_datablock(visit_state)
         if not datablock:
-            return
+            return datablock, old_name
 
         uuid = incoming_proxy.mixer_uuid()
         self._data[uuid] = incoming_proxy

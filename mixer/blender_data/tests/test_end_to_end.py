@@ -20,6 +20,7 @@ class TestWorld(unittest.TestCase):
         register_bl_equals(self, safe_context)
 
     def test_world(self):
+        # test_end_to_end.TestWorld.test_world
         world = bpy.data.worlds[0]
         world.use_nodes = True
         self.assertGreaterEqual(len(world.node_tree.nodes), 2)
@@ -39,6 +40,9 @@ class TestWorld(unittest.TestCase):
             sent_id = sent_ids.get(key)
             if sent_id is None:
                 continue
+
+            # pretend it is a new one
+            update._datablock_uuid += "_new"
 
             encoded = codec.encode(update)
             # sender side
@@ -67,6 +71,9 @@ class TestWorld(unittest.TestCase):
             sent_id = sent_ids.get(key)
             if sent_id is None:
                 continue
+
+            # pretend it is a new one
+            update._datablock_uuid += "_new"
 
             # create a property on the send proxy and test that is does not fail on the receiver
             # property on ID
