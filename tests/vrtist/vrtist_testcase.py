@@ -4,7 +4,6 @@ Test case for the VRTist protocol
 import logging
 import sys
 
-from mixer.broadcaster.common import MessageType
 import tests.blender_lib as bl
 from tests.mixer_testcase import MixerTestCase
 

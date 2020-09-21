@@ -12,11 +12,9 @@ from mixer.blender_data.proxy import (
     BpyPropDataCollectionProxy,
     BpyPropStructCollectionProxy,
     BpyStructProxy,
-    Delta,
     DeltaAddition,
     DeltaDeletion,
     DeltaUpdate,
-    ensure_uuid,
 )
 
 from mixer.blender_data.filter import test_context
