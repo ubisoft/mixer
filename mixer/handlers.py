@@ -564,10 +564,12 @@ def create_vrtist_objects():
     VRtist will filter the received messages and handle only the objects that belong to the
     same scene as the one initially synchronized
     """
+    scene_objects = {x.name_full: x for x in bpy.context.scene.objects}
+
     changed = False
     for obj_name in share_data.objects_added:
-        if obj_name in bpy.context.scene.objects:
-            obj = bpy.context.scene.objects[obj_name]
+        obj = scene_objects.get(obj_name)
+        if obj:
             scene_api.send_add_object_to_vrtist(share_data.client, bpy.context.scene.name_full, obj.name_full)
             changed = True
     return changed
