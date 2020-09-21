@@ -90,7 +90,7 @@ class StructDatablockRef(DifferentialCompute):
         self.generate_all_uuids()
         scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
         self.assertIsInstance(scene_delta, DeltaUpdate)
-        world_delta = scene_delta.value.data("world")
+        world_delta = scene_delta.value.data("world", resolve_delta=False)
         self.assertIsInstance(world_delta, DeltaUpdate)
         world_update = world_delta.value
         self.assertIsInstance(world_update, BpyIDRefProxy)
@@ -108,7 +108,7 @@ class StructDatablockRef(DifferentialCompute):
         self.generate_all_uuids()
         scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
         self.assertIsInstance(scene_delta, DeltaUpdate)
-        world_delta = scene_delta.value.data("world")
+        world_delta = scene_delta.value.data("world", resolve_delta=False)
         self.assertIsInstance(world_delta, DeltaUpdate)
         world_update = world_delta.value
         self.assertIsInstance(world_update, BpyIDRefProxy)
@@ -336,10 +336,12 @@ class Collection(DifferentialCompute):
         point2 = points_remove_proxy.data(2, resolve_delta=False)
         self.assertIsInstance(point2, DeltaDeletion)
 
-        points_add_proxy = scene_delta.data("view_settings").data("curve_mapping").data("curves").data(1).data("points")
+        points_add_proxy = (
+            scene_delta.value.data("view_settings").data("curve_mapping").data("curves").data(1).data("points")
+        )
         self.assertIsInstance(points_add_proxy, BpyPropStructCollectionProxy)
 
-        self.assertIsInstance(points_add_proxy.data(2), DeltaAddition)
+        self.assertIsInstance(points_add_proxy.data(2, resolve_delta=False), DeltaAddition)
 
         # points are ordered by location. removing the second one produces an update
         # at index 1 and a delete at index 2
