@@ -137,8 +137,11 @@ def encode_baked_mesh(obj):
         # This happens for empty curves
         return bytes()
 
-    original_bm = bmesh.new()
-    original_bm.from_mesh(mesh)
+    original_bm = None
+    if obj.type == "MESH":
+        # Mesh is restored later only if is has not been generated from a curve or something else
+        original_bm = bmesh.new()
+        original_bm.from_mesh(mesh)
 
     bm = bmesh.new()
     bm.from_mesh(mesh)
@@ -183,7 +186,7 @@ def encode_baked_mesh(obj):
         obj.to_mesh_clear()
     else:
         original_bm.to_mesh(mesh)
-    original_bm.free()
+        original_bm.free()
 
     stats_timer.checkpoint("make_buffers")
 
