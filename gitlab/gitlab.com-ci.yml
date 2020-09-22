@@ -25,6 +25,11 @@ zip:
       - mixer
     expire_in: 1 week
 
+try_except_from_gitlab_com:
+  stage: pre_release
+  script:
+    - echo "Hello world"
+
 .on_version_tag: &tpl_on_version_tag
   only:
     refs:
