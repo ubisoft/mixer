@@ -386,7 +386,8 @@ class BlenderClient(Client):
         channel_index, index = common.decode_int(data, index)
         if not hasattr(ob, channel):
             ob = ob.data
-        ob.keyframe_delete(channel, index=channel_index)
+        frame, index = common.decode_int(data, index)
+        ob.keyframe_delete(channel, index=channel_index, frame=frame)
         return name
 
     def build_query_animation_data(self, data):
@@ -497,6 +498,13 @@ class BlenderClient(Client):
             return
         action = animation_data.action
         if not action:
+            buffer = (
+                common.encode_string(obj_name)
+                + common.encode_string(channel_name)
+                + common.encode_int(channel_index)
+                + common.int_to_bytes(0, 4)  # send empty buffer
+            )
+            self.add_command(common.Command(MessageType.ANIMATION, buffer, 0))
             return
         for fcurve in action.fcurves:
             if fcurve.data_path == channel_name:
