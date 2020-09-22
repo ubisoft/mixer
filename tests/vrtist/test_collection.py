@@ -256,10 +256,12 @@ c2.name = "c2_updated"
     def test_rename_unlink_object3(self):
         s = """
 import bpy
+master = bpy.data.scenes[0].view_layers[0].layer_collection.collection
 c1 = bpy.data.collections.new("c1")
 c2 = bpy.data.collections.new("c2")
 c3 = bpy.data.collections.new("c3")
 obj = bpy.data.objects.new("obj", None)
+master.children.link(c1)
 c1.children.link(c2)
 c2.children.link(c3)
 c2.objects.link(obj)
