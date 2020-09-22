@@ -16,6 +16,7 @@ flake8:
 zip:
   tags:
     - linux
+  image: alpine
   stage: pre_release
   script:
     - cp CHANGELOG.md README.md LICENSE mixer/
@@ -28,7 +29,7 @@ zip:
 try_except_from_gitlab_com:
   stage: pre_release
   script:
-    - echo "Hello world"
+    - echo "$CI_SERVER_URL"
 
 .on_version_tag: &tpl_on_version_tag
   only:
