@@ -7,7 +7,6 @@ stages:
 
 flake8:
   tags:
-    - linux
     - docker
   image: python:3
   stage: pre_release
@@ -17,7 +16,8 @@ flake8:
 
 zip:
   tags:
-    - linux
+    - docker
+  image: alpine
   stage: pre_release
   script:
     - cp CHANGELOG.md README.md LICENSE mixer/
@@ -27,19 +27,27 @@ zip:
       - mixer
     expire_in: 1 week
 
-.on_version_tag: &tpl_on_version_tag
+.only_on_gitlab.com:
+  only:
+    variables:
+      - $CI_SERVER_URL == "https://gitlab.com"
+
+.exclude_on_gitlab.com:
+  except:
+    variables:
+      - $CI_SERVER_URL == "https://gitlab.com"
+
+.on_version_tag:
   only:
     refs:
       # see inject_version.py
       - /^v([0-9]+)\.([0-9]+)\.([0-9]+)(\-[0-9A-Za-z-]+)?(\+[0-9A-Za-z-]+)?$/
 
-
 release:
-  <<: *tpl_on_version_tag
+  extends: .on_version_tag
   dependencies:
     - zip
   tags:
-    - linux
     - docker
   image: python:3
   stage: release
@@ -52,7 +60,7 @@ release:
       - mixer-${CI_COMMIT_REF_NAME}.zip
 
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
-unittest:
+.base_unittest:
   stage: pre_release
   tags:
     - blender
@@ -77,8 +85,21 @@ unittest:
       junit:
         - logs\tests\*.xml
 
-.deploy_network_folder: &tpl_deploy_network_folder
-  <<: *tpl_on_version_tag
+unittest:
+  extends:
+    - .base_unittest
+    - .exclude_on_gitlab.com
+
+unittest_gitlab.com:
+  extends:
+    - .base_unittest
+    - .only_on_gitlab.com
+    - .on_version_tag
+
+.deploy_network_folder:
+  extends:
+    - .on_version_tag
+    - .exclude_on_gitlab.com
   stage: deploy
   tags:
     - linux
@@ -87,8 +108,10 @@ unittest:
     - bash gitlab/deploy_in_network_folder.sh mixer-${CI_COMMIT_REF_NAME}.zip
   when: manual
 
-.deploy_perforce_folder: &tpl_deploy_perforce_folder
-  <<: *tpl_on_version_tag
+.deploy_perforce_folder:
+  extends:
+    - .on_version_tag
+    - .exclude_on_gitlab.com
   stage: deploy
   tags:
     - linux
@@ -98,11 +121,11 @@ unittest:
   when: manual
 
 deploy:incubator:
-  <<: *tpl_deploy_network_folder
+  extends: .deploy_network_folder
   environment:
     name: incubator
 
 deploy:rr_special:
-  <<: *tpl_deploy_perforce_folder
+  extends: .deploy_perforce_folder
   environment:
     name: rr_special
