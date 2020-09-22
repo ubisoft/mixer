@@ -32,7 +32,7 @@ try_except_from_gitlab_com:
     - echo "$CI_SERVER_URL"
   except:
     variables:
-      - $CI_SERVER_URL != "https://gitlab.com"
+      - $CI_SERVER_URL == "https://gitlab.com"
 
 .on_version_tag: &tpl_on_version_tag
   only:
