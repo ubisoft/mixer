@@ -1,3 +1,13 @@
+# 0.16.1 (2020-09-22)
+
+## Bugfix
+
+- VRtist: Don't restore original mesh after baking if the original object was not a mesh
+
+## CI/CD
+
+- Merge gitlab.com CI script into main CI script using `only` and `except` clauses.
+
 # 0.16.0 (2020-09-17)
 
 ## Features
