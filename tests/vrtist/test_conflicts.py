@@ -233,6 +233,17 @@ bpy.data.collections.remove(collection)
 
 
 class TestObjectRenameGeneric(ThrottledTestCase):
+    def setUp(self):
+        super().setUp("file2.blend")
+
+        # work around the ADD_OBJECT_TO_VRTIST mismatch that is caused because the message generation depends on the
+        # active scene. So leave only one scene
+        cleanup_scenes = """
+import bpy
+bpy.data.scenes.remove(bpy.data.scenes["Scene.001"])
+"""
+        self.send_string(cleanup_scenes, to=0)
+
     def test_update_object(self):
         self.send_strings([bl.data_objects_rename("A", "B")], to=0)
         delay = 0.0
