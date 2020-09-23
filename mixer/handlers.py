@@ -113,19 +113,31 @@ def handler_send_frame_changed(scene):
         share_data.client.synced_time_messages = False
 
 
+processing_depsgraph_handler = False
+
+
 @persistent
 def handler_send_scene_data_to_server(scene, dummy):
-    logger.debug("handler_send_scene_data_to_server")
-
-    # Ensure we will rebuild accessors when a depsgraph update happens
-    # todo investigate why we need this...
-    share_data.set_dirty()
-
-    if share_data.client.block_signals:
-        logger.debug("handler_send_scene_data_to_server canceled (block_signals = True)")
+    global processing_depsgraph_handler
+    if processing_depsgraph_handler:
+        logger.error("Depsgraph handler recursion attempt")
         return
 
-    send_scene_data_to_server(scene, dummy)
+    processing_depsgraph_handler = True
+    try:
+        logger.debug("handler_send_scene_data_to_server")
+
+        # Ensure we will rebuild accessors when a depsgraph update happens
+        # todo investigate why we need this...
+        share_data.set_dirty()
+
+        if share_data.client.block_signals:
+            logger.debug("handler_send_scene_data_to_server canceled (block_signals = True)")
+            return
+
+        send_scene_data_to_server(scene, dummy)
+    finally:
+        processing_depsgraph_handler = False
 
 
 class TransformStruct:
