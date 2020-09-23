@@ -1,3 +1,9 @@
+# 0.16.1+modifiers-4 (2020-09-23)
+
+## Features
+
+- Add Grease pencil modifiers
+
 # 0.16.1 (2020-09-22)
 
 ## Bugfix
@@ -25,17 +31,6 @@
 - Fix random test failure with room not joinable yet
 - Disconnects clients properly when server is killed
 - VRtist: Fixed synchro stuff
-
-# 0.15.0+modifiers-1 (2020-09-09)
-
-## Features
-
-- Experimental support of modifiers (breaks all rename operations)
-
-## CI/CD
-
-- Add optional build info to the version tag
-- Upgrade Flake and Black
 
 # 0.15.0 (2020-08-12)
 
