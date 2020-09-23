@@ -1339,13 +1339,15 @@ class BpyPropStructCollectionProxy(Proxy):
                         sequence[k] = apply_attribute(collection, k, sequence[k], delta, visit_state, to_blender)
                     elif isinstance(delta, DeltaDeletion):
                         item = collection[k]
-                        collection.remove(item)
+                        if to_blender:
+                            collection.remove(item)
                         del sequence[k]
                     else:  # DeltaAddition
                         raise NotImplementedError("Not implemented: DeltaAddition for array")
                         # TODO pre save for use_curves
                         # since ordering does not include this requirement
-                        write_attribute(collection, k, delta.value, visit_state)
+                        if to_blender:
+                            write_attribute(collection, k, delta.value, visit_state)
                         sequence[k] = delta.value
 
                 except Exception as e:
@@ -1359,13 +1361,20 @@ class BpyPropStructCollectionProxy(Proxy):
                 try:
                     if isinstance(delta, DeltaDeletion):
                         # TODO do all collections have remove ?
-                        item = collection[k]
-                        collection.remove(item)
+                        # see "name collision" in diff()
+                        k = k[1:]
+                        if to_blender:
+                            item = collection[k]
+                            collection.remove(item)
                         del self._data[k]
                     elif isinstance(delta, DeltaAddition):
                         # TODO pre save for use_curves
                         # since ordering does not include this requirement
-                        write_attribute(collection, k, delta.value, visit_state)
+
+                        # see "name collision" in diff()
+                        k = k[1:]
+                        if to_blender:
+                            write_attribute(collection, k, delta.value, visit_state)
                         self._data[k] = delta.value
                     else:
                         self._data[k] = apply_attribute(collection, k, self._data[k], delta, visit_state, to_blender)
@@ -1419,23 +1428,49 @@ class BpyPropStructCollectionProxy(Proxy):
             # This assumes that keys ordring is the same in the proxy and in blender, which is
             # guaranteed by the fact that proxy load uses Context.properties()
 
-            proxy_keys = self._data.keys()
-            blender_keys = collection.keys()
-            added_keys = blender_keys - proxy_keys
-            for k in added_keys:
-                value = read_attribute(collection[k], item_property, visit_state)
-                diff._data[k] = DeltaAddition(value)
+            bl_rna = getattr(collection, "bl_rna", None)
+            if bl_rna is not None and isinstance(
+                bl_rna, (type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers))
+            ):
+                # TODO move this into specifics.py
+                # order-dependant collections with different types like Modifiers
+                proxy_names = list(self._data.keys())
+                blender_names = collection.keys()
+                proxy_types = [self.data(name).data("type") for name in proxy_names]
+                blender_types = [collection[name].type for name in blender_names]
+                if proxy_types == blender_types and proxy_names == blender_names:
+                    # Same types and names : do sparse modification
+                    for name in proxy_names:
+                        delta = diff_attribute(collection[name], item_property, self.data(name), visit_state)
+                        if delta is not None:
+                            diff._data[name] = delta
+                else:
+                    # names or types do not match, rebuild all
+                    # There are name collisions during Modifier order change for instance, so prefix
+                    # the names to avoid them (using a tuple fails in the json encoder)
+                    for name in proxy_names:
+                        diff._data["D" + name] = DeltaDeletion(self.data(name))
+                    for name in blender_names:
+                        value = read_attribute(collection[name], item_property, visit_state)
+                        diff._data["A" + name] = DeltaAddition(value)
+            else:
+                # non order dependant, uniform types
+                proxy_keys = self._data.keys()
+                blender_keys = collection.keys()
+                added_keys = blender_keys - proxy_keys
+                for k in added_keys:
+                    value = read_attribute(collection[k], item_property, visit_state)
+                    diff._data[k] = DeltaAddition(value)
 
-            deleted_keys = proxy_keys - blender_keys
-            for k in deleted_keys:
-                diff._data[k] = DeltaDeletion(self.data(k))
+                deleted_keys = proxy_keys - blender_keys
+                for k in deleted_keys:
+                    diff._data[k] = DeltaDeletion(self.data(k))
 
-            maybe_updated_keys = proxy_keys & blender_keys
-            for k in maybe_updated_keys:
-                delta = diff_attribute(collection[k], item_property, self.data(k), visit_state)
-                if delta is not None:
-                    diff._data[k] = delta
-
+                maybe_updated_keys = proxy_keys & blender_keys
+                for k in maybe_updated_keys:
+                    delta = diff_attribute(collection[k], item_property, self.data(k), visit_state)
+                    if delta is not None:
+                        diff._data[k] = delta
         if len(diff._data):
             return DeltaUpdate(diff)
 
