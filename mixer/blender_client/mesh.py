@@ -1,5 +1,6 @@
 import logging
 import struct
+import array
 
 import bpy
 import bmesh
@@ -160,34 +161,26 @@ def encode_baked_mesh(obj):
     # get active uv layer
     uvlayer = mesh.uv_layers.active
 
-    vertices = []
-    normals = []
-    uvs = []
-    indices = []
-    material_indices = []  # array of triangle index, material index
+    vertices = array.array("d", (0.0,)) * len(mesh.vertices) * 3
+    mesh.vertices.foreach_get("co", vertices)
 
-    current_material_index = -1
-    current_face_index = 0
-    logger.debug("Writing %d polygons", len(mesh.polygons))
-    loops = mesh.loops
-    mesh_vertices = mesh.vertices
-    uv_layer_data = None
+    normals = array.array("d", (0.0,)) * len(mesh.loops) * 3
+    mesh.loops.foreach_get("normal", normals)
+
     if uvlayer:
-        uv_layer_data = uvlayer.data
-    for f in mesh.polygons:
-        for loop_id in f.loop_indices:
-            mesh_loop = loops[loop_id]
-            index = mesh_loop.vertex_index
-            vertices.extend(mesh_vertices[index].co)
-            normals.extend(mesh_loop.normal)
-            if uvlayer:
-                uvs.extend([x for x in uv_layer_data[loop_id].uv])
-            indices.append(loop_id)
+        uvs = array.array("d", (0.0,)) * len(mesh.loops) * 2
+        mesh.uv_layers[0].data.foreach_get("uv", uvs)
+    else:
+        uvs = []
 
-        if f.material_index != current_material_index:
-            current_material_index = f.material_index
-            material_indices.extend([current_face_index, current_material_index])
-        current_face_index = current_face_index + 1
+    indices = array.array("i", (0,)) * len(mesh.loops)
+    mesh.loops.foreach_get("vertex_index", indices)
+
+    if len(obj.material_slots) <= 1:
+        material_indices = []
+    else:
+        material_indices = array.array("i", (0,)) * len(mesh.polygons)
+        mesh.polygons.foreach_get("material_index", material_indices)
 
     if obj.type != "MESH":
         obj.to_mesh_clear()
@@ -216,7 +209,7 @@ def encode_baked_mesh(obj):
     stats_timer.checkpoint("write_uvs")
 
     # material indices + binary material indices buffer
-    size = len(material_indices) // 2
+    size = len(material_indices)
     binary_material_indices_buffer = common.int_to_bytes(size, 4) + struct.pack(
         f"{len(material_indices)}I", *material_indices
     )
@@ -469,48 +462,42 @@ def decode_baked_mesh(obj, data, index):
     positions, index = common.decode_vector3_array(data, index)
     normals, index = common.decode_vector3_array(data, index)
     uvs, index = common.decode_vector2_array(data, index)
-    material_indices, index = common.decode_int2_array(data, index)
+    material_indices, index = common.decode_int_array(data, index)
     triangles, index = common.decode_int3_array(data, index)
 
     bm = bmesh.new()
     for i in range(len(positions)):
-        vertex = bm.verts.new(positions[i])
+        bm.verts.new(positions[i])
         # according to https://blender.stackexchange.com/questions/49357/bmesh-how-can-i-import-custom-vertex-normals
         # normals are not working for bmesh...
-        vertex.normal = normals[i]
+        # vertex.normal = normals[i]
     bm.verts.ensure_lookup_table()
 
     uv_layer = None
     if len(uvs) > 0:
         uv_layer = bm.loops.layers.uv.new()
 
-    current_material_index = 0
-    index_in_material_indices = 0
-    next_triangle_index = len(triangles)
+    multi_material = False
     if len(material_indices) > 1:
-        next_triangle_index = material_indices[index_in_material_indices + 1][0]
-    if len(material_indices) > 0:
-        current_material_index = material_indices[index_in_material_indices][1]
+        multi_material = True
 
+    current_uv_index = 0
     for i in range(len(triangles)):
-        if i >= next_triangle_index:
-            index_in_material_indices = index_in_material_indices + 1
-            next_triangle_index = len(triangles)
-            if len(material_indices) > index_in_material_indices + 1:
-                next_triangle_index = material_indices[index_in_material_indices + 1][0]
-            current_material_index = material_indices[index_in_material_indices][1]
-
         triangle = triangles[i]
         i1 = triangle[0]
         i2 = triangle[1]
         i3 = triangle[2]
         try:
             face = bm.faces.new((bm.verts[i1], bm.verts[i2], bm.verts[i3]))
-            face.material_index = current_material_index
+            if multi_material:
+                face.material_index = material_indices[i]
+            else:
+                face.material_index = 0
             if uv_layer:
-                face.loops[0][uv_layer].uv = uvs[i1]
-                face.loops[1][uv_layer].uv = uvs[i2]
-                face.loops[2][uv_layer].uv = uvs[i3]
+                face.loops[0][uv_layer].uv = uvs[current_uv_index]
+                face.loops[1][uv_layer].uv = uvs[current_uv_index + 1]
+                face.loops[2][uv_layer].uv = uvs[current_uv_index + 2]
+                current_uv_index = current_uv_index + 3
         except Exception:
             pass
 
@@ -520,10 +507,7 @@ def decode_baked_mesh(obj, data, index):
     bm.free()
 
     # hack ! Since bmesh cannot be used to set custom normals
-    normals2 = []
-    for loop in me.loops:
-        normals2.append(normals[loop.vertex_index])
-    me.normals_split_custom_set(normals2)
+    me.normals_split_custom_set(normals)
     me.use_auto_smooth = True
 
     return index
