@@ -110,18 +110,30 @@ class BlenderClient(Client):
         self._received_command_count: int = 0
         self._received_byte_size: int = 0
 
+        self.command_pack = None
+
+    def send_command_pack(self):
+        if self.command_pack is not None:
+            command = self.command_pack
+            self.command_pack = None
+            self.synced_time_messages = False
+            super().add_command(command)
+
     def add_command(self, command: common.Command):
         # A wrapped message is a message emitted from a frame change event.
         # Right now we wrap this kind of messages adding the client_id.
         # In the future we will probably always add the client_id to all messages. But the difference
         # between synced time messages and the other must remain.
         if self.synced_time_messages:
-            command = common.Command(
-                MessageType.CLIENT_ID_WRAPPER,
-                common.encode_string(self.client_id) + common.encode_int(command.type.value) + command.data,
-                0,
-            )
-        super().add_command(command)
+            command = common.encode_int(command.type.value) + command.data
+            if self.command_pack is None:
+                self.command_pack = common.Command(
+                    MessageType.CLIENT_ID_WRAPPER, common.encode_string(self.client_id), 0
+                )
+
+            self.command_pack.data += common.encode_int(len(command)) + command
+        else:
+            super().add_command(command)
 
     # returns the path of an object
     def get_object_path(self, obj):
@@ -218,6 +230,13 @@ class BlenderClient(Client):
             obj = self.get_or_create_path(src_path)
             new_obj = obj.copy()
             new_obj.name = dst_name
+
+            # copy materials
+            material_count = len(obj.material_slots)
+            if material_count == len(new_obj.material_slots):
+                for i in range(material_count):
+                    new_obj.material_slots[i].material = obj.material_slots[i].material.copy()
+
             if hasattr(obj, "data"):
                 new_obj.data = obj.data.copy()
                 new_obj.data.name = dst_name
@@ -327,10 +346,11 @@ class BlenderClient(Client):
                 path = bpy.path.abspath(image.filepath)
                 path = path.replace("\\", "/")
                 if pack:
-                    self.send_texture_data(path, pack.data)
+                    self.send_texture_data(image.name_full, pack.data)
+                    return image.name_full
                 else:
                     self.send_texture_file(path)
-                return path
+                    return path
         return None
 
     def build_add_keyframe(self, data):
@@ -366,13 +386,14 @@ class BlenderClient(Client):
         channel_index, index = common.decode_int(data, index)
         if not hasattr(ob, channel):
             ob = ob.data
-        ob.keyframe_delete(channel, index=channel_index)
+        frame, index = common.decode_int(data, index)
+        ob.keyframe_delete(channel, index=channel_index, frame=frame)
         return name
 
-    def build_query_object_data(self, data):
+    def build_query_animation_data(self, data):
         index = 0
         name, index = common.decode_string(data, index)
-        self.query_object_data(name)
+        self.query_animation_data(name)
 
     def build_clear_animations(self, data):
         index = 0
@@ -386,8 +407,8 @@ class BlenderClient(Client):
         index = 0
         montage, index = common.decode_bool(data, index)
         winman = bpy.data.window_managers["WinMan"]
-        if hasattr(winman, "UAS_shot_manager_handler_toggle"):
-            winman.UAS_shot_manager_handler_toggle = montage
+        if hasattr(winman, "UAS_shot_manager_shots_play_mode"):
+            winman.UAS_shot_manager_shots_play_mode = montage
 
     def send_group_begin(self):
         # The integer sent is for future use: the server might fill it with the group size once all messages
@@ -477,6 +498,13 @@ class BlenderClient(Client):
             return
         action = animation_data.action
         if not action:
+            buffer = (
+                common.encode_string(obj_name)
+                + common.encode_string(channel_name)
+                + common.encode_int(channel_index)
+                + common.int_to_bytes(0, 4)  # send empty buffer
+            )
+            self.add_command(common.Command(MessageType.ANIMATION, buffer, 0))
             return
         for fcurve in action.fcurves:
             if fcurve.data_path == channel_name:
@@ -495,7 +523,7 @@ class BlenderClient(Client):
                         + struct.pack(f"{len(times)}i", *times)
                         + struct.pack(f"{len(values)}f", *values)
                     )
-                    self.add_command(common.Command(MessageType.CAMERA_ANIMATION, buffer, 0))
+                    self.add_command(common.Command(MessageType.ANIMATION, buffer, 0))
                     return
 
     def send_camera_animations(self, obj):
@@ -515,6 +543,14 @@ class BlenderClient(Client):
             + common.encode_float(obj.data.dof.focus_distance)
         )
         self.add_command(common.Command(MessageType.CAMERA_ATTRIBUTES, buffer, 0))
+
+    def send_light_attributes(self, obj):
+        buffer = (
+            common.encode_string(obj.name_full)
+            + common.encode_float(obj.data.energy)
+            + common.encode_color(obj.data.color)
+        )
+        self.add_command(common.Command(MessageType.LIGHT_ATTRIBUTES, buffer, 0))
 
     def send_current_camera(self, camera_name):
         buffer = common.encode_string(camera_name)
@@ -587,23 +623,28 @@ class BlenderClient(Client):
     def build_play(self, command):
         ctx = self.override_context()
         if ctx:
-            if not ctx["screen"].is_animation_playing:
+            screen_ctx = ctx["screen"]
+            if hasattr(screen_ctx, "is_animation_playing") and not screen_ctx.is_animation_playing:
+                share_data.current_camera = ""
                 bpy.ops.screen.animation_play(ctx)
 
     def build_pause(self, command):
         ctx = self.override_context()
         if ctx:
-            if ctx["screen"].is_animation_playing:
+            screen_ctx = ctx["screen"]
+            if hasattr(screen_ctx, "is_animation_playing") and screen_ctx.is_animation_playing:
                 bpy.ops.screen.animation_play(ctx)
 
-    def query_object_data(self, object_name):
+    def query_animation_data(self, object_name):
         previous_value = share_data.client.skip_next_depsgraph_update
         share_data.client.skip_next_depsgraph_update = False
 
         if object_name not in share_data.blender_objects:
             return
         ob = share_data.blender_objects[object_name]
-        update_params(ob)
+        self.synced_time_messages = True
+        update_animation_params(ob)
+        self.send_command_pack()
 
         share_data.client.skip_next_depsgraph_update = previous_value
 
@@ -831,8 +872,8 @@ class BlenderClient(Client):
                         self.build_add_keyframe(command.data)
                     elif command.type == MessageType.REMOVE_KEYFRAME:
                         self.build_remove_keyframe(command.data)
-                    elif command.type == MessageType.QUERY_OBJECT_DATA:
-                        self.build_query_object_data(command.data)
+                    elif command.type == MessageType.QUERY_ANIMATION_DATA:
+                        self.build_query_animation_data(command.data)
 
                     elif command.type == MessageType.CLEAR_ANIMATIONS:
                         self.build_clear_animations(command.data)
@@ -935,6 +976,12 @@ def update_params(obj):
     if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
         if obj.mode == "OBJECT":
             share_data.client.send_mesh(obj)
+
+
+def update_animation_params(obj):
+    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 0)
+    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 1)
+    share_data.client.send_animation_buffer(obj.name_full, obj.animation_data, "location", 2)
 
 
 def clear_scene_content():

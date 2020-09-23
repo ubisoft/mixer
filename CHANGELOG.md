@@ -1,20 +1,41 @@
-# 0.15.0+modifiers-3 (2020-09-11)
+# 0.16.1 (2020-09-22)
+
+## Bugfix
+
+- VRtist: Don't restore original mesh after baking if the original object was not a mesh
+
+## CI/CD
+
+- Merge gitlab.com CI script into main CI script using `only` and `except` clauses.
+
+# 0.16.0 (2020-09-17)
 
 ## CI
 
 - Update Blender version on tests that run on gitlab.com
 
-# 0.15.0+modifiers-2 (2020-09-11)
+- Put back sync of `proxy_storage` and `proxy_dir` fields of SequenceEditor (#146)
+- VRtist: Packed frame related diffs for VRtist client
 
 ## Bugfix
 
-- Fix CI to get back release generation on Gitlab.com
+- Fix mesh being triangulated after leaving edit mode. (#191)
+- Fix crash occuring when vertex group data is inconsistent (#121)
+- Fix send_base_mesh crash
+- Fix random test failure with room not joinable yet
+- Disconnects clients properly when server is killed
+- VRtist: Fixed synchro stuff
 
 # 0.15.0+modifiers-1 (2020-09-09)
 
 ## Features
 
 - Experimental support of modifiers (breaks all rename operations)
+
+## CI/CD
+
+- Add optional build info to the version tag
+- Upgrade Flake and Black
 
 # 0.15.0 (2020-08-12)
 

@@ -12,7 +12,7 @@ import bpy
 from mixer.share_data import share_data
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.stats import save_statistics
-from mixer.broadcaster.common import RoomAttributes
+from mixer.broadcaster.common import RoomAttributes, ClientAttributes
 from mixer.connection import is_client_connected, connect, join_room, leave_current_room, disconnect
 
 logger = logging.getLogger(__name__)
@@ -297,12 +297,17 @@ class LaunchVRtistOperator(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return os.path.isfile(get_mixer_prefs().VRtist)
+        return (
+            os.path.isfile(get_mixer_prefs().VRtist)
+            and is_client_connected()
+            and share_data.client.current_room is not None
+            and share_data.client.client_id is not None
+        )
 
     def execute(self, context):
         bpy.data.window_managers["WinMan"].mixer.send_base_meshes = False
         mixer_prefs = get_mixer_prefs()
-        if not share_data.client.current_room:
+        if not share_data.client or not share_data.client.current_room:
             try:
                 connect()
             except Exception as e:
@@ -310,6 +315,15 @@ class LaunchVRtistOperator(bpy.types.Operator):
                 return {"CANCELLED"}
 
             join_room(mixer_prefs.room, mixer_prefs.experimental)
+
+        color = share_data.client.clients_attributes[share_data.client.client_id].get(
+            ClientAttributes.USERCOLOR, (0.0, 0.0, 0.0)
+        )
+        color = (int(c * 255) for c in color)
+        color = "#" + "".join(f"{c:02x}" for c in color)
+        name = "VR " + share_data.client.clients_attributes[share_data.client.client_id].get(
+            ClientAttributes.USERNAME, "client"
+        )
 
         args = [
             mixer_prefs.VRtist,
@@ -321,6 +335,10 @@ class LaunchVRtistOperator(bpy.types.Operator):
             str(mixer_prefs.port),
             "--master",
             str(share_data.client.client_id),
+            "--usercolor",
+            color,
+            "--username",
+            name,
         ]
         subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
         return {"FINISHED"}
