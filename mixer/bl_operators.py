@@ -366,7 +366,7 @@ class OpenStatsDirOperator(bpy.types.Operator):
     bl_options = {"REGISTER"}
 
     def execute(self, context):
-        if sys.platform == 'win32':
+        if sys.platform == "win32":
             os.startfile(get_mixer_prefs().statistics_directory)
         else:
             opener = "open" if sys.platform == "darwin" else "xdg-open"
