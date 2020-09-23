@@ -1460,11 +1460,11 @@ class BpyPropStructCollectionProxy(Proxy):
                 added_keys = blender_keys - proxy_keys
                 for k in added_keys:
                     value = read_attribute(collection[k], item_property, visit_state)
-                    diff._data[k] = DeltaAddition(value)
+                    diff._data["A" + k] = DeltaAddition(value)
 
                 deleted_keys = proxy_keys - blender_keys
                 for k in deleted_keys:
-                    diff._data[k] = DeltaDeletion(self.data(k))
+                    diff._data["D" + k] = DeltaDeletion(self.data(k))
 
                 maybe_updated_keys = proxy_keys & blender_keys
                 for k in maybe_updated_keys:

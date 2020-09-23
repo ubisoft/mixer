@@ -276,14 +276,15 @@ class Collection(DifferentialCompute):
         views_update = views_delta.value
         self.assertIsInstance(views_update, BpyPropStructCollectionProxy)
 
-        self.assertIn("New", views_update)
-        view_delta = views_update.data("New", resolve_delta=False)
+        # for why "A" and "D" see BpyProStructCollectionProxy.diff()
+        self.assertIn("ANew", views_update)
+        view_delta = views_update.data("ANew", resolve_delta=False)
         self.assertIsInstance(view_delta, DeltaAddition)
         view_update = view_delta.value
         self.assertIsInstance(view_update, BpyStructProxy)
 
-        self.assertIn("right", views_update)
-        view_delta = views_update.data("right", resolve_delta=False)
+        self.assertIn("Dright", views_update)
+        view_delta = views_update.data("Dright", resolve_delta=False)
         self.assertIsInstance(view_delta, DeltaDeletion)
 
         self.assertIn("left", views_update)
