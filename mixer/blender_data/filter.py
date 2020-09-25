@@ -242,6 +242,11 @@ default_exclusions = {
         # Seems to be a view of the master collection children
         NameFilterOut("children"),
     ],
+    T.Mesh: [
+        # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
+        # but do not synchronize its contents
+        NameFilterIn("name")
+    ],
     T.MeshPolygon: [NameFilterOut("area")],
     T.MeshVertex: [
         # MeshVertex.groups is updated via Object.vertex_groups
@@ -365,6 +370,7 @@ safe_blenddata_collections = [
     "collections",
     "images",
     "lights",
+    "meshes",
     "metaballs",
     "objects",
     "scenes",

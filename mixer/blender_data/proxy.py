@@ -24,7 +24,6 @@ from mixer.blender_data.blenddata import (
     bl_rna_to_type,
 )
 from mixer.blender_data.types import bases_of, is_builtin, is_vector, is_matrix, is_pointer_to, sub_id_type
-from mixer.bl_utils import get_mixer_prefs
 
 DEBUG = True
 
@@ -1892,6 +1891,7 @@ class BpyPropDataCollectionProxy(Proxy):
 # TODO useless since unresolved references are handled
 _creation_order = {
     # anything before objects (meshes, lights, cameras)
+    # Mesh must be received before Object because Object creation requires the Mesh, that cannot be updated afterwards
     "objects": 10,
     "collections": 20,
     "scenes": 30,

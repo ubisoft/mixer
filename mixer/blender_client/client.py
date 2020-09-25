@@ -39,7 +39,7 @@ from mixer.blender_client import material as material_api
 from mixer.blender_client import mesh as mesh_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
-from mixer.blender_data.proxy import BpyIDProxy
+from mixer.blender_data.proxy import ensure_uuid, BpyIDProxy
 import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
 from mixer.draw_handlers import set_draw_handlers
@@ -437,8 +437,13 @@ class BlenderClient(Client):
     def send_mesh(self, obj):
         logger.info("send_mesh %s", obj.name_full)
         mesh = obj.data
-        mesh_name = self.get_mesh_name(mesh)
-        path = self.get_object_path(obj)
+        if share_data.use_experimental_sync():
+            # see build_mesh_generic()
+            path = ensure_uuid(mesh)
+            mesh_name = mesh.name
+        else:
+            path = self.get_object_path(obj)
+            mesh_name = self.get_mesh_name(mesh)
 
         binary_buffer = common.encode_string(path) + common.encode_string(mesh_name)
 
@@ -463,6 +468,12 @@ class BlenderClient(Client):
 
     @stats_timer(share_data)
     def build_mesh(self, command_data):
+        if share_data.use_experimental_sync():
+            return self.build_mesh_generic(command_data)
+        else:
+            return self.build_mesh_vrtist(command_data)
+
+    def build_mesh_vrtist(self, command_data):
         index = 0
 
         path, index = common.decode_string(command_data, index)
@@ -490,6 +501,27 @@ class BlenderClient(Client):
             material_name, index = common.decode_string(command_data, index)
             if slot.link == "OBJECT" and material_name != "":
                 slot.material = material_api.get_or_create_material(material_name)
+
+    def build_mesh_generic(self, command_data):
+        index = 0
+
+        uuid, index = common.decode_string(command_data, index)
+        mesh_name, index = common.decode_string(command_data, index)
+        logger.info("build_mesh_generic %s", mesh_name)
+
+        meshes_proxy = share_data.bpy_data_proxy.data("meshes")
+        mesh_proxy = meshes_proxy.data(uuid)
+        if mesh_proxy is None:
+            # HACK : craft a dummy proxy and load it into the proxy system
+            proxy = BpyIDProxy()
+            proxy._bpy_data_collection = "meshes"
+            proxy._data["name"] = mesh_name
+            proxy._datablock_uuid = uuid
+            mesh, _ = share_data.bpy_data_proxy.create_datablock(proxy)
+        else:
+            mesh = share_data.bpy_data_proxy.visit_state().ids[uuid]
+
+        index = mesh_api.decode_mesh_generic(self, mesh, command_data, index)
 
     def send_set_current_scene(self, name):
         buffer = common.encode_string(name)
