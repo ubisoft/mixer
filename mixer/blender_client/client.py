@@ -39,6 +39,7 @@ from mixer.blender_client import material as material_api
 from mixer.blender_client import mesh as mesh_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
+from mixer.blender_data.proxy import BpyIDProxy
 import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
 from mixer.draw_handlers import set_draw_handlers
@@ -938,6 +939,37 @@ class BlenderClient(Client):
         self.set_client_attributes(self.compute_client_custom_attributes())
 
 
+def update_params_generic(proxy: Optional[BpyIDProxy] = None, obj: Optional[bpy.types.ID] = None):
+    """Send messages for datablocks not yet handled by the generic synchronization
+
+    Materials are handled inside mesh/grease pencil send
+    """
+
+    if not (proxy is None or obj is None):
+        raise ValueError("Only one of proxy and obj parameters must be provided")
+
+    if obj is None:
+        if proxy.collection_name != "objects":
+            return
+
+        obj = bpy.data.objects[proxy.data("name")]
+
+    if not isinstance(obj, bpy.types.Object) or obj.data is None:
+        return
+
+    typename = obj.data.bl_rna.name
+
+    if typename == "Grease Pencil":
+        for material in obj.data.materials:
+            share_data.client.send_material(material)
+        grease_pencil_api.send_grease_pencil_mesh(share_data.client, obj)
+        grease_pencil_api.send_grease_pencil_connection(share_data.client, obj)
+
+    if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
+        if obj.mode == "OBJECT":
+            share_data.client.send_mesh(obj)
+
+
 def update_params(obj):
     # send collection instances
     if obj.instance_type == "COLLECTION":
@@ -976,6 +1008,9 @@ def update_params(obj):
 
     if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
         if obj.mode == "OBJECT":
+
+            # TODO add uuid
+
             share_data.client.send_mesh(obj)
 
 
@@ -1038,6 +1073,8 @@ def send_scene_content():
         return
 
     with HandlerManager(False):
+        from mixer import handlers_generic as generic
+
         # mesh baking may trigger depsgraph_updatewhen more than one view layer and
         # cause to reenter send_scene_data_to_server() and send duplicate messages
 
@@ -1049,7 +1086,10 @@ def send_scene_content():
         for material in bpy.data.materials:
             share_data.client.send_material(material)
 
-        send_scene_data_to_server(None, None)
+        if share_data.use_experimental_sync():
+            generic.send_scene_data_to_server(None, None)
+        else:
+            send_scene_data_to_server(None, None)
 
         shot_manager.send_scene()
         share_data.client.send_frame_start_end(bpy.context.scene.frame_start, bpy.context.scene.frame_end)

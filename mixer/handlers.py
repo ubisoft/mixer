@@ -16,8 +16,8 @@ import logging
 import bpy
 
 from mixer.share_data import share_data
+from mixer import handlers_generic as generic
 from mixer.blender_client import collection as collection_api
-from mixer.blender_client import data as data_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
 import mixer.shot_manager as shot_manager
@@ -30,8 +30,6 @@ from bpy.app.handlers import persistent
 
 from mixer.share_data import object_visibility
 from mixer.stats import StatsTimer
-from mixer.blender_data.diff import BpyBlendDiff
-from mixer.blender_data.filter import safe_context
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import update_params
 
@@ -135,7 +133,10 @@ def handler_send_scene_data_to_server(scene, dummy):
             logger.debug("handler_send_scene_data_to_server canceled (block_signals = True)")
             return
 
-        send_scene_data_to_server(scene, dummy)
+        if share_data.use_experimental_sync():
+            generic.send_scene_data_to_server(scene, dummy)
+        else:
+            send_scene_data_to_server(scene, dummy)
     finally:
         processing_depsgraph_handler = False
 
@@ -789,34 +790,6 @@ def send_scene_data_to_server(scene, dummy):
         changed |= add_scenes()
         changed |= add_collections()
         changed |= add_objects()
-
-        # Updates from the VRtist protocol and from the full Blender protocol must be carefully intermixed
-        # This is an unfortunate requirements from the current coexistence status of
-        # both protocols
-
-        # After creation of meshes : meshes are not yet supported by full Blender protocol,
-        # but needed to properly create objects
-        # Before creation of objects :  the VRtist protocol  will implicitely create objects with
-        # inappropriate default values (e.g. transform creates an object with no data)
-        if share_data.use_experimental_sync():
-            # Compute the difference between the proxy state and the Blender state
-            # It is a coarse difference at the ID level(created, removed, renamed)
-            diff = BpyBlendDiff()
-            diff.diff(share_data.bpy_data_proxy, safe_context)
-
-            # Ask the proxy to compute the list of elements to synchronize and update itself
-            depsgraph = bpy.context.evaluated_depsgraph_get()
-            changeset = share_data.bpy_data_proxy.update(diff, safe_context, depsgraph.updates)
-
-            # Send the data update messages (includes serialization)
-            data_api.send_data_creations(changeset.creations)
-            data_api.send_data_removals(changeset.removals)
-            data_api.send_data_renames(changeset.renames)
-            data_api.send_data_updates(changeset.updates)
-            share_data.bpy_data_proxy.debug_check_id_proxies()
-
-        # send the VRtist transforms after full Blender protocol has the opportunity to create the object data
-        # that is not handled by VRtist protocol, otherwise the receiver creates an empty when it receives a transform
         changed |= update_transforms()
         changed |= add_collections_to_scenes()
         changed |= add_collections_to_collections()
