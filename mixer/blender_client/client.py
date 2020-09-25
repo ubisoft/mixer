@@ -113,6 +113,7 @@ class BlenderClient(Client):
         self.command_pack = None
 
     def send_command_pack(self):
+        self.synced_time_messages = False
         if self.command_pack is not None:
             command = self.command_pack
             self.command_pack = None
