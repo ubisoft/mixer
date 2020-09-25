@@ -512,12 +512,9 @@ class BlenderClient(Client):
         meshes_proxy = share_data.bpy_data_proxy.data("meshes")
         mesh_proxy = meshes_proxy.data(uuid)
         if mesh_proxy is None:
-            # HACK : craft a dummy proxy and load it into the proxy system
-            proxy = BpyIDProxy()
-            proxy._bpy_data_collection = "meshes"
-            proxy._data["name"] = mesh_name
-            proxy._datablock_uuid = uuid
-            mesh, _ = share_data.bpy_data_proxy.create_datablock(proxy)
+            # should not happen because a minimal generic Mesh BLENDER_DATA_CREATE is send before sending MESH
+            logger.warning(f"build_mesh for unregistered datablock {mesh_name} {uuid}. Ignored")
+            return
         else:
             mesh = share_data.bpy_data_proxy.visit_state().ids[uuid]
 
