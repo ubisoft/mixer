@@ -685,7 +685,7 @@ class BpyIDProxy(BpyStructProxy):
                     # local has already a datablock uuid_1/name_B but receives a creation for
                     # datablock uuid_2/name_B.
                     # Rename ours
-                    unique_name = f"_mixer_conflict_duplicate_name_{get_mixer_prefs().user}_{self.mixer_uuid()}"
+                    unique_name = f"{incoming_name}_{self.mixer_uuid()}"
                     logger.warning(f"Creation name conflict. Renamed incoming {self.data('name')} into {unique_name}")
                     self.rename(unique_name)
                     old_name = datablock.name
@@ -2125,7 +2125,7 @@ class BpyBlendProxy(Proxy):
 
             datablock = self.ids[uuid]
             tmp_name = f"_mixer_tmp_{uuid}"
-            if datablock.name != old_name:
+            if datablock.name != new_name and datablock.name != old_name:
                 # We are receiving a rename but our datablock has not the same name as the datablock on the
                 # sender side. This means that we have renamed or processed another rename that the
                 # sender has not yet processed.
