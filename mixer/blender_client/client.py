@@ -939,37 +939,6 @@ class BlenderClient(Client):
         self.set_client_attributes(self.compute_client_custom_attributes())
 
 
-def update_params_generic(proxy: Optional[BpyIDProxy] = None, obj: Optional[bpy.types.ID] = None):
-    """Send messages for datablocks not yet handled by the generic synchronization
-
-    Materials are handled inside mesh/grease pencil send
-    """
-
-    if not (proxy is None or obj is None):
-        raise ValueError("Only one of proxy and obj parameters must be provided")
-
-    if obj is None:
-        if proxy.collection_name != "objects":
-            return
-
-        obj = bpy.data.objects[proxy.data("name")]
-
-    if not isinstance(obj, bpy.types.Object) or obj.data is None:
-        return
-
-    typename = obj.data.bl_rna.name
-
-    if typename == "Grease Pencil":
-        for material in obj.data.materials:
-            share_data.client.send_material(material)
-        grease_pencil_api.send_grease_pencil_mesh(share_data.client, obj)
-        grease_pencil_api.send_grease_pencil_connection(share_data.client, obj)
-
-    if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
-        if obj.mode == "OBJECT":
-            share_data.client.send_mesh(obj)
-
-
 def update_params(obj):
     # send collection instances
     if obj.instance_type == "COLLECTION":
@@ -1008,9 +977,6 @@ def update_params(obj):
 
     if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
         if obj.mode == "OBJECT":
-
-            # TODO add uuid
-
             share_data.client.send_mesh(obj)
 
 

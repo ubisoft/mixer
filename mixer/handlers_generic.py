@@ -1,31 +1,67 @@
 """
 This module defines Blender handlers for Mixer in generic synchronization mode
 """
-from __future__ import annotations
 
+from collections import defaultdict
 import logging
+from typing import Dict, List
 
 import bpy
-from bpy.types import Depsgraph
 
 from mixer.blender_client import data as data_api
-from mixer.blender_client.client import update_params_generic
+from mixer.blender_client import grease_pencil as grease_pencil_api
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
+from mixer.blender_data.proxy import BpyIDProxy
 
 from mixer.share_data import share_data
 
 logger = logging.getLogger(__name__)
 
 
-def update_objects_data(depsgraph: Depsgraph):
-    if len(depsgraph.updates) == 0:
-        return
+def update_unhandled_object_proxy_data(proxies: List[BpyIDProxy]) -> List[bpy.types.ID]:
+    datablocks = []
+    for proxy in proxies:
+        if proxy.collection_name != "objects":
+            continue
+        object_datablock = proxy.collection[proxy.data("name")]
+        datablocks.append(object_datablock)
+        if object_datablock.data is not None:
+            datablocks.append(object_datablock.data)
 
-    for update in depsgraph.updates:
-        obj = update.id.original
-        if obj.bl_rna is bpy.types.Object.bl_rna:
-            update_params_generic(obj=obj)
+    update_unhandled_updated_datablocks(datablocks)
+
+
+def update_unhandled_updated_datablocks(datablocks: List[bpy.types.ID]):
+    """Send messages for datablocks not yet handled by the generic synchronization
+
+    Materials are handled inside mesh/grease pencil send
+    """
+
+    unhandled_types = (bpy.types.Mesh, bpy.types.GreasePencil)
+    d: Dict[bpy.types.ID, bpy.types.Object] = defaultdict(list)
+    for datablock in datablocks:
+        if isinstance(datablock, bpy.types.Object):
+            if (
+                datablock.data is not None
+                and isinstance(datablock.data, unhandled_types)
+                and datablock.mode == "OBJECT"
+            ):
+                d[datablock.data].append(datablock)
+        elif isinstance(datablock, bpy.types.Material):
+            share_data.client.send_material(datablock)
+
+    for data, objects in d.items():
+        if isinstance(data, bpy.types.Mesh):
+            for obj in objects:
+                share_data.client.send_mesh(obj)
+        elif isinstance(data, bpy.types.GreasePencil):
+            # TODO material will be send more than once ?
+            for obj in objects:
+                for material in obj.materials:
+                    share_data.client.send_material(material)
+                grease_pencil_api.send_grease_pencil_mesh(share_data.client, obj)
+                grease_pencil_api.send_grease_pencil_connection(share_data.client, obj)
 
 
 def send_scene_data_to_server(scene, dummy):
@@ -66,8 +102,7 @@ def send_scene_data_to_server(scene, dummy):
 
     # Send VRtist formatted messages for datablocks not yet supported by generic synchronization
     # i.e. Mesh, GreasePencil
-    for proxy in changeset.creations:
-        update_params_generic(proxy=proxy)
+    update_unhandled_object_proxy_data(changeset.creations)
 
     data_api.send_data_creations(changeset.creations)
     data_api.send_data_removals(changeset.removals)
@@ -75,6 +110,7 @@ def send_scene_data_to_server(scene, dummy):
     data_api.send_data_updates(changeset.updates)
     share_data.bpy_data_proxy.debug_check_id_proxies()
 
-    update_objects_data(depsgraph)
+    datablocks = [update.id.original for update in depsgraph.updates]
+    update_unhandled_updated_datablocks(datablocks)
 
     logger.debug("send_scene_data_to_server: end")
