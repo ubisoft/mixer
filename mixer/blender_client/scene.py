@@ -14,7 +14,7 @@ def send_scene(client: Client, scene_name: str):
     client.add_command(common.Command(common.MessageType.SCENE, buffer, 0))
 
 
-def delete_scene(scene):
+def delete_scene(scene) -> bool:
     # Due to bug mentionned here https://developer.blender.org/T71422, deleting a scene with D.scenes.remove()
     # in a function called from a timer gives a hard crash. This is due to context.window being None.
     # To overcome this issue, we call an operator with a custom context that define window.
@@ -26,7 +26,12 @@ def delete_scene(scene):
                     return window
 
     ctx = {"window": window(), "scene": scene}
-    bpy.ops.scene.delete(ctx)
+    try:
+        bpy.ops.scene.delete(ctx)
+        return True
+    except RuntimeError as e:
+        logger.warning(f"delete_scene {scene}: exception {e}")
+        return False
 
 
 def build_scene(data):
