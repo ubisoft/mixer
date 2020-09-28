@@ -253,7 +253,15 @@ default_exclusions = {
         NameFilterOut("groups")
     ],
     #
-    T.Node: [NameFilterOut(["internal_links"])],
+    T.Node: [
+        NameFilterOut(
+            [
+                "internal_links",
+                # cannot be written: set by shader editor
+                "dimensions",
+            ]
+        )
+    ],
     T.NodeLink: [
         # see NodeLinkProxy
         NameFilterOut(["from_node", "from_socket", "to_node", "to_socket", "is_hidden"])
