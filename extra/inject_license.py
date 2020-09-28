@@ -37,7 +37,7 @@ def main():
             filepath = Path(subdir) / filename
 
             if filename.endswith(".py"):
-                if "broadcaster" in subdir:
+                if subdir.startswith(os.path.join("mixer", "broadcaster")):
                     inject_license_header_in_python_src_file(filepath, "MIT", license_headers["MIT"])
                 else:
                     inject_license_header_in_python_src_file(filepath, "GPL", license_headers["GPL"])
