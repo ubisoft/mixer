@@ -668,27 +668,35 @@ class BpyIDProxy(BpyStructProxy):
             logger.warning(f"create_standalone_datablock: datablock already registered : {self}")
             logger.warning("... update ignored")
             return None, None
-
-        old_name = None
+        renames = []
         incoming_name = self.data("name")
-        datablock = self.collection.get(incoming_name)
-        if datablock:
-            if not datablock.mixer_uuid:
+        existing_datablock = self.collection.get(incoming_name)
+        if existing_datablock:
+            if not existing_datablock.mixer_uuid:
                 # A datablock created by VRtist command in the same command batch
                 # Not an error, we will make it ours by adding the uuid and registering it
                 logger.info(f"create_standalone_datablock for {self} found existing datablock from VRtist")
+                datablock = existing_datablock
             else:
-                if datablock.mixer_uuid != self.mixer_uuid():
-                    # We have a datablock with teh requested name but a different uuid.
-                    # It is a simultaneous creation :
-                    # local has already a datablock uuid_1/name_B but receives a creation for
-                    # datablock uuid_2/name_B.
-                    # Rename ours
-                    unique_name = f"{incoming_name}_{self.mixer_uuid()}"
-                    logger.warning(f"Creation name conflict. Renamed incoming {self.data('name')} into {unique_name}")
-                    self.rename(unique_name)
-                    old_name = datablock.name
-                    name = unique_name
+                if existing_datablock.mixer_uuid != self.mixer_uuid():
+                    # local has a datablock with the same name as remote wants to create, but a different uuid.
+                    # It is a simultaneous creation : rename local's datablock. Remote will do the same thing on its side
+                    # and we will end up will all renamed datablocks
+                    unique_name = f"{existing_datablock.name}_{existing_datablock.mixer_uuid}"
+                    logger.warning(
+                        f"create_standalone_datablock: Creation name conflict. Renamed existing bpy.data.{self.collection_name}[{existing_datablock.name}] into {unique_name}"
+                    )
+
+                    # Rename local's and issue a rename command
+                    renames.append(
+                        (
+                            existing_datablock.mixer_uuid,
+                            existing_datablock.name,
+                            unique_name,
+                            f"Conflict bpy.data.{self.collection_name}[{self.data('name')}] into {unique_name}",
+                        )
+                    )
+                    existing_datablock.name = unique_name
 
                     datablock = specifics.bpy_data_ctor(self.collection_name, self, visit_state)
                 else:
@@ -706,7 +714,7 @@ class BpyIDProxy(BpyStructProxy):
         if DEBUG:
             name = self.data("name")
             if self.collection.get(name) != datablock:
-                logger.warning(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
+                logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
         datablock.mixer_uuid = self.mixer_uuid()
 
@@ -718,7 +726,7 @@ class BpyIDProxy(BpyStructProxy):
         for k, v in self._data.items():
             write_attribute(datablock, k, v, visit_state)
 
-        return datablock, old_name
+        return datablock, renames
 
     def update_standalone_datablock(self, datablock: T.ID, delta: DeltaUpdate, visit_state: VisitState) -> T.ID:
         """
@@ -757,7 +765,7 @@ class BpyIDProxy(BpyStructProxy):
                     return None
                 if DEBUG:
                     if bl_instance.get(attr_name) != id_:
-                        logger.warning(f"Name mismatch after creation of bpy.data.{collection_name}[{attr_name}] ")
+                        logger.error(f"Name mismatch after creation of bpy.data.{collection_name}[{attr_name}] ")
                 id_.mixer_uuid = self.mixer_uuid()
         else:
             logger.info(f"IDproxy save embedded {self}")
@@ -1587,8 +1595,7 @@ class BpyPropDataCollectionProxy(Proxy):
             incoming_proxy : this proxy contents is used to update the bpy.data collection item
         """
 
-        incoming_name = incoming_proxy.data("name")
-        datablock, old_name = incoming_proxy.create_standalone_datablock(visit_state)
+        datablock, renames = incoming_proxy.create_standalone_datablock(visit_state)
 
         # One existing scene from the document loaded at join time could not be removed. Remove it now
         if (
@@ -1601,7 +1608,7 @@ class BpyPropDataCollectionProxy(Proxy):
             delete_scene(bpy.data.scenes[0])
 
         if not datablock:
-            return datablock, old_name
+            return None, None
 
         uuid = incoming_proxy.mixer_uuid()
         self._data[uuid] = incoming_proxy
@@ -1616,11 +1623,6 @@ class BpyPropDataCollectionProxy(Proxy):
                 logger.info(f"create_datablock: resolving reference {collection}.link({ref_target}")
                 collection.link(ref_target)
             del visit_state.unresolved_refs[uuid]
-
-        renames = []
-        if datablock.name != incoming_name:
-            # Means that a datablock with the requested name was found, so the existing datablock was renamed
-            renames.append((uuid, old_name, datablock.name, str(incoming_proxy)))
 
         return datablock, renames
 
@@ -2143,10 +2145,12 @@ class BpyBlendProxy(Proxy):
             datablock = self.ids[uuid]
             tmp_name = f"_mixer_tmp_{uuid}"
             if datablock.name != new_name and datablock.name != old_name:
-                # We are receiving a rename but our datablock has not the same name as the datablock on the
-                # sender side. This means that we have renamed or processed another rename that the
-                # sender has not yet processed.
-                new_name = f"_mixer_rename_conflict_{uuid}"
+                # local receives a rename, but its datablock name does not match the remote datablock name before
+                # the rename. This means that one of these happened:
+                # - local has renamed the datablock and remote will receive the rename command later on
+                # - local has processed a rename command that remote had not yet processed, but will process later on
+                # ensure that everyone renames its datablock with the **same** name
+                new_name = new_name = f"_mixer_rename_conflict_{uuid}"
                 logger.warning(f"rename_datablocks: conflict for existing {datablock} and incoming old name {old_name}")
                 logger.warning(f"... using {new_name}")
             renames.append([bpy_data_collection_proxy, proxy, old_name, tmp_name, new_name, datablock])
