@@ -1589,6 +1589,17 @@ class BpyPropDataCollectionProxy(Proxy):
 
         incoming_name = incoming_proxy.data("name")
         datablock, old_name = incoming_proxy.create_standalone_datablock(visit_state)
+
+        # One existing scene from the document loaded at join time could not be removed. Remove it now
+        if (
+            incoming_proxy.collection_name == "scenes"
+            and len(bpy.data.scenes) == 2
+            and bpy.data.scenes[0].name == "_mixer_to_be_removed_"
+        ):
+            from mixer.blender_client.scene import delete_scene
+
+            delete_scene(bpy.data.scenes[0])
+
         if not datablock:
             return datablock, old_name
 
@@ -1664,7 +1675,12 @@ class BpyPropDataCollectionProxy(Proxy):
         # TODO scene and last_scene_ ...
         logger.info("Perform removal for %s", proxy)
         try:
-            proxy.collection.remove(datablock)
+            if isinstance(datablock, T.Scene):
+                from mixer.blender_client.scene import delete_scene
+
+                delete_scene(datablock)
+            else:
+                proxy.collection.remove(datablock)
         except ReferenceError as e:
             # We probably have processed previously the deletion of a datablock referenced by Object.data (e.g. Light).
             # On both sides it deletes the Object as well. So the sender issues a message for object deletion
@@ -2022,7 +2038,7 @@ class BpyBlendProxy(Proxy):
             if not isinstance(datablock, safe_depsgraph_updates):
                 logger.info("depsgraph update: ignoring untracked type %s", datablock)
                 continue
-            if isinstance(datablock, T.Scene) and datablock.name == "__last_scene_to_be_removed__":
+            if isinstance(datablock, T.Scene) and datablock.name == "_mixer_to_be_removed_":
                 continue
             proxy = self.id_proxies.get(datablock.mixer_uuid)
             if proxy is None:
@@ -2116,7 +2132,8 @@ class BpyBlendProxy(Proxy):
         for uuid, old_name, new_name in items:
             proxy = self.id_proxies.get(uuid)
             if proxy is None:
-                logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
+                logger.error(f"rename_datablocks(): no proxy for {uuid} (debug info)")
+                return
 
             bpy_data_collection_proxy = self._data.get(proxy.collection_name)
             if bpy_data_collection_proxy is None:

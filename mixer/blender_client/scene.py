@@ -35,7 +35,7 @@ def build_scene(data):
 
     # remove what was previously the last scene that could not be removed
     to_remove = None
-    if len(bpy.data.scenes) == 1 and bpy.data.scenes[0].name == "__last_scene_to_be_removed__":
+    if len(bpy.data.scenes) == 1 and bpy.data.scenes[0].name == "_mixer_to_be_removed_":
         to_remove = bpy.data.scenes[0]
 
     scene = share_data.blender_scenes.get(scene_name)

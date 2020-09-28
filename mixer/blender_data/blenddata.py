@@ -65,7 +65,7 @@ class BlendDataCollection:
 
     def remove(self, name_full):
         if self._name == "scenes":
-            # search for __last_scene_to_be_removed__
+            # search for _mixer_to_be_removed_
             logger.error("Not implemented : remove scene %s", name_full)
             return
         item = self.items.get(name_full)

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def skip_bpy_data_item(collection_name, item):
     # Never want to consider these as updated, created, removed, ...
     if collection_name == "scenes":
-        if item.name == "__last_scene_to_be_removed__":
+        if item.name == "_mixer_to_be_removed_":
             return True
     elif collection_name == "images":
         if item.source == "VIEWER":

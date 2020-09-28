@@ -1053,7 +1053,7 @@ def clear_scene_content():
 
         if len(bpy.data.scenes) == 1:
             scene = bpy.data.scenes[0]
-            scene.name = "__last_scene_to_be_removed__"
+            scene.name = "_mixer_to_be_removed_"
 
 
 @stats_timer(share_data)
