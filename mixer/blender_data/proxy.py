@@ -1829,7 +1829,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 else:
                     del self._data[k]
             except Exception as e:
-                logger.warning(f"BpyPropDataCollectionProxy.apply(). Processing {ref_delta}")
+                logger.warning(f"BpyPropDataCollectionProxy.apply(). Processing {ref_delta} to_blender {to_blender}")
                 logger.warning(f"... for {collection}[{k}]")
                 logger.warning(f"... Exception: {e}")
                 logger.warning("... Update ignored")

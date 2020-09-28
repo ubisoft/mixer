@@ -764,7 +764,10 @@ def send_scene_data_to_server(scene, dummy):
     share_data.pending_test_update = False
 
     if not is_in_object_mode():
-        logger.info("send_scene_data_to_server canceled (not is_in_object_mode)")
+        if depsgraph.updates:
+            logger.info("send_scene_data_to_server canceled (not is_in_object_mode). Skipping updates")
+            for update in depsgraph.updates:
+                logger.info(" ......%s", update.id.original)
         return
 
     update_object_state(share_data.old_objects, share_data.blender_objects)
