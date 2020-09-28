@@ -215,14 +215,10 @@ def update_scenes_state():
             scene.mixer_uuid = str(uuid4())
 
     scenes_after = {
-        scene.mixer_uuid: name
-        for name, scene in share_data.blender_scenes.items()
-        if name != "_mixer_to_be_removed_"
+        scene.mixer_uuid: name for name, scene in share_data.blender_scenes.items() if name != "_mixer_to_be_removed_"
     }
     scenes_before = {
-        scene.mixer_uuid: name
-        for name, scene in share_data.scenes_info.items()
-        if name != "_mixer_to_be_removed_"
+        scene.mixer_uuid: name for name, scene in share_data.scenes_info.items() if name != "_mixer_to_be_removed_"
     }
     share_data.scenes_added, share_data.scenes_removed, share_data.scenes_renamed = find_renamed(
         scenes_before, scenes_after
