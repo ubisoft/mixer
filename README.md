@@ -46,7 +46,7 @@ If you have quick questions or want to chat with us, we have a channel on the Bl
 
 The original code is Copyright (C) 2020 Ubisoft.
 
-All code of the `mixer` package except the `mixer.broadcaster` sub-package is under the GPLv3 license. Code of the `mixer.broadcaster` sub-package is under the MIT license so fill free to extract it and use it directly in other python projects that are under a permissive license.
+All code of the `mixer` package except the `mixer.broadcaster` sub-package is under the GPLv3 license. Code of the `mixer.broadcaster` sub-package is under the MIT license so feel free to extract it and use it directly in other python projects that are under a permissive license.
 
 ## Documentation
 
