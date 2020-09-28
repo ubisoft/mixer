@@ -737,7 +737,7 @@ class BpyIDProxy(BpyStructProxy):
             logger.warning(f"BpyIDProxy.update_standalone_datablock() {self} pre_save_id returns None")
             return None
 
-        self.apply(self.collection, self._data["name"], delta, visit_state)
+        self.apply(self.collection, datablock.name, delta, visit_state)
         return datablock
 
     def save(self, bl_instance: any = None, attr_name: str = None, visit_state: VisitState = None) -> T.ID:
