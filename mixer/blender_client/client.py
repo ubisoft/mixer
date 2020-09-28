@@ -39,7 +39,7 @@ from mixer.blender_client import material as material_api
 from mixer.blender_client import mesh as mesh_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
-from mixer.blender_data.proxy import ensure_uuid, BpyIDProxy
+from mixer.blender_data.proxy import ensure_uuid
 import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
 from mixer.draw_handlers import set_draw_handlers
