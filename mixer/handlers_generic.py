@@ -52,8 +52,6 @@ def update_unhandled_updated_datablocks(datablocks: Set[bpy.types.ID]):
             ):
                 if datablock.data in d:
                     d[datablock.data].append(datablock)
-        elif isinstance(datablock, bpy.types.Material):
-            share_data.client.send_material(datablock)
 
     for data, objects in d.items():
         if isinstance(data, bpy.types.Mesh):
