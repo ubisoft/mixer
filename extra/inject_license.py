@@ -58,8 +58,11 @@ def inject_license_header_in_python_src_file(filepath, license_name: str, header
         print(f"Adding license {license_name} to {filepath}")
 
         for line in header:
-            f.write(f"# {line}")
-        f.write("\n")
+            if line != "\n":
+                f.write(f"# {line}")
+            else:
+                f.write("#\n")  # avoid trailing whitespace
+        f.write("\n\n")
         f.write(file_content)
 
 
