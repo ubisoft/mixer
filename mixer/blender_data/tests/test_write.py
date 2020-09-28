@@ -61,6 +61,7 @@ class TestWriteAttribute(unittest.TestCase):
         cycles_proxy.save(scene, "cycles", self.proxy.visit_state())
         self.assertEqual(True, scene.cycles.shading_system)
 
+    @unittest.skip("Mesh currently restricted to Mesh.name")
     def test_write_array_of_struct_with_vec(self):
         # self.addTypeEqualityFunc(D.bpy_struct, bl_equalityfunc)
         cube = D.meshes["Cube"]
