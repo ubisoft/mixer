@@ -88,14 +88,6 @@ class TestSimultaneousCreate(ThrottledTestCase):
         if not self.experimental_sync:
             self.expected_counts = {MessageType.LIGHT: lights}
             raise unittest.SkipTest("FAILS: Only one point light remains")
-        else:
-            scenes = 1
-            # these are broken
-            self.ignored_messages |= {
-                MessageType.ADD_OBJECT_TO_VRTIST,
-            }
-            self.expected_counts = {MessageType.BLENDER_DATA_CREATE: lights + scenes}
-            raise unittest.SkipTest("FAILS: see #222")
 
         location = "0.0, -3.0, 0.0"
         self.send_strings([bl.active_layer_master_collection() + bl.ops_objects_light_add(location=location)], to=0)
