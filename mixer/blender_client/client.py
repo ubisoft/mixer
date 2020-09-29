@@ -19,7 +19,7 @@
 This module defines how we send Blender updates to the server, and how we interpret updates we receive to update
 Blender's data.
 
-This functionalities are implemented in the BlenderClient class and in submodules of the package.
+These functionalities are implemented in the BlenderClient class and in submodules of the package.
 
 Submodules with a well defined entity name (camera, collection, light, ...) handle updates for the corresponding
 data type in Blender. The goal is to replace all this specific code with the submodule data.py, which use
