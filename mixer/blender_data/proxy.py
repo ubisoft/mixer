@@ -660,7 +660,7 @@ class BpyIDProxy(BpyStructProxy):
     def target(self, visit_state: VisitState) -> T.ID:
         return visit_state.ids.get(self.mixer_uuid())
 
-    def create_standalone_datablock(self, visit_state: VisitState) -> Tuple[Optional[T.ID], Optional[str]]:
+    def create_standalone_datablock(self, visit_state: VisitState) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """
         Save this proxy into its target standalone datablock
         """
@@ -668,7 +668,7 @@ class BpyIDProxy(BpyStructProxy):
             logger.warning(f"create_standalone_datablock: datablock already registered : {self}")
             logger.warning("... update ignored")
             return None, None
-        renames = []
+        renames: RenameChangeset = []
         incoming_name = self.data("name")
         existing_datablock = self.collection.get(incoming_name)
         if existing_datablock:
@@ -2123,13 +2123,14 @@ class BpyBlendProxy(Proxy):
         del self.id_proxies[uuid]
         del self.ids[uuid]
 
-    def rename_datablocks(self, items: List[str, str, str]):
+    def rename_datablocks(self, items: List[str, str, str]) -> RenameChangeset:
         """
         Rename a bpy.data collection item and update the proxy accordingly
 
         Args:
             items: list of (uuid, new_name) tuples
         """
+        rename_changeset_to_send: RenameChangeset = []
         renames = []
         for uuid, old_name, new_name in items:
             proxy = self.id_proxies.get(uuid)
@@ -2151,8 +2152,20 @@ class BpyBlendProxy(Proxy):
                 # - local has processed a rename command that remote had not yet processed, but will process later on
                 # ensure that everyone renames its datablock with the **same** name
                 new_name = new_name = f"_mixer_rename_conflict_{uuid}"
-                logger.warning(f"rename_datablocks: conflict for existing {datablock} and incoming old name {old_name}")
+                logger.warning(f"rename_datablocks: conflict for existing {datablock}")
+                logger.warning(f'... incoming old name "{old_name}" new name "{new_name}"')
                 logger.warning(f"... using {new_name}")
+
+                # Strangely, for collections not everyone always detect a conflict, so rename for everyone
+                rename_changeset_to_send.append(
+                    (
+                        datablock.mixer_uuid,
+                        datablock.name,
+                        new_name,
+                        f"Conflict bpy.data.{proxy.collection_name}[{datablock.name}] into {new_name}",
+                    )
+                )
+
             renames.append([bpy_data_collection_proxy, proxy, old_name, tmp_name, new_name, datablock])
 
         # The rename process is handled in two phases to avoid spontaneous renames from Blender
@@ -2162,6 +2175,8 @@ class BpyBlendProxy(Proxy):
 
         for bpy_data_collection_proxy, proxy, _, _, new_name, datablock in renames:
             bpy_data_collection_proxy.rename_datablock(proxy, new_name, datablock)
+
+        return rename_changeset_to_send
 
     def debug_check_id_proxies(self):
         return 0

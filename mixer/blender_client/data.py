@@ -165,7 +165,10 @@ def build_data_rename(buffer):
     for uuid, old_name, new_name in items:
         logger.info("build_data_rename: %s (%s) into %s", uuid, old_name, new_name)
 
-    share_data.bpy_data_proxy.rename_datablocks(items)
+    rename_changeset = share_data.bpy_data_proxy.rename_datablocks(items)
 
     # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
     share_data.set_dirty()
+
+    if rename_changeset:
+        send_data_renames(rename_changeset)
