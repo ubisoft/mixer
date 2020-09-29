@@ -57,3 +57,4 @@ More documentation is available in the `doc` directory:
 - [Developer environment](doc/development.md)
 - [Releasing a new version](doc/release.md)
 - [Unit testing](doc/unittest.md)
+- [Hosting a Mixer server](doc/hosting.md)
