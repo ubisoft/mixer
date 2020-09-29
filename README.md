@@ -8,13 +8,13 @@ Mixer is a Blender addon developed at Ubisoft Animation Studio for Real Time Col
 
 ## Repositories
 
-We open source this addon through two repositories:
-- On Github https://github.com/ubisoft/mixer as part of Ubisoft open source repositories
-- On Gitlab https://gitlab.com/ubisoft-animation-studio/mixer which reflects with more fidelity our workflow since we usually develop on an internal Gitlab instance.
+The main repository is on Gitlab https://gitlab.com/ubisoft-animation-studio/mixer, please post your issues and merge requests there.
 
 On the Gitlab repository you can see the CI tasks running (linting, unit tests, packing the addon and releases) and you have access to clean releases on the dedicated page https://gitlab.com/ubisoft-animation-studio/mixer/-/releases.
 
-For now we are still working on our internal Gitlab instance and mirroring to github.com and gitlab.com. In the future we might consider moving entirely to one of the public repositories. As a consequence, the gitlab.com repository only run our unit tests on release tags using [a specialized CICD script](gitlab/gitlab.com-ci.yml). This is to avoid running too many tests on our gitlab runners.
+We do our development on both public Gitlab and an internal instance at Ubisoft. Mirroring is used to keep all repositories in sync (commits, tags and branches). We are slowly moving some important issues to the public repository to give more information to the community about our future developments and to open discussions.
+
+We also have a mirror on Github https://github.com/ubisoft/mixer, as part of Ubisoft open source repositories.
 
 ## Usage
 
@@ -36,9 +36,9 @@ As a Developer, you may want to read the [Developer environment](doc/development
 
 ## Contributing
 
-You can report any bug through issues on Github or Gitlab. Please include the version you use in the issue and how to reproduce the bug, if possible. You can join a blender file, or a room file that you can save with the "Download Room" button in advanced room options.
+You can [report any bug through issues on Gitlab](https://gitlab.com/ubisoft-animation-studio/mixer/-/issues). Please include the version you use in the issue and how to reproduce the bug, if possible. You can join a blender file, or a room file that you can save with the "Download Room" button in advanced room options.
 
-You can submit pull request on Github or merge requests on Gitlab, but keep in mind that the architecture of the addon is likely to change significantly in the next few months. For bugfixes, simple refactoring, typos, documentation, or things related to the usage of the Blender API you can directly submit the pull/merge request. For features please also open an issue to discuss it, so we can think about how it would fit in the future architecture.
+You can [submit a merge requests on Gitlab](https://gitlab.com/ubisoft-animation-studio/mixer/-/merge_requests), but keep in mind that the architecture of the addon is likely to change significantly in the next few months. For bugfixes, simple refactoring, typos, documentation, or things related to the usage of the Blender API you can directly submit the merge request. For features please also open an issue to discuss it, so we can think about how it would fit in the future architecture.
 
 If you have quick questions or want to chat with us, we have a channel on the Blender chat dedicated to this addon: https://blender.chat/channel/mixer-addon
 
