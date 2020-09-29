@@ -21,6 +21,7 @@ import os
 import struct
 import traceback
 from typing import Set, Tuple, Optional
+from enum import IntEnum
 
 import bpy
 from mathutils import Matrix, Quaternion
@@ -47,6 +48,13 @@ from mixer.blender_client.camera import send_camera
 from mixer.blender_client.light import send_light
 
 logger = logging.getLogger(__name__)
+
+
+class InterpolationTypes(IntEnum):
+    CONSTANT = 0
+    LINEAR = 1
+    BEZIER = 2
+    OTHER = 3
 
 
 def get_target(region: bpy.types.Region, region_3d: bpy.types.RegionView3D, pixel_coords: Tuple[float, float]):
@@ -354,16 +362,7 @@ class BlenderClient(Client):
                     return path
         return None
 
-    def build_add_keyframe(self, data):
-        index = 0
-        name, index = common.decode_string(data, index)
-        if name not in share_data.blender_objects:
-            return name
-        ob = share_data.blender_objects[name]
-        channel, index = common.decode_string(data, index)
-        channel_index, index = common.decode_int(data, index)
-        frame, index = common.decode_int(data, index)
-        value, index = common.decode_float(data, index)
+    def insert_key(self, ob, channel, channel_index, frame, value, interpolation):
 
         if not hasattr(ob, channel):
             ob = ob.data
@@ -374,7 +373,33 @@ class BlenderClient(Client):
         else:
             attr = value
         setattr(ob, channel, attr)
+
         ob.keyframe_insert(channel, frame=float(frame), index=channel_index)
+
+        curves = ob.animation_data.action.fcurves
+        for curve in curves:
+            if curve.data_path == channel and (channel_index == -1 or curve.array_index == channel_index):
+                keyframes = curve.keyframe_points
+                for i in reversed(range(len(keyframes))):
+                    if keyframes[i].co[0] == frame:
+                        keyframes[i].interpolation = self.get_interpolation_type(interpolation).name
+                        curve.update()
+                        return
+
+    def build_add_keyframe(self, data):
+        index = 0
+        name, index = common.decode_string(data, index)
+        if name not in share_data.blender_objects:
+            return name
+        ob = share_data.blender_objects[name]
+        channel, index = common.decode_string(data, index)
+        channel_index, index = common.decode_int(data, index)
+        frame, index = common.decode_int(data, index)
+        value, index = common.decode_float(data, index)
+        interpolation, index = common.decode_int(data, index)
+
+        self.insert_key(ob, channel, channel_index, frame, value, interpolation)
+
         return name
 
     def build_remove_keyframe(self, data):
@@ -494,6 +519,33 @@ class BlenderClient(Client):
         buffer = common.encode_string(name)
         self.add_command(common.Command(MessageType.SET_SCENE, buffer, 0))
 
+    def get_interpolation(self, keyframe):
+        interp = keyframe.interpolation
+        if interp == "CONSTANT":
+            return InterpolationTypes.CONSTANT.value
+        if interp == "LINEAR":
+            return InterpolationTypes.LINEAR.value
+        if interp == "BEZIER":
+            return InterpolationTypes.BEZIER.value
+        return InterpolationTypes.OTHER.value
+
+    def get_interpolation_type(self, interp):
+        if interp == InterpolationTypes.CONSTANT.value:
+            return InterpolationTypes.CONSTANT
+        if interp == InterpolationTypes.LINEAR.value:
+            return InterpolationTypes.LINEAR
+        if interp == InterpolationTypes.BEZIER.value:
+            return InterpolationTypes.BEZIER
+        return InterpolationTypes.OTHER
+
+    def set_interpolation(self, keyframe, interpolation):
+        if interpolation == InterpolationTypes.CONSTANT:
+            keyframe.interpolation = "CONSTANT"
+        if interpolation == InterpolationTypes.LINEAR:
+            keyframe.interpolation = "LINEAR"
+        if interpolation == InterpolationTypes.BEZIER:
+            keyframe.interpolation = "BEZIER"
+
     def send_animation_buffer(self, obj_name, animation_data, channel_name, channel_index=-1):
         if not animation_data:
             return
@@ -513,9 +565,11 @@ class BlenderClient(Client):
                     key_count = len(fcurve.keyframe_points)
                     times = []
                     values = []
+                    interpolations = []
                     for keyframe in fcurve.keyframe_points:
                         times.append(int(keyframe.co[0]))
                         values.append(keyframe.co[1])
+                        interpolations.append(self.get_interpolation(keyframe))
                     buffer = (
                         common.encode_string(obj_name)
                         + common.encode_string(channel_name)
@@ -523,6 +577,7 @@ class BlenderClient(Client):
                         + common.int_to_bytes(key_count, 4)
                         + struct.pack(f"{len(times)}i", *times)
                         + struct.pack(f"{len(values)}f", *values)
+                        + struct.pack(f"{len(interpolations)}i", *interpolations)
                     )
                     self.add_command(common.Command(MessageType.ANIMATION, buffer, 0))
                     return
