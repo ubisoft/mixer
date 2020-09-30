@@ -907,6 +907,11 @@ class BpyIDRefProxy(Proxy):
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({self._datablock_uuid}, bpy.data.{self._bpy_data_collection}, name at creation: {self._initial_name})"
 
+    def is_none(self) -> bool:
+        """Returns True if this object is a None reference"""
+
+        return not self._datablock_uuid
+
     def load(self, datablock: T.ID, visit_state: VisitState) -> BpyIDRefProxy:
         """
         Load the reference to a standalone datablock
@@ -994,11 +999,14 @@ class BpyIDRefProxy(Proxy):
     ) -> StructLikeProxy:
         update: BpyIDRefProxy = delta.value
         if to_blender:
-            assert type(update) == type(self)
-            assert self._bpy_data_collection == update._bpy_data_collection
+            if update.is_none():
+                setattr(parent, key, None)
+            else:
+                assert type(update) == type(self), "type(update) == type(self)"
+                assert self.is_none() or self._bpy_data_collection == update._bpy_data_collection, "self.is_none() or self._bpy_data_collection == update._bpy_data_collection"
 
-            datablock = visit_state.ids.get(update._datablock_uuid)
-            setattr(parent, key, datablock)
+                datablock = visit_state.ids.get(update._datablock_uuid)
+                setattr(parent, key, datablock)
         return update
 
     def diff(self, datablock: T.ID, datablock_property: T.Property, visit_state: VisitState) -> Optional[ProxyDiff]:
@@ -1013,7 +1021,7 @@ class BpyIDRefProxy(Proxy):
         """
 
         if datablock is None:
-            return DeltaDeletion()
+            return DeltaUpdate(BpyIDRefProxy())
 
         value = read_attribute(datablock, datablock_property, visit_state)
         assert isinstance(value, BpyIDRefProxy)
@@ -2305,10 +2313,10 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, vis
     """
 
     # Like in write_attribute parent and key are needed to specify a L-value
-    assert type(delta) == DeltaUpdate
+    # assert type(delta) == DeltaUpdate
 
     value = delta.value
-    assert proxy_value is None or type(proxy_value) == type(value)
+    # assert proxy_value is None or type(proxy_value) == type(value)
 
     try:
         if isinstance(proxy_value, Proxy):
@@ -2318,8 +2326,9 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, vis
             try:
                 # try is less costly than fetching the property to find if the attribute is readonly
                 setattr(parent, key, value)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"apply_attribute: setattr({parent}, {key}, {value})")
+                logger.warning(f"... exception {e})")
         return value
 
     except Exception as e:
