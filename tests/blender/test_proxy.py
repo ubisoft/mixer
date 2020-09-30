@@ -37,7 +37,7 @@ bpy.ops.transform.translate(value=(0, 4, 0))
         self.end_test()
 
 
-class TestBpyPropStructCollectionProxy(TestGenericJoinBefore):
+class TestStructCollectionProxy(TestGenericJoinBefore):
     def test_light_falloff_curve_add_point(self):
         action = """
 import bpy

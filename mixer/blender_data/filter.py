@@ -200,7 +200,7 @@ test_filter = FilterStack()
 
 # Members of bpy.data that will be totally excluded from synchronization
 # Do not exclude collections that may be a target of Object.data. It we did so, an Object.data member
-# would be loaded ad a BpyIDProxy instead of a BpyIDRefProxy
+# would be loaded ad a DatablockProxy instead of a DatablockRefProxy
 blenddata_exclude = [
     # "brushes" generates harmless warnings when EnumProperty properties are initialized with a value not in the enum
     "brushes",
@@ -370,7 +370,7 @@ test_context = Context(test_filter)
 #
 safe_exclusions = {}
 
-# depsgraph updates not in this ist are not handled by BpyBlendProxy.update()
+# depsgraph updates not in this ist are not handled by BpyDataProxy.update()
 # more types are just waiting to be tested
 # A specific problem for Scene as the depsgraph reports numerous meaningless Scene updates
 # that will probably hurt performance. We may have to find another way to update Scene or maybe

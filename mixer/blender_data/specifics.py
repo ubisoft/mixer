@@ -28,11 +28,11 @@ import bpy.path
 
 logger = logging.getLogger(__name__)
 Proxy = TypeVar("Proxy")
-BpyIDProxy = TypeVar("BpyIDProxy")
+DatablockProxy = TypeVar("DatablockProxy")
 VisitState = TypeVar("VisitState")
 
 
-def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy, visit_state: Any) -> Optional[T.ID]:
+def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, visit_state: Any) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     if collection_name == "images":
         is_packed = proxy.data("packed_file") is not None
@@ -62,10 +62,10 @@ def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy, visit_state: Any) -> 
         if target_proxy is not None:
             # use class name to work around circular references with proxy.py
             target_proxy_class = target_proxy.__class__.__name__
-            if target_proxy_class != "BpyIDRefProxy":
+            if target_proxy_class != "DatablockRefProxy":
                 # error on the sender side
                 logger.warning(
-                    f"bpy.data.objects[{name}].data proxy is a {target_proxy_class}. Expected a BpyIDRefProxy"
+                    f"bpy.data.objects[{name}].data proxy is a {target_proxy_class}. Expected a DatablockRefProxy"
                 )
                 logger.warning("... loaded as Empty")
             else:

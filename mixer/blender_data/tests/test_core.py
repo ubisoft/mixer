@@ -24,8 +24,8 @@ from mixer.blender_data.tests.utils import equals, register_bl_equals, test_blen
 
 from mixer.blender_data import types
 from mixer.blender_data.proxy import (
-    BpyBlendProxy,
-    BpyStructProxy,
+    BpyDataProxy,
+    StructProxy,
     LoadElementAs,
     load_as_what,
 )
@@ -37,7 +37,7 @@ class TestCore(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
         register_bl_equals(self, test_context)
-        self._proxy = BpyBlendProxy()
+        self._proxy = BpyDataProxy()
         self._visit_state = self._proxy.visit_state()
 
     def test_issubclass(self):
@@ -106,7 +106,7 @@ class TestCore(unittest.TestCase):
                 self.assertFalse(isinstance(prop.bl_rna, T.ID))
 
     def test_load_as(self):
-        proxy = BpyBlendProxy()
+        proxy = BpyDataProxy()
         proxy.load(test_context)
         root_ids = proxy.root_ids
         self.assertEqual(
@@ -150,7 +150,7 @@ class TestCore(unittest.TestCase):
 
     def test_skip_ShaderNodeTree(self):  # noqa N802
         world = D.worlds["World"]
-        proxy = BpyStructProxy().load(world, self._visit_state)
+        proxy = StructProxy().load(world, self._visit_state)
         self.assertTrue("color" in proxy._data)
         # self.assertFalse("node_tree" in proxy._data)
 

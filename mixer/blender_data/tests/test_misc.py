@@ -24,8 +24,8 @@ from bpy import data as D  # noqa
 from bpy import types as T  # noqa
 from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.proxy import (
-    BpyBlendProxy,
-    BpyIDRefProxy,
+    BpyDataProxy,
+    DatablockRefProxy,
     SoaElement,
 )
 from mixer.blender_data.tests.utils import test_blend_file
@@ -44,7 +44,7 @@ class TestLoadProxy(unittest.TestCase):
         file = test_blend_file
         # file = r"D:\work\data\test_files\BlenderSS 2_82.blend"
         bpy.ops.wm.open_mainfile(filepath=file)
-        self.proxy = BpyBlendProxy()
+        self.proxy = BpyDataProxy()
         self.proxy.load(test_context)
 
     def check(self, item, expected_elements):
@@ -83,7 +83,7 @@ class TestLoadProxy(unittest.TestCase):
 
         filter_stack = copy.copy(test_filter)
         filter_stack.append({T.Scene: TypeFilterOut(T.SceneEEVEE)})
-        proxy = BpyBlendProxy()
+        proxy = BpyDataProxy()
         proxy.load(Context(filter_stack))
         blend_data_ = proxy._data
         scene_ = blend_data_["scenes"].search_one("Scene_0")._data
@@ -101,7 +101,7 @@ class TestLoadProxy(unittest.TestCase):
         # self.assertEqual(4, len(objects))
 
         # for o in objects.values():
-        #     self.assertEqual(type(o), BpyIDRefProxy, o)
+        #     self.assertEqual(type(o), DatablockRefProxy, o)
 
         # builtin attributes (floats)
         frame_properties = [name for name in scene.keys() if name.startswith("frame_")]
@@ -114,12 +114,12 @@ class TestLoadProxy(unittest.TestCase):
         # Currently mot loaded
         # # PropertiesGroup
         # cycles_proxy = scene["view_layers"]._data["View Layer"]._data["cycles"]
-        # self.assertIsInstance(cycles_proxy, BpyPropertyGroupProxy)
+        # self.assertIsInstance(cycles_proxy, StructProxy)
         # self.assertEqual(32, len(cycles_proxy._data))
 
         # # The master collection
         # master_collection = scene["collection"]
-        # self.assertIsInstance(master_collection, BpyIDProxy)
+        # self.assertIsInstance(master_collection, DatablockProxy)
 
     def test_collections(self):
         # test_misc.TestLoadProxy.test_collections
@@ -131,29 +131,29 @@ class TestLoadProxy(unittest.TestCase):
         expected_uuids = self.expected_uuids(bpy.data.collections, ["Collection_0_0_0"])
         self.check(coll_0_0_children, expected_uuids)
         for c in coll_0_0_children._data.values():
-            self.assertIsInstance(c, BpyIDRefProxy)
+            self.assertIsInstance(c, DatablockRefProxy)
 
         coll_0_0_objects = coll_0_0["objects"]
         expected_uuids = self.expected_uuids(bpy.data.objects, ["Camera_obj_0", "Camera_obj_1", "Cube", "Light"])
         self.check(coll_0_0_objects, expected_uuids)
         for o in coll_0_0_objects._data.values():
-            self.assertIsInstance(o, BpyIDRefProxy)
+            self.assertIsInstance(o, DatablockRefProxy)
 
     def test_camera_focus_object_idref(self):
         # test_misc.TestLoadProxy.test_camera_focus_object_idref
         cam = D.cameras["Camera_0"]
         cam.dof.focus_object = D.objects["Cube"]
-        self.proxy = BpyBlendProxy()
+        self.proxy = BpyDataProxy()
         self.proxy.load(test_context)
         # load into proxy
         cam_proxy = self.proxy.data("cameras").search_one("Camera_0")
         focus_object_proxy = cam_proxy.data("dof").data("focus_object")
-        self.assertIsInstance(focus_object_proxy, BpyIDRefProxy)
+        self.assertIsInstance(focus_object_proxy, DatablockRefProxy)
         self.assertEqual(focus_object_proxy._datablock_uuid, D.objects["Cube"].mixer_uuid)
 
     def test_camera_focus_object_none(self):
         # test_misc.TestLoadProxy.test_camera_focus_object_none
-        self.proxy = BpyBlendProxy()
+        self.proxy = BpyDataProxy()
         self.proxy.load(test_context)
         # load into proxy
         cam_proxy = self.proxy.data("cameras").search_one("Camera_0")
@@ -242,7 +242,7 @@ class TestAosSoa(unittest.TestCase):
         import array
 
         bpy.ops.object.gpencil_add(type="STROKE")
-        proxy = BpyBlendProxy()
+        proxy = BpyDataProxy()
         proxy.load(test_context)
         gp_layers = proxy.data("grease_pencils").search_one("Stroke").data("layers")
         gp_points = gp_layers.data("Lines").data("frames").data(0).data("strokes").data(0).data("points")._data

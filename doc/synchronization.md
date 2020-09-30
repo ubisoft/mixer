@@ -22,7 +22,7 @@ The ID level synchronization is in `mixer/blender_data` and mainly in `proxy.py`
 
 These Proxy classes are meant to mirror Blender data storage in `bpy.data`. This included simple properties, structures, IDs, references to IDs in bpy.data, structures and colections of all these.
 
-At the top level, a single `BpyBlendProxy` instance recursively mirrors most of `bpy.data`.
+At the top level, a single `BpyDataProxy` instance recursively mirrors most of `bpy.data`.
 
 ### Controlling items to synchronize
 
@@ -41,9 +41,9 @@ So adding items to synchronize should just be a matter of editing `filter.py` an
 
 Changes are detected using a depsgraph modification handler, processed by `send_scene_data_to_server()`. The core of the ID-level synchronization is inside the `use_experimental_sync()` test, the rest being synchronization for the VRtist protocol.
 
-We start by computing a difference between the cached BpyBlendProxy and the current Blender state. This difference is restricted to added or removed elements. Modified elements will be taken from the depsgraph update. Then the proxy is requested to update itself and compute the list of updated or removed ID proxies. The updated proxies are then serialized and sent. The serialization currently uses JSON (`json_codec.py`) and this is just a choice to deliver features quickly. At this point, each ID is sent as a whole and an addition mechanism should be implemented to compute a property-level difference, in order to send a minimal amount of data.
+We start by computing a difference between the cached BpyDataProxy and the current Blender state. This difference is restricted to added or removed elements. Modified elements will be taken from the depsgraph update. Then the proxy is requested to update itself and compute the list of updated or removed ID proxies. The updated proxies are then serialized and sent. The serialization currently uses JSON (`json_codec.py`) and this is just a choice to deliver features quickly. At this point, each ID is sent as a whole and an addition mechanism should be implemented to compute a property-level difference, in order to send a minimal amount of data.
 
-The messages are received by the server that broadcasts them to the users that are joined to the room. On reception, `build_data_update()` deserialises the `BpyIDProxy`, then calls `BpyBendProxy.update_one()` so that the global proxy updates itself and the corresponding `bpy.data` item, recursively updating all the sub-properties.
+The messages are received by the server that broadcasts them to the users that are joined to the room. On reception, `build_data_update()` deserialises the `DatablockProxy`, then calls `BpyBendProxy.update_one()` so that the global proxy updates itself and the corresponding `bpy.data` item, recursively updating all the sub-properties.
 
 ### Known restrictions
 

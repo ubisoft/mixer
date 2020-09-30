@@ -25,7 +25,7 @@ import logging
 from typing import List, Mapping, Set
 from uuid import uuid4
 
-from mixer.blender_data.proxy import BpyBlendProxy
+from mixer.blender_data.proxy import BpyDataProxy
 from mixer.blender_data.filter import test_context
 from mixer.bl_utils import get_mixer_prefs
 
@@ -164,7 +164,7 @@ class ShareData:
         self.start_frame = 0
         self.end_frame = 0
 
-        self.bpy_data_proxy: BpyBlendProxy = None
+        self.bpy_data_proxy: BpyDataProxy = None
 
     def leave_current_room(self):
         if self.client is not None:
@@ -406,7 +406,7 @@ class ShareData:
     def set_experimental_sync(self, experimental_sync: bool):
         if experimental_sync:
             logger.warning("Experimental sync in ON")
-            self.bpy_data_proxy = BpyBlendProxy()
+            self.bpy_data_proxy = BpyDataProxy()
         else:
             logger.warning("Experimental sync in OFF")
             if self.bpy_data_proxy:

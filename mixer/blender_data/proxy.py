@@ -46,7 +46,7 @@ DEBUG = True
 
 BpyBlendDiff = TypeVar("BpyBlendDiff")
 BpyPropCollectionDiff = TypeVar("BpyPropCollectionDiff")
-BpyIDProxy = TypeVar("BpyIDProxy")
+DatablockProxy = TypeVar("DatablockProxy")
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ def debug_check_stack_overflow(func, *args, **kwargs):
 # Remmoving the "with" lines halves loading time (!!)
 class DebugContext:
     """
-    Context class only used during BpyBlendProxy construction, to keep contextual data during traversal
+    Context class only used during BpyDataProxy construction, to keep contextual data during traversal
     of the blender data hierarchy and perform safety checkes
     """
 
@@ -116,18 +116,18 @@ class UnresolvedRef:
     """
 
     target: T.bpy_prop_collection
-    proxy: BpyIDRefProxy
+    proxy: DatablockRefProxy
 
 
 RootIds = Set[T.ID]
-IDProxies = Mapping[str, BpyIDProxy]
+IDProxies = Mapping[str, DatablockProxy]
 IDs = Mapping[str, T.ID]
 UnresolvedRefs = Dict[str, UnresolvedRef]
 
 
 @dataclass
 class VisitState:
-    # This class remains from an early implementation. It gathers BpyBlendProxy state encapsulated
+    # This class remains from an early implementation. It gathers BpyDataProxy state encapsulated
     # so that it can be used during the data traversal
     # This parts need refactoring and simplification (some items are now useless)
     root_ids: RootIds
@@ -174,7 +174,7 @@ def load_as_what(attr_property: bpy.types.Property, attr: any, root_ids: RootIds
 
     if same_rna(attr_property, T.CollectionProperty):
         if is_ID_subclass_rna(attr_property.fixed_type.bl_rna):
-            # Collections at root level are not handled by this code (See BpyBlendProxy.load()) so here it
+            # Collections at root level are not handled by this code (See BpyDataProxy.load()) so here it
             # should be a nested collection and IDs should be ref to root collections.
             return LoadElementAs.ID_REF
         else:
@@ -210,7 +210,7 @@ class DeltaAddition(Delta):
 
 class DeltaDeletion(Delta):
     # TODO it is overkill to have the deleted value in DeltaDeletion in all cases.
-    # we mostly need it if it is a BpyIDRefProxy
+    # we mostly need it if it is a DatablockRefProxy
     pass
 
 
@@ -269,15 +269,15 @@ def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState
         load_as = load_as_what(attr_property, attr, visit_state.root_ids)
         assert load_as != LoadElementAs.ID_DEF
         if load_as == LoadElementAs.STRUCT:
-            return BpyPropStructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
+            return StructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
         else:
             # LoadElementAs.ID_REF:
             # References into Blenddata collection, for instance D.scenes[0].objects
-            return BpyPropDataCollectionProxy().load_as_IDref(attr, visit_state)
+            return DatablockCollectionProxy().load_as_IDref(attr, visit_state)
 
     # TODO merge with previous case
     if isinstance(attr_property, T.CollectionProperty):
-        return BpyPropStructCollectionProxy().load(attr, attr_property, visit_state)
+        return StructCollectionProxy().load(attr, attr_property, visit_state)
 
     bl_rna = attr_property.bl_rna
     if bl_rna is None:
@@ -285,15 +285,15 @@ def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState
         return None
 
     if issubclass(attr_type, T.PropertyGroup):
-        return BpyPropertyGroupProxy().load(attr, visit_state)
+        return StructProxy().load(attr, visit_state)
 
     if issubclass(attr_type, T.ID):
         if attr.is_embedded_data:
-            return BpyIDProxy.make(attr_property).load(attr, visit_state)
+            return DatablockProxy.make(attr_property).load(attr, visit_state)
         else:
-            return BpyIDRefProxy().load(attr, visit_state)
+            return DatablockRefProxy().load(attr, visit_state)
     elif issubclass(attr_type, T.bpy_struct):
-        return BpyStructProxy().load(attr, visit_state)
+        return StructProxy().load(attr, visit_state)
 
     raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
 
@@ -367,7 +367,7 @@ class Proxy:
         raise NotImplementedError(f"diff for {container}[{key}]")
 
 
-class StructLikeProxy(Proxy):
+class StructProxy(Proxy):
     """
     Holds a copy of a Blender bpy_struct
     """
@@ -460,7 +460,7 @@ class StructLikeProxy(Proxy):
         struct_delta: Optional[DeltaUpdate],
         visit_state: VisitState,
         to_blender: bool = True,
-    ) -> StructLikeProxy:
+    ) -> StructProxy:
         """
         Apply diff to the Blender attribute at parent[key] or parent.key and update accordingly this proxy entry
         at key.
@@ -511,8 +511,8 @@ class StructLikeProxy(Proxy):
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
 
-        As this proxy tracks a Struct or ID, the result will be a DeltaUpdate that contains a BpyStructProxy
-        or a BpyIDProxy with an Delta item per added, deleted or updated property. One expect only DeltaUpdate,
+        As this proxy tracks a Struct or ID, the result will be a DeltaUpdate that contains a StructProxy
+        or a DatablockProxy with an Delta item per added, deleted or updated property. One expect only DeltaUpdate,
         although DeltalAddition or DeltaDeletion may be produced when an addon is loaded or unloaded while
         a room is joined. This situation, is not really supported as there is no handler to track
         addon changes.
@@ -557,15 +557,7 @@ class StructLikeProxy(Proxy):
         return None
 
 
-class BpyPropertyGroupProxy(StructLikeProxy):
-    pass
-
-
-class BpyStructProxy(StructLikeProxy):
-    pass
-
-
-class BpyIDProxy(BpyStructProxy):
+class DatablockProxy(StructProxy):
     """
     Holds a copy of a datablock, standalone (bpy.data.cameras['Camera']) or embedded.
     """
@@ -591,7 +583,7 @@ class BpyIDProxy(BpyStructProxy):
 
         if is_pointer_to(attr_property, T.NodeTree):
             return NodeTreeProxy()
-        return BpyIDProxy()
+        return DatablockProxy()
 
     @property
     def is_standalone_datablock(self):
@@ -609,7 +601,7 @@ class BpyIDProxy(BpyStructProxy):
         self._data["name_full"] = new_name
 
     def __str__(self) -> str:
-        return f"BpyIDProxy {self.mixer_uuid()} for bpy.data.{self.collection_name}[{self.data('name')}]"
+        return f"DatablockProxy {self.mixer_uuid()} for bpy.data.{self.collection_name}[{self.data('name')}]"
 
     def update_from_datablock(self, bl_instance: T.ID, visit_state: VisitState):
         self.load(bl_instance, visit_state, bpy_data_collection_name=None)
@@ -623,7 +615,7 @@ class BpyIDProxy(BpyStructProxy):
         """"""
         if bl_instance.is_embedded_data and bpy_data_collection_name is not None:
             logger.error(
-                f"BpyIDProxy.load() for {bl_instance} : is_embedded_data is True and bpy_prop_collection is {bpy_data_collection_name}. Item ignored"
+                f"DatablockProxy.load() for {bl_instance} : is_embedded_data is True and bpy_prop_collection is {bpy_data_collection_name}. Item ignored"
             )
             return
 
@@ -657,7 +649,7 @@ class BpyIDProxy(BpyStructProxy):
                 # - when we find a reference to a BlendData ID that was not loaded
                 # - the ID are not properly ordred at creation time, for instance (objects, meshes)
                 # instead of (meshes, objects) : a bug
-                logger.debug("BpyIDProxy.load(): %s not in visit_state.ids[uuid]", bl_instance)
+                logger.debug("DatablockProxy.load(): %s not in visit_state.ids[uuid]", bl_instance)
             self._datablock_uuid = bl_instance.mixer_uuid
             visit_state.id_proxies[uuid] = self
 
@@ -737,7 +729,7 @@ class BpyIDProxy(BpyStructProxy):
 
         datablock = specifics.pre_save_id(self, datablock, visit_state)
         if datablock is None:
-            logger.warning(f"BpyIDProxy.update_standalone_datablock() {self} pre_save_id returns None")
+            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
             return None, None
 
         for k, v in self._data.items():
@@ -751,7 +743,7 @@ class BpyIDProxy(BpyStructProxy):
         """
         datablock = specifics.pre_save_id(delta.value, datablock, visit_state)
         if datablock is None:
-            logger.warning(f"BpyIDProxy.update_standalone_datablock() {self} pre_save_id returns None")
+            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
             return None
 
         self.apply(self.collection, datablock.name, delta, visit_state)
@@ -792,7 +784,7 @@ class BpyIDProxy(BpyStructProxy):
 
         target = specifics.pre_save_id(self, id_, visit_state)
         if target is None:
-            logger.warning(f"BpyIDProxy.save() {bl_instance}.{attr_name} is None")
+            logger.warning(f"DatablockProxy.save() {bl_instance}.{attr_name} is None")
             return None
 
         for k, v in self._data.items():
@@ -800,7 +792,7 @@ class BpyIDProxy(BpyStructProxy):
 
         return target
 
-    def update_from_proxy(self, other: BpyIDProxy):
+    def update_from_proxy(self, other: DatablockProxy):
         # Currently, we receive the full list of attributes, so replace everything.
         # Do not keep existing attribute as they may not be applicable any more to the new object. For instance
         # if a light has been morphed from POINT to SUN, the 'falloff_curve' attribute no more exists
@@ -843,7 +835,7 @@ class BpyIDProxy(BpyStructProxy):
                 continue
 
 
-class NodeLinksProxy(BpyStructProxy):
+class NodeLinksProxy(StructProxy):
     def __init__(self):
         super().__init__()
 
@@ -864,7 +856,7 @@ class NodeLinksProxy(BpyStructProxy):
         return self
 
 
-class NodeTreeProxy(BpyIDProxy):
+class NodeTreeProxy(DatablockProxy):
     def __init__(self):
         super().__init__()
 
@@ -887,7 +879,7 @@ class NodeTreeProxy(BpyIDProxy):
             node_tree.links.new(src_socket, dst_socket)
 
 
-class BpyIDRefProxy(Proxy):
+class DatablockRefProxy(Proxy):
     """
     A reference to a standalone datablock
 
@@ -912,7 +904,7 @@ class BpyIDRefProxy(Proxy):
 
         return not self._datablock_uuid
 
-    def load(self, datablock: T.ID, visit_state: VisitState) -> BpyIDRefProxy:
+    def load(self, datablock: T.ID, visit_state: VisitState) -> DatablockRefProxy:
         """
         Load the reference to a standalone datablock
         """
@@ -937,7 +929,9 @@ class BpyIDRefProxy(Proxy):
         """
         ref_target = self.target(visit_state)
         if ref_target is None:
-            logger.warning(f"BpyIDRefProxy. Target of {container}.{key} not found. Last known name {self._debug_name}")
+            logger.warning(
+                f"DatablockRefProxy. Target of {container}.{key} not found. Last known name {self._debug_name}"
+            )
         if isinstance(container, T.bpy_prop_collection):
             # reference stored in a collection
             if isinstance(key, str):
@@ -945,12 +939,14 @@ class BpyIDRefProxy(Proxy):
                     container[key] = ref_target
                 except TypeError as e:
                     logger.warning(
-                        f"BpyIDRefProxy.save() exception while saving {ref_target} into {container}[{key}]..."
+                        f"DatablockRefProxy.save() exception while saving {ref_target} into {container}[{key}]..."
                     )
                     logger.warning(f"...{e}")
             else:
                 # is there a case for this ?
-                logger.warning(f"Not implemented: BpyIDRefProxy.save() for IDRef into collection {container}[{key}]")
+                logger.warning(
+                    f"Not implemented: DatablockRefProxy.save() for IDRef into collection {container}[{key}]"
+                )
         else:
             # reference stored in a struct
             if not container.bl_rna.properties[key].is_readonly:
@@ -996,8 +992,8 @@ class BpyIDRefProxy(Proxy):
         delta: Optional[DeltaUpdate],
         visit_state: VisitState,
         to_blender: bool = True,
-    ) -> StructLikeProxy:
-        update: BpyIDRefProxy = delta.value
+    ) -> StructProxy:
+        update: DatablockRefProxy = delta.value
         if to_blender:
             if update.is_none():
                 setattr(parent, key, None)
@@ -1023,10 +1019,10 @@ class BpyIDRefProxy(Proxy):
         """
 
         if datablock is None:
-            return DeltaUpdate(BpyIDRefProxy())
+            return DeltaUpdate(DatablockRefProxy())
 
         value = read_attribute(datablock, datablock_property, visit_state)
-        assert isinstance(value, BpyIDRefProxy)
+        assert isinstance(value, DatablockRefProxy)
         if value._datablock_uuid != self._datablock_uuid:
             return DeltaUpdate(value)
         else:
@@ -1132,7 +1128,7 @@ class AosElement(Proxy):
         # self._data.clear()
         # attr_property = item_bl_rna.properties[attr_name]
         # # A bit overkill:
-        # # for T.Mesh.vertices[...].groups, generates a BpyPropStructCollectionProxy per Vertex even if empty
+        # # for T.Mesh.vertices[...].groups, generates a StructCollectionProxy per Vertex even if empty
         # self._data[MIXER_SEQUENCE] = [
         #     read_attribute(getattr(item, attr_name), attr_property, context, visit_context) for item in bl_collection
         # ]
@@ -1238,19 +1234,19 @@ def write_metaballelements(target, src_sequence, visit_state: VisitState):
         write_attribute(target, i, src_sequence[i], visit_state)
 
 
-class BpyPropStructCollectionProxy(Proxy):
+class StructCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of non-ID in bpy.data
     """
 
     def __init__(self):
-        self._data: Mapping[Union[str, int], BpyIDProxy] = {}
+        self._data: Mapping[Union[str, int], DatablockProxy] = {}
 
     @classmethod
     def make(cls, attr_property: T.Property):
         if attr_property.srna == T.NodeLinks.bl_rna:
             return NodeLinksProxy()
-        return BpyPropStructCollectionProxy()
+        return StructCollectionProxy()
 
     def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, visit_state: VisitState):
 
@@ -1280,9 +1276,9 @@ class BpyPropStructCollectionProxy(Proxy):
             is_sequence = not bl_collection.keys()
             if is_sequence:
                 # easier for the encoder to always have a dict
-                self._data = {MIXER_SEQUENCE: [BpyStructProxy().load(v, visit_state) for v in bl_collection.values()]}
+                self._data = {MIXER_SEQUENCE: [StructProxy().load(v, visit_state) for v in bl_collection.values()]}
             else:
-                self._data = {k: BpyStructProxy().load(v, visit_state) for k, v in bl_collection.items()}
+                self._data = {k: StructProxy().load(v, visit_state) for k, v in bl_collection.items()}
 
         return self
 
@@ -1331,7 +1327,7 @@ class BpyPropStructCollectionProxy(Proxy):
 
     def apply(
         self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], visit_state: VisitState, to_blender=True
-    ) -> StructLikeProxy:
+    ) -> StructProxy:
 
         assert isinstance(key, (int, str))
 
@@ -1385,7 +1381,7 @@ class BpyPropStructCollectionProxy(Proxy):
                         sequence[k] = delta.value
 
                 except Exception as e:
-                    logger.warning(f"BpyPropStructCollectionProxy.apply(). Processing {delta}")
+                    logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
                     logger.warning(f"... for {collection}[{k}]")
                     logger.warning(f"... Exception: {e}")
                     logger.warning("... Update ignored")
@@ -1413,7 +1409,7 @@ class BpyPropStructCollectionProxy(Proxy):
                     else:
                         self._data[k] = apply_attribute(collection, k, self._data[k], delta, visit_state, to_blender)
                 except Exception as e:
-                    logger.warning(f"BpyPropStructCollectionProxy.apply(). Processing {delta}")
+                    logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
                     logger.warning(f"... for {collection}[{k}]")
                     logger.warning(f"... Exception: {e}")
                     logger.warning("... Update ignored")
@@ -1456,7 +1452,7 @@ class BpyPropStructCollectionProxy(Proxy):
                     if delta is not None:
                         diff._data[i] = delta
         else:
-            # index by string. This is similar to BpyPropDataCollectionproxy.diff
+            # index by string. This is similar to DatablockCollectionProxy.diff
             # Renames are detected as Deletion + Addition
 
             # This assumes that keys ordring is the same in the proxy and in blender, which is
@@ -1511,7 +1507,7 @@ class BpyPropStructCollectionProxy(Proxy):
         return None
 
 
-CreationChangeset = List[BpyIDProxy]
+CreationChangeset = List[DatablockProxy]
 UpdateChangeset = List[DeltaUpdate]
 # uuid, debug_display
 RemovalChangeset = List[Tuple[str, str]]
@@ -1527,20 +1523,20 @@ class Changeset:
         self.updates: UpdateChangeset = []
 
 
-class BpyPropDataCollectionProxy(Proxy):
+class DatablockCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of standalone datablocks, be it one of bpy.data collections
     or a collection like Scene.collection.objects.
 
     This proxy keeps track of the state of the whole collection. If the tracked collection is a bpy.data
-    collection (e.g.bpy.data.objects), the proxy contents will be instances of BpyIDProxy.
-    Otherwise (e.g. Scene.collection.objects) the proxy contents are instances of BpyIDRefProxy
+    collection (e.g.bpy.data.objects), the proxy contents will be instances of DatablockProxy.
+    Otherwise (e.g. Scene.collection.objects) the proxy contents are instances of DatablockRefProxy
     that reference items in bpy.data collections
     """
 
     def __init__(self):
         # On item per datablock. The key is the uuid, which eases rename management
-        self._data: Mapping[str, BpyIDProxy] = {}
+        self._data: Mapping[str, DatablockProxy] = {}
 
     def __len__(self):
         return len(self._data)
@@ -1561,7 +1557,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 # if collection_name == "objects" and isinstance(item.data, T.Mesh):
                 #     continue
                 # # /HACK
-                self._data[uuid] = BpyIDProxy().load(item, visit_state, bpy_data_collection_name=collection_name)
+                self._data[uuid] = DatablockProxy().load(item, visit_state, bpy_data_collection_name=collection_name)
 
         return self
 
@@ -1572,7 +1568,7 @@ class BpyPropDataCollectionProxy(Proxy):
         for name, item in bl_collection.items():
             with visit_state.debug_context.enter(name, item):
                 uuid = item.mixer_uuid
-                self._data[uuid] = BpyIDRefProxy().load(item, visit_state)
+                self._data[uuid] = DatablockRefProxy().load(item, visit_state)
         return self
 
     def save(self, parent: Any, key: str, visit_state: VisitState):
@@ -1612,9 +1608,9 @@ class BpyPropDataCollectionProxy(Proxy):
         return self._data.get(key)
 
     def create_datablock(
-        self, incoming_proxy: BpyIDProxy, visit_state: VisitState
+        self, incoming_proxy: DatablockProxy, visit_state: VisitState
     ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
-        """Create a bpy.data datablock from a received BpyIDProxy and update the proxy structures accordingly
+        """Create a bpy.data datablock from a received DatablockProxy and update the proxy structures accordingly
 
         Receiver side
 
@@ -1654,7 +1650,7 @@ class BpyPropDataCollectionProxy(Proxy):
         return datablock, renames
 
     def update_datablock(self, delta: DeltaUpdate, visit_state: VisitState):
-        """Update a bpy.data item from a received BpyIDProxy and update the proxy structures accordingly
+        """Update a bpy.data item from a received DatablockProxy and update the proxy structures accordingly
 
         Receiver side
 
@@ -1664,7 +1660,7 @@ class BpyPropDataCollectionProxy(Proxy):
         incoming_proxy = delta.value
         uuid = incoming_proxy.mixer_uuid()
 
-        proxy: BpyIDProxy = visit_state.id_proxies.get(uuid)
+        proxy: DatablockProxy = visit_state.id_proxies.get(uuid)
         if proxy is None:
             logger.error(
                 f"update_datablock(): Missing proxy for bpy.data.{incoming_proxy.collection_name}[{incoming_proxy.data('name')}] uuid {uuid}"
@@ -1693,7 +1689,7 @@ class BpyPropDataCollectionProxy(Proxy):
 
         return id_
 
-    def remove_datablock(self, proxy: BpyIDProxy, datablock: T.ID):
+    def remove_datablock(self, proxy: DatablockProxy, datablock: T.ID):
         """Remove a bpy.data collection item and update the proxy structures
 
         Receiver side
@@ -1720,7 +1716,7 @@ class BpyPropDataCollectionProxy(Proxy):
         uuid = proxy.mixer_uuid()
         del self._data[uuid]
 
-    def rename_datablock(self, proxy: BpyIDProxy, new_name: str, datablock: T.ID):
+    def rename_datablock(self, proxy: DatablockProxy, new_name: str, datablock: T.ID):
         """
         Rename a bpy.data collection item and update the proxy structures
 
@@ -1753,7 +1749,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 uuid = ensure_uuid(id_)
                 visit_state.root_ids.add(id_)
                 visit_state.ids[uuid] = id_
-                proxy = BpyIDProxy().load(id_, visit_state, bpy_data_collection_name=collection_name)
+                proxy = DatablockProxy().load(id_, visit_state, bpy_data_collection_name=collection_name)
                 visit_state.id_proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
@@ -1818,12 +1814,12 @@ class BpyPropDataCollectionProxy(Proxy):
         collection_delta: Optional[DeltaUpdate],
         visit_state: VisitState,
         to_blender: bool = True,
-    ) -> BpyPropDataCollectionProxy:
+    ) -> DatablockCollectionProxy:
 
         # WARNING this is only for collections of IDrefs, like Scene.collection.objects
         # not the right place
 
-        collection_update: BpyPropDataCollectionProxy = collection_delta.value
+        collection_update: DatablockCollectionProxy = collection_delta.value
         assert type(collection_update) == type(self)
         collection = getattr(parent, key)
         for k, ref_delta in collection_update._data.items():
@@ -1831,16 +1827,16 @@ class BpyPropDataCollectionProxy(Proxy):
                 if not isinstance(ref_delta, (DeltaAddition, DeltaDeletion)):
                     logger.warning(f"unexpected type for delta at {collection}[{k}]: {ref_delta}. Ignored")
                     continue
-                ref_update: BpyIDRefProxy = ref_delta.value
-                if not isinstance(ref_update, BpyIDRefProxy):
+                ref_update: DatablockRefProxy = ref_delta.value
+                if not isinstance(ref_update, DatablockRefProxy):
                     logger.warning(f"unexpected type for delta_value at {collection}[{k}]: {ref_update}. Ignored")
                     continue
 
-                assert isinstance(ref_update, BpyIDRefProxy)
+                assert isinstance(ref_update, DatablockRefProxy)
                 if to_blender:
                     # TODO another case for rename trouble ik k remains the name
                     # should be fixed automatically if the key is the uuid at
-                    # BpyPropDataCollectionProxy load
+                    # DatablockCollectionProxy load
                     uuid = ref_update._datablock_uuid
                     datablock = visit_state.ids.get(uuid)
                     if datablock is None:
@@ -1858,7 +1854,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 else:
                     del self._data[k]
             except Exception as e:
-                logger.warning(f"BpyPropDataCollectionProxy.apply(). Processing {ref_delta} to_blender {to_blender}")
+                logger.warning(f"DatablockCollectionProxy.apply(). Processing {ref_delta} to_blender {to_blender}")
                 logger.warning(f"... for {collection}[{k}]")
                 logger.warning(f"... Exception: {e}")
                 logger.warning("... Update ignored")
@@ -1872,7 +1868,7 @@ class BpyPropDataCollectionProxy(Proxy):
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
 
-        As this proxy tracks a collection, the result will be a DeltaUpdate that contains a BpyPropDataCollectionProxy
+        As this proxy tracks a collection, the result will be a DeltaUpdate that contains a DatablockCollectionProxy
         with an Delta item per added, deleted or update item
 
         Args:
@@ -1899,7 +1895,7 @@ class BpyPropDataCollectionProxy(Proxy):
 
         for k in added_keys:
             value = read_attribute(blender_items[k], item_property, visit_state)
-            assert isinstance(value, (BpyIDProxy, BpyIDRefProxy))
+            assert isinstance(value, (DatablockProxy, DatablockRefProxy))
             diff._data[k] = DeltaAddition(value)
 
         for k in deleted_keys:
@@ -1916,7 +1912,7 @@ class BpyPropDataCollectionProxy(Proxy):
 
         return None
 
-    def search(self, name: str) -> [BpyIDProxy]:
+    def search(self, name: str) -> [DatablockProxy]:
         """Convenience method to find proxies by name instead of uuid (for tests only)"""
         results = []
         for uuid in self._data.keys():
@@ -1926,7 +1922,7 @@ class BpyPropDataCollectionProxy(Proxy):
                 results.append(proxy)
         return results
 
-    def search_one(self, name: str) -> BpyIDProxy:
+    def search_one(self, name: str) -> DatablockProxy:
         """Convenience method to find a proxy by name instead of uuid (for tests only)"""
         results = self.search(name)
         return None if not results else results[0]
@@ -1947,7 +1943,7 @@ def _pred_by_creation_order(item: Tuple[str, Any]):
     return _creation_order.get(item[0], 0)
 
 
-class BpyBlendProxy(Proxy):
+class BpyDataProxy(Proxy):
     def __init__(self, *args, **kwargs):
         # ID elements stored in bpy.data.* collections, computed before recursive visit starts:
         self.root_ids: RootIds = set()
@@ -1957,8 +1953,8 @@ class BpyBlendProxy(Proxy):
         # Only needed to cleanup root_ids and id_proxies on ID removal
         self.ids: IDs = {}
 
-        self._data: Mapping[str, BpyPropDataCollectionProxy] = {
-            name: BpyPropDataCollectionProxy() for name in BlendData.instance().collection_names()
+        self._data: Mapping[str, DatablockCollectionProxy] = {
+            name: DatablockCollectionProxy() for name in BlendData.instance().collection_names()
         }
 
         # Pending unresolved references.
@@ -1984,7 +1980,7 @@ class BpyBlendProxy(Proxy):
 
         TODO check is this is actually required or if we can rely upon is_embedded_data being False
         """
-        # Normal operation no more involve BpyBlendProxy.load() ad initial synchronization behaves
+        # Normal operation no more involve BpyDataProxy.load() ad initial synchronization behaves
         # like a creation. The current load_as_what() implementation relies on root_ids to determine if
         # a T.ID must ne loaded as an IDRef (pointer to bpy.data) or an IDDef (pointer to an "owned" ID).
         # so we need to load all the root_ids before loading anything into the proxy.
@@ -2011,10 +2007,10 @@ class BpyBlendProxy(Proxy):
         for name, _ in context.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
             with visit_state.debug_context.enter(name, collection):
-                self._data[name] = BpyPropDataCollectionProxy().load_as_ID(collection, visit_state)
+                self._data[name] = DatablockCollectionProxy().load_as_ID(collection, visit_state)
         return self
 
-    def find(self, collection_name: str, key: str) -> BpyIDProxy:
+    def find(self, collection_name: str, key: str) -> DatablockProxy:
         # TODO not used ?
         if not self._data:
             return None
@@ -2094,7 +2090,7 @@ class BpyBlendProxy(Proxy):
         return changeset
 
     def create_datablock(
-        self, incoming_proxy: BpyIDProxy, context: Context = safe_context
+        self, incoming_proxy: DatablockProxy, context: Context = safe_context
     ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """
         Create bpy.data collection item and update the proxy accordingly
@@ -2118,7 +2114,7 @@ class BpyBlendProxy(Proxy):
         Receiver side
         """
         assert isinstance(update, DeltaUpdate)
-        incoming_proxy: BpyIDProxy = update.value
+        incoming_proxy: DatablockProxy = update.value
         bpy_data_collection_proxy = self._data.get(incoming_proxy.collection_name)
         if bpy_data_collection_proxy is None:
             logger.warning(
@@ -2196,7 +2192,7 @@ class BpyBlendProxy(Proxy):
             renames.append([bpy_data_collection_proxy, proxy, old_name, tmp_name, new_name, datablock])
 
         # The rename process is handled in two phases to avoid spontaneous renames from Blender
-        # see BpyPropDataCollectionProxy.update() for explanation
+        # see DatablockCollectionProxy.update() for explanation
         for bpy_data_collection_proxy, proxy, _, tmp_name, _, datablock in renames:
             bpy_data_collection_proxy.rename_datablock(proxy, tmp_name, datablock)
 
@@ -2212,15 +2208,15 @@ class BpyBlendProxy(Proxy):
         try:
             dummy = sum(len(id_.name) for id_ in self.root_ids)
         except ReferenceError:
-            logger.warning("BpyBlendProxy: Stale reference in root_ids")
+            logger.warning("BpyDataProxy: Stale reference in root_ids")
         try:
             dummy = sum(len(id_.name) for id_ in self.ids.values())
         except ReferenceError:
-            logger.warning("BpyBlendProxy: Stale reference in root_ids")
+            logger.warning("BpyDataProxy: Stale reference in root_ids")
 
         return dummy
 
-    def diff(self, context: Context) -> Optional[BpyBlendProxy]:
+    def diff(self, context: Context) -> Optional[BpyDataProxy]:
         # Currently for tests only
         diff = self.__class__()
         visit_state = self.visit_state(context)
@@ -2239,12 +2235,12 @@ class BpyBlendProxy(Proxy):
 
 
 proxy_classes = [
-    BpyIDProxy,
-    BpyIDRefProxy,
-    BpyStructProxy,
-    BpyPropertyGroupProxy,
-    BpyPropStructCollectionProxy,
-    BpyPropDataCollectionProxy,
+    DatablockProxy,
+    DatablockRefProxy,
+    StructProxy,
+    StructProxy,
+    StructCollectionProxy,
+    DatablockCollectionProxy,
     SoaElement,
     AosElement,
 ]

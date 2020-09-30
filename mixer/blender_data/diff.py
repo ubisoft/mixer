@@ -23,9 +23,9 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data.filter import Context, skip_bpy_data_item
 from mixer.blender_data.proxy import (
-    BpyBlendProxy,
-    BpyIDProxy,
-    BpyPropDataCollectionProxy,
+    BpyDataProxy,
+    DatablockProxy,
+    DatablockCollectionProxy,
     ensure_uuid,
 )
 
@@ -35,14 +35,14 @@ BlendDataCollectionName = str
 ItemsAdded = Mapping[str, str]
 # Item_name : collection_name
 
-ItemsRemoved = List[BpyIDProxy]
+ItemsRemoved = List[DatablockProxy]
 
-ItemsRenamed = List[Tuple[BpyIDProxy, str]]
+ItemsRenamed = List[Tuple[DatablockProxy, str]]
 # (proxy, old_name)
 
 
 def find_renamed(
-    proxy_items: Mapping[Uuid, BpyIDProxy], blender_items: Mapping[Uuid, Tuple[str, str]]
+    proxy_items: Mapping[Uuid, DatablockProxy], blender_items: Mapping[Uuid, Tuple[str, str]]
 ) -> Tuple[ItemsAdded, ItemsRemoved, ItemsRenamed]:
     """
     Split before/after mappings into added/removed/renamed
@@ -80,7 +80,7 @@ class BpyPropCollectionDiff(BpyDiff):
     items_removed: ItemsRemoved = []
     items_renamed: ItemsRenamed = []
 
-    def diff(self, proxy: BpyPropDataCollectionProxy, collection_name: str, context: Context):
+    def diff(self, proxy: DatablockCollectionProxy, collection_name: str, context: Context):
         self.items_added.clear()
         self.items_removed.clear()
         self.items_renamed.clear()
@@ -122,9 +122,9 @@ class BpyBlendDiff(BpyDiff):
 
     # TODO cleanup: not used.
     # Will not be used as the per_DI deltas will be limited to the depsgraph updates
-    id_deltas: List[Tuple[BpyIDProxy, T.ID]] = []
+    id_deltas: List[Tuple[DatablockProxy, T.ID]] = []
 
-    def diff(self, blend_proxy: BpyBlendProxy, context: Context):
+    def diff(self, blend_proxy: BpyDataProxy, context: Context):
         self.collection_deltas.clear()
         self.id_deltas.clear()
 
@@ -138,8 +138,8 @@ class BpyBlendDiff(BpyDiff):
 
         # Before this change:
         # Only datablocks handled by the generic synchronization system get a uuid, either from
-        # BpyBlendProxy.initialize_ref_targets() during room creation, or later during diff processing.
-        # Datablocks of unhandled types get no uuid and BpyIDRefProxy references to them are incorrect.
+        # BpyDataProxy.initialize_ref_targets() during room creation, or later during diff processing.
+        # Datablocks of unhandled types get no uuid and DatablockRefProxy references to them are incorrect.
         # What is more, this means trouble for tests since datablocks of unhandled types are assigned
         # a uuid during the message grabbing, which means that they get different uuids on both ends.
         for collection_name in context.unhandled_bpy_data_collection_names:

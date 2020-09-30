@@ -19,7 +19,7 @@ import unittest
 
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from mixer.blender_data.proxy import BpyBlendProxy
+from mixer.blender_data.proxy import BpyDataProxy
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import test_context
 
@@ -32,7 +32,7 @@ class TestDiff(unittest.TestCase):
     def setUp(self):
         for w in D.worlds:
             D.worlds.remove(w)
-        self.proxy = BpyBlendProxy()
+        self.proxy = BpyDataProxy()
 
     def test_create(self):
         # test_diff.TestDiff.test_create

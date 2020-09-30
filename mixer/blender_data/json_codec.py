@@ -25,13 +25,11 @@ import json
 from typing import Any, Mapping
 
 from mixer.blender_data.proxy import (
-    BpyIDProxy,
-    BpyIDRefProxy,
-    BpyPropertyGroupProxy,
-    BpyPropDataCollectionProxy,
-    BpyPropStructCollectionProxy,
-    BpyStructProxy,
-    StructLikeProxy,
+    DatablockProxy,
+    DatablockRefProxy,
+    StructProxy,
+    DatablockCollectionProxy,
+    StructCollectionProxy,
     NodeLinksProxy,
     NodeTreeProxy,
     Delta,
@@ -43,10 +41,17 @@ from mixer.blender_data.proxy import (
 # https://stackoverflow.com/questions/38307068/make-a-dict-json-from-string-with-duplicate-keys-python/38307621#38307621
 # https://stackoverflow.com/questions/31085153/easiest-way-to-serialize-object-in-a-nested-dictionary
 
-struct_like_classes = [BpyIDProxy, BpyIDRefProxy, BpyStructProxy, BpyPropertyGroupProxy, NodeLinksProxy, NodeTreeProxy]
+struct_like_classes = [
+    DatablockProxy,
+    DatablockRefProxy,
+    StructProxy,
+    StructProxy,
+    NodeLinksProxy,
+    NodeTreeProxy,
+]
 collection_classes = [
-    BpyPropStructCollectionProxy,
-    BpyPropDataCollectionProxy,
+    StructCollectionProxy,
+    DatablockCollectionProxy,
 ]
 delta_classes = [
     Delta,
@@ -75,7 +80,7 @@ def default(obj):
 
     # TODO AOS and SOA
 
-    is_known = issubclass(class_, (StructLikeProxy, BpyIDRefProxy, Delta)) or class_ in collection_classes
+    is_known = issubclass(class_, (StructProxy, DatablockRefProxy, Delta)) or class_ in collection_classes
     if is_known:
         # Add the proxy class so that the decoder and instantiate the right type
         d = {MIXER_CLASS: class_.__name__}
