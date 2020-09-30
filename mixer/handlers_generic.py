@@ -58,10 +58,7 @@ def update_unhandled_updated_datablocks(datablocks: Set[bpy.types.ID]):
             for obj in objects:
                 share_data.client.send_mesh(obj)
         elif isinstance(data, bpy.types.GreasePencil):
-            # TODO material will be send more than once ?
             for obj in objects:
-                for material in obj.materials:
-                    share_data.client.send_material(material)
                 grease_pencil_api.send_grease_pencil_mesh(share_data.client, obj)
                 grease_pencil_api.send_grease_pencil_connection(share_data.client, obj)
 

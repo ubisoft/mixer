@@ -259,6 +259,11 @@ default_exclusions = {
         # Seems to be a view of the master collection children
         NameFilterOut("children"),
     ],
+    T.GreasePencil: [
+        # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
+        # but do not synchronize its contents
+        NameFilterIn("name")
+    ],
     T.Mesh: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
@@ -377,8 +382,10 @@ safe_depsgraph_updates = (
     T.Camera,
     T.Collection,
     T.Image,
+    # no generic sync of GreasePencil, use VRtist message
     T.Light,
     T.Material,
+    # no generic sync of Mesh, use VRtist message
     T.MetaBall,
     T.NodeTree,
     T.Object,
@@ -394,6 +401,7 @@ safe_filter = FilterStack()
 safe_blenddata_collections = [
     "cameras",
     "collections",
+    "grease_pencils",
     "images",
     "lights",
     "materials",

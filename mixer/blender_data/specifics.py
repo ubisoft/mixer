@@ -180,7 +180,18 @@ def pre_save_id(proxy: Proxy, target: T.ID, visit_state: VisitState) -> T.ID:
     Returns:
         [bpy.types.ID]: a possibly new ID
     """
-    if isinstance(target, T.Scene):
+    if isinstance(target, bpy.types.Material):
+        is_grease_pencil = proxy.data("is_grease_pencil")
+        # will be None for a DeltaUpdate that does not modify "is_grease_pencil"
+        if is_grease_pencil is not None:
+            # is_grease_pencil is modified
+            if is_grease_pencil:
+                if not target.grease_pencil:
+                    bpy.data.materials.create_gpencil_data(target)
+            else:
+                if target.grease_pencil:
+                    bpy.data.materials.remove_gpencil_data(target)
+    elif isinstance(target, T.Scene):
         # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
         use_nodes = proxy.data("use_nodes")
         if use_nodes:
