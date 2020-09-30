@@ -254,7 +254,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, visit
 
     bl_rna = getattr(collection, "bl_rna", None)
     if bl_rna is not None:
-        if isinstance(bl_rna, type(T.ObjectModifiers.bl_rna)):
+        if isinstance(bl_rna, (type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl_rna))):
             name = proxy.data("name")
             modifier_type = proxy.data("type")
             return collection.new(name, modifier_type)
@@ -347,7 +347,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, visit
 
 
 # order dependent, so always clear
-always_clear = [type(T.ObjectModifiers.bl_rna), type(T.SequenceModifiers.bl_rna)]
+always_clear = [type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl_rna), type(T.SequenceModifiers.bl_rna)]
 
 
 def truncate_collection(target: T.bpy_prop_collection, incoming_keys: List[str]):
