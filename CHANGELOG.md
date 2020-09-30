@@ -1,3 +1,22 @@
+# 0.17.0-alpha1 (2020-09-30) 
+
+## Features
+
+- Object modifiers (except those using Image and Curve)
+- GreasePencil modifiers
+- Change instances collection
+
+## Bugfix
+
+- Fix synchronization problems after renaming
+- Fix synchronization problems after simultaneous creation
+- Fix _last_scene_to_be_removed_
+
+## CI/CD
+
+- Add optional build info to the version tag
+- Upgrade Flake and Black
+
 # 0.16.1 (2020-09-22)
 
 ## Bugfix
