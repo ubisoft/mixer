@@ -237,6 +237,7 @@ class TestAosSoa(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
 
+    @unittest.skip("grease_pencil restricted to name")
     def test_all_soa_grease_pencil(self):
         import array
 
