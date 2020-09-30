@@ -1003,7 +1003,9 @@ class BpyIDRefProxy(Proxy):
                 setattr(parent, key, None)
             else:
                 assert type(update) == type(self), "type(update) == type(self)"
-                assert self.is_none() or self._bpy_data_collection == update._bpy_data_collection, "self.is_none() or self._bpy_data_collection == update._bpy_data_collection"
+                assert (
+                    self.is_none() or self._bpy_data_collection == update._bpy_data_collection
+                ), "self.is_none() or self._bpy_data_collection == update._bpy_data_collection"
 
                 datablock = visit_state.ids.get(update._datablock_uuid)
                 setattr(parent, key, datablock)
