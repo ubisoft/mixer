@@ -14,7 +14,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
+"""
+Proxies for bpy.types.NodeTree and bpy.types.NodeLinks
+"""
 from __future__ import annotations
 
 import logging
@@ -33,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 
 class NodeLinksProxy(StructProxy):
+    """Proxy for bpy.types.NodeLinks"""
+
     def __init__(self):
         super().__init__()
 
@@ -54,6 +58,8 @@ class NodeLinksProxy(StructProxy):
 
 
 class NodeTreeProxy(DatablockProxy):
+    """Proxies for bpy.types.NodeTree"""
+
     def __init__(self):
         super().__init__()
 

@@ -15,6 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+Proxy of a bpy.types.Struct collection, excluding bpy.types.ID collections that are implemented
+in datablock_collection_proxy.py
+
+See synchronization.md
+"""
 from __future__ import annotations
 
 import itertools
@@ -86,7 +92,11 @@ def write_metaballelements(target, src_sequence, visit_state: VisitState):
 
 class StructCollectionProxy(Proxy):
     """
-    Proxy to a bpy_prop_collection of non-ID in bpy.data
+    Proxy to a bpy_prop_collection of non-datablock Struct.
+
+    It can track an array (int keys) or a dictionnary(string keys).
+
+    TODO split into array and dictionary proxies
     """
 
     def __init__(self):
@@ -134,7 +144,7 @@ class StructCollectionProxy(Proxy):
 
     def save(self, bl_instance: any, attr_name: str, visit_state: VisitState):
         """
-        Save this proxy into a Blender object
+        Save this proxy the Blender property
         """
         target = getattr(bl_instance, attr_name, None)
         if target is None:
@@ -181,7 +191,7 @@ class StructCollectionProxy(Proxy):
 
         assert isinstance(key, (int, str))
 
-        # TODO factozize with save
+        # TODO factorize with save
 
         if isinstance(key, int):
             collection = parent[key]

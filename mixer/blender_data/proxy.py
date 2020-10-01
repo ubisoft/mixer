@@ -14,7 +14,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+Base class and utilities for the proxy system.
 
+See synchronization.md
+"""
 from __future__ import annotations
 
 from enum import IntEnum
@@ -73,6 +77,12 @@ def is_ID_subclass_rna(bl_rna):  # noqa
 
 
 class Delta:
+    """
+    A Delta records the difference between the proxy state and Blender state.
+
+    It is created with Proxy.diff() and applied with Proxy.apply()
+    """
+
     def __init__(self, value: Optional[Any] = None):
         self.value = value
 
@@ -85,8 +95,6 @@ class DeltaAddition(Delta):
 
 
 class DeltaDeletion(Delta):
-    # TODO it is overkill to have the deleted value in DeltaDeletion in all cases.
-    # we mostly need it if it is a DatablockRefProxy
     pass
 
 
@@ -98,6 +106,10 @@ MAX_DEPTH = 30
 
 
 class Proxy:
+    """
+    Base class for all proxies.
+    """
+
     def __eq__(self, other):
         if self.__class__ is not other.__class__:
             return False
@@ -167,6 +179,7 @@ class Proxy:
 
 
 def ensure_uuid(item: bpy.types.ID) -> str:
+    """Ensures that the item datablock has a mixer_uuid property"""
     uuid = item.get("mixer_uuid")
     if not uuid:
         uuid = str(uuid4())

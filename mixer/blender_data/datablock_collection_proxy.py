@@ -14,7 +14,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+Proxy of a datablock collection
 
+See synchronization.md
+"""
 from __future__ import annotations
 
 import logging
@@ -49,7 +53,10 @@ class DatablockCollectionProxy(Proxy):
     This proxy keeps track of the state of the whole collection. If the tracked collection is a bpy.data
     collection (e.g.bpy.data.objects), the proxy contents will be instances of DatablockProxy.
     Otherwise (e.g. Scene.collection.objects) the proxy contents are instances of DatablockRefProxy
-    that reference items in bpy.data collections
+    that reference items in bpy.data collections.
+
+    TODO Split this class into proxy to collections of standalone datablocks (bpy.data collections)
+    and proxy to collection of datablock references (e.g. Scene.objects)
     """
 
     def __init__(self):
@@ -61,7 +68,7 @@ class DatablockCollectionProxy(Proxy):
 
     def load_as_ID(self, bl_collection: bpy.types.bpy_prop_collection, visit_state: VisitState):  # noqa N802
         """
-        Load bl_collection elements as plain IDs, with all element properties. Use this to load from bpy.data
+        Load bl_collection elements as standalone datablocks.
         """
         for name, item in bl_collection.items():
             collection_name = BlendData.instance().bl_collection_name_from_ID(item)
@@ -69,19 +76,13 @@ class DatablockCollectionProxy(Proxy):
                 continue
             with visit_state.debug_context.enter(name, item):
                 uuid = ensure_uuid(item)
-                # # HACK: Skip objects with a mesh in order to process D.objects withtout processing D.meshes
-                # # - writing meshes is not currently implemented and we must avoid double processing with VRtist
-                # # - reading objects is required for metaballs
-                # if collection_name == "objects" and isinstance(item.data, T.Mesh):
-                #     continue
-                # # /HACK
                 self._data[uuid] = DatablockProxy().load(item, visit_state, bpy_data_collection_name=collection_name)
 
         return self
 
     def load_as_IDref(self, bl_collection: bpy.types.bpy_prop_collection, visit_state: VisitState):  # noqa N802
         """
-        Load bl_collection elements as referenced into bpy.data
+        Load bl_collection elements as references to bpy.data collections
         """
         for name, item in bl_collection.items():
             with visit_state.debug_context.enter(name, item):
@@ -91,7 +92,8 @@ class DatablockCollectionProxy(Proxy):
 
     def save(self, parent: Any, key: str, visit_state: VisitState):
         """
-        Save this Proxy into a Blender property
+        Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data
+        or a collection of referenced datablocks like bpy.type.Collection.children
         """
         if not self._data:
             return
@@ -105,6 +107,7 @@ class DatablockCollectionProxy(Proxy):
         link = getattr(target, "link", None)
         unlink = getattr(target, "unlink", None)
         if link is not None and unlink is not None:
+            # Collection of datablock references
             if not len(target):
                 for _, ref_proxy in self._data.items():
                     datablock = ref_proxy.target(visit_state)
@@ -119,6 +122,7 @@ class DatablockCollectionProxy(Proxy):
             else:
                 logger.warning(f"Saving into non empty collection: {target}. Ignored")
         else:
+            # collection of standalone datablocks
             for k, v in self._data.items():
                 write_attribute(target, k, v, visit_state)
 
@@ -129,8 +133,6 @@ class DatablockCollectionProxy(Proxy):
         self, incoming_proxy: DatablockProxy, visit_state: VisitState
     ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """Create a bpy.data datablock from a received DatablockProxy and update the proxy structures accordingly
-
-        Receiver side
 
         Args:
             incoming_proxy : this proxy contents is used to update the bpy.data collection item
@@ -168,13 +170,7 @@ class DatablockCollectionProxy(Proxy):
         return datablock, renames
 
     def update_datablock(self, delta: DeltaUpdate, visit_state: VisitState):
-        """Update a bpy.data item from a received DatablockProxy and update the proxy structures accordingly
-
-        Receiver side
-
-        Args:
-            proxy : this proxy contents is used to update the bpy.data collection item
-        """
+        """Update a bpy.data item from a received DatablockProxy and update the proxy state"""
         incoming_proxy = delta.value
         uuid = incoming_proxy.mixer_uuid()
 
@@ -208,14 +204,7 @@ class DatablockCollectionProxy(Proxy):
         return id_
 
     def remove_datablock(self, proxy: DatablockProxy, datablock: T.ID):
-        """Remove a bpy.data collection item and update the proxy structures
-
-        Receiver side
-
-        Args:
-            uuid: the mixer_uuid of the datablock
-        """
-        # TODO scene and last_scene_ ...
+        """Remove a bpy.data collection item and update the proxy state"""
         logger.info("Perform removal for %s", proxy)
         try:
             if isinstance(datablock, T.Scene):
@@ -236,12 +225,7 @@ class DatablockCollectionProxy(Proxy):
 
     def rename_datablock(self, proxy: DatablockProxy, new_name: str, datablock: T.ID):
         """
-        Rename a bpy.data collection item and update the proxy structures
-
-        Receiver side
-
-        Args:
-            uuid: the mixer_uuid of the datablock
+        Rename a bpy.data collection item and update the proxy state
         """
         logger.info("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
         proxy.rename(new_name)
@@ -249,7 +233,7 @@ class DatablockCollectionProxy(Proxy):
 
     def update(self, diff: BpyPropCollectionDiff, visit_state: VisitState) -> Changeset:
         """
-        Update the proxy according to the diff
+        Update the proxy according to local datablock creations, removals or renames
         """
         changeset = Changeset()
         # Sort so that the tests receive the messages in deterministic order. Sad but not very harmfull
@@ -294,8 +278,7 @@ class DatablockCollectionProxy(Proxy):
         #
         # Handle spontaneous renames
         #
-        # Say
-        # - local and remote are synced with 2 objects with uuid/name D7/A FC/B
+        # - local and remote are initially synced with 2 objects with uuid/name D7/A FC/B
         # - local renames D7/A into B
         #   - D7 is actually renamed into B.001 !
         #   - we detect (D7 -> B.001)
@@ -333,9 +316,12 @@ class DatablockCollectionProxy(Proxy):
         visit_state: VisitState,
         to_blender: bool = True,
     ) -> DatablockCollectionProxy:
+        """
+        Apply a received Delta to this proxy.
 
-        # WARNING this is only for collections of IDrefs, like Scene.collection.objects
-        # not the right place
+        This method is only applicable if this is a proxy to a collection of datablock references
+        like Scene.collection.objects, because changes to bpy.data are processed by xxx_datablock() methods.
+        """
 
         collection_update: DatablockCollectionProxy = collection_delta.value
         assert type(collection_update) == type(self)

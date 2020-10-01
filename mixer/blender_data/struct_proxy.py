@@ -15,6 +15,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+Proxy of a bpy.types.Struct, excluding bpy.types.ID that is implemented in datablock_proxy.py
+
+See synchronization.md
+"""
 from __future__ import annotations
 
 import logging
@@ -37,33 +42,7 @@ class StructProxy(Proxy):
     Holds a copy of a Blender bpy_struct
     """
 
-    # TODO limit depth like in multiuser. Anyhow, there are circular references in f-curves
     def __init__(self):
-
-        # We care for some non readonly properties. Collection object are tagged read_only byt can be updated with
-
-        # Beware :
-
-        # >>> bpy.types.Scene.bl_rna.properties['collection']
-        # <bpy_struct, PointerProperty("collection")>
-
-        # TODO is_readonly may be only interesting for "base types". FOr Collections it seems always set to true
-        # meaning that the collection property slot cannot be updated although the object is mutable
-        # TODO we also care for some readonly properties that are in fact links to data collections
-
-        # The property information are taken from the containing class, not from the attribute.
-        # So we get :
-        #   T.Scene.bl_rna.properties['collection']
-        #       <bpy_struct, PointerProperty("collection")>
-        #   T.Scene.bl_rna.properties['collection'].fixed_type
-        #       <bpy_struct, Struct("Collection")>
-        # But if we take the information in the attribute we get information for the dereferenced
-        # data
-        #   D.scenes[0].collection.bl_rna
-        #       <bpy_struct, Struct("Collection")>
-        #
-        # We need the former to make a difference between T.Scene.collection and T.Collection.children.
-        # the former is a pointer
         self._data = {}
         pass
 
@@ -144,7 +123,7 @@ class StructProxy(Proxy):
 
         assert isinstance(key, (int, str))
 
-        # TODO factozize with save
+        # TODO factorize with save
 
         if isinstance(key, int):
             struct = parent[key]

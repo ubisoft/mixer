@@ -14,7 +14,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+Proxy of a reference to datablock
 
+See synchronization.md
+"""
 from __future__ import annotations
 
 import logging
@@ -56,13 +60,15 @@ class DatablockRefProxy(Proxy):
         return f"{self.__class__.__name__}({self._datablock_uuid}, bpy.data.{self._bpy_data_collection}, name at creation: {self._initial_name})"
 
     def is_none(self) -> bool:
-        """Returns True if this object is a None reference"""
+        """
+        Returns True if the reference is None (like if Scene.camera is not set)
+        """
 
         return not self._datablock_uuid
 
     def load(self, datablock: T.ID, visit_state: VisitState) -> DatablockRefProxy:
         """
-        Load the reference to a standalone datablock
+        Load a reference to a standalone datablock into this proxy
         """
         assert not datablock.is_embedded_data
 
@@ -80,7 +86,7 @@ class DatablockRefProxy(Proxy):
 
     def save(self, container: Union[T.ID, T.bpy_prop_collection], key: str, visit_state: VisitState):
         """
-        Save the standalone datablock reference represented by self into a datablock member (Scene.camera)
+        Save the datablock reference represented by this proxy into a datablock member (Scene.camera)
         or a collection item (Scene.collection.children["Collection"])
         """
         ref_target = self.target(visit_state)
@@ -115,7 +121,7 @@ class DatablockRefProxy(Proxy):
 
     def target(self, visit_state: VisitState) -> T.ID:
         """
-        The datablock referenced
+        The datablock referenced by this proxy
         """
         datablock = visit_state.ids.get(self._datablock_uuid)
         if datablock is None:
@@ -149,6 +155,9 @@ class DatablockRefProxy(Proxy):
         visit_state: VisitState,
         to_blender: bool = True,
     ) -> StructProxy:
+        """
+        Apply a delta to this proxy, which occurs when Scene.camera changes, for instance
+        """
         update: DatablockRefProxy = delta.value
         if to_blender:
             if update.is_none():
@@ -165,13 +174,7 @@ class DatablockRefProxy(Proxy):
 
     def diff(self, datablock: T.ID, datablock_property: T.Property, visit_state: VisitState) -> Optional[DeltaUpdate]:
         """
-        Computes the difference between the state of an item tracked by this proxy and its Blender state.
-
-        As this proxy tracks a reference to a standalone datablock, the result
-
-        Args:
-            datablock: the databloc tha must be diffed against this proxy
-            datablock_property: the property of datablock as found in its enclosing object
+        Computes the difference between this proxy and its Blender state.
         """
 
         if datablock is None:

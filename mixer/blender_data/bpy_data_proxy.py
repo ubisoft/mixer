@@ -14,7 +14,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+This module provides an implementation for the a proxy to the whole Blender data state, i.e the relevant members
+of bpy.data.
 
+See synchronization.md
+"""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -72,7 +77,7 @@ class UnresolvedRef:
 class DebugContext:
     """
     Context class only used during BpyDataProxy construction, to keep contextual data during traversal
-    of the blender data hierarchy and perform safety checkes
+    of the blender data hierarchy and perform safety checks
     """
 
     serialized_addresses: Set[bpy.types.ID] = set()  # Already serialized addresses (struct or IDs), for debug
@@ -104,26 +109,44 @@ UnresolvedRefs = Dict[str, UnresolvedRef]
 
 @dataclass
 class VisitState:
-    # This class remains from an early implementation. It gathers BpyDataProxy state encapsulated
-    # so that it can be used during the data traversal
-    # This parts need refactoring and simplification (some items are now useless)
+    """
+    Gathers proxy system state (mainly known datablocks) and properties to synchronize
+
+    TODO remove obsolete members
+    """
+
     root_ids: RootIds
+    """Part ot the proxy system state: list of datablocks in bpy.data"""
+
     id_proxies: IDProxies
+    """Part ot the proxy system state: {uuid: DatablockProxy}"""
+
     ids: IDs
+    """Part ot the proxy system state: {uuid: bpy.types.ID}"""
+
     unresolved_refs: UnresolvedRefs
+
     context: Context
+    """Controls what properties are synchronized"""
+
     debug_context: DebugContext = DebugContext()
 
 
 class BpyDataProxy(Proxy):
+    """Proxy to bpy.data collections
+
+    This proxy contains a DatablockCollection proxy per synchronized bpy.data collection
+    """
+
     def __init__(self, *args, **kwargs):
-        # ID elements stored in bpy.data.* collections, computed before recursive visit starts:
+
         self.root_ids: RootIds = set()
+        """ID elements stored in bpy.data.* collections, computed before recursive visit starts:"""
 
         self.id_proxies: IDProxies = {}
 
-        # Only needed to cleanup root_ids and id_proxies on ID removal
         self.ids: IDs = {}
+        """Only needed to cleanup root_ids and id_proxies on ID removal"""
 
         self._data: Mapping[str, DatablockCollectionProxy] = {
             name: DatablockCollectionProxy() for name in BlendData.instance().collection_names()
@@ -194,13 +217,11 @@ class BpyDataProxy(Proxy):
     def update(
         self, diff: BpyBlendDiff, context: Context = safe_context, depsgraph_updates: T.bpy_prop_collection = ()
     ) -> Changeset:
-        """Update the proxy using the state of the Blendata collections (ID creation, deletion)
-        and the depsgraph updates (ID modification)
+        """
+        Process local changes, i.e. created, removed and renames datablocks as well as depsgraph updates.
 
-        Sender side
-
-        Returns:
-            A list a creations/updates and a list of removals
+        This updates the local proxy state and return a Changeset to send to the server. This method is also
+        used to send the initial scene contents, which is seen as datablock creations.
         """
         changeset: Changeset = Changeset()
 
@@ -265,9 +286,7 @@ class BpyDataProxy(Proxy):
         self, incoming_proxy: DatablockProxy, context: Context = safe_context
     ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """
-        Create bpy.data collection item and update the proxy accordingly
-
-        Receiver side
+        Process a received datablock creation command, creating the datablock and updating the proxy state
         """
         bpy_data_collection_proxy = self._data.get(incoming_proxy.collection_name)
         if bpy_data_collection_proxy is None:
@@ -281,9 +300,7 @@ class BpyDataProxy(Proxy):
 
     def update_datablock(self, update: DeltaUpdate, context: Context = safe_context) -> Optional[T.ID]:
         """
-        Update a bpy.data collection item and update the proxy accordingly
-
-        Receiver side
+        Process a received datablock update command, updating the datablock and the proxy state
         """
         assert isinstance(update, DeltaUpdate)
         incoming_proxy: DatablockProxy = update.value
@@ -299,9 +316,7 @@ class BpyDataProxy(Proxy):
 
     def remove_datablock(self, uuid: str):
         """
-        Remove a bpy.data collection item and update the proxy accordingly
-
-        Receiver side
+        Process a received datablock removal command, removing the datablock and updating the proxy state
         """
         proxy = self.id_proxies.get(uuid)
         if proxy is None:
@@ -320,10 +335,7 @@ class BpyDataProxy(Proxy):
 
     def rename_datablocks(self, items: List[str, str, str]) -> RenameChangeset:
         """
-        Rename a bpy.data collection item and update the proxy accordingly
-
-        Args:
-            items: list of (uuid, new_name) tuples
+        Process a received datablock rename command, renaming the datablocks and updating the proxy state.
         """
         rename_changeset_to_send: RenameChangeset = []
         renames = []
@@ -374,6 +386,7 @@ class BpyDataProxy(Proxy):
         return rename_changeset_to_send
 
     def debug_check_id_proxies(self):
+        """To detect stale entries in proxy state during development"""
         return 0
         # try to find stale entries ASAP: access them all
         dummy = 0
@@ -389,7 +402,7 @@ class BpyDataProxy(Proxy):
         return dummy
 
     def diff(self, context: Context) -> Optional[BpyDataProxy]:
-        # Currently for tests only
+        """Currently for tests only"""
         diff = self.__class__()
         visit_state = self.visit_state(context)
         for name, proxy in self._data.items():

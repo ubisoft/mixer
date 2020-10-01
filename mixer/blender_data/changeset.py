@@ -14,13 +14,14 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
+"""
+Define class and types to hold the changes between the proxy state and the Blender state.
+"""
 from __future__ import annotations
 
 from typing import List, Tuple
 
 import bpy.types as T  # noqa
-
 
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.proxy import DeltaUpdate

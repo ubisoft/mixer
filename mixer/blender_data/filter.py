@@ -14,7 +14,15 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+Defines the classes and configuration that controls the data synchronizations, i.e. which types and type members
+should be synchronized.
 
+This module could be enhanced to provide multiple Context to that different data is synchronized at different times
+according to user preferences.
+
+see synchronization.md
+"""
 import logging
 from typing import Any, ItemsView, Iterable, List, Mapping, Union
 
@@ -42,10 +50,6 @@ def skip_bpy_data_item(collection_name, item):
 class Filter:
     def is_active(self):
         return True
-
-
-# TODO FilterNameIn, FilterNameOut, FilterNameAdd
-# properties (included, excluded)
 
 
 class TypeFilter(Filter):
@@ -158,8 +162,14 @@ Properties = Mapping[PropertyName, Property]
 
 
 class Context:
+    """
+    Keeps track of properties to synchronize for all types.
 
-    # TODO check plugins and appearing disappearing attributes
+    Only one Context is currently use, but using several contexts could let the user control what is synchronized.
+
+    TODO Removing a plugin may cause a failure because the plugin properties are loaded in Context
+    and never unloaded
+    """
 
     def __init__(self, filter_stack):
         self._properties: Mapping[BlRna, Properties] = {}
@@ -167,6 +177,9 @@ class Context:
         self._unhandled_bpy_data_collection_names: List[str] = None
 
     def properties(self, bl_rna_property: T.Property = None, bpy_type=None) -> ItemsView:
+        """
+        Return the properties to synchronize for bpy_type
+        """
         if (bl_rna_property is None) and (bpy_type is None):
             return []
         if (bl_rna_property is not None) and (bpy_type is not None):
@@ -198,9 +211,6 @@ class Context:
 
 test_filter = FilterStack()
 
-# Members of bpy.data that will be totally excluded from synchronization
-# Do not exclude collections that may be a target of Object.data. It we did so, an Object.data member
-# would be loaded ad a DatablockProxy instead of a DatablockRefProxy
 blenddata_exclude = [
     # "brushes" generates harmless warnings when EnumProperty properties are initialized with a value not in the enum
     "brushes",
@@ -210,10 +220,13 @@ blenddata_exclude = [
     "screens",
     "window_managers",
     "workspaces",
-    # "grease_pencils",
 ]
+"""Members of bpy.data that will be totally excluded from synchronization.
 
-# TODO some of these will be included in future read_only exclusion
+Do not exclude collections that may be a target of Object.data. It we did so, an Object.data member
+would be loaded ad a DatablockProxy instead of a DatablockRefProxy
+"""
+
 _exclude_names = {
     "type_info",  # for Available (?) keyingset
     "depsgraph",  # found in Viewlayer
@@ -229,8 +242,8 @@ _exclude_names = {
     "preview",
     "mixer_uuid",
 }
+"""Names of properties that are always excluded"""
 
-# What we never want to load, ither because it is meaningless (depsgraph) or because it is not implemented at all
 default_exclusions = {
     None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
     T.ActionGroup: [NameFilterOut("channels")],
@@ -243,7 +256,7 @@ default_exclusions = {
     T.CurveMapPoint: [NameFilterOut("select")],
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
-    # TODO temporary ? Restore after foerach_get()
+    # TODO temporary ? Restore after foreach_get()
     T.Image: [
         NameFilterOut("pixels"),
         # meaningless to sync these, since they are handled by Image.pack() ?
@@ -361,31 +374,26 @@ default_exclusions = {
         NameFilterOut("active_layer_collection"),
     ],
 }
+"""
+Per-type property exclusions
+"""
 
 test_filter.append(default_exclusions)
 test_context = Context(test_filter)
+"""For tests"""
 
-#
-# safe means "can be released"
-#
 safe_exclusions = {}
 
-# depsgraph updates not in this ist are not handled by BpyDataProxy.update()
-# more types are just waiting to be tested
-# A specific problem for Scene as the depsgraph reports numerous meaningless Scene updates
-# that will probably hurt performance. We may have to find another way to update Scene or maybe
-# ignore scene updates when it is the only update in the depsgraph update + a timer update just for
-# Scene
-# Also do not blindly update what is already updated in VRtist code without checking that
-# they do not interfere
 safe_depsgraph_updates = (
     T.Camera,
     T.Collection,
     T.Image,
     # no generic sync of GreasePencil, use VRtist message
+    # T.GreasePencil,
     T.Light,
     T.Material,
     # no generic sync of Mesh, use VRtist message
+    # T.Mesh
     T.MetaBall,
     T.NodeTree,
     T.Object,
@@ -393,11 +401,14 @@ safe_depsgraph_updates = (
     T.Sound,
     T.World,
 )
+"""
+Datablock with a type in this list will be processed by the generic synchronization of depsgraph updates.
+
+Add new datablock type in this list to synchronize its updates as detect by depsgraph updates.
+See synchronization.md
+"""
 
 safe_filter = FilterStack()
-# The collections in this list are tested by BpyBlendDiff collection update
-# they will be included in creation messages.
-# objects is needed to items not created by VRtist
 safe_blenddata_collections = [
     "cameras",
     "collections",
@@ -412,11 +423,17 @@ safe_blenddata_collections = [
     "sounds",
     "worlds",
 ]
+"""
+The bpy.data collections in this list are checked for creation/removal and rename by BpyBlendDiff
 
-# mostly works
-# safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]
+Add a new collection to this list to synchronize creation, remova and rename events.
+"""
+
 safe_blenddata = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
 safe_filter.append(default_exclusions)
 safe_filter.append(safe_exclusions)
 safe_filter.append(safe_blenddata)
 safe_context = Context(safe_filter)
+"""
+The default context used for synchronization, that provides per-type lists of properties to synchronize
+"""

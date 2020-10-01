@@ -14,7 +14,15 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+Classes and methods to compute the difference between a BpyDataProxy and the bpy.data collections.
 
+It computes datablock additions, removals and renames.
+This module was written before the proxy system implements differential synchronization (Proxy.diff() and Proxy.apply())
+and its functionality should move into BpyDataProxy
+
+See synchronization.md
+"""
 from __future__ import annotations
 
 import logging

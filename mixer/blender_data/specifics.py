@@ -15,7 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Type specific helpers for Proxy load and save
+"""
+Proxy helpers Blender types that have different interfaces or requirements, but do not require their own complete
+Proxy implementation.
+
+
+TODO Enhance this module so that it is possible to reference types that do not exist in all Blender versions or
+to control behavior with plugin data.
 """
 import logging
 from pathlib import Path
@@ -33,6 +39,11 @@ VisitState = TypeVar("VisitState")
 
 
 def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, visit_state: Any) -> Optional[T.ID]:
+    """
+    Create an element in a bpy.data collection.
+
+    Contains collection-specific code is the mathod to add an element is not new(name: str)
+    """
     collection = getattr(bpy.data, collection_name)
     if collection_name == "images":
         is_packed = proxy.data("packed_file") is not None
@@ -269,7 +280,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, visit
 
         if isinstance(bl_rna, type(T.KeyingSetPaths.bl_rna)):
             # TODO current implementation fails
-            # All keying sets paths have an empty name, and insertion with add()à failes
+            # All keying sets paths have an empty name, and insertion with add() fails
             # with an empty name
             target_ref = proxy.data("id")
             if target_ref is None:
@@ -346,11 +357,14 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, visit
         return None
 
 
-# order dependent, so always clear
 always_clear = [type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl_rna), type(T.SequenceModifiers.bl_rna)]
+"""Collections in this list are order dependent and should always be cleared"""
 
 
 def truncate_collection(target: T.bpy_prop_collection, incoming_keys: List[str]):
+    """
+    TODO check if this is obsolete since Delta updates
+    """
     if not hasattr(target, "bl_rna"):
         return
 

@@ -14,7 +14,11 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+Proxy of a datablock
 
+See synchronization.md
+"""
 from __future__ import annotations
 
 import logging
@@ -42,14 +46,15 @@ logger = logging.getLogger(__name__)
 
 class DatablockProxy(StructProxy):
     """
-    Holds a copy of a datablock, standalone (bpy.data.cameras['Camera']) or embedded.
+    Proxy to a datablock, standalone (bpy.data.cameras['Camera']) or embedded.
     """
-
-    # name of the bpy.data collection this datablock belongs to, None if embedded in another datablock
 
     def __init__(self):
         super().__init__()
+
         self._bpy_data_collection: str = None
+        """name of the bpy.data collection this datablock belongs to, None if embedded in another datablock"""
+
         self._class_name: str = ""
         self._datablock_uuid: Optional[str] = None
 
@@ -97,7 +102,9 @@ class DatablockProxy(StructProxy):
         visit_state: VisitState,
         bpy_data_collection_name: str = None,
     ):
-        """"""
+        """
+        Load a datablock into this proxy
+        """
         if bl_instance.is_embedded_data and bpy_data_collection_name is not None:
             logger.error(
                 f"DatablockProxy.load() for {bl_instance} : is_embedded_data is True and bpy_prop_collection is {bpy_data_collection_name}. Item ignored"
@@ -236,9 +243,7 @@ class DatablockProxy(StructProxy):
 
     def save(self, bl_instance: any = None, attr_name: str = None, visit_state: VisitState = None) -> T.ID:
         """
-        Save this proxy into an existing datablock that may be
-        - a bpy.data member item
-        - an embedded datablock
+        Save this proxy into an existing datablock that may be a bpy.data member item or an embedded datablock
         """
         collection_name = self.collection_name
         if collection_name is not None:
@@ -278,6 +283,7 @@ class DatablockProxy(StructProxy):
         return target
 
     def update_from_proxy(self, other: DatablockProxy):
+        """Obsolete"""
         # Currently, we receive the full list of attributes, so replace everything.
         # Do not keep existing attribute as they may not be applicable any more to the new object. For instance
         # if a light has been morphed from POINT to SUN, the 'falloff_curve' attribute no more exists
@@ -292,16 +298,7 @@ class DatablockProxy(StructProxy):
         visit_state: VisitState,
     ):
         """
-        Apply diff to this proxy entry, but do not update Blender
-
-        Args:
-            parent ([type]): [description]
-            key ([type]): [description]
-            delta ([type]): [description]
-            visit_state ([type]): [description]
-
-        Returns:
-            [type]: [description]
+        Apply delta to this proxy, but do not update Blender state
         """
         if delta is None:
             return

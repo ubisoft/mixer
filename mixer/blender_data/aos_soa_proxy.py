@@ -14,7 +14,15 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+This module define Proxy classes and utilities to load array of structures like MeshVertex.vertices
+into structure of array and thus benefit from the performance of foreach_get() and foreach_set()
+and from the buffer compacity.
 
+This module is not currently used
+
+See synchronization.md
+"""
 from __future__ import annotations
 
 import array

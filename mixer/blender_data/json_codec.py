@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-An elementary json encoder-decoder to transmit Proxy and Delta items
+An elementary json encoder-decoder to transmit Proxy and Delta items.
 
 This module and the resulting encoding are by no way optimal. It is just a simple
 implementation that does the job.
