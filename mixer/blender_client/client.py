@@ -712,6 +712,15 @@ class BlenderClient(Client):
             common.Command(MessageType.FRAME_START_END, common.encode_int(start) + common.encode_int(end), 0)
         )
 
+    def build_start_end_frame(self, data):
+        index = 0
+        start, index = common.decode_int(data, index)
+        end, index = common.decode_int(data, index)
+        bpy.context.scene.frame_start = start
+        bpy.context.scene.frame_end = end
+        share_data.start_frame = bpy.context.scene.frame_start
+        share_data.end_frame = bpy.context.scene.frame_end
+
     def override_context(self):
         for window in bpy.context.window_manager.windows:
             for area in window.screen.areas:
@@ -966,6 +975,8 @@ class BlenderClient(Client):
                         self.build_frame(command.data)
                     elif command.type == MessageType.QUERY_CURRENT_FRAME:
                         self.query_current_frame()
+                    elif command.type == MessageType.FRAME_START_END:
+                        self.build_start_end_frame(command.data)
 
                     elif command.type == MessageType.PLAY:
                         self.build_play(command.data)

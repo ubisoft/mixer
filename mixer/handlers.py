@@ -645,8 +645,9 @@ def update_objects_data():
             share_data.client.send_material(obj)
 
         if typename == "Scene":
-            update_frame_start_end()
             shot_manager.update_scene()
+
+    update_frame_start_end()
 
     # Send transforms
     for obj in transforms:
