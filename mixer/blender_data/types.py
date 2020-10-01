@@ -15,6 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+Type related utilities
+"""
+import functools
 from typing import Any, List, Type
 
 import bpy.types as T  # noqa N812
@@ -58,3 +62,12 @@ def is_instance(rna_property: T.Property, base: T.Property) -> bool:
 
 def is_pointer_to(rna_property: T.Property, base: type) -> bool:
     return is_pointer(rna_property) and is_instance(rna_property.fixed_type, base.bl_rna)
+
+
+@functools.lru_cache(maxsize=None)
+def sub_id_type(type_):
+    """Returns the base closest to ID (e.g Light for PointLight)"""
+    sub_id_list = [t for t in type_.mro() if issubclass(t, T.ID) and t != T.ID]
+    if sub_id_list:
+        return sub_id_list[-1]
+    return None

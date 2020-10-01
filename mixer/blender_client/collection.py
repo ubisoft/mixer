@@ -44,6 +44,14 @@ def send_collection(client: Client, collection: bpy.types.Collection):
 
 def build_collection(data):
     name_full, index = common.decode_string(data, 0)
+
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning("build_collection %s, ignored in experimental mode", name_full)
+        return
+
+    # Blender/Blender in VRtist (non generic) mode
     visible, index = common.decode_bool(data, index)
     hide_viewport = not visible
     offset, index = common.decode_vector3(data, index)
@@ -74,6 +82,14 @@ def send_collection_removed(client: Client, collection_name):
 
 def build_collection_removed(data):
     name_full, index = common.decode_string(data, 0)
+
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning("build_collection_remove %s, ignore in experimental mode", name_full)
+        return
+
+    # Blender/Blender in VRtist (non generic) mode
     logger.info("build_collectionRemove %s", name_full)
     collection = share_data.blender_collections.get(name_full)
     if collection:
@@ -96,9 +112,16 @@ def send_add_collection_to_collection(client: Client, parent_collection_name, co
 def build_collection_to_collection(data):
     parent_name, index = common.decode_string(data, 0)
     child_name, _ = common.decode_string(data, index)
-    logger.info("build_collection_to_collection %s <- %s", parent_name, child_name)
 
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning("build_collection_to_collection %s <- %s, ignore in experimental mode", parent_name, child_name)
+        return
+
+    logger.info("build_collection_to_collection %s <- %s", parent_name, child_name)
     parent = share_data.blender_collections[parent_name]
+
     child = share_data.blender_collections[child_name]
 
     try:
@@ -126,6 +149,15 @@ def send_remove_collection_from_collection(client: Client, parent_collection_nam
 def build_remove_collection_from_collection(data):
     parent_name, index = common.decode_string(data, 0)
     child_name, _ = common.decode_string(data, index)
+
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning(
+            "build_remove_collection_from_collection %s <- %s, ignore in experimental mode", parent_name, child_name
+        )
+        return
+
     logger.info("build_remove_collection_from_collection %s <- %s", parent_name, child_name)
 
     parent = share_data.blender_collections[parent_name]
@@ -142,12 +174,20 @@ def send_add_object_to_collection(client: Client, collection_name, obj_name):
 def build_add_object_to_collection(data):
     collection_name, index = common.decode_string(data, 0)
     object_name, _ = common.decode_string(data, index)
+
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning(
+            "build_add_object_to_collection %s <- %s, ignore in experimental mode", collection_name, object_name
+        )
+        return
     logger.info("build_add_object_to_collection %s <- %s", collection_name, object_name)
 
     collection = share_data.blender_collections[collection_name]
 
     # We may have received an object creation message before this collection link message
-    # and object creation will have created and linked the collecetion if needed
+    # and object creation will have created and linked the collection if needed
     if collection.objects.get(object_name) is None:
         object_ = share_data.blender_objects[object_name]
         collection.objects.link(object_)
@@ -162,6 +202,15 @@ def send_remove_object_from_collection(client: Client, collection_name, obj_name
 def build_remove_object_from_collection(data):
     collection_name, index = common.decode_string(data, 0)
     object_name, _ = common.decode_string(data, index)
+
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning(
+            "build_remove_object_from_collection %s <- %s, ignore in experimental mode", collection_name, object_name
+        )
+        return
+
     logger.info("build_remove_object_from_collection %s <- %s", collection_name, object_name)
 
     collection = share_data.blender_collections[collection_name]
@@ -187,6 +236,15 @@ def send_collection_instance(client: Client, obj):
 def build_collection_instance(data):
     instance_name, index = common.decode_string(data, 0)
     instantiated_name, _ = common.decode_string(data, index)
+
+    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
+    # In generic mode, it conflicts with generic messages, so drop it
+    if share_data.use_experimental_sync():
+        logger.warning(
+            "build_collection_instance %s <- %s, ignore in experimental mode", instantiated_name, instance_name
+        )
+        return
+
     logger.info("build_collection_instance %s from %s", instantiated_name, instance_name)
 
     instantiated = share_data.blender_collections[instantiated_name]

@@ -29,8 +29,12 @@ is expressed 2 times. This lead to messages that are bigger than necessary.
 We plan to change the strategy to store the name_full of the parent in the command instead.
 """
 
+import logging
+
 from mixer.share_data import share_data
 import bpy
+
+logger = logging.getLogger(__name__)
 
 
 def get_or_create_path(path, data=None) -> bpy.types.Object:
@@ -42,6 +46,7 @@ def get_or_create_path(path, data=None) -> bpy.types.Object:
     elem = path[index + 1 :]
     ob = share_data.blender_objects.get(elem)
     if not ob:
+        logger.info(f"get_or_create_path: creating bpy.data.objects[{elem}] for path {path}")
         ob = bpy.data.objects.new(elem, data)
         share_data._blender_objects[ob.name_full] = ob
     return ob

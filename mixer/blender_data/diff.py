@@ -21,7 +21,6 @@ from typing import List, Mapping, Tuple
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.filter import Context, skip_bpy_data_item
 from mixer.blender_data.proxy import (
     BpyBlendProxy,
@@ -108,8 +107,6 @@ class BpyPropCollectionDiff(BpyDiff):
 
             blender_items[item.mixer_uuid] = (name, collection_name)
         self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
-        if not self.empty():
-            BlendData.instance().collection(collection_name).set_dirty()
 
     def empty(self):
         return not (self.items_added or self.items_removed or self.items_renamed)
@@ -132,6 +129,8 @@ class BpyBlendDiff(BpyDiff):
         self.id_deltas.clear()
 
         for collection_name, _ in context.properties(bpy_type=T.BlendData):
+            if collection_name not in blend_proxy._data:
+                continue
             delta = BpyPropCollectionDiff()
             delta.diff(blend_proxy._data[collection_name], collection_name, context)
             if not delta.empty():

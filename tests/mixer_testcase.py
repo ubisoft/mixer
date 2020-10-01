@@ -132,7 +132,8 @@ class MixerTestCase(unittest.TestCase):
                 blender.wait()
                 blender.close()
             except Exception:
-                raise
+                # always close server
+                pass
 
         self._server_process.kill()
         mixer.codec.unregister()
@@ -142,10 +143,12 @@ class MixerTestCase(unittest.TestCase):
 
     def assert_matches(self):
         # TODO add message count dict as param
-
-        self._sender.disconnect_mixer()
-        # time.sleep(1)
-        self._receiver.disconnect_mixer()
+        try:
+            self._sender.disconnect_mixer()
+            # time.sleep(1)
+            self._receiver.disconnect_mixer()
+        except Exception as e:
+            raise self.failureException(f"Exception during disconnect():\n{e}\nPossible Blender crash") from None
 
         # wait for disconnect before killing the server. Avoids a disconnect operator context error message
         time.sleep(0.5)
@@ -288,6 +291,16 @@ class MixerTestCase(unittest.TestCase):
                         f"Unexpected message count for message {message_name}. Expected {expected_count}: found {len_a}\n{detail_message}",
                     )
 
+                def decode_proxy_strings(stream):
+                    for decoded in stream:
+                        # HACK do not hardcode
+                        proxy_string = getattr(decoded, "proxy_string", None)
+                        if proxy_string is not None:
+                            decoded.proxy_string = json.loads(proxy_string)
+
+                decode_proxy_strings(decoded_stream_a)
+                decode_proxy_strings(decoded_stream_b)
+
                 for i, (decoded_a, decoded_b) in enumerate(zip(decoded_stream_a, decoded_stream_b)):
                     # TODO there another failure case with floats as they will cause sort differences for proxies
                     # we actually need to sort on something else, that the encoded json of the proxy, maybe the uuid
@@ -296,13 +309,6 @@ class MixerTestCase(unittest.TestCase):
                         type(decoded_b),
                         f"{message_name}: Type mismatch at decoded message mismatch at index {i}",
                     )
-
-                    # HACK do not hardcode
-                    proxy_string_a = getattr(decoded_a, "proxy_string", None)
-                    proxy_string_b = getattr(decoded_b, "proxy_string", None)
-                    if proxy_string_a is not None and proxy_string_b is not None:
-                        decoded_a.proxy_string = json.loads(proxy_string_a)
-                        decoded_b.proxy_string = json.loads(proxy_string_b)
 
                 if message_type == MessageType.BLENDER_DATA_CREATE:
                     short_a = [
@@ -373,11 +379,19 @@ class MixerTestCase(unittest.TestCase):
                 blender.join_room(experimental=self.experimental_sync)
 
     def disconnect(self):
-        for blender in self._blenders:
-            blender.disconnect_mixer()
+        try:
+            for blender in self._blenders:
+                blender.disconnect_mixer()
+        except Exception as e:
+            raise self.failureException(f"Exception {e} during disconnect_mixer(). Possible Blender crash")
 
-    def send_string(self, s: str, to: Optional[int] = 0):
-        self._blenders[to].send_string(s)
+    def send_string(self, s: str, to: Optional[int] = 0, sleep: float = 0.5):
+        try:
+            self._blenders[to].send_string(s, sleep)
+        except Exception as e:
+            raise self.failureException(
+                f"Exception {e}\n" "during send command :\n" "{s}\n" "to Blender {to}.\n" "Possible Blender crash"
+            )
 
-    def send_strings(self, strings: List[str], to: Optional[int] = 0):
-        self.send_string("\n".join(strings), to)
+    def send_strings(self, strings: List[str], to: Optional[int] = 0, sleep: float = 0.5):
+        self.send_string("\n".join(strings), to, sleep)

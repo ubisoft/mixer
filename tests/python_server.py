@@ -192,7 +192,9 @@ if __name__ == "__main__":
 
             ptvsd.enable_attach(address=("localhost", args.ptvsd), redirect_output=True)
             if args.wait_for_debugger:
+                logger.warning(f"Waiting for debugger on port {args.ptvsd}")
                 ptvsd.wait_for_attach()
+                logger.warning("Debugger attached")
         except ImportError:
             pass
 

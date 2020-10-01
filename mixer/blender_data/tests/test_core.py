@@ -27,7 +27,6 @@ from mixer.blender_data.proxy import (
     BpyBlendProxy,
     BpyStructProxy,
     LoadElementAs,
-    VisitState,
     load_as_what,
 )
 from mixer.blender_data.filter import test_context
@@ -38,7 +37,8 @@ class TestCore(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
         register_bl_equals(self, test_context)
-        self._visit_state = VisitState({}, {}, {}, test_context)
+        self._proxy = BpyBlendProxy()
+        self._visit_state = self._proxy.visit_state()
 
     def test_issubclass(self):
 

@@ -99,6 +99,35 @@ obj.active_material = mat
 
         self.assert_matches()
 
+    def test_unresolved_ref_in_bpy_prop_collection(self):
+        # Unresolved references stored in bpy_pro_collection
+
+        # only care about Blender_DATA_CREATE
+        self.ignored_messages |= {MessageType.MATERIAL, MessageType.OBJECT_VISIBILITY}
+
+        # That datablock references are correctly handled even in the pointee is received after the pointer, like in
+        # the Collection layout below, with collections being created (hence transmitted) in A, B, C order
+        # A
+        #   children C
+        # B
+        #   children C
+
+        s = """
+import bpy
+a = bpy.data.collections.new("A")
+b = bpy.data.collections.new("B")
+c = bpy.data.collections.new("C")
+a.children.link(c)
+b.children.link(c)
+"""
+        self.send_string(s)
+
+        self.assert_matches()
+
+    @unittest.skip("TODO")
+    def test_unresolved_ref_in_struct(self):
+        pass
+
 
 @parameterized_class(
     [{"experimental_sync": True}],

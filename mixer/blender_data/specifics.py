@@ -26,16 +26,14 @@ import bpy
 import bpy.types as T  # noqa N812
 import bpy.path
 
-from mixer.blender_data.blenddata import BlendData
-
 logger = logging.getLogger(__name__)
 Proxy = TypeVar("Proxy")
 BpyIDProxy = TypeVar("BpyIDProxy")
+VisitState = TypeVar("VisitState")
 
 
 def bpy_data_ctor(collection_name: str, proxy: BpyIDProxy, visit_state: Any) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
-    BlendData.instance().collection(collection_name).set_dirty
     if collection_name == "images":
         is_packed = proxy.data("packed_file") is not None
         image = None
@@ -172,7 +170,7 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
     return properties
 
 
-def pre_save_id(proxy: Proxy, target: T.ID) -> T.ID:
+def pre_save_id(proxy: Proxy, target: T.ID, visit_state: VisitState) -> T.ID:
     """Process attributes that must be saved first and return a possibly updated reference to the target
 
     Args:
@@ -182,7 +180,18 @@ def pre_save_id(proxy: Proxy, target: T.ID) -> T.ID:
     Returns:
         [bpy.types.ID]: a possibly new ID
     """
-    if isinstance(target, T.Scene):
+    if isinstance(target, bpy.types.Material):
+        is_grease_pencil = proxy.data("is_grease_pencil")
+        # will be None for a DeltaUpdate that does not modify "is_grease_pencil"
+        if is_grease_pencil is not None:
+            # is_grease_pencil is modified
+            if is_grease_pencil:
+                if not target.grease_pencil:
+                    bpy.data.materials.create_gpencil_data(target)
+            else:
+                if target.grease_pencil:
+                    bpy.data.materials.remove_gpencil_data(target)
+    elif isinstance(target, T.Scene):
         # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
         use_nodes = proxy.data("use_nodes")
         if use_nodes:
@@ -196,7 +205,7 @@ def pre_save_id(proxy: Proxy, target: T.ID) -> T.ID:
         if light_type is not None and light_type != target.type:
             target.type = light_type
             # must reload the reference
-            target = proxy.target()
+            target = proxy.target(visit_state)
     elif isinstance(target, T.ColorManagedViewSettings):
         use_curve_mapping = proxy.data("use_curve_mapping")
         if use_curve_mapping:
@@ -240,11 +249,20 @@ non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP",
 effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - non_effect_sequences
 
 
-def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
+def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, visit_state: VisitState):
     """Add an element to a bpy_prop_collection using the collection specific API"""
 
     bl_rna = getattr(collection, "bl_rna", None)
     if bl_rna is not None:
+        if isinstance(bl_rna, (type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl_rna))):
+            name = proxy.data("name")
+            modifier_type = proxy.data("type")
+            return collection.new(name, modifier_type)
+
+        if isinstance(bl_rna, type(T.ObjectConstraints.bl_rna)):
+            type_ = proxy.data("type")
+            return collection.new(type_)
+
         if isinstance(bl_rna, type(T.KeyingSets.bl_rna)):
             idname = proxy.data("bl_idname")
             return collection.new(name=key, idname=idname)
@@ -257,7 +275,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
             if target_ref is None:
                 target = None
             else:
-                target = target_ref.target()
+                target = target_ref.target(visit_state)
             data_path = proxy.data("data_path")
             index = proxy.data("array_index")
             group_method = proxy.data("group_method")
@@ -281,7 +299,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
                 return collection.new_effect(name, type_, channel, frame_start, frame_end=frame_end)
             if type_ == "SOUND":
                 sound = proxy.data("sound")
-                target = sound.target()
+                target = sound.target(visit_state)
                 if not target:
                     logger.warning(f"missing target ID block for bpy.data.{sound.collection}[{sound.key}] ")
                     return None
@@ -329,7 +347,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str):
 
 
 # order dependent, so always clear
-always_clear = [type(T.ObjectModifiers.bl_rna), type(T.SequenceModifiers.bl_rna)]
+always_clear = [type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl_rna), type(T.SequenceModifiers.bl_rna)]
 
 
 def truncate_collection(target: T.bpy_prop_collection, incoming_keys: List[str]):

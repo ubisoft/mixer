@@ -57,6 +57,7 @@ from mixer.blender_client import material as material_api
 from mixer.blender_client import mesh as mesh_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
+from mixer.blender_data.proxy import ensure_uuid
 import mixer.shot_manager as shot_manager
 from mixer.stats import stats_timer
 from mixer.draw_handlers import set_draw_handlers
@@ -478,8 +479,13 @@ class BlenderClient(Client):
     def send_mesh(self, obj):
         logger.info("send_mesh %s", obj.name_full)
         mesh = obj.data
-        mesh_name = self.get_mesh_name(mesh)
-        path = self.get_object_path(obj)
+        if share_data.use_experimental_sync():
+            # see build_mesh_generic()
+            path = ensure_uuid(mesh)
+            mesh_name = mesh.name
+        else:
+            path = self.get_object_path(obj)
+            mesh_name = self.get_mesh_name(mesh)
 
         binary_buffer = common.encode_string(path) + common.encode_string(mesh_name)
 
@@ -504,6 +510,12 @@ class BlenderClient(Client):
 
     @stats_timer(share_data)
     def build_mesh(self, command_data):
+        if share_data.use_experimental_sync():
+            return self.build_mesh_generic(command_data)
+        else:
+            return self.build_mesh_vrtist(command_data)
+
+    def build_mesh_vrtist(self, command_data):
         index = 0
 
         path, index = common.decode_string(command_data, index)
@@ -531,6 +543,24 @@ class BlenderClient(Client):
             material_name, index = common.decode_string(command_data, index)
             if slot.link == "OBJECT" and material_name != "":
                 slot.material = material_api.get_or_create_material(material_name)
+
+    def build_mesh_generic(self, command_data):
+        index = 0
+
+        uuid, index = common.decode_string(command_data, index)
+        mesh_name, index = common.decode_string(command_data, index)
+        logger.info("build_mesh_generic %s", mesh_name)
+
+        meshes_proxy = share_data.bpy_data_proxy.data("meshes")
+        mesh_proxy = meshes_proxy.data(uuid)
+        if mesh_proxy is None:
+            # should not happen because a minimal generic Mesh BLENDER_DATA_CREATE is send before sending MESH
+            logger.warning(f"build_mesh for unregistered datablock {mesh_name} {uuid}. Ignored")
+            return
+        else:
+            mesh = share_data.bpy_data_proxy.visit_state().ids[uuid]
+
+        index = mesh_api.decode_mesh_generic(self, mesh, command_data, index)
 
     def send_set_current_scene(self, name):
         buffer = common.encode_string(name)
@@ -1095,7 +1125,7 @@ def clear_scene_content():
 
         if len(bpy.data.scenes) == 1:
             scene = bpy.data.scenes[0]
-            scene.name = "__last_scene_to_be_removed__"
+            scene.name = "_mixer_to_be_removed_"
 
 
 @stats_timer(share_data)
@@ -1110,6 +1140,8 @@ def send_scene_content():
         return
 
     with HandlerManager(False):
+        from mixer import handlers_generic as generic
+
         # mesh baking may trigger depsgraph_updatewhen more than one view layer and
         # cause to reenter send_scene_data_to_server() and send duplicate messages
 
@@ -1121,7 +1153,10 @@ def send_scene_content():
         for material in bpy.data.materials:
             share_data.client.send_material(material)
 
-        send_scene_data_to_server(None, None)
+        if share_data.use_experimental_sync():
+            generic.send_scene_data_to_server(None, None)
+        else:
+            send_scene_data_to_server(None, None)
 
         shot_manager.send_scene()
         share_data.client.send_frame_start_end(bpy.context.scene.frame_start, bpy.context.scene.frame_end)

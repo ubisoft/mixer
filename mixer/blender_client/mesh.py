@@ -18,6 +18,7 @@
 import logging
 import struct
 import array
+from typing import Optional
 
 import bpy
 import bmesh
@@ -469,9 +470,9 @@ def encode_mesh(obj, do_encode_base_mesh, do_encode_baked_mesh):
 
 
 @stats_timer(share_data)
-def decode_baked_mesh(obj, data, index):
+def decode_baked_mesh(obj: Optional[bpy.types.Object], data, index):
     # Note: Blender should not load a baked mesh but we have this function to debug the encoding part
-    # and as an exemple for implementations that load baked meshes
+    # and as an example for implementations that load baked meshes
     byte_size, index = common.decode_int(data, index)
     if byte_size == 0:
         return index
@@ -482,56 +483,57 @@ def decode_baked_mesh(obj, data, index):
     material_indices, index = common.decode_int_array(data, index)
     triangles, index = common.decode_int3_array(data, index)
 
-    bm = bmesh.new()
-    for i in range(len(positions)):
-        bm.verts.new(positions[i])
-        # according to https://blender.stackexchange.com/questions/49357/bmesh-how-can-i-import-custom-vertex-normals
-        # normals are not working for bmesh...
-        # vertex.normal = normals[i]
-    bm.verts.ensure_lookup_table()
+    if obj is not None:
+        bm = bmesh.new()
+        for i in range(len(positions)):
+            bm.verts.new(positions[i])
+            # according to https://blender.stackexchange.com/questions/49357/bmesh-how-can-i-import-custom-vertex-normals
+            # normals are not working for bmesh...
+            # vertex.normal = normals[i]
+        bm.verts.ensure_lookup_table()
 
-    uv_layer = None
-    if len(uvs) > 0:
-        uv_layer = bm.loops.layers.uv.new()
+        uv_layer = None
+        if len(uvs) > 0:
+            uv_layer = bm.loops.layers.uv.new()
 
-    multi_material = False
-    if len(material_indices) > 1:
-        multi_material = True
+        multi_material = False
+        if len(material_indices) > 1:
+            multi_material = True
 
-    current_uv_index = 0
-    for i in range(len(triangles)):
-        triangle = triangles[i]
-        i1 = triangle[0]
-        i2 = triangle[1]
-        i3 = triangle[2]
-        try:
-            face = bm.faces.new((bm.verts[i1], bm.verts[i2], bm.verts[i3]))
-            if multi_material:
-                face.material_index = material_indices[i]
-            else:
-                face.material_index = 0
-            if uv_layer:
-                face.loops[0][uv_layer].uv = uvs[current_uv_index]
-                face.loops[1][uv_layer].uv = uvs[current_uv_index + 1]
-                face.loops[2][uv_layer].uv = uvs[current_uv_index + 2]
-                current_uv_index = current_uv_index + 3
-        except Exception:
-            pass
+        current_uv_index = 0
+        for i in range(len(triangles)):
+            triangle = triangles[i]
+            i1 = triangle[0]
+            i2 = triangle[1]
+            i3 = triangle[2]
+            try:
+                face = bm.faces.new((bm.verts[i1], bm.verts[i2], bm.verts[i3]))
+                if multi_material:
+                    face.material_index = material_indices[i]
+                else:
+                    face.material_index = 0
+                if uv_layer:
+                    face.loops[0][uv_layer].uv = uvs[current_uv_index]
+                    face.loops[1][uv_layer].uv = uvs[current_uv_index + 1]
+                    face.loops[2][uv_layer].uv = uvs[current_uv_index + 2]
+                    current_uv_index = current_uv_index + 3
+            except Exception:
+                pass
 
-    me = obj.data
+        me = obj.data
 
-    bm.to_mesh(me)
-    bm.free()
+        bm.to_mesh(me)
+        bm.free()
 
-    # hack ! Since bmesh cannot be used to set custom normals
-    me.normals_split_custom_set(normals)
-    me.use_auto_smooth = True
+        # hack ! Since bmesh cannot be used to set custom normals
+        me.normals_split_custom_set(normals)
+        me.use_auto_smooth = True
 
     return index
 
 
 @stats_timer(share_data)
-def decode_base_mesh(client, obj, data, index):
+def decode_base_mesh(client, obj: bpy.types.Object, mesh: bpy.types.Mesh, data, index):
     bm = bmesh.new()
 
     position_count, index = common.decode_int(data, index)
@@ -581,7 +583,7 @@ def decode_base_mesh(client, obj, data, index):
     index = decode_bmesh_layer(data, index, bm.loops.layers.color, loops_iterator(bm), decode_layer_color)
 
     bm.normal_update()
-    bm.to_mesh(obj.data)
+    bm.to_mesh(mesh)
     bm.free()
 
     # Load shape keys
@@ -625,28 +627,28 @@ def decode_base_mesh(client, obj, data, index):
             vertex_group.add([vert_idx], weight, "REPLACE")
 
     # Normals
-    obj.data.use_auto_smooth, index = common.decode_bool(data, index)
-    obj.data.auto_smooth_angle, index = common.decode_float(data, index)
+    mesh.use_auto_smooth, index = common.decode_bool(data, index)
+    mesh.auto_smooth_angle, index = common.decode_float(data, index)
 
     has_custom_normal, index = common.decode_bool(data, index)
 
     if has_custom_normal:
         normals = []
-        for _loop in obj.data.loops:
+        for _loop in mesh.loops:
             normal, index = common.decode_vector3(data, index)
             normals.append(normal)
-        obj.data.normals_split_custom_set(normals)
+        mesh.normals_split_custom_set(normals)
 
     # UV Maps and Vertex Colors are added automatically based on layers in the bmesh
     # We just need to update their name and active_render state:
 
     # UV Maps
-    for uv_layer in obj.data.uv_layers:
+    for uv_layer in mesh.uv_layers:
         uv_layer.name, index = common.decode_string(data, index)
         uv_layer.active_render, index = common.decode_bool(data, index)
 
     # Vertex Colors
-    for vertex_colors in obj.data.vertex_colors:
+    for vertex_colors in mesh.vertex_colors:
         vertex_colors.name, index = common.decode_string(data, index)
         vertex_colors.active_render, index = common.decode_bool(data, index)
 
@@ -665,7 +667,7 @@ def decode_mesh(client, obj, data, index):
         # No base mesh, lets read the baked mesh
         index = decode_baked_mesh(obj, data, index)
     else:
-        index = decode_base_mesh(client, obj, data, index)
+        index = decode_base_mesh(client, obj, obj.data, data, index)
         # Skip the baked mesh (its size is encoded here)
         baked_mesh_byte_size, index = common.decode_int(data, index)
         index += baked_mesh_byte_size
@@ -675,5 +677,24 @@ def decode_mesh(client, obj, data, index):
     for material_name in material_names:
         material = material_api.get_or_create_material(material_name) if material_name != "" else None
         obj.data.materials.append(material)
+
+    return index
+
+
+def decode_mesh_generic(client, mesh: bpy.types.Mesh, data, index):
+
+    try:
+        tmp_obj = bpy.data.objects.new("_miser_tmp_", None)
+        byte_size, index = common.decode_int(data, index)
+        if byte_size == 0:
+            # No base mesh, lets read the baked mesh
+            index = decode_baked_mesh(tmp_obj, data, index)
+        else:
+            index = decode_base_mesh(client, tmp_obj, mesh, data, index)
+            # Skip the baked mesh (its size is encoded here)
+            baked_mesh_byte_size, index = common.decode_int(data, index)
+            index += baked_mesh_byte_size
+    finally:
+        bpy.data.objects.remove(tmp_obj)
 
     return index

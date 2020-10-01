@@ -33,8 +33,8 @@ import logging
 import bpy
 
 from mixer.share_data import share_data
+from mixer import handlers_generic as generic
 from mixer.blender_client import collection as collection_api
-from mixer.blender_client import data as data_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
 import mixer.shot_manager as shot_manager
@@ -47,8 +47,6 @@ from bpy.app.handlers import persistent
 
 from mixer.share_data import object_visibility
 from mixer.stats import StatsTimer
-from mixer.blender_data.diff import BpyBlendDiff
-from mixer.blender_data.filter import safe_context
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import update_params
 
@@ -130,19 +128,34 @@ def handler_send_frame_changed(scene):
         share_data.client.send_command_pack()
 
 
+processing_depsgraph_handler = False
+
+
 @persistent
 def handler_send_scene_data_to_server(scene, dummy):
-    logger.debug("handler_send_scene_data_to_server")
-
-    # Ensure we will rebuild accessors when a depsgraph update happens
-    # todo investigate why we need this...
-    share_data.set_dirty()
-
-    if share_data.client.block_signals:
-        logger.debug("handler_send_scene_data_to_server canceled (block_signals = True)")
+    global processing_depsgraph_handler
+    if processing_depsgraph_handler:
+        logger.error("Depsgraph handler recursion attempt")
         return
 
-    send_scene_data_to_server(scene, dummy)
+    processing_depsgraph_handler = True
+    try:
+        logger.debug("handler_send_scene_data_to_server")
+
+        # Ensure we will rebuild accessors when a depsgraph update happens
+        # todo investigate why we need this...
+        share_data.set_dirty()
+
+        if share_data.client.block_signals:
+            logger.debug("handler_send_scene_data_to_server canceled (block_signals = True)")
+            return
+
+        if share_data.use_experimental_sync():
+            generic.send_scene_data_to_server(scene, dummy)
+        else:
+            send_scene_data_to_server(scene, dummy)
+    finally:
+        processing_depsgraph_handler = False
 
 
 class TransformStruct:
@@ -219,14 +232,10 @@ def update_scenes_state():
             scene.mixer_uuid = str(uuid4())
 
     scenes_after = {
-        scene.mixer_uuid: name
-        for name, scene in share_data.blender_scenes.items()
-        if name != "__last_scene_to_be_removed__"
+        scene.mixer_uuid: name for name, scene in share_data.blender_scenes.items() if name != "_mixer_to_be_removed_"
     }
     scenes_before = {
-        scene.mixer_uuid: name
-        for name, scene in share_data.scenes_info.items()
-        if name != "__last_scene_to_be_removed__"
+        scene.mixer_uuid: name for name, scene in share_data.scenes_info.items() if name != "_mixer_to_be_removed_"
     }
     share_data.scenes_added, share_data.scenes_removed, share_data.scenes_renamed = find_renamed(
         scenes_before, scenes_after
@@ -350,6 +359,11 @@ def update_object_state(old_objects: dict, new_objects: dict):
         share_data.objects_added.clear()
         share_data.objects_removed.clear()
         return
+
+    if len(share_data.objects_added) > 1 and len(share_data.objects_removed) > 1:
+        logger.error(
+            f"more than one object renamed: unsupported{share_data.objects_added} {share_data.objects_removed}"
+        )
 
     for obj_name in share_data.objects_removed:
         if obj_name in share_data.old_objects:
@@ -767,7 +781,10 @@ def send_scene_data_to_server(scene, dummy):
     share_data.pending_test_update = False
 
     if not is_in_object_mode():
-        logger.info("send_scene_data_to_server canceled (not is_in_object_mode)")
+        if depsgraph.updates:
+            logger.info("send_scene_data_to_server canceled (not is_in_object_mode). Skipping updates")
+            for update in depsgraph.updates:
+                logger.info(" ......%s", update.id.original)
         return
 
     update_object_state(share_data.old_objects, share_data.blender_objects)
@@ -789,34 +806,6 @@ def send_scene_data_to_server(scene, dummy):
         changed |= add_scenes()
         changed |= add_collections()
         changed |= add_objects()
-
-        # Updates from the VRtist protocol and from the full Blender protocol must be carefully intermixed
-        # This is an unfortunate requirements from the current coexistence status of
-        # both protocols
-
-        # After creation of meshes : meshes are not yet supported by full Blender protocol,
-        # but needed to properly create objects
-        # Before creation of objects :  the VRtist protocol  will implicitely create objects with
-        # inappropriate default values (e.g. transform creates an object with no data)
-        if share_data.use_experimental_sync():
-            # Compute the difference between the proxy state and the Blender state
-            # It is a coarse difference at the ID level(created, removed, renamed)
-            diff = BpyBlendDiff()
-            diff.diff(share_data.bpy_data_proxy, safe_context)
-
-            # Ask the proxy to compute the list of elements to synchronize and update itself
-            depsgraph = bpy.context.evaluated_depsgraph_get()
-            changeset = share_data.bpy_data_proxy.update(diff, safe_context, depsgraph.updates)
-
-            # Send the data update messages (includes serialization)
-            data_api.send_data_creations(changeset.creations)
-            data_api.send_data_removals(changeset.removals)
-            data_api.send_data_renames(changeset.renames)
-            data_api.send_data_updates(changeset.updates)
-            share_data.bpy_data_proxy.debug_check_id_proxies()
-
-        # send the VRtist transforms after full Blender protocol has the opportunity to create the object data
-        # that is not handled by VRtist protocol, otherwise the receiver creates an empty when it receives a transform
         changed |= update_transforms()
         changed |= add_collections_to_scenes()
         changed |= add_collections_to_collections()

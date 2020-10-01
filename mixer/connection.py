@@ -31,7 +31,6 @@ import time
 from pathlib import Path
 
 from mixer.stats import save_statistics, get_stats_filename
-from mixer.blender_data.blenddata import BlendData
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import SendSceneContentFailed, BlenderClient
 from mixer.handlers import HandlerManager
@@ -53,7 +52,6 @@ def join_room(room_name: str, experimental_sync: bool):
     logger.info("join_room")
 
     assert share_data.client.current_room is None
-    BlendData.instance().reset()
     share_data.session_id += 1
     # todo tech debt -> current_room should be set when JOIN_ROOM is received
     # todo _joining_room_name should be set in client timer
@@ -135,14 +133,13 @@ def is_localhost(host):
 
 
 def connect():
-    logger.info("connect")
-    BlendData.instance().reset()
+    prefs = get_mixer_prefs()
+    logger.info(f"connect to {prefs.host}:{prefs.port}")
     if share_data.client is not None:
         # a server shutdown was not processed
         logger.debug("connect: share_data.client is not None")
         share_data.client = None
 
-    prefs = get_mixer_prefs()
     if not create_main_client(prefs.host, prefs.port):
         if is_localhost(prefs.host):
             if prefs.no_start_server:
@@ -166,7 +163,6 @@ def disconnect():
     logger.info("disconnect")
 
     leave_current_room()
-    BlendData.instance().reset()
 
     remove_draw_handlers()
 

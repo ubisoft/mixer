@@ -56,9 +56,9 @@ class BlenderApp:
         self._blender.send_function(f, *args, **kwargs)
         time.sleep(1)
 
-    def send_string(self, s):
+    def send_string(self, s, sleep: float):
         self._blender.send_string(s)
-        time.sleep(0.5)
+        time.sleep(sleep)
 
     def quit(self):
         self._blender.send_function(bl.quit)

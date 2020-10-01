@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 def skip_bpy_data_item(collection_name, item):
     # Never want to consider these as updated, created, removed, ...
     if collection_name == "scenes":
-        if item.name == "__last_scene_to_be_removed__":
+        if item.name == "_mixer_to_be_removed_":
             return True
     elif collection_name == "images":
         if item.source == "VIEWER":
@@ -178,6 +178,8 @@ class Context:
         bl_rna_properties = self._properties.get(bl_rna)
         if bl_rna_properties is None:
             filtered_properties = self._filter_stack.apply(bl_rna, list(bl_rna.properties))
+            # Differential update requires that the properties are delivered in the same order
+            # as Blender delivers them
             bl_rna_properties = {p.identifier: p for p in filtered_properties}
             self._properties[bl_rna] = bl_rna_properties
         return bl_rna_properties.items()
@@ -236,7 +238,9 @@ default_exclusions = {
     # makes a loop
     T.Bone: [NameFilterOut("parent")],
     # TODO temporary ?
+    T.Collection: [NameFilterOut("all_objects")],
     T.CompositorNodeRLayers: [NameFilterOut("scene")],
+    T.CurveMapPoint: [NameFilterOut("select")],
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foerach_get()
@@ -255,13 +259,31 @@ default_exclusions = {
         # Seems to be a view of the master collection children
         NameFilterOut("children"),
     ],
+    T.GreasePencil: [
+        # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
+        # but do not synchronize its contents
+        NameFilterIn("name")
+    ],
+    T.Mesh: [
+        # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
+        # but do not synchronize its contents
+        NameFilterIn("name")
+    ],
     T.MeshPolygon: [NameFilterOut("area")],
     T.MeshVertex: [
         # MeshVertex.groups is updated via Object.vertex_groups
         NameFilterOut("groups")
     ],
     #
-    T.Node: [NameFilterOut(["internal_links"])],
+    T.Node: [
+        NameFilterOut(
+            [
+                "internal_links",
+                # cannot be written: set by shader editor
+                "dimensions",
+            ]
+        )
+    ],
     T.NodeLink: [
         # see NodeLinkProxy
         NameFilterOut(["from_node", "from_socket", "to_node", "to_socket", "is_hidden"])
@@ -289,13 +311,19 @@ default_exclusions = {
         ),
         # TODO triggers an error on metaballs
         #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
-        #   looks like a bpy_prop_collection and the key is and empy string
+        #   looks like a bpy_prop_collection and the key is and empty string
         NameFilterOut("material_slots"),
         # TODO temporary, has a seed member that makes some tests fail
         NameFilterOut("field"),
-        # TODO temporary, waiting for shkape_key support
+        # TODO temporary, waiting for shape_key support
         # there is a loop in active_shape_key/relative_key
         NameFilterOut("active_shape_key"),
+    ],
+    T.RenderSettings: [
+        NameFilterOut(
+            # just a view of "right" and "left" from RenderSettings.views
+            "stereo_views"
+        )
     ],
     T.Scene: [
         NameFilterOut(
@@ -311,7 +339,6 @@ default_exclusions = {
                 "tool_settings",
                 # TODO temporary, not implemented
                 "node_tree",
-                "collection",
                 "view_layers",
                 "rigidbody_world",
             ]
@@ -345,19 +372,46 @@ safe_exclusions = {}
 
 # depsgraph updates not in this ist are not handled by BpyBlendProxy.update()
 # more types are just waiting to be tested
-# A specific proble for Scene as the depsgraph reports numerous meaningless Scene updates
+# A specific problem for Scene as the depsgraph reports numerous meaningless Scene updates
 # that will probably hurt performance. We may have to find another way to update Scene or maybe
-# ignore scene updates when it is the only update in the despgrtaph update + a timer update just for
+# ignore scene updates when it is the only update in the depsgraph update + a timer update just for
 # Scene
 # Also do not blindly update what is already updated in VRtist code without checking that
 # they do not interfere
-safe_depsgraph_updates = [T.Camera, T.Image, T.Light, T.MetaBall, T.NodeTree, T.Scene, T.Sound, T.World]
+safe_depsgraph_updates = (
+    T.Camera,
+    T.Collection,
+    T.Image,
+    # no generic sync of GreasePencil, use VRtist message
+    T.Light,
+    T.Material,
+    # no generic sync of Mesh, use VRtist message
+    T.MetaBall,
+    T.NodeTree,
+    T.Object,
+    T.Scene,
+    T.Sound,
+    T.World,
+)
 
 safe_filter = FilterStack()
 # The collections in this list are tested by BpyBlendDiff collection update
 # they will be included in creation messages.
 # objects is needed to items not created by VRtist
-safe_blenddata_collections = ["cameras", "images", "lights", "metaballs", "objects", "scenes", "sounds", "worlds"]
+safe_blenddata_collections = [
+    "cameras",
+    "collections",
+    "grease_pencils",
+    "images",
+    "lights",
+    "materials",
+    "meshes",
+    "metaballs",
+    "objects",
+    "scenes",
+    "sounds",
+    "worlds",
+]
 
 # mostly works
 # safe_blenddata_collections = ["lights", "cameras", "metaballs", "objects", "scenes"]
