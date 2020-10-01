@@ -1,3 +1,9 @@
+# WIP
+
+## Bugfix
+
+- Fix : create object and edit with object popup breaks synchronization
+
 # 0.17.0-alpha1 (2020-09-30) 
 
 ## Features
