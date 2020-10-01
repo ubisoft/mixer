@@ -55,7 +55,7 @@ class BuildProxyOperator(bpy.types.Operator):
     def execute(self, context):
         # Cannot import at module level, since it requires access to bpy.data which is not
         # accessible during module load
-        from mixer.blender_data.proxy import BpyDataProxy
+        from mixer.blender_data.bpy_data_proxy import BpyDataProxy
         from mixer.blender_data.filter import test_context
         import cProfile
         import io

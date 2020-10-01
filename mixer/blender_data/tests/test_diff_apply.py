@@ -4,12 +4,9 @@ import unittest
 
 import bpy
 
+from mixer.blender_data.bpy_data_proxy import BpyDataProxy
+from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.diff import BpyBlendDiff
-from mixer.blender_data.proxy import (
-    BpyDataProxy,
-    DatablockProxy,
-)
-
 from mixer.blender_data.filter import test_context
 
 

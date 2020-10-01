@@ -15,19 +15,24 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import logging
-from typing import List, Mapping, Tuple
+from typing import List, Mapping, Tuple, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data.filter import Context, skip_bpy_data_item
-from mixer.blender_data.proxy import (
-    BpyDataProxy,
-    DatablockProxy,
-    DatablockCollectionProxy,
-    ensure_uuid,
-)
+from mixer.blender_data.proxy import ensure_uuid
+
+if TYPE_CHECKING:
+    from mixer.blender_data.proxy import BpyDataProxy
+    from mixer.blender_data.datablock_proxy import DatablockProxy
+    from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
+
+    ItemsRemoved = List[DatablockProxy]
+    ItemsRenamed = List[Tuple[DatablockProxy, str]]
 
 logger = logging.getLogger(__name__)
 Uuid = str
@@ -35,9 +40,6 @@ BlendDataCollectionName = str
 ItemsAdded = Mapping[str, str]
 # Item_name : collection_name
 
-ItemsRemoved = List[DatablockProxy]
-
-ItemsRenamed = List[Tuple[DatablockProxy, str]]
 # (proxy, old_name)
 
 

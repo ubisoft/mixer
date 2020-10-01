@@ -22,20 +22,13 @@ import unittest
 import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from mixer.blender_data.blenddata import BlendData
-from mixer.blender_data.proxy import (
-    BpyDataProxy,
-    DatablockRefProxy,
-    SoaElement,
-)
-from mixer.blender_data.tests.utils import test_blend_file
 
-from mixer.blender_data.filter import (
-    Context,
-    TypeFilterOut,
-    test_context,
-    test_filter,
-)
+from mixer.blender_data.aos_soa_proxy import SoaElement
+from mixer.blender_data.blenddata import BlendData
+from mixer.blender_data.bpy_data_proxy import BpyDataProxy
+from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+from mixer.blender_data.filter import Context, TypeFilterOut, test_context, test_filter
+from mixer.blender_data.tests.utils import test_blend_file
 
 
 class TestLoadProxy(unittest.TestCase):

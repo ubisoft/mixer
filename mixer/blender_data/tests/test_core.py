@@ -20,16 +20,14 @@ import unittest
 import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from mixer.blender_data.tests.utils import equals, register_bl_equals, test_blend_file
+
 
 from mixer.blender_data import types
-from mixer.blender_data.proxy import (
-    BpyDataProxy,
-    StructProxy,
-    LoadElementAs,
-    load_as_what,
-)
+from mixer.blender_data.attributes import LoadElementAs, load_as_what
+from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.filter import test_context
+from mixer.blender_data.struct_proxy import StructProxy
+from mixer.blender_data.tests.utils import equals, register_bl_equals, test_blend_file
 
 
 # @unittest.skip('')

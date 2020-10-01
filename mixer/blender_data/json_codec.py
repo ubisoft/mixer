@@ -24,19 +24,13 @@ implementation that does the job.
 import json
 from typing import Any, Mapping
 
-from mixer.blender_data.proxy import (
-    DatablockProxy,
-    DatablockRefProxy,
-    StructProxy,
-    DatablockCollectionProxy,
-    StructCollectionProxy,
-    NodeLinksProxy,
-    NodeTreeProxy,
-    Delta,
-    DeltaAddition,
-    DeltaDeletion,
-    DeltaUpdate,
-)
+from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaUpdate
+from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
+from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+from mixer.blender_data.node_proxy import NodeLinksProxy, NodeTreeProxy
+from mixer.blender_data.struct_proxy import StructProxy
+from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 # https://stackoverflow.com/questions/38307068/make-a-dict-json-from-string-with-duplicate-keys-python/38307621#38307621
 # https://stackoverflow.com/questions/31085153/easiest-way-to-serialize-object-in-a-nested-dictionary

@@ -20,15 +20,13 @@ import unittest
 import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from mixer.blender_data.json_codec import Codec
-from mixer.blender_data.proxy import (
-    BpyDataProxy,
-    DatablockProxy,
-    DatablockRefProxy,
-)
-from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
+from mixer.blender_data.bpy_data_proxy import BpyDataProxy
+from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.filter import test_context
+from mixer.blender_data.json_codec import Codec
+from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
 
 class TestCodec(unittest.TestCase):

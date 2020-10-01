@@ -25,7 +25,7 @@ import logging
 from typing import List, Mapping, Set
 from uuid import uuid4
 
-from mixer.blender_data.proxy import BpyDataProxy
+from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.filter import test_context
 from mixer.bl_utils import get_mixer_prefs
 

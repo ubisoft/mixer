@@ -19,7 +19,8 @@ import unittest
 
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from mixer.blender_data.proxy import BpyDataProxy
+
+from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import test_context
 
