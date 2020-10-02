@@ -245,7 +245,12 @@ _exclude_names = {
 """Names of properties that are always excluded"""
 
 default_exclusions = {
-    None: [TypeFilterOut(T.MeshVertex), NameFilterOut(_exclude_names)],
+    None: [
+        TypeFilterOut(T.MeshVertex),
+        # Temporary: parent and child are involved in circular reference
+        TypeFilterOut(T.PoseBone),
+        NameFilterOut(_exclude_names),
+    ],
     T.ActionGroup: [NameFilterOut("channels")],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
     # makes a loop
