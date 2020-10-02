@@ -140,7 +140,7 @@ class Proxy:
         else:
             return resolve(self._data.get(key))
 
-    def save(self, bl_instance: any, attr_name: str):
+    def save(self, bl_instance: Any, attr_name: str):
         """
         Save this proxy into a blender object
         """

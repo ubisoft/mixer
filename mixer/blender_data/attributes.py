@@ -52,7 +52,7 @@ def is_ID_subclass_rna(bl_rna):  # noqa
     return issubclass(bl_rna_to_type(bl_rna), bpy.types.ID)
 
 
-def load_as_what(attr_property: bpy.types.Property, attr: any, root_ids: RootIds):
+def load_as_what(attr_property: bpy.types.Property, attr: Any, root_ids: RootIds):
     """
     Determine if we must load an attribute as a struct, a blenddata collection element (ID_DEF)
     or a reference to a BlendData collection element (ID_REF)

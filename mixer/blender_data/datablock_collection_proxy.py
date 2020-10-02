@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import traceback
-from typing import Any, Mapping, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -61,7 +61,7 @@ class DatablockCollectionProxy(Proxy):
 
     def __init__(self):
         # On item per datablock. The key is the uuid, which eases rename management
-        self._data: Mapping[str, DatablockProxy] = {}
+        self._data: Dict[str, DatablockProxy] = {}
 
     def __len__(self):
         return len(self._data)

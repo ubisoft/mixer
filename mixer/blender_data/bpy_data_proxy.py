@@ -25,7 +25,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 import logging
-from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -92,8 +92,8 @@ class RecursionGuard:
 
 
 RootIds = Set[T.ID]
-IDProxies = Mapping[str, DatablockProxy]
-IDs = Mapping[str, T.ID]
+IDProxies = Dict[str, DatablockProxy]
+IDs = Dict[str, T.ID]
 UnresolvedRefs = Dict[str, UnresolvedRef]
 
 
@@ -138,7 +138,7 @@ class BpyDataProxy(Proxy):
         self.ids: IDs = {}
         """Only needed to cleanup root_ids and id_proxies on ID removal"""
 
-        self._data: Mapping[str, DatablockCollectionProxy] = {
+        self._data: Dict[str, DatablockCollectionProxy] = {
             name: DatablockCollectionProxy() for name in BlendData.instance().collection_names()
         }
 

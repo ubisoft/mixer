@@ -22,7 +22,7 @@ This module and the resulting encoding are by no way optimal. It is just a simpl
 implementation that does the job.
 """
 import json
-from typing import Any, Mapping
+from typing import Any, Dict
 
 from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaUpdate
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
@@ -61,7 +61,7 @@ options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_n
 MIXER_CLASS = "__mixer_class__"
 
 
-def default_optional(obj, option_name: str) -> Mapping[str, Any]:
+def default_optional(obj, option_name: str) -> Dict[str, Any]:
     option = getattr(obj, option_name, None)
     if option is not None:
         return {option_name: option}

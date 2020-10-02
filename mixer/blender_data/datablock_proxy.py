@@ -241,7 +241,7 @@ class DatablockProxy(StructProxy):
         self.apply(self.collection, datablock.name, delta, visit_state)
         return datablock
 
-    def save(self, bl_instance: any = None, attr_name: str = None, visit_state: VisitState = None) -> T.ID:
+    def save(self, bl_instance: Any = None, attr_name: str = None, visit_state: VisitState = None) -> T.ID:
         """
         Save this proxy into an existing datablock that may be a bpy.data member item or an embedded datablock
         """
