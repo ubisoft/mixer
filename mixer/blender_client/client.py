@@ -1108,6 +1108,8 @@ def clear_scene_content():
     with HandlerManager(False):
 
         data = [
+            "actions",
+            "armatures",
             "cameras",
             "collections",
             "curves",
