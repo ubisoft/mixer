@@ -324,18 +324,20 @@ default_exclusions = {
         NameFilterOut(
             [
                 # bounding box, will be computed
-                "dimensions"
+                "dimensions",
+                # TODO triggers an error on metaballs
+                #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
+                #   looks like a bpy_prop_collection and the key is and empty string
+                "material_slots",
+                # TODO temporary, has a seed member that makes some tests fail
+                "field",
+                # TODO temporary, waiting for shape_key support
+                # there is a loop in active_shape_key/relative_key
+                "active_shape_key",
+                # temporary
+                "vertex_groups",
             ]
-        ),
-        # TODO triggers an error on metaballs
-        #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
-        #   looks like a bpy_prop_collection and the key is and empty string
-        NameFilterOut("material_slots"),
-        # TODO temporary, has a seed member that makes some tests fail
-        NameFilterOut("field"),
-        # TODO temporary, waiting for shape_key support
-        # there is a loop in active_shape_key/relative_key
-        NameFilterOut("active_shape_key"),
+        )
     ],
     T.RenderSettings: [
         NameFilterOut(
