@@ -35,25 +35,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def debug_check_stack_overflow(func, *args, **kwargs):
-    """
-    Use as a function decorator to detect probable stack overflow in case of circular references
-
-    Beware : inspect performance is very poor.
-    sys.setrecursionlimit cannot be used because it will possibly break the Blender VScode
-    plugin and StackOverflowException is not caught by VScode "Raised exceptions" breakpoint.
-    """
-
-    def wrapper(*args, **kwargs):
-        import inspect
-
-        if len(inspect.stack(0)) > 50:
-            raise RuntimeError("Possible stackoverflow")
-        return func(*args, **kwargs)
-
-    return wrapper
-
-
 class LoadElementAs(IntEnum):
     STRUCT = 0
     ID_REF = 1
@@ -119,79 +100,72 @@ MAX_DEPTH = 30
 def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
-
-
     """
-    debug_context = visit_state.debug_context
-    if debug_context.visit_depth() > MAX_DEPTH:
-        # stop before hitting the recursion limit, it is easier to debug
-        # if we arrive here, we have cyclical data references that should be excluded in filter.py
-        if not debug_context.limit_notified:
-            debug_context.limit_notified = True
-            logger.error("Maximum property depth exceeded. Deeper properties ignored. Path :")
-            logger.error(debug_context.property_fullpath())
-        return
+    try:
+        visit_state.recursion_guard.push(attr_property.name)
 
-    attr_type = type(attr)
+        attr_type = type(attr)
 
-    if is_builtin(attr_type):
-        return attr
-    if is_vector(attr_type):
-        return list(attr)
-    if is_matrix(attr_type):
-        return [list(col) for col in attr.col]
+        if is_builtin(attr_type):
+            return attr
+        if is_vector(attr_type):
+            return list(attr)
+        if is_matrix(attr_type):
+            return [list(col) for col in attr.col]
 
-    # We have tested the types that are usefully reported by the python binding, now harder work.
-    # These were implemented first and may be better implemented with the bl_rna property of the parent struct
-    if attr_type == T.bpy_prop_array:
-        return [e for e in attr]
+        # We have tested the types that are usefully reported by the python binding, now harder work.
+        # These were implemented first and may be better implemented with the bl_rna property of the parent struct
+        if attr_type == T.bpy_prop_array:
+            return [e for e in attr]
 
-    if attr_type == T.bpy_prop_collection:
-        # need to know for each element if it is a ref or id
-        load_as = load_as_what(attr_property, attr, visit_state.root_ids)
-        assert load_as != LoadElementAs.ID_DEF
-        if load_as == LoadElementAs.STRUCT:
+        if attr_type == T.bpy_prop_collection:
+            # need to know for each element if it is a ref or id
+            load_as = load_as_what(attr_property, attr, visit_state.root_ids)
+            assert load_as != LoadElementAs.ID_DEF
+            if load_as == LoadElementAs.STRUCT:
+                from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
+
+                return StructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
+            else:
+                from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
+
+                # LoadElementAs.ID_REF:
+                # References into Blenddata collection, for instance D.scenes[0].objects
+                return DatablockCollectionProxy().load_as_IDref(attr, visit_state)
+
+        # TODO merge with previous case
+        if isinstance(attr_property, T.CollectionProperty):
             from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
-            return StructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
-        else:
-            from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
+            return StructCollectionProxy().load(attr, attr_property, visit_state)
 
-            # LoadElementAs.ID_REF:
-            # References into Blenddata collection, for instance D.scenes[0].objects
-            return DatablockCollectionProxy().load_as_IDref(attr, visit_state)
+        bl_rna = attr_property.bl_rna
+        if bl_rna is None:
+            logger.warning("Not implemented: attribute %s", attr)
+            return None
 
-    # TODO merge with previous case
-    if isinstance(attr_property, T.CollectionProperty):
-        from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
+        if issubclass(attr_type, T.PropertyGroup):
+            from mixer.blender_data.struct_proxy import StructProxy
 
-        return StructCollectionProxy().load(attr, attr_property, visit_state)
+            return StructProxy().load(attr, visit_state)
 
-    bl_rna = attr_property.bl_rna
-    if bl_rna is None:
-        logger.warning("Not implemented: attribute %s", attr)
-        return None
+        if issubclass(attr_type, T.ID):
+            if attr.is_embedded_data:
+                from mixer.blender_data.datablock_proxy import DatablockProxy
 
-    if issubclass(attr_type, T.PropertyGroup):
-        from mixer.blender_data.struct_proxy import StructProxy
+                return DatablockProxy.make(attr_property).load(attr, visit_state)
+            else:
+                from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
-        return StructProxy().load(attr, visit_state)
+                return DatablockRefProxy().load(attr, visit_state)
+        elif issubclass(attr_type, T.bpy_struct):
+            from mixer.blender_data.struct_proxy import StructProxy
 
-    if issubclass(attr_type, T.ID):
-        if attr.is_embedded_data:
-            from mixer.blender_data.datablock_proxy import DatablockProxy
+            return StructProxy().load(attr, visit_state)
 
-            return DatablockProxy.make(attr_property).load(attr, visit_state)
-        else:
-            from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
-
-            return DatablockRefProxy().load(attr, visit_state)
-    elif issubclass(attr_type, T.bpy_struct):
-        from mixer.blender_data.struct_proxy import StructProxy
-
-        return StructProxy().load(attr, visit_state)
-
-    raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
+        raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
+    finally:
+        visit_state.recursion_guard.pop()
 
 
 def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: VisitState):
