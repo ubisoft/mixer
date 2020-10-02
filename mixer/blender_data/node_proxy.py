@@ -20,7 +20,7 @@ Proxies for bpy.types.NodeTree and bpy.types.NodeLinks
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 import bpy.types as T  # noqa
 
 from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -63,7 +63,7 @@ class NodeTreeProxy(DatablockProxy):
     def __init__(self):
         super().__init__()
 
-    def save(self, bl_instance: any, attr_name: str, visit_state: VisitState):
+    def save(self, bl_instance: Any, attr_name: str, visit_state: VisitState):
         # see https://stackoverflow.com/questions/36185377/how-i-can-create-a-material-select-it-create-new-nodes-with-this-material-and
         # Saving NodeTree.links require access to NodeTree.nodes, so we need an implementation at the NodeTree level
 

@@ -23,10 +23,9 @@ See synchronization.md
 from __future__ import annotations
 
 from collections import defaultdict
-from contextlib import contextmanager
 from dataclasses import dataclass
 import logging
-from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -37,7 +36,7 @@ from mixer.blender_data.datablock_collection_proxy import DatablockCollectionPro
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import Context, safe_depsgraph_updates, safe_context
-from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy
+from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy, MaxDepthExceeded
 
 if TYPE_CHECKING:
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
@@ -72,38 +71,29 @@ class UnresolvedRef:
     proxy: DatablockRefProxy
 
 
-# Using a context doubles load time in SS2.82. This remains true for a null context
-# Remmoving the "with" lines halves loading time (!!)
-class DebugContext:
+class RecursionGuard:
     """
-    Context class only used during BpyDataProxy construction, to keep contextual data during traversal
-    of the blender data hierarchy and perform safety checks
+    Limits allowed attribute depth, and guards against recursion caused by unfiltered circular references
     """
 
-    serialized_addresses: Set[bpy.types.ID] = set()  # Already serialized addresses (struct or IDs), for debug
-    property_stack: List[Tuple[str, any]] = []  # Stack of properties up to this point in the visit
-    property_value: Any
-    limit_notified: bool = False
+    MAX_DEPTH = 30
 
-    @contextmanager
-    def enter(self, property_name, property_value):
-        self.property_stack.append((property_name, property_value))
-        yield
-        self.property_stack.pop()
-        self.serialized_addresses.add(id(property_value))
+    def __init__(self):
+        self._property_stack: List[str] = []
 
-    def visit_depth(self):
-        # Utility for debug
-        return len(self.property_stack)
+    def push(self, name: str):
+        self._property_stack.append(name)
+        if len(self._property_stack) > self.MAX_DEPTH:
+            property_path = ".".join([p for p in self._property_stack])
+            raise MaxDepthExceeded(property_path)
 
-    def property_fullpath(self):
-        # Utility for debug
-        return ".".join([p[0] for p in self.property_stack])
+    def pop(self):
+        self._property_stack.pop()
 
 
 RootIds = Set[T.ID]
-IDProxies = Mapping[str, DatablockProxy]
-IDs = Mapping[str, T.ID]
+IDProxies = Dict[str, DatablockProxy]
+IDs = Dict[str, T.ID]
 UnresolvedRefs = Dict[str, UnresolvedRef]
 
 
@@ -129,7 +119,7 @@ class VisitState:
     context: Context
     """Controls what properties are synchronized"""
 
-    debug_context: DebugContext = DebugContext()
+    recursion_guard: RecursionGuard = RecursionGuard()
 
 
 class BpyDataProxy(Proxy):
@@ -148,7 +138,7 @@ class BpyDataProxy(Proxy):
         self.ids: IDs = {}
         """Only needed to cleanup root_ids and id_proxies on ID removal"""
 
-        self._data: Mapping[str, DatablockCollectionProxy] = {
+        self._data: Dict[str, DatablockCollectionProxy] = {
             name: DatablockCollectionProxy() for name in BlendData.instance().collection_names()
         }
 
@@ -201,8 +191,7 @@ class BpyDataProxy(Proxy):
 
         for name, _ in context.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
-            with visit_state.debug_context.enter(name, collection):
-                self._data[name] = DatablockCollectionProxy().load_as_ID(collection, visit_state)
+            self._data[name] = DatablockCollectionProxy().load_as_ID(collection, visit_state)
         return self
 
     def find(self, collection_name: str, key: str) -> DatablockProxy:

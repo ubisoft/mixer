@@ -26,7 +26,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import List, Mapping, Tuple, TYPE_CHECKING
+from typing import List, Dict, Tuple, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -35,7 +35,7 @@ from mixer.blender_data.filter import Context, skip_bpy_data_item
 from mixer.blender_data.proxy import ensure_uuid
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import BpyDataProxy
+    from mixer.blender_data.bpy_data_proxy import BpyDataProxy
     from mixer.blender_data.datablock_proxy import DatablockProxy
     from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 
@@ -45,14 +45,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 Uuid = str
 BlendDataCollectionName = str
-ItemsAdded = Mapping[str, str]
+ItemsAdded = Dict[str, str]
 # Item_name : collection_name
 
 # (proxy, old_name)
 
 
 def find_renamed(
-    proxy_items: Mapping[Uuid, DatablockProxy], blender_items: Mapping[Uuid, Tuple[str, str]]
+    proxy_items: Dict[Uuid, DatablockProxy], blender_items: Dict[Uuid, Tuple[str, str]]
 ) -> Tuple[ItemsAdded, ItemsRemoved, ItemsRenamed]:
     """
     Split before/after mappings into added/removed/renamed

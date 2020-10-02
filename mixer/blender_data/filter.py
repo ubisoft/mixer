@@ -24,7 +24,7 @@ according to user preferences.
 see synchronization.md
 """
 import logging
-from typing import Any, ItemsView, Iterable, List, Mapping, Union
+from typing import Any, Dict, ItemsView, Iterable, List, Union
 
 from bpy import types as T  # noqa
 
@@ -123,7 +123,7 @@ class NameFilterIn(NameFilter):
 
 
 # true class with isactive()
-FilterSet = Mapping[Any, Iterable[Filter]]
+FilterSet = Dict[Any, Iterable[Filter]]
 
 
 def bases(bl_rna):
@@ -158,7 +158,7 @@ class FilterStack:
 BlRna = Any
 PropertyName = str
 Property = Any
-Properties = Mapping[PropertyName, Property]
+Properties = Dict[PropertyName, Property]
 
 
 class Context:
@@ -172,7 +172,7 @@ class Context:
     """
 
     def __init__(self, filter_stack):
-        self._properties: Mapping[BlRna, Properties] = {}
+        self._properties: Dict[BlRna, Properties] = {}
         self._filter_stack: FilterStack = filter_stack
         self._unhandled_bpy_data_collection_names: List[str] = None
 

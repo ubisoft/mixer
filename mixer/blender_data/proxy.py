@@ -40,23 +40,10 @@ logger = logging.getLogger(__name__)
 MIXER_SEQUENCE = "__mixer_sequence__"
 
 
-def debug_check_stack_overflow(func, *args, **kwargs):
-    """
-    Use as a function decorator to detect probable stack overflow in case of circular references
+class MaxDepthExceeded(Exception):
+    """Thrown when attribute depth is too large"""
 
-    Beware : inspect performance is very poor.
-    sys.setrecursionlimit cannot be used because it will possibly break the Blender VScode
-    plugin and StackOverflowException is not caught by VScode "Raised exceptions" breakpoint.
-    """
-
-    def wrapper(*args, **kwargs):
-        import inspect
-
-        if len(inspect.stack(0)) > 50:
-            raise RuntimeError("Possible stackoverflow")
-        return func(*args, **kwargs)
-
-    return wrapper
+    pass
 
 
 class LoadElementAs(IntEnum):
@@ -100,9 +87,6 @@ class DeltaDeletion(Delta):
 
 class DeltaUpdate(Delta):
     pass
-
-
-MAX_DEPTH = 30
 
 
 class Proxy:
@@ -156,7 +140,7 @@ class Proxy:
         else:
             return resolve(self._data.get(key))
 
-    def save(self, bl_instance: any, attr_name: str):
+    def save(self, bl_instance: Any, attr_name: str):
         """
         Save this proxy into a blender object
         """

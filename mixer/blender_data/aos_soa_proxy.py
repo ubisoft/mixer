@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import array
 import logging
-from typing import List, Mapping, Union, TYPE_CHECKING
+from typing import List, Dict, Union, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -109,7 +109,7 @@ class AosElement(Proxy):
     """
 
     def __init__(self):
-        self._data: Mapping[str, List] = {}
+        self._data: Dict[str, List] = {}
 
     def load(
         self,

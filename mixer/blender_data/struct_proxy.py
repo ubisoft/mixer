@@ -46,7 +46,7 @@ class StructProxy(Proxy):
         self._data = {}
         pass
 
-    def load(self, bl_instance: any, visit_state: VisitState):
+    def load(self, bl_instance: Any, visit_state: VisitState):
 
         """
         Load a Blender object into this proxy

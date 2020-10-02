@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import traceback
-from typing import Any, Mapping, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -34,7 +34,7 @@ from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.diff import BpyPropCollectionDiff
 from mixer.blender_data.filter import skip_bpy_data_item
-from mixer.blender_data.proxy import DeltaUpdate, DeltaAddition, DeltaDeletion
+from mixer.blender_data.proxy import DeltaUpdate, DeltaAddition, DeltaDeletion, MaxDepthExceeded
 from mixer.blender_data.proxy import ensure_uuid, Proxy
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 
@@ -61,7 +61,7 @@ class DatablockCollectionProxy(Proxy):
 
     def __init__(self):
         # On item per datablock. The key is the uuid, which eases rename management
-        self._data: Mapping[str, DatablockProxy] = {}
+        self._data: Dict[str, DatablockProxy] = {}
 
     def __len__(self):
         return len(self._data)
@@ -70,13 +70,12 @@ class DatablockCollectionProxy(Proxy):
         """
         Load bl_collection elements as standalone datablocks.
         """
-        for name, item in bl_collection.items():
+        for _, item in bl_collection.items():
             collection_name = BlendData.instance().bl_collection_name_from_ID(item)
             if skip_bpy_data_item(collection_name, item):
                 continue
-            with visit_state.debug_context.enter(name, item):
-                uuid = ensure_uuid(item)
-                self._data[uuid] = DatablockProxy().load(item, visit_state, bpy_data_collection_name=collection_name)
+            uuid = ensure_uuid(item)
+            self._data[uuid] = DatablockProxy().load(item, visit_state, bpy_data_collection_name=collection_name)
 
         return self
 
@@ -84,10 +83,9 @@ class DatablockCollectionProxy(Proxy):
         """
         Load bl_collection elements as references to bpy.data collections
         """
-        for name, item in bl_collection.items():
-            with visit_state.debug_context.enter(name, item):
-                uuid = item.mixer_uuid
-                self._data[uuid] = DatablockRefProxy().load(item, visit_state)
+        for _, item in bl_collection.items():
+            uuid = item.mixer_uuid
+            self._data[uuid] = DatablockRefProxy().load(item, visit_state)
         return self
 
     def save(self, parent: Any, key: str, visit_state: VisitState):
@@ -255,8 +253,12 @@ class DatablockCollectionProxy(Proxy):
                 visit_state.id_proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
+            except MaxDepthExceeded as e:
+                logger.error(f"MaxDepthExceeded while loading {collection_name}[{name}]:")
+                logger.error("... Nested attribute depth is too large: ")
+                logger.error(f"... {e}")
             except Exception:
-                logger.error(f"Exception during update/added for {collection_name}[{name}]:")
+                logger.error(f"Exception while loading {collection_name}[{name}]:")
                 for line in traceback.format_exc().splitlines():
                     logger.error(line)
 

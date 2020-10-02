@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import itertools
 import logging
-from typing import Any, Mapping, Optional, TYPE_CHECKING, Union
+from typing import Any, Dict, Optional, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -100,7 +100,7 @@ class StructCollectionProxy(Proxy):
     """
 
     def __init__(self):
-        self._data: Mapping[Union[str, int], DatablockProxy] = {}
+        self._data: Dict[Union[str, int], DatablockProxy] = {}
 
     @classmethod
     def make(cls, attr_property: T.Property):
@@ -142,7 +142,7 @@ class StructCollectionProxy(Proxy):
 
         return self
 
-    def save(self, bl_instance: any, attr_name: str, visit_state: VisitState):
+    def save(self, bl_instance: Any, attr_name: str, visit_state: VisitState):
         """
         Save this proxy the Blender property
         """

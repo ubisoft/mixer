@@ -684,7 +684,7 @@ def decode_mesh(client, obj, data, index):
 def decode_mesh_generic(client, mesh: bpy.types.Mesh, data, index):
 
     try:
-        tmp_obj = bpy.data.objects.new("_miser_tmp_", None)
+        tmp_obj = bpy.data.objects.new("_mixer_tmp_", None)
         byte_size, index = common.decode_int(data, index)
         if byte_size == 0:
             # No base mesh, lets read the baked mesh
