@@ -15,7 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Interface to the bpy.data collections
+"""
+Interface to the bpy.data collections
+
+TODO This module is obsolete and should be removed
 """
 import functools
 import logging
@@ -46,7 +49,7 @@ rna_identifier_to_collection_name = {value.bl_rna.identifier: key for key, value
 
 class BlendDataCollection:
     """
-    Wrapper to any of the collections inside bpy.data
+    Obsolete wrapper to any of the collections inside bpy.data
     """
 
     # DO NOT keep references to bpy.data collection. They become stale and to not show modifications
@@ -112,7 +115,7 @@ class BlendDataCollection:
 
 class BlendData:
     """
-    Wrapper to bpy.data, with linear time access to collection items by name.
+    Mostly obsolete wrapper to bpy.data, with linear time access to collection items by name.
 
     These objects keep live reference to Blender blenddata collection, so they must not be used after the
     file has been reloaded, hence the handler below.

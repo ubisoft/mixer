@@ -21,15 +21,21 @@ This module handles generic updates using the blender_data package.
 The goal for Mixer is to replace all code specific to entities (camera, light, material, ...) by this generic update
 mechanism.
 """
+from __future__ import annotations
 
 import itertools
 import logging
 import traceback
+from typing import TYPE_CHECKING
 
 from mixer.blender_data.json_codec import Codec
-from mixer.blender_data.proxy import CreationChangeset, RemovalChangeset, UpdateChangeset, RenameChangeset, Delta
 from mixer.broadcaster import common
 from mixer.share_data import share_data
+
+if TYPE_CHECKING:
+    from mixer.blender_data.changeset import CreationChangeset, RemovalChangeset, UpdateChangeset, RenameChangeset
+    from mixer.blender_data.proxy import Delta
+
 
 logger = logging.getLogger(__name__)
 

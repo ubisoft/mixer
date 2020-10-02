@@ -1,3 +1,13 @@
+# WIP
+
+## Documentation
+
+- Update synchronization.md
+
+## Refactor
+
+- blender_data: split proxy.py
+
 # 0.17.0-alpha1 (2020-09-30) 
 
 ## Features
@@ -8,9 +18,10 @@
 
 ## Bugfix
 
-- Fix synchronization problems after renaming
-- Fix synchronization problems after simultaneous creation
-- Fix _last_scene_to_be_removed_
+- Fix: synchronization problems after renaming
+- Fix: synchronization problems after simultaneous creation
+- Fix: create object and edit with object popup breaks synchronization
+- Fix: _last_scene_to_be_removed_ is sometimes in the list of scenes
 
 ## CI/CD
 
@@ -37,7 +48,7 @@
 ## Bugfix
 
 - Fix mesh being triangulated after leaving edit mode. (#191)
-- Fix crash occuring when vertex group data is inconsistent (#121)
+- Fix crash occurring when vertex group data is inconsistent (#121)
 - Fix send_base_mesh crash
 - Fix random test failure with room not joinable yet
 - Disconnects clients properly when server is killed

@@ -84,7 +84,7 @@ class TestReferencedDatablock(VRtistTestCase):
         # only care about Blender_DATA_CREATE
         self.ignored_messages |= {MessageType.MATERIAL, MessageType.OBJECT_VISIBILITY}
 
-        # This test verifies that BpyIdRefProxy references of unhandled collections are correct.
+        # This test verifies that DatablockRefProxy references of unhandled collections are correct.
         # Before fix, obj.active_material has a different uuid on both ends. This is a regression caused
         # by a9573127.
 

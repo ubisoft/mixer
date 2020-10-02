@@ -20,21 +20,19 @@ import unittest
 import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from mixer.blender_data.json_codec import Codec
-from mixer.blender_data.proxy import (
-    BpyBlendProxy,
-    BpyIDProxy,
-    BpyIDRefProxy,
-)
-from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
+from mixer.blender_data.bpy_data_proxy import BpyDataProxy
+from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.filter import test_context
+from mixer.blender_data.json_codec import Codec
+from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
 
 class TestCodec(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
-        self.proxy = BpyBlendProxy()
+        self.proxy = BpyDataProxy()
         register_bl_equals(self, test_context)
 
     def test_camera(self):
@@ -52,7 +50,7 @@ class TestCodec(unittest.TestCase):
         # patch the name so that it does not get mixed up as we restore later in the same scene
         cam_proxy_sent = self.proxy.data("cameras").search_one("Camera_0")
         cam_proxy_sent._data["name"] = transmit_name
-        self.assertIsInstance(cam_proxy_sent, BpyIDProxy)
+        self.assertIsInstance(cam_proxy_sent, DatablockProxy)
 
         # encode
         codec = Codec()
@@ -69,7 +67,7 @@ class TestCodec(unittest.TestCase):
         cam_proxy_received = codec.decode(message)
 
         focus_object_proxy = cam_proxy_received.data("dof").data("focus_object")
-        self.assertIsInstance(focus_object_proxy, BpyIDRefProxy)
+        self.assertIsInstance(focus_object_proxy, DatablockRefProxy)
         self.assertEqual(focus_object_proxy._datablock_uuid, cam_sent.dof.focus_object.mixer_uuid)
 
         # save into blender

@@ -16,7 +16,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Define and register encodable/decodable message types
+Define the mapping between message types nad message classes.
+
+Mostly used by tests to ease message decoding
 """
 from mixer import codec
 from mixer.broadcaster.common import MessageType

@@ -20,7 +20,10 @@ import unittest
 import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from mixer.blender_data.proxy import BpyBlendProxy, BpyIDProxy, BpyIDRefProxy, write_attribute
+from mixer.blender_data.attributes import write_attribute
+from mixer.blender_data.bpy_data_proxy import BpyDataProxy
+from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
 from mixer.blender_data.filter import test_context
@@ -38,7 +41,7 @@ class TestWriteAttribute(unittest.TestCase):
         # use_curve_mapping == False
         D.scenes["Scene_0"].view_settings.use_curve_mapping = True
 
-        self.proxy = BpyBlendProxy()
+        self.proxy = BpyDataProxy()
         self.proxy.load(context)
         register_bl_equals(self, context)
 
@@ -134,7 +137,7 @@ class TestWriteAttribute(unittest.TestCase):
         for i, point in enumerate(points):
             curve0.points[i].location = point
 
-        self.proxy = BpyBlendProxy()
+        self.proxy = BpyDataProxy()
         self.proxy.load(context)
 
         light.name = "light_bak"
@@ -161,7 +164,7 @@ class TestWriteAttribute(unittest.TestCase):
         for i, point in enumerate(src_points):
             curve0.points[i].location = point
 
-        self.proxy = BpyBlendProxy()
+        self.proxy = BpyDataProxy()
         self.proxy.load(context)
 
         light.name = "light_bak"
@@ -206,7 +209,7 @@ class TestWriteAttribute(unittest.TestCase):
         for i, point in enumerate(src_points):
             curve0.points[i].location = point
 
-        self.proxy = BpyBlendProxy()
+        self.proxy = BpyDataProxy()
         self.proxy.load(context)
 
         light.name = "light_bak"
@@ -228,7 +231,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene_name = "Scene_0"
         scene = D.scenes[scene_name]
         scene_proxy = self.proxy.data("scenes").search_one(scene_name)
-        self.assertIsInstance(scene_proxy, BpyIDProxy)
+        self.assertIsInstance(scene_proxy, DatablockProxy)
 
         scene.name = "scene_bak"
         scene_bak = D.scenes["scene_bak"]
@@ -244,7 +247,7 @@ class TestWriteAttribute(unittest.TestCase):
         assert expected_world is not None
 
         world_ref_proxy = self.proxy.data("scenes").search_one(scene_name).data("world")
-        self.assertIsInstance(world_ref_proxy, BpyIDRefProxy)
+        self.assertIsInstance(world_ref_proxy, DatablockRefProxy)
 
         scene.world = None
         assert scene.world != expected_world
@@ -261,7 +264,7 @@ class TestWriteAttribute(unittest.TestCase):
         # setup the scene and reload
         focus_object = D.objects["Cube"]
         camera.dof.focus_object = focus_object
-        self.proxy = BpyBlendProxy()
+        self.proxy = BpyDataProxy()
         self.proxy.load(context)
 
         camera.name = "camera_bak"

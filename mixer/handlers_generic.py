@@ -1,9 +1,10 @@
 """
 This module defines Blender handlers for Mixer in generic synchronization mode
 """
+from __future__ import annotations
 
 import logging
-from typing import Dict, List, Set
+from typing import Dict, List, Set, TYPE_CHECKING
 
 import bpy
 
@@ -11,14 +12,16 @@ from mixer.blender_client import data as data_api
 from mixer.blender_client import grease_pencil as grease_pencil_api
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_context
-from mixer.blender_data.proxy import BpyIDProxy
+
+if TYPE_CHECKING:
+    from mixer.blender_data.datablock_proxy import DatablockProxy
 
 from mixer.share_data import share_data
 
 logger = logging.getLogger(__name__)
 
 
-def unhandled_created_datablocks(proxies: List[BpyIDProxy]) -> Set[bpy.types.ID]:
+def unhandled_created_datablocks(proxies: List[DatablockProxy]) -> Set[bpy.types.ID]:
     datablocks = set()
     for proxy in proxies:
         if proxy.collection_name != "objects":

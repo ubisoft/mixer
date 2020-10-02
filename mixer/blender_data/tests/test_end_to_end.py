@@ -21,7 +21,9 @@ import bpy
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
 from mixer.blender_data.json_codec import Codec
-from mixer.blender_data.proxy import BpyBlendProxy, BpyIDProxy, BpyStructProxy
+from mixer.blender_data.bpy_data_proxy import BpyDataProxy
+from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
 from mixer.blender_data.filter import safe_context
@@ -31,7 +33,7 @@ from mixer.blender_data.diff import BpyBlendDiff
 class TestWorld(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
-        self.bpy_data_proxy = BpyBlendProxy()
+        self.bpy_data_proxy = BpyDataProxy()
         self.diff = BpyBlendDiff()
         bpy.data.worlds[0].name = "World"
         register_bl_equals(self, safe_context)
@@ -95,8 +97,8 @@ class TestWorld(unittest.TestCase):
             # create a property on the send proxy and test that is does not fail on the receiver
             # property on ID
             update._data["does_not_exist_property"] = ""
-            update._data["does_not_exist_struct"] = BpyStructProxy()
-            update._data["does_not_exist_ID"] = BpyIDProxy()
+            update._data["does_not_exist_struct"] = StructProxy()
+            update._data["does_not_exist_ID"] = DatablockProxy()
 
             encoded = codec.encode(update)
             # sender side
