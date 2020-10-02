@@ -70,7 +70,7 @@ class DatablockCollectionProxy(Proxy):
         """
         Load bl_collection elements as standalone datablocks.
         """
-        for name, item in bl_collection.items():
+        for _, item in bl_collection.items():
             collection_name = BlendData.instance().bl_collection_name_from_ID(item)
             if skip_bpy_data_item(collection_name, item):
                 continue
@@ -83,7 +83,7 @@ class DatablockCollectionProxy(Proxy):
         """
         Load bl_collection elements as references to bpy.data collections
         """
-        for name, item in bl_collection.items():
+        for _, item in bl_collection.items():
             uuid = item.mixer_uuid
             self._data[uuid] = DatablockRefProxy().load(item, visit_state)
         return self
