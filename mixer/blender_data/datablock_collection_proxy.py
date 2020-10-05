@@ -112,11 +112,8 @@ class DatablockCollectionProxy(Proxy):
                     if datablock:
                         link(datablock)
                     else:
-                        # The reference will be resolved when the referenced datablock will be loaded
-                        uuid = ref_proxy._datablock_uuid
-                        logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy}")
-                        unresolved_list = visit_state.unresolved_refs[uuid]
-                        unresolved_list.append((target, ref_proxy))
+                        logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy.display_string()}")
+                        visit_state.unresolved_refs.append(ref_proxy.mixer_uuid, link)
             else:
                 logger.warning(f"Saving into non empty collection: {target}. Ignored")
         else:
@@ -157,14 +154,7 @@ class DatablockCollectionProxy(Proxy):
         visit_state.ids[uuid] = datablock
         visit_state.id_proxies[uuid] = incoming_proxy
 
-        unresolved_refs = visit_state.unresolved_refs.get(uuid)
-        if unresolved_refs:
-            for collection, ref_proxy in unresolved_refs:
-                ref_target = ref_proxy.target(visit_state)
-                logger.info(f"create_datablock: resolving reference {collection}.link({ref_target}")
-                collection.link(ref_target)
-            del visit_state.unresolved_refs[uuid]
-
+        visit_state.unresolved_refs.resolve(uuid, datablock)
         return datablock, renames
 
     def update_datablock(self, delta: DeltaUpdate, visit_state: VisitState):
