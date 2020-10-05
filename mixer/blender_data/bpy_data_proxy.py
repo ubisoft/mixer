@@ -22,10 +22,9 @@ See synchronization.md
 """
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import bpy
 import bpy.types as T  # noqa
@@ -36,10 +35,7 @@ from mixer.blender_data.datablock_collection_proxy import DatablockCollectionPro
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import Context, safe_depsgraph_updates, safe_context
-from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy, MaxDepthExceeded
-
-if TYPE_CHECKING:
-    from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy, MaxDepthExceeded, UnresolvedRefs
 
 logger = logging.getLogger(__name__)
 
@@ -56,19 +52,6 @@ _creation_order = {
 
 def _pred_by_creation_order(item: Tuple[str, Any]):
     return _creation_order.get(item[0], 0)
-
-
-@dataclass
-class UnresolvedRef:
-    """A datablock reference that could not be resolved when target.init() needed to be called
-    because the referenced datablock was not yet received.
-
-    No suitable ordering can easily be provided by the sender for many reasons including Collection.children
-    referencing other collections and Scene.sequencer strips that can reference other scenes
-    """
-
-    target: T.bpy_prop_collection
-    proxy: DatablockRefProxy
 
 
 class RecursionGuard:
@@ -94,7 +77,6 @@ class RecursionGuard:
 RootIds = Set[T.ID]
 IDProxies = Dict[str, DatablockProxy]
 IDs = Dict[str, T.ID]
-UnresolvedRefs = Dict[str, UnresolvedRef]
 
 
 @dataclass
@@ -143,7 +125,7 @@ class BpyDataProxy(Proxy):
         }
 
         # Pending unresolved references.
-        self._unresolved_refs: UnresolvedRefs = defaultdict(list)
+        self._unresolved_refs = UnresolvedRefs()
 
     def clear(self):
         self._data.clear()

@@ -10,11 +10,7 @@ from tests.mixer_testcase import BlenderDesc
 from tests import blender_snippets as bl
 
 
-@parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}],
-    class_name_func=VRtistTestCase.get_class_name,
-)
-class TestSpontaneousRename(VRtistTestCase):
+class MiscTestCase(VRtistTestCase):
     def setUp(self):
         sender_blendfile = files_folder() / "empty.blend"
         receiver_blendfile = files_folder() / "empty.blend"
@@ -23,6 +19,12 @@ class TestSpontaneousRename(VRtistTestCase):
         blenderdescs = [sender, receiver]
         super().setUp(blenderdescs=blenderdescs)
 
+
+@parameterized_class(
+    [{"experimental_sync": True}, {"experimental_sync": False}],
+    class_name_func=VRtistTestCase.get_class_name,
+)
+class TestSpontaneousRename(MiscTestCase):
     def test_object_empty(self):
         self.send_strings([bl.data_objects_new("Empty", None), bl.data_objects_new("Empty", None)], to=0)
 
@@ -53,18 +55,10 @@ class TestSpontaneousRename(VRtistTestCase):
     [{"experimental_sync": True}, {"experimental_sync": False}],
     class_name_func=VRtistTestCase.get_class_name,
 )
-class TestReferencedDatablock(VRtistTestCase):
+class TestReferencedDatablock(MiscTestCase):
     """
     Rename datablock referenced by Object.data
     """
-
-    def setUp(self):
-        sender_blendfile = files_folder() / "empty.blend"
-        receiver_blendfile = files_folder() / "empty.blend"
-        sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
-        receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
-        blenderdescs = [sender, receiver]
-        super().setUp(blenderdescs=blenderdescs)
 
     def test_light(self):
         # Rename the light datablock
@@ -133,18 +127,10 @@ b.children.link(c)
     [{"experimental_sync": True}],
     class_name_func=VRtistTestCase.get_class_name,
 )
-class TestRenameDatablock(VRtistTestCase):
+class TestRenameDatablock(MiscTestCase):
     """
     Rename datablock referenced by Object.data
     """
-
-    def setUp(self):
-        sender_blendfile = files_folder() / "empty.blend"
-        receiver_blendfile = files_folder() / "empty.blend"
-        sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
-        receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
-        blenderdescs = [sender, receiver]
-        super().setUp(blenderdescs=blenderdescs)
 
     def test_light(self):
         # Rename the light datablock
@@ -155,4 +141,46 @@ class TestRenameDatablock(VRtistTestCase):
         self.send_strings([bl.data_lights_rename("Point", "__Point")], to=0)
         self.send_strings([bl.data_lights_update("__Point", ".energy = 0")], to=0)
 
+        self.assert_matches()
+
+
+@parameterized_class(
+    [{"experimental_sync": True}, {"experimental_sync": False}],
+    class_name_func=VRtistTestCase.get_class_name,
+)
+class TestParenting(MiscTestCase):
+    """
+    Check that parenting works regardless of parent and child creation order
+    """
+
+    def test_object_parent(self):
+        # 3 empties or which the creation order is not the parent order
+        create = """
+import bpy
+scene = bpy.data.scenes[0]
+obj0 = bpy.data.objects.new("obj0", None)
+obj1 = bpy.data.objects.new("obj1", None)
+obj2 = bpy.data.objects.new("obj2", None)
+scene.collection.objects.link(obj0)
+scene.collection.objects.link(obj1)
+scene.collection.objects.link(obj2)
+obj2.parent = obj0
+obj0.parent = obj1
+"""
+        self.send_string(create, to=0)
+        self.assert_matches()
+
+    def test_collection_children(self):
+        # Rename the light datablock
+        create = """
+import bpy
+scene = bpy.data.scenes[0]
+coll0 = bpy.data.collections.new("coll0")
+coll1 = bpy.data.collections.new("coll1")
+coll2 = bpy.data.collections.new("coll2")
+scene.collection.children.link(coll1)
+coll1.children.link(coll0)
+coll0.children.link(coll2)
+"""
+        self.send_string(create, to=0)
         self.assert_matches()

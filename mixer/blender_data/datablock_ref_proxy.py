@@ -34,7 +34,7 @@ from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.types import bases_of
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import VisitState
+    from mixer.blender_data.proxy import Uuid, VisitState
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,13 @@ class DatablockRefProxy(Proxy):
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({self._datablock_uuid}, bpy.data.{self._bpy_data_collection}, name at creation: {self._initial_name})"
+
+    def display_string(self) -> str:
+        return f"bpy.data.{self._bpy_data_collection}[{self._initial_name}]"
+
+    @property
+    def mixer_uuid(self) -> Uuid:
+        return self._datablock_uuid
 
     def is_none(self) -> bool:
         """
@@ -90,15 +97,20 @@ class DatablockRefProxy(Proxy):
         or a collection item (Scene.collection.children["Collection"])
         """
         ref_target = self.target(visit_state)
+        # make sure to differentiate actual None value and unresolved ref
         if ref_target is None:
-            logger.warning(
-                f"DatablockRefProxy. Target of {container}.{key} not found. Last known name {self._debug_name}"
-            )
+            logger.info(f"Unresolved reference {container}.{key} -> {self.display_string()}]")
         if isinstance(container, T.bpy_prop_collection):
             # reference stored in a collection
+            # is there a case for this is is always link() in DatablockCollectionProxy ?
             if isinstance(key, str):
                 try:
-                    container[key] = ref_target
+                    if ref_target is None:
+                        visit_state.unresolved_refs.append(
+                            self.mixer_uuid, lambda datablock: container.__setitem__(key, datablock)
+                        )
+                    else:
+                        container[key] = ref_target
                 except TypeError as e:
                     logger.warning(
                         f"DatablockRefProxy.save() exception while saving {ref_target} into {container}[{key}]..."
@@ -110,16 +122,21 @@ class DatablockRefProxy(Proxy):
                     f"Not implemented: DatablockRefProxy.save() for IDRef into collection {container}[{key}]"
                 )
         else:
-            # reference stored in a struct
+            # reference stored in a struct (e.g. Object.parent)
             if not container.bl_rna.properties[key].is_readonly:
                 try:
                     # This is what saves Camera.dof.focus_object
-                    setattr(container, key, ref_target)
+                    if ref_target is None:
+                        visit_state.unresolved_refs.append(
+                            self.mixer_uuid, lambda datablock: setattr(container, key, datablock)
+                        )
+                    else:
+                        setattr(container, key, ref_target)
                 except Exception as e:
                     logger.warning(f"write attribute skipped {key} for {container}...")
                     logger.warning(f" ...Error: {repr(e)}")
 
-    def target(self, visit_state: VisitState) -> T.ID:
+    def target(self, visit_state: VisitState) -> Optional[T.ID]:
         """
         The datablock referenced by this proxy
         """
@@ -132,15 +149,18 @@ class DatablockRefProxy(Proxy):
             # it was created under the hood by a VRtist command and register it.
             collection = getattr(bpy.data, self._bpy_data_collection, None)
             if collection is None:
-                logger.warning(f"{self}: reference to unknown collection bpy.data.{self.collection_name}")
+                logger.warning(f"{self}: reference to unknown collection bpy.data.{self._bpy_data_collection}")
                 return None
 
             datablock = collection.get(self._initial_name)
             if datablock is None:
-                logger.warning(f"{self}: target unknown")
                 return None
 
-            assert datablock.mixer_uuid == ""
+            if datablock.mixer_uuid != "":
+                logger.warning(
+                    f"Fetching datablock by name found datablock {datablock} with uuid {datablock.mixer_uuid}"
+                )
+                return None
             datablock.mixer_uuid = self._datablock_uuid
             visit_state.ids[self._datablock_uuid] = datablock
             logger.warning(f"{self}: registering {datablock}")

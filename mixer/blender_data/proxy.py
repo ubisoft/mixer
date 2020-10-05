@@ -21,9 +21,11 @@ See synchronization.md
 """
 from __future__ import annotations
 
+from collections import defaultdict
+from dataclasses import dataclass
 from enum import IntEnum
 import logging
-from typing import Any, Optional, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Union
 from uuid import uuid4
 
 import bpy
@@ -33,11 +35,50 @@ from mixer.blender_data.blenddata import bl_rna_to_type
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import VisitState
+    from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
 logger = logging.getLogger(__name__)
 
 # storing everything in a single dictionary is easier for serialization
 MIXER_SEQUENCE = "__mixer_sequence__"
+
+Uuid = str
+
+
+@dataclass
+class UnresolvedRef:
+    """A datablock reference that could not be resolved when target.init() needed to be called
+    because the referenced datablock was not yet received.
+
+    No suitable ordering can easily be provided by the sender for many reasons including Collection.children
+    referencing other collections and Scene.sequencer strips that can reference other scenes
+    """
+
+    target: T.bpy_prop_collection
+    proxy: DatablockRefProxy
+
+
+class UnresolvedRefs:
+    """For each each Struct ot collection of datablocks, a list or unresolved references
+    Datablock referenced may be temporarily unresolved when referenced datablocks
+    (e.g. a bpy.types.Collection) are received before the item that references it
+    (e.g. bpy.types.Collection.children)
+    """
+
+    SrcLink = Callable[[T.ID], None]
+
+    def __init__(self):
+        self._refs: Dict[Uuid, List[self.Func]] = defaultdict(list)
+
+    def append(self, dst_uuid: Uuid, src_link: SrcLink):
+        self._refs[dst_uuid].append(src_link)
+
+    def resolve(self, dst_uuid: Uuid, dst_datablock: T.ID):
+        if dst_uuid in self._refs:
+            for src_link in self._refs[dst_uuid]:
+                src_link(dst_datablock)
+                logger.info(f"resolving reference to {dst_datablock}")
+            del self._refs[dst_uuid]
 
 
 class MaxDepthExceeded(Exception):
