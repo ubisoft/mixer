@@ -155,7 +155,7 @@ class TestParenting(MiscTestCase):
 
     def test_object_parent(self):
         # 3 empties or which the creation order is not the parent order
-        create = f"""
+        create = """
 import bpy
 scene = bpy.data.scenes[0]
 obj0 = bpy.data.objects.new("obj0", None)
@@ -172,7 +172,7 @@ obj0.parent = obj1
 
     def test_collection_children(self):
         # Rename the light datablock
-        create = f"""
+        create = """
 import bpy
 scene = bpy.data.scenes[0]
 coll0 = bpy.data.collections.new("coll0")
