@@ -282,15 +282,6 @@ class DatablockProxy(StructProxy):
 
         return target
 
-    def update_from_proxy(self, other: DatablockProxy):
-        """Obsolete"""
-        # Currently, we receive the full list of attributes, so replace everything.
-        # Do not keep existing attribute as they may not be applicable any more to the new object. For instance
-        # if a light has been morphed from POINT to SUN, the 'falloff_curve' attribute no more exists
-        #
-        # To perform differential updates in the future, we will need markers for removed attributes
-        self._data = other._data
-
     def apply_to_proxy(
         self,
         datablock: T.ID,
