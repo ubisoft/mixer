@@ -157,10 +157,10 @@ class DatablockRefProxy(Proxy):
                 return None
 
             if datablock.mixer_uuid != "":
-                logger.warning(
-                    f"Fetching datablock by name found datablock {datablock} with uuid {datablock.mixer_uuid}"
-                )
-                return None
+                logger.error(f"{self}: found datablock with uuid in bpy.data.{self._bpy_data_collection}")
+                logger.error(f'... "{self._bpy_data_collection}" may be missing from clear_scene_contents()')
+                return
+
             datablock.mixer_uuid = self._datablock_uuid
             context.proxy_state.datablocks[self._datablock_uuid] = datablock
             logger.warning(f"{self}: registering {datablock}")

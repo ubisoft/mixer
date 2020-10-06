@@ -144,7 +144,7 @@ class StructProxy(Proxy):
                 current_value = self._data.get(k)
                 self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
             except Exception as e:
-                logger.warning(f"StructLike.apply(). Processing {member_delta}")
+                logger.warning(f"Struct.apply(). Processing {member_delta}")
                 logger.warning(f"... for {struct}.{k}")
                 logger.warning(f"... Exception: {e}")
                 logger.warning("... Update ignored")

@@ -310,7 +310,7 @@ class DatablockProxy(StructProxy):
                 current_value = self._data.get(k)
                 self._data[k] = apply_attribute(datablock, k, current_value, delta, context, to_blender=False)
             except Exception as e:
-                logger.warning(f"StructLike.apply(). Processing {delta}")
+                logger.warning(f"Datablock.apply(). Processing {delta}")
                 logger.warning(f"... for {datablock}.{k}")
                 logger.warning(f"... Exception: {e}")
                 logger.warning("... Update ignored")

@@ -216,12 +216,16 @@ class StructCollectionProxy(Proxy):
             del_indices = [i for i, delta in enumerate(update._data.values()) if isinstance(delta, DeltaDeletion)]
             if add_indices or del_indices:
                 # Cannot have deletions and additions
-                assert not add_indices or not del_indices
+                assert not add_indices or not del_indices, "not add_indices or not del_indices"
                 indices = add_indices if add_indices else del_indices
                 # Check that adds and deleted are at the end
-                assert not indices or indices[-1] == len(update._data) - 1
+                assert (
+                    not indices or indices[-1] == len(update._data) - 1
+                ), "not indices or indices[-1] == len(update._data) - 1"
                 # check that adds and deletes are contiguous
-                assert all(a + 1 == b for a, b in zip(indices, iter(indices[1:])))
+                assert all(
+                    a + 1 == b for a, b in zip(indices, iter(indices[1:]))
+                ), "all(a + 1 == b for a, b in zip(indices, iter(indices[1:])))"
 
             for k, delta in update._data.items():
                 try:

@@ -195,7 +195,7 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, con
         return value
 
     except Exception as e:
-        logger.warning(f"diff exception for attr: {e}")
+        logger.warning(f"apply exception for attr: {e}")
         raise
 
 
