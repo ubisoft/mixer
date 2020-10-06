@@ -11,7 +11,7 @@ import bpy
 from mixer.blender_client import data as data_api
 from mixer.blender_client import grease_pencil as grease_pencil_api
 from mixer.blender_data.diff import BpyBlendDiff
-from mixer.blender_data.filter import safe_context
+from mixer.blender_data.filter import safe_properties
 
 if TYPE_CHECKING:
     from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -99,11 +99,11 @@ def send_scene_data_to_server(scene, dummy):
     # Compute the difference between the proxy state and the Blender state
     # It is a coarse difference at the ID level(created, removed, renamed)
     diff = BpyBlendDiff()
-    diff.diff(share_data.bpy_data_proxy, safe_context)
+    diff.diff(share_data.bpy_data_proxy, safe_properties)
 
     # Ask the proxy to compute the list of elements to synchronize and update itself
     depsgraph = bpy.context.evaluated_depsgraph_get()
-    changeset = share_data.bpy_data_proxy.update(diff, safe_context, depsgraph.updates)
+    changeset = share_data.bpy_data_proxy.update(diff, safe_properties, depsgraph.updates)
 
     data_api.send_data_creations(changeset.creations)
     data_api.send_data_removals(changeset.removals)

@@ -135,7 +135,7 @@ class AosElement(Proxy):
         # # A bit overkill:
         # # for T.Mesh.vertices[...].groups, generates a StructCollectionProxy per Vertex even if empty
         # self._data[MIXER_SEQUENCE] = [
-        #     read_attribute(getattr(item, attr_name), attr_property, context, visit_context) for item in bl_collection
+        #     read_attribute(getattr(item, attr_name), attr_property, synchronized_properties, visit_context) for item in bl_collection
         # ]
         # return self
 

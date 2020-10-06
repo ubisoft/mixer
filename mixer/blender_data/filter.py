@@ -18,7 +18,7 @@
 Defines the classes and configuration that controls the data synchronizations, i.e. which types and type members
 should be synchronized.
 
-This module could be enhanced to provide multiple Context to that different data is synchronized at different times
+This module could be enhanced to provide multiple SynchronizedProperties to that different data is synchronized at different times
 according to user preferences.
 
 see synchronization.md
@@ -161,13 +161,13 @@ Property = Any
 Properties = Dict[PropertyName, Property]
 
 
-class Context:
+class SynchronizedProperties:
     """
     Keeps track of properties to synchronize for all types.
 
-    Only one Context is currently use, but using several contexts could let the user control what is synchronized.
+    Only one SynchronizedProperties is currently use, but using several contexts could let the user control what is synchronized.
 
-    TODO Removing a plugin may cause a failure because the plugin properties are loaded in Context
+    TODO Removing a plugin may cause a failure because the plugin properties are loaded in SynchronizedProperties
     and never unloaded
     """
 
@@ -386,7 +386,7 @@ Per-type property exclusions
 """
 
 test_filter.append(default_exclusions)
-test_context = Context(test_filter)
+test_properties = SynchronizedProperties(test_filter)
 """For tests"""
 
 safe_exclusions = {}
@@ -440,7 +440,7 @@ safe_blenddata = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
 safe_filter.append(default_exclusions)
 safe_filter.append(safe_exclusions)
 safe_filter.append(safe_blenddata)
-safe_context = Context(safe_filter)
+safe_properties = SynchronizedProperties(safe_filter)
 """
 The default context used for synchronization, that provides per-type lists of properties to synchronize
 """

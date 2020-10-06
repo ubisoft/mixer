@@ -26,7 +26,7 @@ from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
-from mixer.blender_data.filter import safe_context
+from mixer.blender_data.filter import safe_properties
 from mixer.blender_data.diff import BpyBlendDiff
 
 
@@ -36,7 +36,7 @@ class TestWorld(unittest.TestCase):
         self.bpy_data_proxy = BpyDataProxy()
         self.diff = BpyBlendDiff()
         bpy.data.worlds[0].name = "World"
-        register_bl_equals(self, safe_context)
+        register_bl_equals(self, safe_properties)
 
     def test_world(self):
         # test_end_to_end.TestWorld.test_world
@@ -44,11 +44,11 @@ class TestWorld(unittest.TestCase):
         world.use_nodes = True
         self.assertGreaterEqual(len(world.node_tree.nodes), 2)
 
-        self.diff.diff(self.bpy_data_proxy, safe_context)
+        self.diff.diff(self.bpy_data_proxy, safe_properties)
         sent_ids = {}
         sent_ids.update({("worlds", world.name): world})
 
-        changeset = self.bpy_data_proxy.update(self.diff, safe_context)
+        changeset = self.bpy_data_proxy.update(self.diff, safe_properties)
         updates = changeset.creations
         # avoid clash on restore
         world.name = world.name + "_bak"
@@ -75,11 +75,11 @@ class TestWorld(unittest.TestCase):
         # test_end_to_end.TestWorld.test_non_existing
         world = bpy.data.worlds[0]
 
-        self.diff.diff(self.bpy_data_proxy, safe_context)
+        self.diff.diff(self.bpy_data_proxy, safe_properties)
         sent_ids = {}
         sent_ids.update({("worlds", world.name): world})
 
-        changeset = self.bpy_data_proxy.update(self.diff, safe_context)
+        changeset = self.bpy_data_proxy.update(self.diff, safe_properties)
         creations = changeset.creations
         # avoid clash on restore
         world.name = world.name + "_bak"

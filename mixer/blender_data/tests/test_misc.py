@@ -27,7 +27,7 @@ from mixer.blender_data.aos_soa_proxy import SoaElement
 from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
-from mixer.blender_data.filter import Context, TypeFilterOut, test_context, test_filter
+from mixer.blender_data.filter import SynchronizedProperties, TypeFilterOut, test_properties, test_filter
 from mixer.blender_data.tests.utils import test_blend_file
 
 
@@ -38,7 +38,7 @@ class TestLoadProxy(unittest.TestCase):
         # file = r"D:\work\data\test_files\BlenderSS 2_82.blend"
         bpy.ops.wm.open_mainfile(filepath=file)
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
 
     def check(self, item, expected_elements):
         self.assertSetEqual(set(item._data.keys()), set(expected_elements))
@@ -77,7 +77,7 @@ class TestLoadProxy(unittest.TestCase):
         filter_stack = copy.copy(test_filter)
         filter_stack.append({T.Scene: TypeFilterOut(T.SceneEEVEE)})
         proxy = BpyDataProxy()
-        proxy.load(Context(filter_stack))
+        proxy.load(SynchronizedProperties(filter_stack))
         blend_data_ = proxy._data
         scene_ = blend_data_["scenes"].search_one("Scene_0")._data
         self.assertFalse("eevee" in scene_)
@@ -137,7 +137,7 @@ class TestLoadProxy(unittest.TestCase):
         cam = D.cameras["Camera_0"]
         cam.dof.focus_object = D.objects["Cube"]
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         # load into proxy
         cam_proxy = self.proxy.data("cameras").search_one("Camera_0")
         focus_object_proxy = cam_proxy.data("dof").data("focus_object")
@@ -147,7 +147,7 @@ class TestLoadProxy(unittest.TestCase):
     def test_camera_focus_object_none(self):
         # test_misc.TestLoadProxy.test_camera_focus_object_none
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         # load into proxy
         cam_proxy = self.proxy.data("cameras").search_one("Camera_0")
         focus_object_proxy = cam_proxy.data("dof").data("focus_object")
@@ -156,7 +156,7 @@ class TestLoadProxy(unittest.TestCase):
 
 class TestProperties(unittest.TestCase):
     def test_one(self):
-        context = test_context
+        synchronized_properties = test_properties
         camera = D.cameras[0]
 
         # for 2.83.4
@@ -202,7 +202,7 @@ class TestProperties(unittest.TestCase):
             "animation_data",
             "cycles",
         }
-        names = {prop[0] for prop in context.properties(camera)}
+        names = {prop[0] for prop in synchronized_properties.properties(camera)}
         self.assertSetEqual(names, expected_names, "Expected list from 2.83.4, check version")
 
 
@@ -236,7 +236,7 @@ class TestAosSoa(unittest.TestCase):
 
         bpy.ops.object.gpencil_add(type="STROKE")
         proxy = BpyDataProxy()
-        proxy.load(test_context)
+        proxy.load(test_properties)
         gp_layers = proxy.data("grease_pencils").search_one("Stroke").data("layers")
         gp_points = gp_layers.data("Lines").data("frames").data(0).data("strokes").data(0).data("points")._data
         expected = (

@@ -52,7 +52,7 @@ class StructProxy(Proxy):
         Load a Blender object into this proxy
         """
         self._data.clear()
-        properties = visit_state.context.properties(bl_instance)
+        properties = visit_state.synchronized_properties.properties(bl_instance)
         # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
         # that we do not want to load anyway
         properties = specifics.conditional_properties(bl_instance, properties)
@@ -171,12 +171,12 @@ class StructProxy(Proxy):
         diff = self.__class__()
         diff.init(struct)
 
-        # PERF accessing the properties from the context is **far** cheaper that iterating over
+        # PERF accessing the properties from the synchronized_properties is **far** cheaper that iterating over
         # _data and the getting the properties with
         #   member_property = struct.bl_rna.properties[k]
         # line to which py-spy attributes 20% of the total diff !
 
-        for k, member_property in visit_state.context.properties(struct):
+        for k, member_property in visit_state.synchronized_properties.properties(struct):
             # TODO in test_differential.StructDatablockRef.test_remove
             # target et a scene, k is world and v (current world value) is None
             # so diff fails. v should be a BpyIDRefNoneProxy

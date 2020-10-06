@@ -26,7 +26,7 @@ from typing import List, Mapping, Set
 from uuid import uuid4
 
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
-from mixer.blender_data.filter import test_context
+from mixer.blender_data.filter import test_properties
 from mixer.bl_utils import get_mixer_prefs
 
 import bpy
@@ -401,7 +401,7 @@ class ShareData:
         if self.use_experimental_sync():
             # default, not safe
             # the initialisation must initialize reference target for all useful collections (except screens, ...)
-            self.bpy_data_proxy.initialize_ref_targets(test_context)
+            self.bpy_data_proxy.initialize_ref_targets(test_properties)
 
     def set_experimental_sync(self, experimental_sync: bool):
         if experimental_sync:

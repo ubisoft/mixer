@@ -119,7 +119,7 @@ class DatablockProxy(StructProxy):
 
         self._class_name = bl_instance.__class__.__name__
         self._data.clear()
-        properties = visit_state.context.properties(bl_instance)
+        properties = visit_state.synchronized_properties.properties(bl_instance)
         # this assumes that specifics.py apply only to ID, not Struct
         properties = specifics.conditional_properties(bl_instance, properties)
         for name, bl_rna_property in properties:

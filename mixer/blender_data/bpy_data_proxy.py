@@ -34,7 +34,7 @@ from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.diff import BpyBlendDiff
-from mixer.blender_data.filter import Context, safe_depsgraph_updates, safe_context
+from mixer.blender_data.filter import SynchronizedProperties, safe_depsgraph_updates, safe_properties
 from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy, MaxDepthExceeded, UnresolvedRefs
 
 logger = logging.getLogger(__name__)
@@ -94,7 +94,7 @@ class VisitState:
 
     unresolved_refs: UnresolvedRefs
 
-    context: Context
+    synchronized_properties: SynchronizedProperties
     """Controls what properties are synchronized"""
 
     recursion_guard: RecursionGuard = RecursionGuard()
@@ -125,13 +125,13 @@ class BpyDataProxy(Proxy):
         self.id_proxies.clear()
         self.ids.clear()
 
-    def visit_state(self, context: Context = safe_context):
-        return VisitState(self.id_proxies, self.ids, self._unresolved_refs, context)
+    def visit_state(self, synchronized_properties: SynchronizedProperties = safe_properties):
+        return VisitState(self.id_proxies, self.ids, self._unresolved_refs, synchronized_properties)
 
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}
 
-    def initialize_ref_targets(self, context: Context):
+    def initialize_ref_targets(self, synchronized_properties: SynchronizedProperties):
         """Keep track of all bpy.data items so that loading recognizes references to them
 
         Call this before updating the proxy from send_scene_content. It is not needed on the
@@ -146,7 +146,7 @@ class BpyDataProxy(Proxy):
         # However, root_ids may no more be required if we can load all the proxies inside out (deepmost first, i.e
         # (Mesh, Metaball, ..), then Object, the Scene). This should be possible as as we sort
         # the updates inside out in update() to the receiver gets them in order
-        for name, _ in context.properties(bpy_type=T.BlendData):
+        for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
             if name in collection_name_to_type:
                 # TODO use BlendData
                 bl_collection = getattr(bpy.data, name)
@@ -154,15 +154,15 @@ class BpyDataProxy(Proxy):
                     uuid = ensure_uuid(item)
                     self.ids[uuid] = item
 
-    def load(self, context: Context):
+    def load(self, synchronized_properties: SynchronizedProperties):
         """Load the current scene into this proxy
 
         Only used for test. The initial load is performed by update()
         """
-        self.initialize_ref_targets(context)
-        visit_state = self.visit_state(context)
+        self.initialize_ref_targets(synchronized_properties)
+        visit_state = self.visit_state(synchronized_properties)
 
-        for name, _ in context.properties(bpy_type=T.BlendData):
+        for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
             self._data[name] = DatablockCollectionProxy().load_as_ID(collection, visit_state)
         return self
@@ -177,7 +177,10 @@ class BpyDataProxy(Proxy):
         return collection_proxy.find(key)
 
     def update(
-        self, diff: BpyBlendDiff, context: Context = safe_context, depsgraph_updates: T.bpy_prop_collection = ()
+        self,
+        diff: BpyBlendDiff,
+        synchronized_properties: SynchronizedProperties = safe_properties,
+        depsgraph_updates: T.bpy_prop_collection = (),
     ) -> Changeset:
         """
         Process local changes, i.e. created, removed and renames datablocks as well as depsgraph updates.
@@ -190,7 +193,7 @@ class BpyDataProxy(Proxy):
         # Update the bpy.data collections status and get the list of newly created bpy.data entries.
         # Updated proxies will contain the IDs to send as an initial transfer.
         # There is no difference between a creation and a subsequent update
-        visit_state = self.visit_state(context)
+        visit_state = self.visit_state(synchronized_properties)
 
         # sort the updates deppmost first so that the receiver will create meshes and lights
         # before objects, for instance
@@ -245,7 +248,7 @@ class BpyDataProxy(Proxy):
         return changeset
 
     def create_datablock(
-        self, incoming_proxy: DatablockProxy, context: Context = safe_context
+        self, incoming_proxy: DatablockProxy, synchronized_properties: SynchronizedProperties = safe_properties
     ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """
         Process a received datablock creation command, creating the datablock and updating the proxy state
@@ -257,10 +260,12 @@ class BpyDataProxy(Proxy):
             )
             return None
 
-        visit_state = self.visit_state(context)
+        visit_state = self.visit_state(synchronized_properties)
         return bpy_data_collection_proxy.create_datablock(incoming_proxy, visit_state)
 
-    def update_datablock(self, update: DeltaUpdate, context: Context = safe_context) -> Optional[T.ID]:
+    def update_datablock(
+        self, update: DeltaUpdate, synchronized_properties: SynchronizedProperties = safe_properties
+    ) -> Optional[T.ID]:
         """
         Process a received datablock update command, updating the datablock and the proxy state
         """
@@ -273,7 +278,7 @@ class BpyDataProxy(Proxy):
             )
             return None
 
-        visit_state = self.visit_state(context)
+        visit_state = self.visit_state(synchronized_properties)
         return bpy_data_collection_proxy.update_datablock(update, visit_state)
 
     def remove_datablock(self, uuid: str):
@@ -346,10 +351,10 @@ class BpyDataProxy(Proxy):
 
         return rename_changeset_to_send
 
-    def diff(self, context: Context) -> Optional[BpyDataProxy]:
+    def diff(self, synchronized_properties: SynchronizedProperties) -> Optional[BpyDataProxy]:
         """Currently for tests only"""
         diff = self.__class__()
-        visit_state = self.visit_state(context)
+        visit_state = self.visit_state(synchronized_properties)
         for name, proxy in self._data.items():
             collection = getattr(bpy.data, name, None)
             if collection is None:

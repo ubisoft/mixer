@@ -13,7 +13,7 @@ from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 from mixer.blender_data.struct_proxy import StructProxy
 
-from mixer.blender_data.filter import test_context
+from mixer.blender_data.filter import test_properties
 
 
 class DifferentialCompute(unittest.TestCase):
@@ -23,7 +23,7 @@ class DifferentialCompute(unittest.TestCase):
         file = test_blend_file
         bpy.ops.wm.open_mainfile(filepath=file)
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy: DatablockProxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
         self.scenes_property = bpy.data.bl_rna.properties["scenes"]
@@ -31,7 +31,7 @@ class DifferentialCompute(unittest.TestCase):
     def generate_all_uuids(self):
         # as a side effect, BpyBlendDiff generates the uuids
         _ = BpyBlendDiff()
-        _.diff(self.proxy, test_context)
+        _.diff(self.proxy, test_properties)
 
 
 class Datablock(DifferentialCompute):
@@ -78,7 +78,7 @@ class StructDatablockRef(DifferentialCompute):
         # test_diff_compute.StructDatablockRef.test_add
         self.scene.world = None
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         world = bpy.data.worlds.new("W")
         self.scene.world = world
         self.generate_all_uuids()
@@ -97,7 +97,7 @@ class StructDatablockRef(DifferentialCompute):
         world2 = bpy.data.worlds.new("W2")
         self.scene.world = world1
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene.world = world2
         self.generate_all_uuids()
         scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
@@ -115,7 +115,7 @@ class StructDatablockRef(DifferentialCompute):
         world1 = bpy.data.worlds.new("W1")
         self.scene.world = world1
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene.world = None
         self.generate_all_uuids()
         scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
@@ -146,7 +146,7 @@ class Collection(DifferentialCompute):
             self.scene.collection.objects.link(empty)
 
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
         for i in range(2):
@@ -199,7 +199,7 @@ class Collection(DifferentialCompute):
             empty = bpy.data.objects.new(f"Unlinked{i}", None)
             collection.objects.link(empty)
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.collection_proxy = self.proxy.data("collections").search_one("Collection")
         self.collection = bpy.data.collections["Collection"]
         for i in range(2):
@@ -241,7 +241,7 @@ class Collection(DifferentialCompute):
         # test_diff_compute.Collection.test_key_str
 
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
 
@@ -303,7 +303,7 @@ class Collection(DifferentialCompute):
         points_add = self.scene.view_settings.curve_mapping.curves[1].points
 
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
 

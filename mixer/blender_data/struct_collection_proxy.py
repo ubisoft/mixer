@@ -124,7 +124,7 @@ class StructCollectionProxy(Proxy):
             # and we need better
             prototype_item = bl_collection[0]
             item_bl_rna = bl_collection_property.fixed_type.bl_rna
-            for attr_name, bl_rna_property in visit_state.context.properties(item_bl_rna):
+            for attr_name, bl_rna_property in visit_state.synchronized_properties.properties(item_bl_rna):
                 if is_soable_property(bl_rna_property):
                     # element type supported by foreach_get
                     self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item)
@@ -316,7 +316,7 @@ class StructCollectionProxy(Proxy):
             # Renames are detected as Deletion + Addition
 
             # This assumes that keys ordring is the same in the proxy and in blender, which is
-            # guaranteed by the fact that proxy load uses Context.properties()
+            # guaranteed by the fact that proxy load uses SynchronizedProperties.properties()
 
             bl_rna = getattr(collection, "bl_rna", None)
             if bl_rna is not None and isinstance(

@@ -26,10 +26,10 @@ from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
-from mixer.blender_data.filter import test_context
+from mixer.blender_data.filter import test_properties
 from mathutils import Matrix, Vector
 
-context = test_context
+synchronized_properties = test_properties
 
 
 class TestWriteAttribute(unittest.TestCase):
@@ -42,8 +42,8 @@ class TestWriteAttribute(unittest.TestCase):
         D.scenes["Scene_0"].view_settings.use_curve_mapping = True
 
         self.proxy = BpyDataProxy()
-        self.proxy.load(context)
-        register_bl_equals(self, context)
+        self.proxy.load(synchronized_properties)
+        register_bl_equals(self, synchronized_properties)
 
     def test_write_simple_types(self):
         scene = D.scenes[0]
@@ -138,7 +138,7 @@ class TestWriteAttribute(unittest.TestCase):
             curve0.points[i].location = point
 
         self.proxy = BpyDataProxy()
-        self.proxy.load(context)
+        self.proxy.load(synchronized_properties)
 
         light.name = "light_bak"
         light_bak = D.lights["light_bak"]
@@ -165,7 +165,7 @@ class TestWriteAttribute(unittest.TestCase):
             curve0.points[i].location = point
 
         self.proxy = BpyDataProxy()
-        self.proxy.load(context)
+        self.proxy.load(synchronized_properties)
 
         light.name = "light_bak"
         light = None
@@ -210,7 +210,7 @@ class TestWriteAttribute(unittest.TestCase):
             curve0.points[i].location = point
 
         self.proxy = BpyDataProxy()
-        self.proxy.load(context)
+        self.proxy.load(synchronized_properties)
 
         light.name = "light_bak"
 
@@ -265,7 +265,7 @@ class TestWriteAttribute(unittest.TestCase):
         focus_object = D.objects["Cube"]
         camera.dof.focus_object = focus_object
         self.proxy = BpyDataProxy()
-        self.proxy.load(context)
+        self.proxy.load(synchronized_properties)
 
         camera.name = "camera_bak"
 

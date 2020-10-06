@@ -58,7 +58,7 @@ class BuildProxyOperator(bpy.types.Operator):
         # Cannot import at module level, since it requires access to bpy.data which is not
         # accessible during module load
         from mixer.blender_data.bpy_data_proxy import BpyDataProxy
-        from mixer.blender_data.filter import test_context
+        from mixer.blender_data.filter import test_properties
         import cProfile
         import io
         import pstats
@@ -74,7 +74,7 @@ class BuildProxyOperator(bpy.types.Operator):
             pr = cProfile.Profile()
             pr.enable()
         t1 = time.time()
-        proxy.load(test_context)
+        proxy.load(test_properties)
         t2 = time.time()
         if profile:
             pr.disable()
@@ -105,7 +105,7 @@ class DiffProxyOperator(bpy.types.Operator):
     def execute(self, context):
         # Cannot import at module level, since it requires access to bpy.data which is not
         # accessible during module load
-        from mixer.blender_data.filter import test_context
+        from mixer.blender_data.filter import test_properties
         import cProfile
         import io
         import pstats
@@ -121,7 +121,7 @@ class DiffProxyOperator(bpy.types.Operator):
             pr.enable()
         t1 = time.time()
         _ = proxy.data("scenes").data("Scene").diff(bpy.data.scenes, "Scene", proxy.visit_state())
-        _ = proxy.diff(test_context)
+        _ = proxy.diff(test_properties)
         t2 = time.time()
         if profile:
             pr.disable()

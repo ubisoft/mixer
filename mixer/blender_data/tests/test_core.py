@@ -24,7 +24,7 @@ from bpy import types as T  # noqa
 
 from mixer.blender_data import types
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
-from mixer.blender_data.filter import test_context
+from mixer.blender_data.filter import test_properties
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.tests.utils import equals, register_bl_equals, test_blend_file
 
@@ -33,7 +33,7 @@ from mixer.blender_data.tests.utils import equals, register_bl_equals, test_blen
 class TestCore(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
-        register_bl_equals(self, test_context)
+        register_bl_equals(self, test_properties)
         self._proxy = BpyDataProxy()
         self._visit_state = self._proxy.visit_state()
 

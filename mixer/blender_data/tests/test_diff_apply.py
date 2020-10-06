@@ -7,7 +7,7 @@ import bpy
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.diff import BpyBlendDiff
-from mixer.blender_data.filter import test_context
+from mixer.blender_data.filter import test_properties
 
 
 class DifferentialApply(unittest.TestCase):
@@ -17,7 +17,7 @@ class DifferentialApply(unittest.TestCase):
         file = test_blend_file
         bpy.ops.wm.open_mainfile(filepath=file)
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy: DatablockProxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
         self.scenes_property = bpy.data.bl_rna.properties["scenes"]
@@ -25,7 +25,7 @@ class DifferentialApply(unittest.TestCase):
     def generate_all_uuids(self):
         # as a side effect, BpyBlendDiff generates the uuids
         _ = BpyBlendDiff()
-        _.diff(self.proxy, test_context)
+        _.diff(self.proxy, test_properties)
 
 
 class Datablock(DifferentialApply):
@@ -54,7 +54,7 @@ class Datablock(DifferentialApply):
 
         self.scene.eevee.use_bloom = False
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy: DatablockProxy = self.proxy.data("scenes").search_one("Scene")
         self.scene.eevee.use_bloom = True
 
@@ -81,7 +81,7 @@ class StructDatablockRef(DifferentialApply):
         # TODO needs a BpyIDNoneRefProxy
         self.scene.world = None
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy: DatablockProxy = self.proxy.data("scenes").search_one("Scene")
 
         world = bpy.data.worlds.new("W")
@@ -104,7 +104,7 @@ class StructDatablockRef(DifferentialApply):
         world2 = bpy.data.worlds.new("W2")
         self.scene.world = world1
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy: DatablockProxy = self.proxy.data("scenes").search_one("Scene")
 
         self.scene.world = world2
@@ -126,7 +126,7 @@ class StructDatablockRef(DifferentialApply):
         world1 = bpy.data.worlds.new("W1")
         self.scene.world = world1
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene.world = None
         self.generate_all_uuids()
         _ = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.visit_state())
@@ -149,7 +149,7 @@ class Collection(DifferentialApply):
             empty = bpy.data.objects.new(f"Deleted{i}", None)
             self.scene.collection.objects.link(empty)
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
         for i in range(2):
@@ -175,7 +175,7 @@ class Collection(DifferentialApply):
         # required because the Added{i} were created after proxy load and are not known by the proxy
         # at this time. IRL the depsgraph handler uses BpyBendDiff to find datablock additions,
         # then BpyDataProxy.update()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
 
         self.scene_proxy.apply(bpy.data.scenes, self.scene.name, scene_delta, self.proxy.visit_state())
 
@@ -194,7 +194,7 @@ class Collection(DifferentialApply):
         # test_diff_apply.Collection.test_key_str
 
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
 
@@ -240,7 +240,7 @@ class Collection(DifferentialApply):
         points1 = self.scene.view_settings.curve_mapping.curves[1].points
 
         self.proxy = BpyDataProxy()
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
         self.scene = bpy.data.scenes["Scene"]
 
