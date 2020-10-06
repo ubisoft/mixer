@@ -150,7 +150,6 @@ class DatablockCollectionProxy(Proxy):
 
         uuid = incoming_proxy.mixer_uuid()
         self._data[uuid] = incoming_proxy
-        visit_state.root_ids.add(datablock)
         visit_state.ids[uuid] = datablock
         visit_state.id_proxies[uuid] = incoming_proxy
 
@@ -185,8 +184,6 @@ class DatablockCollectionProxy(Proxy):
         if existing_id != id_:
             # Not a problem for light morphing
             logger.warning(f"Update_datablock changes datablock {existing_id} to {id_}")
-            visit_state.root_ids.remove(existing_id)
-            visit_state.root_ids.add(id_)
             visit_state.ids[uuid] = id_
 
         return id_
@@ -237,7 +234,6 @@ class DatablockCollectionProxy(Proxy):
                     logger.error("update/ request addition for %s[%s] : not found", collection_name, name)
                     continue
                 uuid = ensure_uuid(id_)
-                visit_state.root_ids.add(id_)
                 visit_state.ids[uuid] = id_
                 proxy = DatablockProxy().load(id_, visit_state, bpy_data_collection_name=collection_name)
                 visit_state.id_proxies[uuid] = proxy
@@ -259,7 +255,6 @@ class DatablockCollectionProxy(Proxy):
                 changeset.removals.append((uuid, str(proxy)))
                 del self._data[uuid]
                 id_ = visit_state.ids[uuid]
-                visit_state.root_ids.remove(id_)
                 del visit_state.id_proxies[uuid]
                 del visit_state.ids[uuid]
             except Exception:
@@ -291,8 +286,6 @@ class DatablockCollectionProxy(Proxy):
                 logger.error(
                     f"update rename : {proxy.collection}[{new_name}] is not {visit_state.ids[uuid]} for {proxy}, {uuid}"
                 )
-            if visit_state.ids[uuid] not in visit_state.root_ids:
-                logger.error(f"update rename : {visit_state.ids[uuid]} not in visit_state.root_ids for {proxy}, {uuid}")
 
             old_name = proxy.data("name")
             changeset.renames.append((proxy.mixer_uuid(), old_name, new_name, str(proxy)))

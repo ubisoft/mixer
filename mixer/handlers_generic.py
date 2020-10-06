@@ -109,7 +109,6 @@ def send_scene_data_to_server(scene, dummy):
     data_api.send_data_removals(changeset.removals)
     data_api.send_data_renames(changeset.renames)
     data_api.send_data_updates(changeset.updates)
-    share_data.bpy_data_proxy.debug_check_id_proxies()
 
     # Send VRtist formatted messages for datablocks not yet supported by generic synchronization
     # i.e. Mesh, GreasePencil

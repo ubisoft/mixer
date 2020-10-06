@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-from enum import IntEnum
 import logging
 import traceback
 from typing import Any, Optional, Union, TYPE_CHECKING
@@ -30,19 +29,9 @@ from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 
 if TYPE_CHECKING:
-    from mixer.blender_data.bpy_data_proxy import RootIds, VisitState
+    from mixer.blender_data.bpy_data_proxy import VisitState
 
 logger = logging.getLogger(__name__)
-
-
-class LoadElementAs(IntEnum):
-    STRUCT = 0
-    ID_REF = 1
-    ID_DEF = 2
-
-
-def same_rna(a, b):
-    return a.bl_rna == b.bl_rna
 
 
 def is_ID_subclass_rna(bl_rna):  # noqa
@@ -50,47 +39,6 @@ def is_ID_subclass_rna(bl_rna):  # noqa
     Return true if the RNA is of a subclass of bpy.types.ID
     """
     return issubclass(bl_rna_to_type(bl_rna), bpy.types.ID)
-
-
-def load_as_what(attr_property: bpy.types.Property, attr: Any, root_ids: RootIds):
-    """
-    Determine if we must load an attribute as a struct, a blenddata collection element (ID_DEF)
-    or a reference to a BlendData collection element (ID_REF)
-
-    All T.Struct are loaded as struct
-    All T.ID are loaded ad IDRef (that is pointer into a D.blendata collection) except
-    for specific case. For instance the scene master "collection" is not a D.collections item.
-
-    Arguments
-    parent -- the type that contains the attribute names attr_name, for instance T.Scene
-    attr_property -- a bl_rna property of a attribute, that can be a CollectionProperty or a "plain" attribute
-    """
-    # Reference to an ID element at the root of the blend file
-    if attr in root_ids:
-        return LoadElementAs.ID_REF
-
-    if same_rna(attr_property, T.CollectionProperty):
-        if is_ID_subclass_rna(attr_property.fixed_type.bl_rna):
-            # Collections at root level are not handled by this code (See BpyDataProxy.load()) so here it
-            # should be a nested collection and IDs should be ref to root collections.
-            return LoadElementAs.ID_REF
-        else:
-            # Only collections at the root level of blendfile are id def, so here it can only be struct
-            return LoadElementAs.STRUCT
-
-    if isinstance(attr, T.Mesh):
-        return LoadElementAs.ID_REF
-
-    if same_rna(attr_property, T.PointerProperty):
-        element_property = attr_property.fixed_type
-    else:
-        element_property = attr_property
-
-    if is_ID_subclass_rna(element_property.bl_rna):
-        # TODO this is wrong for scene master collection
-        return LoadElementAs.ID_DEF
-
-    return LoadElementAs.STRUCT
 
 
 MAX_DEPTH = 30
@@ -119,19 +67,14 @@ def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState
             return [e for e in attr]
 
         if attr_type == T.bpy_prop_collection:
-            # need to know for each element if it is a ref or id
-            load_as = load_as_what(attr_property, attr, visit_state.root_ids)
-            assert load_as != LoadElementAs.ID_DEF
-            if load_as == LoadElementAs.STRUCT:
+            if isinstance(attr_property.fixed_type, bpy.types.ID):
+                from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
+
+                return DatablockCollectionProxy().load_as_IDref(attr, visit_state)
+            else:
                 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
                 return StructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
-            else:
-                from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
-
-                # LoadElementAs.ID_REF:
-                # References into Blenddata collection, for instance D.scenes[0].objects
-                return DatablockCollectionProxy().load_as_IDref(attr, visit_state)
 
         # TODO merge with previous case
         if isinstance(attr_property, T.CollectionProperty):

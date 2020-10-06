@@ -74,7 +74,6 @@ class RecursionGuard:
         self._property_stack.pop()
 
 
-RootIds = Set[T.ID]
 IDProxies = Dict[str, DatablockProxy]
 IDs = Dict[str, T.ID]
 
@@ -86,9 +85,6 @@ class VisitState:
 
     TODO remove obsolete members
     """
-
-    root_ids: RootIds
-    """Part ot the proxy system state: list of datablocks in bpy.data"""
 
     id_proxies: IDProxies
     """Part ot the proxy system state: {uuid: DatablockProxy}"""
@@ -112,9 +108,6 @@ class BpyDataProxy(Proxy):
 
     def __init__(self, *args, **kwargs):
 
-        self.root_ids: RootIds = set()
-        """ID elements stored in bpy.data.* collections, computed before recursive visit starts:"""
-
         self.id_proxies: IDProxies = {}
 
         self.ids: IDs = {}
@@ -129,12 +122,11 @@ class BpyDataProxy(Proxy):
 
     def clear(self):
         self._data.clear()
-        self.root_ids.clear()
         self.id_proxies.clear()
         self.ids.clear()
 
     def visit_state(self, context: Context = safe_context):
-        return VisitState(self.root_ids, self.id_proxies, self.ids, self._unresolved_refs, context)
+        return VisitState(self.id_proxies, self.ids, self._unresolved_refs, context)
 
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}
@@ -160,7 +152,6 @@ class BpyDataProxy(Proxy):
                 bl_collection = getattr(bpy.data, name)
                 for _id_name, item in bl_collection.items():
                     uuid = ensure_uuid(item)
-                    self.root_ids.add(item)
                     self.ids[uuid] = item
 
     def load(self, context: Context):
@@ -300,7 +291,6 @@ class BpyDataProxy(Proxy):
 
         datablock = self.ids[uuid]
         bpy_data_collection_proxy.remove_datablock(proxy, datablock)
-        self.root_ids.remove(datablock)
         del self.id_proxies[uuid]
         del self.ids[uuid]
 
@@ -355,22 +345,6 @@ class BpyDataProxy(Proxy):
             bpy_data_collection_proxy.rename_datablock(proxy, new_name, datablock)
 
         return rename_changeset_to_send
-
-    def debug_check_id_proxies(self):
-        """To detect stale entries in proxy state during development"""
-        return 0
-        # try to find stale entries ASAP: access them all
-        dummy = 0
-        try:
-            dummy = sum(len(id_.name) for id_ in self.root_ids)
-        except ReferenceError:
-            logger.warning("BpyDataProxy: Stale reference in root_ids")
-        try:
-            dummy = sum(len(id_.name) for id_ in self.ids.values())
-        except ReferenceError:
-            logger.warning("BpyDataProxy: Stale reference in root_ids")
-
-        return dummy
 
     def diff(self, context: Context) -> Optional[BpyDataProxy]:
         """Currently for tests only"""
