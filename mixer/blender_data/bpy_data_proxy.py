@@ -22,9 +22,9 @@ See synchronization.md
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import bpy
 import bpy.types as T  # noqa
@@ -34,8 +34,8 @@ from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.diff import BpyBlendDiff
-from mixer.blender_data.filter import Context, safe_depsgraph_updates, safe_context
-from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy, MaxDepthExceeded, UnresolvedRefs
+from mixer.blender_data.filter import SynchronizedProperties, safe_depsgraph_updates, safe_properties
+from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy, MaxDepthExceeded, UnresolvedRefs, Uuid
 
 logger = logging.getLogger(__name__)
 
@@ -74,34 +74,40 @@ class RecursionGuard:
         self._property_stack.pop()
 
 
-RootIds = Set[T.ID]
-IDProxies = Dict[str, DatablockProxy]
-IDs = Dict[str, T.ID]
+@dataclass
+class ProxyState:
+    """
+    State of a BpyDataProxy
+    """
+
+    proxies: Dict[Uuid, DatablockProxy] = field(default_factory=dict)
+    """known proxies"""
+
+    datablocks: Dict[Uuid, T.ID] = field(default_factory=dict)
+    """Known datablocks"""
+
+    unresolved_refs: UnresolvedRefs = UnresolvedRefs()
 
 
 @dataclass
 class VisitState:
     """
     Gathers proxy system state (mainly known datablocks) and properties to synchronize
-
-    TODO remove obsolete members
     """
 
-    root_ids: RootIds
-    """Part ot the proxy system state: list of datablocks in bpy.data"""
+    recursion_guard: RecursionGuard = RecursionGuard()
 
-    id_proxies: IDProxies
-    """Part ot the proxy system state: {uuid: DatablockProxy}"""
 
-    ids: IDs
-    """Part ot the proxy system state: {uuid: bpy.types.ID}"""
+@dataclass
+class Context:
+    proxy_state: ProxyState
+    """Proxy system state"""
 
-    unresolved_refs: UnresolvedRefs
-
-    context: Context
+    synchronized_properties: SynchronizedProperties
     """Controls what properties are synchronized"""
 
-    recursion_guard: RecursionGuard = RecursionGuard()
+    visit_state: VisitState = VisitState()
+    """Current datablock operation state"""
 
 
 class BpyDataProxy(Proxy):
@@ -112,34 +118,24 @@ class BpyDataProxy(Proxy):
 
     def __init__(self, *args, **kwargs):
 
-        self.root_ids: RootIds = set()
-        """ID elements stored in bpy.data.* collections, computed before recursive visit starts:"""
-
-        self.id_proxies: IDProxies = {}
-
-        self.ids: IDs = {}
-        """Only needed to cleanup root_ids and id_proxies on ID removal"""
+        self.state: ProxyState = ProxyState()
 
         self._data: Dict[str, DatablockCollectionProxy] = {
             name: DatablockCollectionProxy() for name in BlendData.instance().collection_names()
         }
 
-        # Pending unresolved references.
-        self._unresolved_refs = UnresolvedRefs()
-
     def clear(self):
         self._data.clear()
-        self.root_ids.clear()
-        self.id_proxies.clear()
-        self.ids.clear()
+        self.state.proxies.clear()
+        self.state.datablocks.clear()
 
-    def visit_state(self, context: Context = safe_context):
-        return VisitState(self.root_ids, self.id_proxies, self.ids, self._unresolved_refs, context)
+    def context(self, synchronized_properties: SynchronizedProperties = safe_properties) -> Context:
+        return Context(self.state, synchronized_properties)
 
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}
 
-    def initialize_ref_targets(self, context: Context):
+    def initialize_ref_targets(self, synchronized_properties: SynchronizedProperties):
         """Keep track of all bpy.data items so that loading recognizes references to them
 
         Call this before updating the proxy from send_scene_content. It is not needed on the
@@ -154,26 +150,25 @@ class BpyDataProxy(Proxy):
         # However, root_ids may no more be required if we can load all the proxies inside out (deepmost first, i.e
         # (Mesh, Metaball, ..), then Object, the Scene). This should be possible as as we sort
         # the updates inside out in update() to the receiver gets them in order
-        for name, _ in context.properties(bpy_type=T.BlendData):
+        for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
             if name in collection_name_to_type:
                 # TODO use BlendData
                 bl_collection = getattr(bpy.data, name)
                 for _id_name, item in bl_collection.items():
                     uuid = ensure_uuid(item)
-                    self.root_ids.add(item)
-                    self.ids[uuid] = item
+                    self.state.datablocks[uuid] = item
 
-    def load(self, context: Context):
+    def load(self, synchronized_properties: SynchronizedProperties):
         """Load the current scene into this proxy
 
         Only used for test. The initial load is performed by update()
         """
-        self.initialize_ref_targets(context)
-        visit_state = self.visit_state(context)
+        self.initialize_ref_targets(synchronized_properties)
+        context = self.context(synchronized_properties)
 
-        for name, _ in context.properties(bpy_type=T.BlendData):
+        for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
-            self._data[name] = DatablockCollectionProxy().load_as_ID(collection, visit_state)
+            self._data[name] = DatablockCollectionProxy().load_as_ID(collection, context)
         return self
 
     def find(self, collection_name: str, key: str) -> DatablockProxy:
@@ -186,7 +181,10 @@ class BpyDataProxy(Proxy):
         return collection_proxy.find(key)
 
     def update(
-        self, diff: BpyBlendDiff, context: Context = safe_context, depsgraph_updates: T.bpy_prop_collection = ()
+        self,
+        diff: BpyBlendDiff,
+        synchronized_properties: SynchronizedProperties = safe_properties,
+        depsgraph_updates: T.bpy_prop_collection = (),
     ) -> Changeset:
         """
         Process local changes, i.e. created, removed and renames datablocks as well as depsgraph updates.
@@ -199,13 +197,13 @@ class BpyDataProxy(Proxy):
         # Update the bpy.data collections status and get the list of newly created bpy.data entries.
         # Updated proxies will contain the IDs to send as an initial transfer.
         # There is no difference between a creation and a subsequent update
-        visit_state = self.visit_state(context)
+        context = self.context(synchronized_properties)
 
         # sort the updates deppmost first so that the receiver will create meshes and lights
         # before objects, for instance
         deltas = sorted(diff.collection_deltas, key=_pred_by_creation_order)
         for delta_name, delta in deltas:
-            collection_changeset = self._data[delta_name].update(delta, visit_state)
+            collection_changeset = self._data[delta_name].update(delta, context)
             changeset.creations.extend(collection_changeset.creations)
             changeset.removals.extend(collection_changeset.removals)
             changeset.renames.extend(collection_changeset.renames)
@@ -229,7 +227,7 @@ class BpyDataProxy(Proxy):
                 continue
             if isinstance(datablock, T.Scene) and datablock.name == "_mixer_to_be_removed_":
                 continue
-            proxy = self.id_proxies.get(datablock.mixer_uuid)
+            proxy = self.state.proxies.get(datablock.mixer_uuid)
             if proxy is None:
                 # Not an error for embedded IDs.
                 if not datablock.is_embedded_data:
@@ -242,11 +240,11 @@ class BpyDataProxy(Proxy):
                 # However, it is not obvious to detect the safe cases and remove the message in such cases
                 logger.info("depsgraph update: Ignoring embedded %s", datablock)
                 continue
-            delta = proxy.diff(datablock, None, visit_state)
+            delta = proxy.diff(datablock, None, context)
             if delta:
                 logger.info("depsgraph update: update %s", datablock)
                 # TODO add an apply mode to diff instead to avoid two traversals ?
-                proxy.apply_to_proxy(datablock, delta, visit_state)
+                proxy.apply_to_proxy(datablock, delta, context)
                 changeset.updates.append(delta)
             else:
                 logger.info("depsgraph update: ignore empty delta %s", datablock)
@@ -254,7 +252,7 @@ class BpyDataProxy(Proxy):
         return changeset
 
     def create_datablock(
-        self, incoming_proxy: DatablockProxy, context: Context = safe_context
+        self, incoming_proxy: DatablockProxy, synchronized_properties: SynchronizedProperties = safe_properties
     ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """
         Process a received datablock creation command, creating the datablock and updating the proxy state
@@ -266,10 +264,12 @@ class BpyDataProxy(Proxy):
             )
             return None
 
-        visit_state = self.visit_state(context)
-        return bpy_data_collection_proxy.create_datablock(incoming_proxy, visit_state)
+        context = self.context(synchronized_properties)
+        return bpy_data_collection_proxy.create_datablock(incoming_proxy, context)
 
-    def update_datablock(self, update: DeltaUpdate, context: Context = safe_context) -> Optional[T.ID]:
+    def update_datablock(
+        self, update: DeltaUpdate, synchronized_properties: SynchronizedProperties = safe_properties
+    ) -> Optional[T.ID]:
         """
         Process a received datablock update command, updating the datablock and the proxy state
         """
@@ -282,14 +282,14 @@ class BpyDataProxy(Proxy):
             )
             return None
 
-        visit_state = self.visit_state(context)
-        return bpy_data_collection_proxy.update_datablock(update, visit_state)
+        context = self.context(synchronized_properties)
+        return bpy_data_collection_proxy.update_datablock(update, context)
 
     def remove_datablock(self, uuid: str):
         """
         Process a received datablock removal command, removing the datablock and updating the proxy state
         """
-        proxy = self.id_proxies.get(uuid)
+        proxy = self.state.proxies.get(uuid)
         if proxy is None:
             logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
 
@@ -298,11 +298,10 @@ class BpyDataProxy(Proxy):
             logger.warning(f"remove_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
             return None
 
-        datablock = self.ids[uuid]
+        datablock = self.state.datablocks[uuid]
         bpy_data_collection_proxy.remove_datablock(proxy, datablock)
-        self.root_ids.remove(datablock)
-        del self.id_proxies[uuid]
-        del self.ids[uuid]
+        del self.state.proxies[uuid]
+        del self.state.datablocks[uuid]
 
     def rename_datablocks(self, items: List[str, str, str]) -> RenameChangeset:
         """
@@ -311,7 +310,7 @@ class BpyDataProxy(Proxy):
         rename_changeset_to_send: RenameChangeset = []
         renames = []
         for uuid, old_name, new_name in items:
-            proxy = self.id_proxies.get(uuid)
+            proxy = self.state.proxies.get(uuid)
             if proxy is None:
                 logger.error(f"rename_datablocks(): no proxy for {uuid} (debug info)")
                 return
@@ -321,7 +320,7 @@ class BpyDataProxy(Proxy):
                 logger.warning(f"rename_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
                 continue
 
-            datablock = self.ids[uuid]
+            datablock = self.state.datablocks[uuid]
             tmp_name = f"_mixer_tmp_{uuid}"
             if datablock.name != new_name and datablock.name != old_name:
                 # local receives a rename, but its datablock name does not match the remote datablock name before
@@ -356,33 +355,17 @@ class BpyDataProxy(Proxy):
 
         return rename_changeset_to_send
 
-    def debug_check_id_proxies(self):
-        """To detect stale entries in proxy state during development"""
-        return 0
-        # try to find stale entries ASAP: access them all
-        dummy = 0
-        try:
-            dummy = sum(len(id_.name) for id_ in self.root_ids)
-        except ReferenceError:
-            logger.warning("BpyDataProxy: Stale reference in root_ids")
-        try:
-            dummy = sum(len(id_.name) for id_ in self.ids.values())
-        except ReferenceError:
-            logger.warning("BpyDataProxy: Stale reference in root_ids")
-
-        return dummy
-
-    def diff(self, context: Context) -> Optional[BpyDataProxy]:
+    def diff(self, synchronized_properties: SynchronizedProperties) -> Optional[BpyDataProxy]:
         """Currently for tests only"""
         diff = self.__class__()
-        visit_state = self.visit_state(context)
+        context = self.context(synchronized_properties)
         for name, proxy in self._data.items():
             collection = getattr(bpy.data, name, None)
             if collection is None:
                 logger.warning(f"Unknown, collection bpy.data.{name}")
                 continue
             collection_property = bpy.data.bl_rna.properties.get(name)
-            delta = proxy.diff(collection, collection_property, visit_state)
+            delta = proxy.diff(collection, collection_property, context)
             if delta is not None:
                 diff._data[name] = diff
         if len(diff._data):

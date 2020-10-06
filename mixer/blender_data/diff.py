@@ -31,7 +31,7 @@ from typing import List, Dict, Tuple, TYPE_CHECKING
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.filter import Context, skip_bpy_data_item
+from mixer.blender_data.filter import SynchronizedProperties, skip_bpy_data_item
 from mixer.blender_data.proxy import ensure_uuid
 
 if TYPE_CHECKING:
@@ -90,7 +90,9 @@ class BpyPropCollectionDiff(BpyDiff):
     items_removed: ItemsRemoved = []
     items_renamed: ItemsRenamed = []
 
-    def diff(self, proxy: DatablockCollectionProxy, collection_name: str, context: Context):
+    def diff(
+        self, proxy: DatablockCollectionProxy, collection_name: str, synchronized_properties: SynchronizedProperties
+    ):
         self.items_added.clear()
         self.items_removed.clear()
         self.items_renamed.clear()
@@ -134,15 +136,15 @@ class BpyBlendDiff(BpyDiff):
     # Will not be used as the per_DI deltas will be limited to the depsgraph updates
     id_deltas: List[Tuple[DatablockProxy, T.ID]] = []
 
-    def diff(self, blend_proxy: BpyDataProxy, context: Context):
+    def diff(self, blend_proxy: BpyDataProxy, synchronized_properties: SynchronizedProperties):
         self.collection_deltas.clear()
         self.id_deltas.clear()
 
-        for collection_name, _ in context.properties(bpy_type=T.BlendData):
+        for collection_name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
             if collection_name not in blend_proxy._data:
                 continue
             delta = BpyPropCollectionDiff()
-            delta.diff(blend_proxy._data[collection_name], collection_name, context)
+            delta.diff(blend_proxy._data[collection_name], collection_name, synchronized_properties)
             if not delta.empty():
                 self.collection_deltas.append((collection_name, delta))
 
@@ -152,7 +154,7 @@ class BpyBlendDiff(BpyDiff):
         # Datablocks of unhandled types get no uuid and DatablockRefProxy references to them are incorrect.
         # What is more, this means trouble for tests since datablocks of unhandled types are assigned
         # a uuid during the message grabbing, which means that they get different uuids on both ends.
-        for collection_name in context.unhandled_bpy_data_collection_names:
+        for collection_name in synchronized_properties.unhandled_bpy_data_collection_names:
             collection = getattr(bpy.data, collection_name)
             for datablock in collection.values():
                 ensure_uuid(datablock)

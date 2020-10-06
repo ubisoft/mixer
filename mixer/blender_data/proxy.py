@@ -23,7 +23,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import IntEnum
 import logging
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Union
 from uuid import uuid4
@@ -31,10 +30,8 @@ from uuid import uuid4
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.blenddata import bl_rna_to_type
-
 if TYPE_CHECKING:
-    from mixer.blender_data.bpy_data_proxy import VisitState
+    from mixer.blender_data.bpy_data_proxy import Context
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
 logger = logging.getLogger(__name__)
@@ -85,23 +82,6 @@ class MaxDepthExceeded(Exception):
     """Thrown when attribute depth is too large"""
 
     pass
-
-
-class LoadElementAs(IntEnum):
-    STRUCT = 0
-    ID_REF = 1
-    ID_DEF = 2
-
-
-def same_rna(a, b):
-    return a.bl_rna == b.bl_rna
-
-
-def is_ID_subclass_rna(bl_rna):  # noqa
-    """
-    Return true if the RNA is of a subclass of bpy.types.ID
-    """
-    return issubclass(bl_rna_to_type(bl_rna), bpy.types.ID)
 
 
 class Delta:
@@ -192,13 +172,13 @@ class Proxy:
         parent: Any,
         key: Union[int, str],
         delta: Optional[DeltaUpdate],
-        visit_state: VisitState,
+        context: Context,
         to_blender: bool = True,
     ) -> Proxy:
         raise NotImplementedError(f"Proxy.apply() for {parent}[{key}]")
 
     def diff(
-        self, container: Union[T.bpy_prop_collection, T.Struct], key: Union[str, int], visit_state: VisitState
+        self, container: Union[T.bpy_prop_collection, T.Struct], key: Union[str, int], context: Context
     ) -> Optional[DeltaUpdate]:
         raise NotImplementedError(f"diff for {container}[{key}]")
 

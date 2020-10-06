@@ -23,9 +23,8 @@ from bpy import types as T  # noqa
 
 
 from mixer.blender_data import types
-from mixer.blender_data.attributes import LoadElementAs, load_as_what
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
-from mixer.blender_data.filter import test_context
+from mixer.blender_data.filter import test_properties
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.tests.utils import equals, register_bl_equals, test_blend_file
 
@@ -34,9 +33,9 @@ from mixer.blender_data.tests.utils import equals, register_bl_equals, test_blen
 class TestCore(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
-        register_bl_equals(self, test_context)
+        register_bl_equals(self, test_properties)
         self._proxy = BpyDataProxy()
-        self._visit_state = self._proxy.visit_state()
+        self._visit_state = self._proxy.context()
 
     def test_issubclass(self):
 
@@ -102,27 +101,6 @@ class TestCore(unittest.TestCase):
             for prop in getattr(bpy.types, t).bl_rna.properties.values():
                 # All ID are behind pointers or in collections
                 self.assertFalse(isinstance(prop.bl_rna, T.ID))
-
-    def test_load_as(self):
-        proxy = BpyDataProxy()
-        proxy.load(test_context)
-        root_ids = proxy.root_ids
-        self.assertEqual(
-            LoadElementAs.STRUCT,
-            load_as_what(T.Scene.bl_rna.properties["display"], bpy.data.scenes[0].display, root_ids),
-        )
-        self.assertEqual(
-            LoadElementAs.ID_REF,
-            load_as_what(T.Scene.bl_rna.properties["objects"], bpy.data.scenes[0].objects, root_ids),
-        )
-        self.assertEqual(
-            LoadElementAs.ID_REF,
-            load_as_what(T.Scene.bl_rna.properties["world"], bpy.data.scenes[0].world, root_ids),
-        )
-        self.assertEqual(
-            LoadElementAs.ID_DEF,
-            load_as_what(T.Scene.bl_rna.properties["collection"], bpy.data.scenes[0].collection, root_ids),
-        )
 
     def test_pointer_class(self):
         eevee = T.Scene.bl_rna.properties["eevee"]

@@ -40,14 +40,14 @@ from mixer.blender_data.struct_proxy import StructProxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.datablock_proxy import DatablockProxy
-    from mixer.blender_data.proxy import VisitState
+    from mixer.blender_data.proxy import Context
 
 logger = logging.getLogger(__name__)
 
 
 # TODO make these functions generic after enough sequences have been seen
 # TODO move to specifics.py
-def write_curvemappoints(target, src_sequence, visit_state: VisitState):
+def write_curvemappoints(target, src_sequence, context: Context):
     src_length = len(src_sequence)
 
     # CurveMapPoints specific (alas ...)
@@ -70,10 +70,10 @@ def write_curvemappoints(target, src_sequence, visit_state: VisitState):
 
     assert src_length == len(target)
     for i in range(src_length):
-        write_attribute(target, i, src_sequence[i], visit_state)
+        write_attribute(target, i, src_sequence[i], context)
 
 
-def write_metaballelements(target, src_sequence, visit_state: VisitState):
+def write_metaballelements(target, src_sequence, context: Context):
     src_length = len(src_sequence)
 
     # truncate dst
@@ -87,7 +87,7 @@ def write_metaballelements(target, src_sequence, visit_state: VisitState):
 
     assert src_length == len(target)
     for i in range(src_length):
-        write_attribute(target, i, src_sequence[i], visit_state)
+        write_attribute(target, i, src_sequence[i], context)
 
 
 class StructCollectionProxy(Proxy):
@@ -108,7 +108,7 @@ class StructCollectionProxy(Proxy):
             return NodeLinksProxy()
         return StructCollectionProxy()
 
-    def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, visit_state: VisitState):
+    def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, context: Context):
 
         if len(bl_collection) == 0:
             self._data.clear()
@@ -124,25 +124,25 @@ class StructCollectionProxy(Proxy):
             # and we need better
             prototype_item = bl_collection[0]
             item_bl_rna = bl_collection_property.fixed_type.bl_rna
-            for attr_name, bl_rna_property in visit_state.context.properties(item_bl_rna):
+            for attr_name, bl_rna_property in context.synchronized_properties.properties(item_bl_rna):
                 if is_soable_property(bl_rna_property):
                     # element type supported by foreach_get
                     self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item)
                 else:
                     # no foreach_get (variable length arrays like MeshVertex.groups, enums, ...)
-                    self._data[attr_name] = AosElement().load(bl_collection, item_bl_rna, attr_name, visit_state)
+                    self._data[attr_name] = AosElement().load(bl_collection, item_bl_rna, attr_name, context)
         else:
             # no keys means it is a sequence. However bl_collection.items() returns [(index, item)...]
             is_sequence = not bl_collection.keys()
             if is_sequence:
                 # easier for the encoder to always have a dict
-                self._data = {MIXER_SEQUENCE: [StructProxy().load(v, visit_state) for v in bl_collection.values()]}
+                self._data = {MIXER_SEQUENCE: [StructProxy().load(v, context) for v in bl_collection.values()]}
             else:
-                self._data = {k: StructProxy().load(v, visit_state) for k, v in bl_collection.items()}
+                self._data = {k: StructProxy().load(v, context) for k, v in bl_collection.items()}
 
         return self
 
-    def save(self, bl_instance: Any, attr_name: str, visit_state: VisitState):
+    def save(self, bl_instance: Any, attr_name: str, context: Context):
         """
         Save this proxy the Blender property
         """
@@ -158,9 +158,9 @@ class StructCollectionProxy(Proxy):
             if srna:
                 # TODO move to specifics
                 if srna.bl_rna is bpy.types.CurveMapPoints.bl_rna:
-                    write_curvemappoints(target, sequence, visit_state)
+                    write_curvemappoints(target, sequence, context)
                 elif srna.bl_rna is bpy.types.MetaBallElements.bl_rna:
-                    write_metaballelements(target, sequence, visit_state)
+                    write_metaballelements(target, sequence, context)
                 else:
                     # TODO WHAT ??
                     pass
@@ -174,7 +174,7 @@ class StructCollectionProxy(Proxy):
                     # - NodeTreeOutputs uses: .new(type, name), .remove(socket), has .clear()
                     # - ActionFCurves uses: .new(data_path, index=0, action_group=""), .remove(fcurve)
                     # - GPencilStrokePoints: .add(count), .pop()
-                    write_attribute(target, i, v, visit_state)
+                    write_attribute(target, i, v, context)
             else:
                 logger.warning(
                     f"Not implemented: write sequence of different length (incoming: {len(sequence)}, existing: {len(target)})for {bl_instance}.{attr_name}"
@@ -183,10 +183,10 @@ class StructCollectionProxy(Proxy):
             # dictionary
             specifics.truncate_collection(target, self._data.keys())
             for k, v in self._data.items():
-                write_attribute(target, k, v, visit_state)
+                write_attribute(target, k, v, context)
 
     def apply(
-        self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], visit_state: VisitState, to_blender=True
+        self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], context: Context, to_blender=True
     ) -> StructProxy:
 
         assert isinstance(key, (int, str))
@@ -200,7 +200,7 @@ class StructCollectionProxy(Proxy):
             # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             collection = parent.get(key)
             if collection is None:
-                collection = specifics.add_element(self, parent, key, visit_state)
+                collection = specifics.add_element(self, parent, key, context)
         else:
             specifics.pre_save_struct(self, parent, key)
             collection = getattr(parent, key, None)
@@ -216,17 +216,21 @@ class StructCollectionProxy(Proxy):
             del_indices = [i for i, delta in enumerate(update._data.values()) if isinstance(delta, DeltaDeletion)]
             if add_indices or del_indices:
                 # Cannot have deletions and additions
-                assert not add_indices or not del_indices
+                assert not add_indices or not del_indices, "not add_indices or not del_indices"
                 indices = add_indices if add_indices else del_indices
                 # Check that adds and deleted are at the end
-                assert not indices or indices[-1] == len(update._data) - 1
+                assert (
+                    not indices or indices[-1] == len(update._data) - 1
+                ), "not indices or indices[-1] == len(update._data) - 1"
                 # check that adds and deletes are contiguous
-                assert all(a + 1 == b for a, b in zip(indices, iter(indices[1:])))
+                assert all(
+                    a + 1 == b for a, b in zip(indices, iter(indices[1:]))
+                ), "all(a + 1 == b for a, b in zip(indices, iter(indices[1:])))"
 
             for k, delta in update._data.items():
                 try:
                     if isinstance(delta, DeltaUpdate):
-                        sequence[k] = apply_attribute(collection, k, sequence[k], delta, visit_state, to_blender)
+                        sequence[k] = apply_attribute(collection, k, sequence[k], delta, context, to_blender)
                     elif isinstance(delta, DeltaDeletion):
                         item = collection[k]
                         if to_blender:
@@ -237,7 +241,7 @@ class StructCollectionProxy(Proxy):
                         # TODO pre save for use_curves
                         # since ordering does not include this requirement
                         if to_blender:
-                            write_attribute(collection, k, delta.value, visit_state)
+                            write_attribute(collection, k, delta.value, context)
                         sequence[k] = delta.value
 
                 except Exception as e:
@@ -264,10 +268,10 @@ class StructCollectionProxy(Proxy):
                         # see "name collision" in diff()
                         k = k[1:]
                         if to_blender:
-                            write_attribute(collection, k, delta.value, visit_state)
+                            write_attribute(collection, k, delta.value, context)
                         self._data[k] = delta.value
                     else:
-                        self._data[k] = apply_attribute(collection, k, self._data[k], delta, visit_state, to_blender)
+                        self._data[k] = apply_attribute(collection, k, self._data[k], delta, context, to_blender)
                 except Exception as e:
                     logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
                     logger.warning(f"... for {collection}[{k}]")
@@ -278,7 +282,7 @@ class StructCollectionProxy(Proxy):
         return self
 
     def diff(
-        self, collection: T.bpy_prop_collection, collection_property: T.Property, visit_state: VisitState
+        self, collection: T.bpy_prop_collection, collection_property: T.Property, context: Context
     ) -> Optional[DeltaUpdate]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
@@ -303,12 +307,12 @@ class StructCollectionProxy(Proxy):
             # since the diff sequence is hollow, we cannot store it in a list. Use a dict with int keys instead
             for i, (proxy_value, blender_value) in enumerate(itertools.zip_longest(sequence, collection)):
                 if proxy_value is None:
-                    value = read_attribute(collection[i], item_property, visit_state)
+                    value = read_attribute(collection[i], item_property, context)
                     diff._data[i] = DeltaAddition(value)
                 elif blender_value is None:
                     diff._data[i] = DeltaDeletion(self.data(i))
                 else:
-                    delta = diff_attribute(collection[i], item_property, proxy_value, visit_state)
+                    delta = diff_attribute(collection[i], item_property, proxy_value, context)
                     if delta is not None:
                         diff._data[i] = delta
         else:
@@ -316,7 +320,7 @@ class StructCollectionProxy(Proxy):
             # Renames are detected as Deletion + Addition
 
             # This assumes that keys ordring is the same in the proxy and in blender, which is
-            # guaranteed by the fact that proxy load uses Context.properties()
+            # guaranteed by the fact that proxy load uses SynchronizedProperties.properties()
 
             bl_rna = getattr(collection, "bl_rna", None)
             if bl_rna is not None and isinstance(
@@ -331,7 +335,7 @@ class StructCollectionProxy(Proxy):
                 if proxy_types == blender_types and proxy_names == blender_names:
                     # Same types and names : do sparse modification
                     for name in proxy_names:
-                        delta = diff_attribute(collection[name], item_property, self.data(name), visit_state)
+                        delta = diff_attribute(collection[name], item_property, self.data(name), context)
                         if delta is not None:
                             diff._data[name] = delta
                 else:
@@ -341,7 +345,7 @@ class StructCollectionProxy(Proxy):
                     for name in proxy_names:
                         diff._data["D" + name] = DeltaDeletion(self.data(name))
                     for name in blender_names:
-                        value = read_attribute(collection[name], item_property, visit_state)
+                        value = read_attribute(collection[name], item_property, context)
                         diff._data["A" + name] = DeltaAddition(value)
             else:
                 # non order dependant, uniform types
@@ -349,7 +353,7 @@ class StructCollectionProxy(Proxy):
                 blender_keys = collection.keys()
                 added_keys = blender_keys - proxy_keys
                 for k in added_keys:
-                    value = read_attribute(collection[k], item_property, visit_state)
+                    value = read_attribute(collection[k], item_property, context)
                     diff._data["A" + k] = DeltaAddition(value)
 
                 deleted_keys = proxy_keys - blender_keys
@@ -358,7 +362,7 @@ class StructCollectionProxy(Proxy):
 
                 maybe_updated_keys = proxy_keys & blender_keys
                 for k in maybe_updated_keys:
-                    delta = diff_attribute(collection[k], item_property, self.data(k), visit_state)
+                    delta = diff_attribute(collection[k], item_property, self.data(k), context)
                     if delta is not None:
                         diff._data[k] = delta
         if len(diff._data):

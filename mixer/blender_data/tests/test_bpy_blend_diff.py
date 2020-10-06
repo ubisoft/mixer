@@ -22,7 +22,7 @@ from bpy import types as T  # noqa
 
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.diff import BpyBlendDiff
-from mixer.blender_data.filter import test_context
+from mixer.blender_data.filter import test_properties
 
 
 def sort_renamed_item(x):
@@ -37,13 +37,13 @@ class TestDiff(unittest.TestCase):
 
     def test_create(self):
         # test_diff.TestDiff.test_create
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
         new_worlds = ["W0", "W1"]
         new_worlds.sort()
         for w in new_worlds:
             D.worlds.new(w)
         diff = BpyBlendDiff()
-        diff.diff(self.proxy, test_context)
+        diff.diff(self.proxy, test_properties)
         for name, delta in diff.collection_deltas:
             self.assertEqual(0, len(delta.items_removed), f"removed count mismatch for {name}")
             self.assertEqual(0, len(delta.items_renamed), f"renamed count mismatch for {name}")
@@ -62,7 +62,7 @@ class TestDiff(unittest.TestCase):
         for w in new_worlds:
             D.worlds.new(w)
 
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
 
         removed = ["W0", "W1"]
         removed.sort()
@@ -70,7 +70,7 @@ class TestDiff(unittest.TestCase):
             D.worlds.remove(D.worlds[w])
 
         diff = BpyBlendDiff()
-        diff.diff(self.proxy, test_context)
+        diff.diff(self.proxy, test_properties)
         for name, delta in diff.collection_deltas:
             self.assertEqual(0, len(delta.items_added), f"added count mismatch for {name}")
             self.assertEqual(0, len(delta.items_renamed), f"renamed count mismatch for {name}")
@@ -89,7 +89,7 @@ class TestDiff(unittest.TestCase):
         for w in new_worlds:
             D.worlds.new(w)
 
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
 
         renamed = [("W0", "W00"), ("W2", "W22")]
         renamed.sort(key=sort_renamed_item)
@@ -97,7 +97,7 @@ class TestDiff(unittest.TestCase):
             D.worlds[old_name].name = new_name
 
         diff = BpyBlendDiff()
-        diff.diff(self.proxy, test_context)
+        diff.diff(self.proxy, test_properties)
         for name, delta in diff.collection_deltas:
             self.assertEqual(0, len(delta.items_added), f"added count mismatch for {name}")
             self.assertEqual(0, len(delta.items_removed), f"removed count mismatch for {name}")
@@ -117,7 +117,7 @@ class TestDiff(unittest.TestCase):
         for w in new_worlds:
             D.worlds.new(w)
 
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
 
         renamed = [("W0", "W00"), ("W2", "W22"), ("W4", "W44")]
         renamed.sort(key=sort_renamed_item)
@@ -135,7 +135,7 @@ class TestDiff(unittest.TestCase):
             D.worlds.remove(D.worlds[w])
 
         diff = BpyBlendDiff()
-        diff.diff(self.proxy, test_context)
+        diff.diff(self.proxy, test_properties)
         for name, delta in diff.collection_deltas:
             if name == "worlds":
                 items_added = list(delta.items_added.keys())

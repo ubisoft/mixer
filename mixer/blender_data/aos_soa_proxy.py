@@ -37,7 +37,7 @@ from mixer.blender_data.proxy import Proxy
 from mixer.blender_data.types import is_vector
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import VisitState
+    from mixer.blender_data.proxy import Context
 
 
 logger = logging.getLogger(__name__)
@@ -116,7 +116,7 @@ class AosElement(Proxy):
         bl_collection: bpy.types.bpy_prop_collection,
         item_bl_rna,
         attr_name: str,
-        visit_state: VisitState,
+        context: Context,
     ):
         """
         - bl_collection: a collection of structure, e.g. T.Mesh.vertices
@@ -135,11 +135,11 @@ class AosElement(Proxy):
         # # A bit overkill:
         # # for T.Mesh.vertices[...].groups, generates a StructCollectionProxy per Vertex even if empty
         # self._data[MIXER_SEQUENCE] = [
-        #     read_attribute(getattr(item, attr_name), attr_property, context, visit_context) for item in bl_collection
+        #     read_attribute(getattr(item, attr_name), attr_property, synchronized_properties, visit_context) for item in bl_collection
         # ]
         # return self
 
-    def save(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str, visit_state: VisitState):
+    def save(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str, context: Context):
 
         logger.warning(f"Not implemented. Save AOS  element for {bl_collection}.{attr_name} ")
 
@@ -189,6 +189,6 @@ class SoaElement(Proxy):
         self._data = buffer
         return self
 
-    def save(self, bl_collection, attr_name, visit_state: VisitState):
+    def save(self, bl_collection, attr_name, context: Context):
         # TODO : serialization currently not performed
         bl_collection.foreach_set(attr_name, self._data)

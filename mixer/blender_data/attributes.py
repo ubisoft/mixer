@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-from enum import IntEnum
 import logging
 import traceback
 from typing import Any, Optional, Union, TYPE_CHECKING
@@ -30,19 +29,9 @@ from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 
 if TYPE_CHECKING:
-    from mixer.blender_data.bpy_data_proxy import RootIds, VisitState
+    from mixer.blender_data.bpy_data_proxy import Context
 
 logger = logging.getLogger(__name__)
-
-
-class LoadElementAs(IntEnum):
-    STRUCT = 0
-    ID_REF = 1
-    ID_DEF = 2
-
-
-def same_rna(a, b):
-    return a.bl_rna == b.bl_rna
 
 
 def is_ID_subclass_rna(bl_rna):  # noqa
@@ -52,57 +41,16 @@ def is_ID_subclass_rna(bl_rna):  # noqa
     return issubclass(bl_rna_to_type(bl_rna), bpy.types.ID)
 
 
-def load_as_what(attr_property: bpy.types.Property, attr: Any, root_ids: RootIds):
-    """
-    Determine if we must load an attribute as a struct, a blenddata collection element (ID_DEF)
-    or a reference to a BlendData collection element (ID_REF)
-
-    All T.Struct are loaded as struct
-    All T.ID are loaded ad IDRef (that is pointer into a D.blendata collection) except
-    for specific case. For instance the scene master "collection" is not a D.collections item.
-
-    Arguments
-    parent -- the type that contains the attribute names attr_name, for instance T.Scene
-    attr_property -- a bl_rna property of a attribute, that can be a CollectionProperty or a "plain" attribute
-    """
-    # Reference to an ID element at the root of the blend file
-    if attr in root_ids:
-        return LoadElementAs.ID_REF
-
-    if same_rna(attr_property, T.CollectionProperty):
-        if is_ID_subclass_rna(attr_property.fixed_type.bl_rna):
-            # Collections at root level are not handled by this code (See BpyDataProxy.load()) so here it
-            # should be a nested collection and IDs should be ref to root collections.
-            return LoadElementAs.ID_REF
-        else:
-            # Only collections at the root level of blendfile are id def, so here it can only be struct
-            return LoadElementAs.STRUCT
-
-    if isinstance(attr, T.Mesh):
-        return LoadElementAs.ID_REF
-
-    if same_rna(attr_property, T.PointerProperty):
-        element_property = attr_property.fixed_type
-    else:
-        element_property = attr_property
-
-    if is_ID_subclass_rna(element_property.bl_rna):
-        # TODO this is wrong for scene master collection
-        return LoadElementAs.ID_DEF
-
-    return LoadElementAs.STRUCT
-
-
 MAX_DEPTH = 30
 
 
 # @debug_check_stack_overflow
-def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState):
+def read_attribute(attr: Any, attr_property: T.Property, context: Context):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
     """
     try:
-        visit_state.recursion_guard.push(attr_property.name)
+        context.visit_state.recursion_guard.push(attr_property.name)
 
         attr_type = type(attr)
 
@@ -119,25 +67,20 @@ def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState
             return [e for e in attr]
 
         if attr_type == T.bpy_prop_collection:
-            # need to know for each element if it is a ref or id
-            load_as = load_as_what(attr_property, attr, visit_state.root_ids)
-            assert load_as != LoadElementAs.ID_DEF
-            if load_as == LoadElementAs.STRUCT:
-                from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
-
-                return StructCollectionProxy.make(attr_property).load(attr, attr_property, visit_state)
-            else:
+            if isinstance(attr_property.fixed_type, bpy.types.ID):
                 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 
-                # LoadElementAs.ID_REF:
-                # References into Blenddata collection, for instance D.scenes[0].objects
-                return DatablockCollectionProxy().load_as_IDref(attr, visit_state)
+                return DatablockCollectionProxy().load_as_IDref(attr, context)
+            else:
+                from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
+
+                return StructCollectionProxy.make(attr_property).load(attr, attr_property, context)
 
         # TODO merge with previous case
         if isinstance(attr_property, T.CollectionProperty):
             from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
-            return StructCollectionProxy().load(attr, attr_property, visit_state)
+            return StructCollectionProxy().load(attr, attr_property, context)
 
         bl_rna = attr_property.bl_rna
         if bl_rna is None:
@@ -147,28 +90,28 @@ def read_attribute(attr: Any, attr_property: T.Property, visit_state: VisitState
         if issubclass(attr_type, T.PropertyGroup):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy().load(attr, visit_state)
+            return StructProxy().load(attr, context)
 
         if issubclass(attr_type, T.ID):
             if attr.is_embedded_data:
                 from mixer.blender_data.datablock_proxy import DatablockProxy
 
-                return DatablockProxy.make(attr_property).load(attr, visit_state)
+                return DatablockProxy.make(attr_property).load(attr, context)
             else:
                 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
-                return DatablockRefProxy().load(attr, visit_state)
+                return DatablockRefProxy().load(attr, context)
         elif issubclass(attr_type, T.bpy_struct):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy().load(attr, visit_state)
+            return StructProxy().load(attr, context)
 
         raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
     finally:
-        visit_state.recursion_guard.pop()
+        context.visit_state.recursion_guard.pop()
 
 
-def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: VisitState):
+def write_attribute(bl_instance, key: Union[str, int], value: Any, context: Context):
     """
     Write a value into a Blender property
     """
@@ -179,7 +122,7 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: 
 
     try:
         if isinstance(value, Proxy):
-            value.save(bl_instance, key, visit_state)
+            value.save(bl_instance, key, context)
         else:
             assert type(key) is str
 
@@ -219,7 +162,7 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any, visit_state: 
             logger.warning(f" ... {line}")
 
 
-def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, visit_state: VisitState, to_blender=True):
+def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, context: Context, to_blender=True):
     """
     Applies a delta to the Blender attribute identified by bl_instance.key or bl_instance[key]
 
@@ -240,7 +183,7 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, vis
 
     try:
         if isinstance(proxy_value, Proxy):
-            return proxy_value.apply(parent, key, delta, visit_state, to_blender)
+            return proxy_value.apply(parent, key, delta, context, to_blender)
 
         if to_blender:
             try:
@@ -252,11 +195,11 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, vis
         return value
 
     except Exception as e:
-        logger.warning(f"diff exception for attr: {e}")
+        logger.warning(f"apply exception for attr: {e}")
         raise
 
 
-def diff_attribute(item: Any, item_property: T.Property, value: Any, visit_state: VisitState) -> Optional[Delta]:
+def diff_attribute(item: Any, item_property: T.Property, value: Any, context: Context) -> Optional[Delta]:
     """
     Computes a difference between a blender item and a proxy value
 
@@ -268,11 +211,11 @@ def diff_attribute(item: Any, item_property: T.Property, value: Any, visit_state
     """
     try:
         if isinstance(value, Proxy):
-            return value.diff(item, item_property, visit_state)
+            return value.diff(item, item_property, context)
 
         # An attribute mappable on a python builtin type
         # TODO overkill to call read_attribute because it is not a proxy type
-        blender_value = read_attribute(item, item_property, visit_state)
+        blender_value = read_attribute(item, item_property, context)
         if blender_value != value:
             # TODO This is too coarse (whole lists)
             return DeltaUpdate(blender_value)

@@ -29,7 +29,7 @@ from mixer.blender_data.attributes import write_attribute
 from mixer.blender_data.struct_proxy import StructProxy
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import VisitState
+    from mixer.blender_data.proxy import Context
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class NodeLinksProxy(StructProxy):
     def __init__(self):
         super().__init__()
 
-    def load(self, bl_instance, _, visit_state: VisitState):
+    def load(self, bl_instance, _, context: Context):
         # NodeLink contain pointers to Node and NodeSocket.
         # Just keep the names to restore the links in ShaderNodeTreeProxy.save
 
@@ -63,7 +63,7 @@ class NodeTreeProxy(DatablockProxy):
     def __init__(self):
         super().__init__()
 
-    def save(self, bl_instance: Any, attr_name: str, visit_state: VisitState):
+    def save(self, bl_instance: Any, attr_name: str, context: Context):
         # see https://stackoverflow.com/questions/36185377/how-i-can-create-a-material-select-it-create-new-nodes-with-this-material-and
         # Saving NodeTree.links require access to NodeTree.nodes, so we need an implementation at the NodeTree level
 
@@ -72,7 +72,7 @@ class NodeTreeProxy(DatablockProxy):
         # save links last
         for k, v in self._data.items():
             if k != "links":
-                write_attribute(node_tree, k, v, visit_state)
+                write_attribute(node_tree, k, v, context)
 
         node_tree.links.clear()
         seq = self.data("links").data(MIXER_SEQUENCE)

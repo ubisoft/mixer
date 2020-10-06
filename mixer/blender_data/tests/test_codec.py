@@ -24,7 +24,7 @@ from bpy import types as T  # noqa
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
-from mixer.blender_data.filter import test_context
+from mixer.blender_data.filter import test_properties
 from mixer.blender_data.json_codec import Codec
 from mixer.blender_data.tests.utils import register_bl_equals, test_blend_file
 
@@ -33,7 +33,7 @@ class TestCodec(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
         self.proxy = BpyDataProxy()
-        register_bl_equals(self, test_context)
+        register_bl_equals(self, test_properties)
 
     def test_camera(self):
         # test_codec.TestCodec.test_camera
@@ -45,7 +45,7 @@ class TestCodec(unittest.TestCase):
         cam_sent.dof.focus_object = D.objects["Cube"]
 
         # load into proxy
-        self.proxy.load(test_context)
+        self.proxy.load(test_properties)
 
         # patch the name so that it does not get mixed up as we restore later in the same scene
         cam_proxy_sent = self.proxy.data("cameras").search_one("Camera_0")
@@ -71,7 +71,7 @@ class TestCodec(unittest.TestCase):
         self.assertEqual(focus_object_proxy._datablock_uuid, cam_sent.dof.focus_object.mixer_uuid)
 
         # save into blender
-        cam_proxy_received.save(D.cameras, transmit_name, self.proxy.visit_state())
+        cam_proxy_received.save(D.cameras, transmit_name, self.proxy.context())
         self.assertEqual(cam_sent, cam_received)
         pass
 

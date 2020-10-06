@@ -36,7 +36,7 @@ from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.types import is_pointer_to, sub_id_type
 
 if TYPE_CHECKING:
-    from mixer.blender_data.bpy_data_proxy import RenameChangeset, VisitState
+    from mixer.blender_data.bpy_data_proxy import RenameChangeset, Context
 
 
 DEBUG = True
@@ -93,13 +93,13 @@ class DatablockProxy(StructProxy):
     def __str__(self) -> str:
         return f"DatablockProxy {self.mixer_uuid()} for bpy.data.{self.collection_name}[{self.data('name')}]"
 
-    def update_from_datablock(self, bl_instance: T.ID, visit_state: VisitState):
-        self.load(bl_instance, visit_state, bpy_data_collection_name=None)
+    def update_from_datablock(self, bl_instance: T.ID, context: Context):
+        self.load(bl_instance, context, bpy_data_collection_name=None)
 
     def load(
         self,
         bl_instance: T.ID,
-        visit_state: VisitState,
+        context: Context,
         bpy_data_collection_name: str = None,
     ):
         """
@@ -119,12 +119,12 @@ class DatablockProxy(StructProxy):
 
         self._class_name = bl_instance.__class__.__name__
         self._data.clear()
-        properties = visit_state.context.properties(bl_instance)
+        properties = context.synchronized_properties.properties(bl_instance)
         # this assumes that specifics.py apply only to ID, not Struct
         properties = specifics.conditional_properties(bl_instance, properties)
         for name, bl_rna_property in properties:
             attr = getattr(bl_instance, name)
-            attr_value = read_attribute(attr, bl_rna_property, visit_state)
+            attr_value = read_attribute(attr, bl_rna_property, context)
             # Also write None values to reset attributes like Camera.dof.focus_object
             # TODO for scene, test difference, only send update if dirty as continuous updates to scene
             # master collection will conflicting writes with Master Collection
@@ -135,15 +135,15 @@ class DatablockProxy(StructProxy):
         uuid = bl_instance.get("mixer_uuid")
         if uuid:
             # It is a bpy.data ID, not an ID "embedded" inside another ID, like scene.collection
-            id_ = visit_state.ids.get(uuid)
+            id_ = context.proxy_state.datablocks.get(uuid)
             if id_ is not bl_instance:
                 # this occurs when
                 # - when we find a reference to a BlendData ID that was not loaded
                 # - the ID are not properly ordred at creation time, for instance (objects, meshes)
                 # instead of (meshes, objects) : a bug
-                logger.debug("DatablockProxy.load(): %s not in visit_state.ids[uuid]", bl_instance)
+                logger.debug("DatablockProxy.load(): %s not in context.proxy_state.datablocks[uuid]", bl_instance)
             self._datablock_uuid = bl_instance.mixer_uuid
-            visit_state.id_proxies[uuid] = self
+            context.proxy_state.proxies[uuid] = self
 
         return self
 
@@ -158,14 +158,14 @@ class DatablockProxy(StructProxy):
     def collection(self) -> T.bpy_prop_collection:
         return getattr(bpy.data, self.collection_name)
 
-    def target(self, visit_state: VisitState) -> T.ID:
-        return visit_state.ids.get(self.mixer_uuid())
+    def target(self, context: Context) -> T.ID:
+        return context.proxy_state.datablocks.get(self.mixer_uuid())
 
-    def create_standalone_datablock(self, visit_state: VisitState) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
+    def create_standalone_datablock(self, context: Context) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """
         Save this proxy into its target standalone datablock
         """
-        if self.target(visit_state):
+        if self.target(context):
             logger.warning(f"create_standalone_datablock: datablock already registered : {self}")
             logger.warning("... update ignored")
             return None, None
@@ -199,14 +199,14 @@ class DatablockProxy(StructProxy):
                     )
                     existing_datablock.name = unique_name
 
-                    datablock = specifics.bpy_data_ctor(self.collection_name, self, visit_state)
+                    datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
                 else:
                     # a creation for a datablock that we already have. This should not happen
                     logger.error(f"create_standalone_datablock: unregistered uuid for {self}")
                     logger.error("... update ignored")
                     return None, None
         else:
-            datablock = specifics.bpy_data_ctor(self.collection_name, self, visit_state)
+            datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
 
         if datablock is None:
             logger.warning(f"Cannot create bpy.data.{self.collection_name}[{self.data('name')}]")
@@ -219,29 +219,29 @@ class DatablockProxy(StructProxy):
 
         datablock.mixer_uuid = self.mixer_uuid()
 
-        datablock = specifics.pre_save_id(self, datablock, visit_state)
+        datablock = specifics.pre_save_id(self, datablock, context)
         if datablock is None:
             logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
             return None, None
 
         for k, v in self._data.items():
-            write_attribute(datablock, k, v, visit_state)
+            write_attribute(datablock, k, v, context)
 
         return datablock, renames
 
-    def update_standalone_datablock(self, datablock: T.ID, delta: DeltaUpdate, visit_state: VisitState) -> T.ID:
+    def update_standalone_datablock(self, datablock: T.ID, delta: DeltaUpdate, context: Context) -> T.ID:
         """
         Update this proxy and datablock according to delta
         """
-        datablock = specifics.pre_save_id(delta.value, datablock, visit_state)
+        datablock = specifics.pre_save_id(delta.value, datablock, context)
         if datablock is None:
             logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
             return None
 
-        self.apply(self.collection, datablock.name, delta, visit_state)
+        self.apply(self.collection, datablock.name, delta, context)
         return datablock
 
-    def save(self, bl_instance: Any = None, attr_name: str = None, visit_state: VisitState = None) -> T.ID:
+    def save(self, bl_instance: Any = None, attr_name: str = None, context: Context = None) -> T.ID:
         """
         Save this proxy into an existing datablock that may be a bpy.data member item or an embedded datablock
         """
@@ -258,7 +258,7 @@ class DatablockProxy(StructProxy):
 
             if id_ is None:
                 logger.warning(f"IDproxy save standalone {self}, not found. Creating")
-                id_ = specifics.bpy_data_ctor(collection_name, self, visit_state)
+                id_ = specifics.bpy_data_ctor(collection_name, self, context)
                 if id_ is None:
                     logger.warning(f"Cannot create bpy.data.{collection_name}[{attr_name}]")
                     return None
@@ -272,13 +272,13 @@ class DatablockProxy(StructProxy):
             id_ = getattr(bl_instance, attr_name)
             pass
 
-        target = specifics.pre_save_id(self, id_, visit_state)
+        target = specifics.pre_save_id(self, id_, context)
         if target is None:
             logger.warning(f"DatablockProxy.save() {bl_instance}.{attr_name} is None")
             return None
 
         for k, v in self._data.items():
-            write_attribute(target, k, v, visit_state)
+            write_attribute(target, k, v, context)
 
         return target
 
@@ -295,7 +295,7 @@ class DatablockProxy(StructProxy):
         self,
         datablock: T.ID,
         delta: Optional[DeltaUpdate],
-        visit_state: VisitState,
+        context: Context,
     ):
         """
         Apply delta to this proxy, but do not update Blender state
@@ -308,9 +308,9 @@ class DatablockProxy(StructProxy):
         for k, delta in update._data.items():
             try:
                 current_value = self._data.get(k)
-                self._data[k] = apply_attribute(datablock, k, current_value, delta, visit_state, to_blender=False)
+                self._data[k] = apply_attribute(datablock, k, current_value, delta, context, to_blender=False)
             except Exception as e:
-                logger.warning(f"StructLike.apply(). Processing {delta}")
+                logger.warning(f"Datablock.apply(). Processing {delta}")
                 logger.warning(f"... for {datablock}.{k}")
                 logger.warning(f"... Exception: {e}")
                 logger.warning("... Update ignored")
