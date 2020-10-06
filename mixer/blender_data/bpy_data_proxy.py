@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import bpy
 import bpy.types as T  # noqa
@@ -35,7 +35,7 @@ from mixer.blender_data.datablock_collection_proxy import DatablockCollectionPro
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import SynchronizedProperties, safe_depsgraph_updates, safe_properties
-from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy, MaxDepthExceeded, UnresolvedRefs
+from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy, MaxDepthExceeded, UnresolvedRefs, Uuid
 
 logger = logging.getLogger(__name__)
 
@@ -74,21 +74,17 @@ class RecursionGuard:
         self._property_stack.pop()
 
 
-IDProxies = Dict[str, DatablockProxy]
-IDs = Dict[str, T.ID]
-
-
 @dataclass
 class ProxyState:
     """
     State of a BpyDataProxy
     """
 
-    proxies: IDProxies = field(default_factory=dict)
-    """Part ot the proxy system state: {uuid: DatablockProxy}"""
+    proxies: Dict[Uuid, DatablockProxy] = field(default_factory=dict)
+    """known proxies"""
 
-    datablocks: IDs = field(default_factory=dict)
-    """Part ot the proxy system state: {uuid: bpy.types.ID}"""
+    datablocks: Dict[Uuid, T.ID] = field(default_factory=dict)
+    """Known datablocks"""
 
     unresolved_refs: UnresolvedRefs = UnresolvedRefs()
 
@@ -111,7 +107,7 @@ class Context:
     """Controls what properties are synchronized"""
 
     visit_state: VisitState = VisitState()
-    """Proxy system state"""
+    """Current datablock operation state"""
 
 
 class BpyDataProxy(Proxy):
@@ -127,9 +123,6 @@ class BpyDataProxy(Proxy):
         self._data: Dict[str, DatablockCollectionProxy] = {
             name: DatablockCollectionProxy() for name in BlendData.instance().collection_names()
         }
-
-        # Pending unresolved references.
-        self._unresolved_refs = UnresolvedRefs()
 
     def clear(self):
         self._data.clear()
