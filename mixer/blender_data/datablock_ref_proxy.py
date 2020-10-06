@@ -34,7 +34,7 @@ from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.types import bases_of
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import Uuid, VisitState
+    from mixer.blender_data.proxy import Uuid, Context
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class DatablockRefProxy(Proxy):
 
         return not self._datablock_uuid
 
-    def load(self, datablock: T.ID, visit_state: VisitState) -> DatablockRefProxy:
+    def load(self, datablock: T.ID, context: Context) -> DatablockRefProxy:
         """
         Load a reference to a standalone datablock into this proxy
         """
@@ -91,12 +91,12 @@ class DatablockRefProxy(Proxy):
         self._debug_name = str(datablock)
         return self
 
-    def save(self, container: Union[T.ID, T.bpy_prop_collection], key: str, visit_state: VisitState):
+    def save(self, container: Union[T.ID, T.bpy_prop_collection], key: str, context: Context):
         """
         Save the datablock reference represented by this proxy into a datablock member (Scene.camera)
         or a collection item (Scene.collection.children["Collection"])
         """
-        ref_target = self.target(visit_state)
+        ref_target = self.target(context)
         # make sure to differentiate actual None value and unresolved ref
         if ref_target is None:
             logger.info(f"Unresolved reference {container}.{key} -> {self.display_string()}]")
@@ -106,7 +106,7 @@ class DatablockRefProxy(Proxy):
             if isinstance(key, str):
                 try:
                     if ref_target is None:
-                        visit_state.unresolved_refs.append(
+                        context.proxy_state.unresolved_refs.append(
                             self.mixer_uuid, lambda datablock: container.__setitem__(key, datablock)
                         )
                     else:
@@ -127,7 +127,7 @@ class DatablockRefProxy(Proxy):
                 try:
                     # This is what saves Camera.dof.focus_object
                     if ref_target is None:
-                        visit_state.unresolved_refs.append(
+                        context.proxy_state.unresolved_refs.append(
                             self.mixer_uuid, lambda datablock: setattr(container, key, datablock)
                         )
                     else:
@@ -136,15 +136,15 @@ class DatablockRefProxy(Proxy):
                     logger.warning(f"write attribute skipped {key} for {container}...")
                     logger.warning(f" ...Error: {repr(e)}")
 
-    def target(self, visit_state: VisitState) -> Optional[T.ID]:
+    def target(self, context: Context) -> Optional[T.ID]:
         """
         The datablock referenced by this proxy
         """
-        datablock = visit_state.ids.get(self._datablock_uuid)
+        datablock = context.proxy_state.datablocks.get(self._datablock_uuid)
         if datablock is None:
             # HACK
             # We are trying to find the target of a datablock reference like Object.mesh and the datablock
-            # is not known to the proxy state (visit_state). This occurs when the target datablock is of
+            # is not known to the proxy state (context). This occurs when the target datablock is of
             # un unsynchronized type (Mesh, currently). If the datablock can be found by name, consider
             # it was created under the hood by a VRtist command and register it.
             collection = getattr(bpy.data, self._bpy_data_collection, None)
@@ -162,7 +162,7 @@ class DatablockRefProxy(Proxy):
                 )
                 return None
             datablock.mixer_uuid = self._datablock_uuid
-            visit_state.ids[self._datablock_uuid] = datablock
+            context.proxy_state.datablocks[self._datablock_uuid] = datablock
             logger.warning(f"{self}: registering {datablock}")
 
         return datablock
@@ -172,7 +172,7 @@ class DatablockRefProxy(Proxy):
         parent: Any,
         key: Union[int, str],
         delta: Optional[DeltaUpdate],
-        visit_state: VisitState,
+        context: Context,
         to_blender: bool = True,
     ) -> StructProxy:
         """
@@ -188,11 +188,11 @@ class DatablockRefProxy(Proxy):
                     self.is_none() or self._bpy_data_collection == update._bpy_data_collection
                 ), "self.is_none() or self._bpy_data_collection == update._bpy_data_collection"
 
-                datablock = visit_state.ids.get(update._datablock_uuid)
+                datablock = context.proxy_state.datablocks.get(update._datablock_uuid)
                 setattr(parent, key, datablock)
         return update
 
-    def diff(self, datablock: T.ID, datablock_property: T.Property, visit_state: VisitState) -> Optional[DeltaUpdate]:
+    def diff(self, datablock: T.ID, datablock_property: T.Property, context: Context) -> Optional[DeltaUpdate]:
         """
         Computes the difference between this proxy and its Blender state.
         """
@@ -200,7 +200,7 @@ class DatablockRefProxy(Proxy):
         if datablock is None:
             return DeltaUpdate(DatablockRefProxy())
 
-        value = read_attribute(datablock, datablock_property, visit_state)
+        value = read_attribute(datablock, datablock_property, context)
         assert isinstance(value, DatablockRefProxy)
         if value._datablock_uuid != self._datablock_uuid:
             return DeltaUpdate(value)

@@ -32,7 +32,7 @@ from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import VisitState
+    from mixer.blender_data.proxy import Context
 
 logger = logging.getLogger(__name__)
 
@@ -46,24 +46,24 @@ class StructProxy(Proxy):
         self._data = {}
         pass
 
-    def load(self, bl_instance: Any, visit_state: VisitState):
+    def load(self, bl_instance: Any, context: Context):
 
         """
         Load a Blender object into this proxy
         """
         self._data.clear()
-        properties = visit_state.synchronized_properties.properties(bl_instance)
+        properties = context.synchronized_properties.properties(bl_instance)
         # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
         # that we do not want to load anyway
         properties = specifics.conditional_properties(bl_instance, properties)
         for name, bl_rna_property in properties:
             attr = getattr(bl_instance, name)
-            attr_value = read_attribute(attr, bl_rna_property, visit_state)
+            attr_value = read_attribute(attr, bl_rna_property, context)
             # Also write None values. We use them to reset attributes like Camera.dof.focus_object
             self._data[name] = attr_value
         return self
 
-    def save(self, bl_instance: Any, key: Union[int, str], visit_state: VisitState):
+    def save(self, bl_instance: Any, key: Union[int, str], context: Context):
         """
         Save this proxy into a Blender attribute
         """
@@ -76,7 +76,7 @@ class StructProxy(Proxy):
             # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             target = bl_instance.get(key)
             if target is None:
-                target = specifics.add_element(self, bl_instance, key, visit_state)
+                target = specifics.add_element(self, bl_instance, key, context)
         else:
             specifics.pre_save_struct(self, bl_instance, key)
             target = getattr(bl_instance, key, None)
@@ -95,14 +95,14 @@ class StructProxy(Proxy):
             return
 
         for k, v in self._data.items():
-            write_attribute(target, k, v, visit_state)
+            write_attribute(target, k, v, context)
 
     def apply(
         self,
         parent: Any,
         key: Union[int, str],
         struct_delta: Optional[DeltaUpdate],
-        visit_state: VisitState,
+        context: Context,
         to_blender: bool = True,
     ) -> StructProxy:
         """
@@ -113,7 +113,7 @@ class StructProxy(Proxy):
             parent ([type]): [description]
             key ([type]): [description]
             delta ([type]): [description]
-            visit_state ([type]): [description]
+            context ([type]): [description]
 
         Returns:
             [type]: [description]
@@ -132,7 +132,7 @@ class StructProxy(Proxy):
             # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             struct = parent.get(key)
             if struct is None:
-                struct = specifics.add_element(self, parent, key, visit_state)
+                struct = specifics.add_element(self, parent, key, context)
         else:
             specifics.pre_save_struct(self, parent, key)
             struct = getattr(parent, key, None)
@@ -142,7 +142,7 @@ class StructProxy(Proxy):
         for k, member_delta in struct_update._data.items():
             try:
                 current_value = self._data.get(k)
-                self._data[k] = apply_attribute(struct, k, current_value, member_delta, visit_state, to_blender)
+                self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
             except Exception as e:
                 logger.warning(f"StructLike.apply(). Processing {member_delta}")
                 logger.warning(f"... for {struct}.{k}")
@@ -151,7 +151,7 @@ class StructProxy(Proxy):
                 continue
         return self
 
-    def diff(self, struct: T.Struct, _: T.Property, visit_state: VisitState) -> Optional[DeltaUpdate]:
+    def diff(self, struct: T.Struct, _: T.Property, context: Context) -> Optional[DeltaUpdate]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
 
@@ -176,7 +176,7 @@ class StructProxy(Proxy):
         #   member_property = struct.bl_rna.properties[k]
         # line to which py-spy attributes 20% of the total diff !
 
-        for k, member_property in visit_state.synchronized_properties.properties(struct):
+        for k, member_property in context.synchronized_properties.properties(struct):
             # TODO in test_differential.StructDatablockRef.test_remove
             # target et a scene, k is world and v (current world value) is None
             # so diff fails. v should be a BpyIDRefNoneProxy
@@ -189,7 +189,7 @@ class StructProxy(Proxy):
                 continue
 
             proxy_data = self._data.get(k)
-            delta = diff_attribute(member, member_property, proxy_data, visit_state)
+            delta = diff_attribute(member, member_property, proxy_data, context)
             if delta is not None:
                 diff._data[k] = delta
 

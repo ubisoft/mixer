@@ -31,7 +31,7 @@ import bpy
 import bpy.types as T  # noqa
 
 if TYPE_CHECKING:
-    from mixer.blender_data.bpy_data_proxy import VisitState
+    from mixer.blender_data.bpy_data_proxy import Context
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
 logger = logging.getLogger(__name__)
@@ -172,13 +172,13 @@ class Proxy:
         parent: Any,
         key: Union[int, str],
         delta: Optional[DeltaUpdate],
-        visit_state: VisitState,
+        context: Context,
         to_blender: bool = True,
     ) -> Proxy:
         raise NotImplementedError(f"Proxy.apply() for {parent}[{key}]")
 
     def diff(
-        self, container: Union[T.bpy_prop_collection, T.Struct], key: Union[str, int], visit_state: VisitState
+        self, container: Union[T.bpy_prop_collection, T.Struct], key: Union[str, int], context: Context
     ) -> Optional[DeltaUpdate]:
         raise NotImplementedError(f"diff for {container}[{key}]")
 

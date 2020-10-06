@@ -71,7 +71,7 @@ class TestCodec(unittest.TestCase):
         self.assertEqual(focus_object_proxy._datablock_uuid, cam_sent.dof.focus_object.mixer_uuid)
 
         # save into blender
-        cam_proxy_received.save(D.cameras, transmit_name, self.proxy.visit_state())
+        cam_proxy_received.save(D.cameras, transmit_name, self.proxy.context())
         self.assertEqual(cam_sent, cam_received)
         pass
 

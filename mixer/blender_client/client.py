@@ -558,7 +558,7 @@ class BlenderClient(Client):
             logger.warning(f"build_mesh for unregistered datablock {mesh_name} {uuid}. Ignored")
             return
         else:
-            mesh = share_data.bpy_data_proxy.visit_state().ids[uuid]
+            mesh = share_data.bpy_data_proxy.context().ids[uuid]
 
         index = mesh_api.decode_mesh_generic(self, mesh, command_data, index)
 

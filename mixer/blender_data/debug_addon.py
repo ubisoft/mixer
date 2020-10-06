@@ -120,7 +120,7 @@ class DiffProxyOperator(bpy.types.Operator):
             pr = cProfile.Profile()
             pr.enable()
         t1 = time.time()
-        _ = proxy.data("scenes").data("Scene").diff(bpy.data.scenes, "Scene", proxy.visit_state())
+        _ = proxy.data("scenes").data("Scene").diff(bpy.data.scenes, "Scene", proxy.context())
         _ = proxy.diff(test_properties)
         t2 = time.time()
         if profile:

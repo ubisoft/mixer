@@ -39,7 +39,7 @@ from mixer.blender_data.proxy import ensure_uuid, Proxy
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import VisitState
+    from mixer.blender_data.proxy import Context
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ class DatablockCollectionProxy(Proxy):
     def __len__(self):
         return len(self._data)
 
-    def load_as_ID(self, bl_collection: bpy.types.bpy_prop_collection, visit_state: VisitState):  # noqa N802
+    def load_as_ID(self, bl_collection: bpy.types.bpy_prop_collection, context: Context):  # noqa N802
         """
         Load bl_collection elements as standalone datablocks.
         """
@@ -75,20 +75,20 @@ class DatablockCollectionProxy(Proxy):
             if skip_bpy_data_item(collection_name, item):
                 continue
             uuid = ensure_uuid(item)
-            self._data[uuid] = DatablockProxy().load(item, visit_state, bpy_data_collection_name=collection_name)
+            self._data[uuid] = DatablockProxy().load(item, context, bpy_data_collection_name=collection_name)
 
         return self
 
-    def load_as_IDref(self, bl_collection: bpy.types.bpy_prop_collection, visit_state: VisitState):  # noqa N802
+    def load_as_IDref(self, bl_collection: bpy.types.bpy_prop_collection, context: Context):  # noqa N802
         """
         Load bl_collection elements as references to bpy.data collections
         """
         for _, item in bl_collection.items():
             uuid = item.mixer_uuid
-            self._data[uuid] = DatablockRefProxy().load(item, visit_state)
+            self._data[uuid] = DatablockRefProxy().load(item, context)
         return self
 
-    def save(self, parent: Any, key: str, visit_state: VisitState):
+    def save(self, parent: Any, key: str, context: Context):
         """
         Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data
         or a collection of referenced datablocks like bpy.type.Collection.children
@@ -108,24 +108,24 @@ class DatablockCollectionProxy(Proxy):
             # Collection of datablock references
             if not len(target):
                 for _, ref_proxy in self._data.items():
-                    datablock = ref_proxy.target(visit_state)
+                    datablock = ref_proxy.target(context)
                     if datablock:
                         link(datablock)
                     else:
                         logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy.display_string()}")
-                        visit_state.unresolved_refs.append(ref_proxy.mixer_uuid, link)
+                        context.proxy_state.unresolved_refs.append(ref_proxy.mixer_uuid, link)
             else:
                 logger.warning(f"Saving into non empty collection: {target}. Ignored")
         else:
             # collection of standalone datablocks
             for k, v in self._data.items():
-                write_attribute(target, k, v, visit_state)
+                write_attribute(target, k, v, context)
 
     def find(self, key: str):
         return self._data.get(key)
 
     def create_datablock(
-        self, incoming_proxy: DatablockProxy, visit_state: VisitState
+        self, incoming_proxy: DatablockProxy, context: Context
     ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """Create a bpy.data datablock from a received DatablockProxy and update the proxy structures accordingly
 
@@ -133,7 +133,7 @@ class DatablockCollectionProxy(Proxy):
             incoming_proxy : this proxy contents is used to update the bpy.data collection item
         """
 
-        datablock, renames = incoming_proxy.create_standalone_datablock(visit_state)
+        datablock, renames = incoming_proxy.create_standalone_datablock(context)
 
         # One existing scene from the document loaded at join time could not be removed. Remove it now
         if (
@@ -150,18 +150,18 @@ class DatablockCollectionProxy(Proxy):
 
         uuid = incoming_proxy.mixer_uuid()
         self._data[uuid] = incoming_proxy
-        visit_state.ids[uuid] = datablock
-        visit_state.id_proxies[uuid] = incoming_proxy
+        context.proxy_state.datablocks[uuid] = datablock
+        context.proxy_state.proxies[uuid] = incoming_proxy
 
-        visit_state.unresolved_refs.resolve(uuid, datablock)
+        context.proxy_state.unresolved_refs.resolve(uuid, datablock)
         return datablock, renames
 
-    def update_datablock(self, delta: DeltaUpdate, visit_state: VisitState):
+    def update_datablock(self, delta: DeltaUpdate, context: Context):
         """Update a bpy.data item from a received DatablockProxy and update the proxy state"""
         incoming_proxy = delta.value
         uuid = incoming_proxy.mixer_uuid()
 
-        proxy: DatablockProxy = visit_state.id_proxies.get(uuid)
+        proxy: DatablockProxy = context.proxy_state.proxies.get(uuid)
         if proxy is None:
             logger.error(
                 f"update_datablock(): Missing proxy for bpy.data.{incoming_proxy.collection_name}[{incoming_proxy.data('name')}] uuid {uuid}"
@@ -175,16 +175,16 @@ class DatablockCollectionProxy(Proxy):
             return
 
         # the ID will have changed if the object has been morphed (change light type, for instance)
-        existing_id = visit_state.ids.get(uuid)
+        existing_id = context.proxy_state.datablocks.get(uuid)
         if existing_id is None:
             logger.warning(f"Non existent uuid {uuid} while updating {proxy.collection_name}[{proxy.data('name')}]")
             return None
 
-        id_ = proxy.update_standalone_datablock(existing_id, delta, visit_state)
+        id_ = proxy.update_standalone_datablock(existing_id, delta, context)
         if existing_id != id_:
             # Not a problem for light morphing
             logger.warning(f"Update_datablock changes datablock {existing_id} to {id_}")
-            visit_state.ids[uuid] = id_
+            context.proxy_state.datablocks[uuid] = id_
 
         return id_
 
@@ -216,7 +216,7 @@ class DatablockCollectionProxy(Proxy):
         proxy.rename(new_name)
         datablock.name = new_name
 
-    def update(self, diff: BpyPropCollectionDiff, visit_state: VisitState) -> Changeset:
+    def update(self, diff: BpyPropCollectionDiff, context: Context) -> Changeset:
         """
         Update the proxy according to local datablock creations, removals or renames
         """
@@ -234,9 +234,9 @@ class DatablockCollectionProxy(Proxy):
                     logger.error("update/ request addition for %s[%s] : not found", collection_name, name)
                     continue
                 uuid = ensure_uuid(id_)
-                visit_state.ids[uuid] = id_
-                proxy = DatablockProxy().load(id_, visit_state, bpy_data_collection_name=collection_name)
-                visit_state.id_proxies[uuid] = proxy
+                context.proxy_state.datablocks[uuid] = id_
+                proxy = DatablockProxy().load(id_, context, bpy_data_collection_name=collection_name)
+                context.proxy_state.proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
             except MaxDepthExceeded as e:
@@ -254,9 +254,9 @@ class DatablockCollectionProxy(Proxy):
                 uuid = proxy.mixer_uuid()
                 changeset.removals.append((uuid, str(proxy)))
                 del self._data[uuid]
-                id_ = visit_state.ids[uuid]
-                del visit_state.id_proxies[uuid]
-                del visit_state.ids[uuid]
+                id_ = context.proxy_state.datablocks[uuid]
+                del context.proxy_state.proxies[uuid]
+                del context.proxy_state.datablocks[uuid]
             except Exception:
                 logger.error(f"Exception during update/removed for proxy {proxy})  :")
                 for line in traceback.format_exc().splitlines():
@@ -282,9 +282,9 @@ class DatablockCollectionProxy(Proxy):
         #
         for proxy, new_name in diff.items_renamed:
             uuid = proxy.mixer_uuid()
-            if proxy.collection[new_name] is not visit_state.ids[uuid]:
+            if proxy.collection[new_name] is not context.proxy_state.datablocks[uuid]:
                 logger.error(
-                    f"update rename : {proxy.collection}[{new_name}] is not {visit_state.ids[uuid]} for {proxy}, {uuid}"
+                    f"update rename : {proxy.collection}[{new_name}] is not {context.proxy_state.datablocks[uuid]} for {proxy}, {uuid}"
                 )
 
             old_name = proxy.data("name")
@@ -298,7 +298,7 @@ class DatablockCollectionProxy(Proxy):
         parent: Any,
         key: Union[int, str],
         collection_delta: Optional[DeltaUpdate],
-        visit_state: VisitState,
+        context: Context,
         to_blender: bool = True,
     ) -> DatablockCollectionProxy:
         """
@@ -327,7 +327,7 @@ class DatablockCollectionProxy(Proxy):
                     # should be fixed automatically if the key is the uuid at
                     # DatablockCollectionProxy load
                     uuid = ref_update._datablock_uuid
-                    datablock = visit_state.ids.get(uuid)
+                    datablock = context.proxy_state.datablocks.get(uuid)
                     if datablock is None:
                         logger.warning(
                             f"delta apply for {parent}[{key}]: unregistered uuid {uuid} for {ref_update._debug_name}"
@@ -352,7 +352,7 @@ class DatablockCollectionProxy(Proxy):
         return self
 
     def diff(
-        self, collection: T.bpy_prop_collection, collection_property: T.Property, visit_state: VisitState
+        self, collection: T.bpy_prop_collection, collection_property: T.Property, context: Context
     ) -> Optional[DeltaUpdate]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
@@ -383,7 +383,7 @@ class DatablockCollectionProxy(Proxy):
         maybe_updated_keys = proxy_keys & blender_keys
 
         for k in added_keys:
-            value = read_attribute(blender_items[k], item_property, visit_state)
+            value = read_attribute(blender_items[k], item_property, context)
             assert isinstance(value, (DatablockProxy, DatablockRefProxy))
             diff._data[k] = DeltaAddition(value)
 
@@ -391,7 +391,7 @@ class DatablockCollectionProxy(Proxy):
             diff._data[k] = DeltaDeletion(self._data[k])
 
         for k in maybe_updated_keys:
-            delta = diff_attribute(blender_items[k], item_property, self.data(k), visit_state)
+            delta = diff_attribute(blender_items[k], item_property, self.data(k), context)
             if delta is not None:
                 assert isinstance(delta, DeltaUpdate)
                 diff._data[k] = delta

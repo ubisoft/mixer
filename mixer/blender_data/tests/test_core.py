@@ -35,7 +35,7 @@ class TestCore(unittest.TestCase):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
         register_bl_equals(self, test_properties)
         self._proxy = BpyDataProxy()
-        self._visit_state = self._proxy.visit_state()
+        self._visit_state = self._proxy.context()
 
     def test_issubclass(self):
 
