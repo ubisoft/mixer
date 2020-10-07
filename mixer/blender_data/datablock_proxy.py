@@ -21,8 +21,9 @@ See synchronization.md
 """
 from __future__ import annotations
 
+from collections import defaultdict
 import logging
-from typing import Any, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -36,7 +37,9 @@ from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.types import is_pointer_to, sub_id_type
 
 if TYPE_CHECKING:
-    from mixer.blender_data.bpy_data_proxy import RenameChangeset, Context
+    import array
+    from mixer.blender_data.bpy_data_proxy import RenameChangeset, Context, VisitState
+    from mixer.blender_data.aos_soa_proxy import SoaElement
 
 
 DEBUG = True
@@ -57,6 +60,8 @@ class DatablockProxy(StructProxy):
 
         self._class_name: str = ""
         self._datablock_uuid: Optional[str] = None
+
+        self._soas: Dict[VisitState.Path, SoaElement] = defaultdict(list)
 
     def init(self, datablock: T.ID):
         if datablock is not None:
@@ -122,13 +127,17 @@ class DatablockProxy(StructProxy):
         properties = context.synchronized_properties.properties(bl_instance)
         # this assumes that specifics.py apply only to ID, not Struct
         properties = specifics.conditional_properties(bl_instance, properties)
-        for name, bl_rna_property in properties:
-            attr = getattr(bl_instance, name)
-            attr_value = read_attribute(attr, bl_rna_property, context)
-            # Also write None values to reset attributes like Camera.dof.focus_object
-            # TODO for scene, test difference, only send update if dirty as continuous updates to scene
-            # master collection will conflicting writes with Master Collection
-            self._data[name] = attr_value
+        try:
+            context.visit_state.datablock_proxy = self
+            for name, bl_rna_property in properties:
+                attr = getattr(bl_instance, name)
+                attr_value = read_attribute(attr, bl_rna_property, context)
+                # Also write None values to reset attributes like Camera.dof.focus_object
+                # TODO for scene, test difference, only send update if dirty as continuous updates to scene
+                # master collection will conflicting writes with Master Collection
+                self._data[name] = attr_value
+        finally:
+            context.visit_state.datablock_proxy = None
 
         specifics.post_save_id(self, bl_instance)
 
@@ -223,9 +232,12 @@ class DatablockProxy(StructProxy):
         if datablock is None:
             logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
             return None, None
-
-        for k, v in self._data.items():
-            write_attribute(datablock, k, v, context)
+        try:
+            context.visit_state.datablock_proxy = self
+            for k, v in self._data.items():
+                write_attribute(datablock, k, v, context)
+        finally:
+            context.visit_state.datablock_proxy = None
 
         return datablock, renames
 
@@ -238,7 +250,12 @@ class DatablockProxy(StructProxy):
             logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
             return None
 
-        self.apply(self.collection, datablock.name, delta, context)
+        try:
+            context.visit_state.datablock_proxy = self
+            self.apply(self.collection, datablock.name, delta, context)
+        finally:
+            context.visit_state.datablock_proxy = None
+
         return datablock
 
     def save(self, bl_instance: Any = None, attr_name: str = None, context: Context = None) -> T.ID:
@@ -277,8 +294,12 @@ class DatablockProxy(StructProxy):
             logger.warning(f"DatablockProxy.save() {bl_instance}.{attr_name} is None")
             return None
 
-        for k, v in self._data.items():
-            write_attribute(target, k, v, context)
+        try:
+            context.visit_state.datablock_proxy = self
+            for k, v in self._data.items():
+                write_attribute(target, k, v, context)
+        finally:
+            context.visit_state.datablock_proxy = None
 
         return target
 
@@ -296,13 +317,26 @@ class DatablockProxy(StructProxy):
 
         update = delta.value
         assert type(update) == type(self)
-        for k, delta in update._data.items():
-            try:
-                current_value = self._data.get(k)
-                self._data[k] = apply_attribute(datablock, k, current_value, delta, context, to_blender=False)
-            except Exception as e:
-                logger.warning(f"Datablock.apply(). Processing {delta}")
-                logger.warning(f"... for {datablock}.{k}")
-                logger.warning(f"... Exception: {e}")
-                logger.warning("... Update ignored")
-                continue
+        try:
+            context.visit_state.datablock_proxy = self
+            for k, delta in update._data.items():
+                try:
+                    current_value = self._data.get(k)
+                    self._data[k] = apply_attribute(datablock, k, current_value, delta, context, to_blender=False)
+                except Exception as e:
+                    logger.warning(f"Datablock.apply(). Processing {delta}")
+                    logger.warning(f"... for {datablock}.{k}")
+                    logger.warning(f"... Exception: {e}")
+                    logger.warning("... Update ignored")
+                    continue
+        finally:
+            context.visit_state.datablock_proxy = None
+
+    def update_soa(self, bl_item, path: List[Union[int, str]], soas: List[Tuple[str, array.array]]):
+        r = self.find_by_path(bl_item, path)
+        if r is None:
+            return
+        container, container_proxy = r
+        for element_name, buffer in soas:
+            soa_proxy = container_proxy.data(element_name)
+            soa_proxy.save_buffer(container, element_name, buffer)

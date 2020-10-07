@@ -24,6 +24,7 @@ mechanism.
 from __future__ import annotations
 
 import itertools
+import json
 import logging
 import traceback
 from typing import TYPE_CHECKING
@@ -59,6 +60,21 @@ def send_data_creations(proxies: CreationChangeset):
         buffer = common.encode_string(encoded_proxy)
         command = common.Command(common.MessageType.BLENDER_DATA_CREATE, buffer, 0)
         share_data.client.add_command(command)
+
+        # send SOA commands i.e. one command for all items in MeshVertex.vertices
+        # TODO may be possible to group per structure, i.e send all MeshVertex element at once
+        uuid = common.encode_string(proxy._datablock_uuid)
+        for path, soa_proxies in proxy._soas.items():
+            items = [uuid]
+            path_string = json.dumps(path)
+            items.append(common.encode_string(path_string))
+            items.append(common.encode_int(len(soa_proxies)))
+            for element_name, soa_proxy in soa_proxies:
+                items.append(common.encode_string(element_name))
+                items.append(common.encode_py_array(soa_proxy._buffer))
+            buffer = b"".join(items)
+            command = common.Command(common.MessageType.BLENDER_DATA_SOAS, buffer, 0)
+            share_data.client.add_command(command)
 
 
 def send_data_updates(updates: UpdateChangeset):
@@ -100,7 +116,6 @@ def build_data_create(buffer):
         logger.error("Exception during build_data_create")
         for line in traceback.format_exc().splitlines():
             logger.error(line)
-        logger.error(f"During processing of buffer for {id_proxy}")
         logger.error(buffer[0:200])
         logger.error("...")
         logger.error(buffer[-200:0])
@@ -108,6 +123,28 @@ def build_data_create(buffer):
 
     if rename_changeset:
         send_data_renames(rename_changeset)
+
+
+def build_soa(buffer):
+    try:
+        uuid, _ = common.decode_string(buffer, 0)
+        logger.info("%s: %s", "build_soa", uuid)
+
+        uuid, index = common.decode_string(buffer, 0)
+        path_string, index = common.decode_string(buffer, index)
+        path = json.loads(path_string)
+        element_count, index = common.decode_int(buffer, index)
+        soas = []
+        for _ in range(element_count):
+            name, index = common.decode_string(buffer, index)
+            array, index = common.decode_py_array(buffer, index)
+            soas.append((name, array))
+        share_data.bpy_data_proxy.update_soa(uuid, path, soas)
+    except Exception:
+        logger.error("Exception during build_soa")
+        for line in traceback.format_exc().splitlines():
+            logger.error(line)
+        logger.error("ignored")
 
 
 def build_data_update(buffer):

@@ -24,6 +24,7 @@ implementation that does the job.
 import json
 from typing import Any, Dict
 
+from mixer.blender_data.aos_soa_proxy import SoaElement
 from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaUpdate
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -42,6 +43,7 @@ struct_like_classes = [
     StructProxy,
     NodeLinksProxy,
     NodeTreeProxy,
+    SoaElement,
 ]
 collection_classes = [
     StructCollectionProxy,
@@ -74,12 +76,14 @@ def default(obj):
 
     # TODO AOS and SOA
 
-    is_known = issubclass(class_, (StructProxy, DatablockRefProxy, Delta)) or class_ in collection_classes
+    is_known = issubclass(class_, (StructProxy, DatablockRefProxy, Delta, SoaElement)) or class_ in collection_classes
     if is_known:
         # Add the proxy class so that the decoder and instantiate the right type
         d = {MIXER_CLASS: class_.__name__}
         if issubclass(class_, Delta):
             d.update({"value": obj.value})
+        elif issubclass(class_, SoaElement):
+            return d
         else:
             d.update({"_data": obj._data})
 
@@ -105,6 +109,8 @@ def decode_hook(x):
     obj = class_()
     if class_ in delta_classes:
         obj.value = x["value"]
+    elif class_ is SoaElement:
+        pass
     else:
         obj._data.update(x["_data"])
 

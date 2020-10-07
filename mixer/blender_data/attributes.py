@@ -49,23 +49,22 @@ def read_attribute(attr: Any, attr_property: T.Property, context: Context):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
     """
+    attr_type = type(attr)
+
+    if is_builtin(attr_type):
+        return attr
+    if is_vector(attr_type):
+        return list(attr)
+    if is_matrix(attr_type):
+        return [list(col) for col in attr.col]
+
+    # We have tested the types that are usefully reported by the python binding, now harder work.
+    # These were implemented first and may be better implemented with the bl_rna property of the parent struct
+    if attr_type == T.bpy_prop_array:
+        return [e for e in attr]
+
     try:
-        context.visit_state.recursion_guard.push(attr_property.name)
-
-        attr_type = type(attr)
-
-        if is_builtin(attr_type):
-            return attr
-        if is_vector(attr_type):
-            return list(attr)
-        if is_matrix(attr_type):
-            return [list(col) for col in attr.col]
-
-        # We have tested the types that are usefully reported by the python binding, now harder work.
-        # These were implemented first and may be better implemented with the bl_rna property of the parent struct
-        if attr_type == T.bpy_prop_array:
-            return [e for e in attr]
-
+        context.visit_state.recursion_guard.push(attr_property.identifier)
         if attr_type == T.bpy_prop_collection:
             if isinstance(attr_property.fixed_type, bpy.types.ID):
                 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
@@ -90,7 +89,7 @@ def read_attribute(attr: Any, attr_property: T.Property, context: Context):
         if issubclass(attr_type, T.PropertyGroup):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy().load(attr, context)
+            return StructProxy().load(attr, attr_property.identifier, context)
 
         if issubclass(attr_type, T.ID):
             if attr.is_embedded_data:
@@ -104,7 +103,7 @@ def read_attribute(attr: Any, attr_property: T.Property, context: Context):
         elif issubclass(attr_type, T.bpy_struct):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy().load(attr, context)
+            return StructProxy().load(attr, attr_property.identifier, context)
 
         raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
     finally:

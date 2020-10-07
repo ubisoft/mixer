@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import array
 import logging
-from typing import List, Dict, Union, TYPE_CHECKING
+from typing import List, Dict, Optional, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -54,7 +54,7 @@ soable_properties = {
 
 # in sync with soa_initializers
 soa_initializers = {
-    bool: [False],
+    bool: array.array("b", [0]),
     int: array.array("l", [0]),
     float: array.array("f", [0.0]),
     mathutils.Vector: array.array("f", [0.0]),
@@ -70,9 +70,13 @@ soa_initializers = {
 soable_collection_properties = {
     T.GPencilStroke.bl_rna.properties["points"],
     T.GPencilStroke.bl_rna.properties["triangles"],
-    T.Mesh.bl_rna.properties["vertices"],
     T.Mesh.bl_rna.properties["edges"],
-    T.Mesh.bl_rna.properties["loops"],
+    T.Mesh.bl_rna.properties["face_maps"],
+    T.Mesh.bl_rna.properties["loop_triangles"],
+    T.Mesh.bl_rna.properties["polygons"],
+    T.Mesh.bl_rna.properties["polygon_layers_float"],
+    T.Mesh.bl_rna.properties["polygon_layers_int"],
+    T.Mesh.bl_rna.properties["vertices"],
     # messy: :MeshPolygon.vertices has variable length, not 3 as stated in the doc, so ignore
     # T.Mesh.bl_rna.properties["polygons"],
     T.MeshUVLoopLayer.bl_rna.properties["data"],
@@ -169,26 +173,60 @@ class SoaElement(Proxy):
     """
 
     def __init__(self):
-        self._data: Union[array.array, [List]] = None
+        self._buffer: Optional[array.array] = None
 
-    def load(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str, prototype_item):
-        attr = getattr(prototype_item, attr_name)
-        attr_type = type(attr)
-        length = len(bl_collection)
-        if is_vector(attr_type):
-            length *= len(attr)
-        elif attr_type is T.bpy_prop_array:
-            length *= len(attr)
-            attr_type = type(attr[0])
+    def load(
+        self, parent: bpy.types.bpy_prop_collection, element_name: str, prototype_item: T.bpy_struct, context: Context
+    ):
+        """
+        Args:
+            parent : The collection that contains this element (e.g.  a_mesh.vertices, a_mesh.edges, ...)
+            attr_name : The name of this element (e.g, "co", "normal", ...)
+            prototype_item : an element pf parent collection
+        """
 
-        buffer = soa_initializer(attr_type, length)
+        # TODO: bool
 
-        # "RuntimeError: internal error setting the array" means that the array is ill-formed.
+        # Determine what type and length of buffer we need
+        # TODO do not reallocate on re-read
+        attr = getattr(prototype_item, element_name)
+        element_type = type(attr)
+        array_size = len(parent)
+        if is_vector(element_type):
+            array_size *= len(attr)
+        elif element_type is T.bpy_prop_array:
+            array_size *= len(attr)
+            element_type = type(attr[0])
+
+        typecode = soa_initializers[element_type].typecode
+        buffer = self._buffer
+        if buffer is None or buffer.buffer_info()[1] != array_size or buffer.typecode != typecode:
+            self._buffer = soa_initializer(element_type, array_size)
+
+        # if foreach_get() raises "RuntimeError: internal error setting the array"
+        # it means that the array is ill-formed.
         # Check rna_access.c:rna_raw_access()
-        bl_collection.foreach_get(attr_name, buffer)
-        self._data = buffer
+        parent.foreach_get(element_name, self._buffer)
+
+        # Store the buffer information at the root of the datablock so that it is easy to find it for serialization
+        visit_state = context.visit_state
+        parent_path = tuple(visit_state.path)
+        datablock_proxy = visit_state.datablock_proxy
+        datablock_proxy._soas[parent_path].append((element_name, self))
+
         return self
 
-    def save(self, bl_collection, attr_name, context: Context):
+    def save(self, bl_instance: T.bpy_prop_collection, attr_name: str, context: Context):
+        # This code is reached during save() of MeshVertex, but the data is in a SOA command
+        # that will be received later and processed with save_buffer()
+        pass
+
+    def save_buffer(self, bl_collection: T.bpy_prop_collection, attr_name, buffer: array.array):
         # TODO : serialization currently not performed
-        bl_collection.foreach_set(attr_name, self._data)
+        self._buffer = buffer
+        try:
+            bl_collection.foreach_set(attr_name, buffer)
+        except RuntimeError as e:
+            logger.error(f"saving soa {bl_collection}.{attr_name} failed")
+            logger.error(f"... member size: {len(bl_collection)}, array: ('{buffer.typecode}', {len(buffer)})")
+            logger.error(f"... exception {e}")

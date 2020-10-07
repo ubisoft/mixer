@@ -22,9 +22,10 @@ See synchronization.md
 """
 from __future__ import annotations
 
+import array
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -94,6 +95,15 @@ class VisitState:
     """
     Gathers proxy system state (mainly known datablocks) and properties to synchronize
     """
+
+    Path = List[Union[str, int]]
+
+    datablock_proxy: Optional[DatablockProxy] = None
+    """The datablock proxy being visited"""
+
+    path: Path = field(default_factory=list)
+    """The path to the current property from the datablock, for instance in GreasePencil
+    ["layers", "fills", "frames", 0, "strokes", 1, "points", 0]"""
 
     recursion_guard: RecursionGuard = RecursionGuard()
 
@@ -371,3 +381,8 @@ class BpyDataProxy(Proxy):
         if len(diff._data):
             return diff
         return None
+
+    def update_soa(self, uuid: Uuid, path: List[Union[int, str]], soas: List[Tuple[str, array.array]]):
+        datablock_proxy = self.state.proxies[uuid]
+        datablock = self.state.datablocks[uuid]
+        datablock_proxy.update_soa(datablock, path, soas)

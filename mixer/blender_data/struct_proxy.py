@@ -46,7 +46,7 @@ class StructProxy(Proxy):
         self._data = {}
         pass
 
-    def load(self, bl_instance: Any, context: Context):
+    def load(self, bl_instance: Any, parent_key: Union[int, str], context: Context):
 
         """
         Load a Blender object into this proxy
@@ -56,11 +56,17 @@ class StructProxy(Proxy):
         # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
         # that we do not want to load anyway
         properties = specifics.conditional_properties(bl_instance, properties)
-        for name, bl_rna_property in properties:
-            attr = getattr(bl_instance, name)
-            attr_value = read_attribute(attr, bl_rna_property, context)
-            # Also write None values. We use them to reset attributes like Camera.dof.focus_object
-            self._data[name] = attr_value
+        try:
+            context.visit_state.path.append(parent_key)
+            for name, bl_rna_property in properties:
+                attr = getattr(bl_instance, name)
+                attr_value = read_attribute(attr, bl_rna_property, context)
+
+                # Also write None values. We use them to reset attributes like Camera.dof.focus_object
+                self._data[name] = attr_value
+        finally:
+            context.visit_state.path.pop()
+
         return self
 
     def save(self, bl_instance: Any, key: Union[int, str], context: Context):
@@ -94,8 +100,12 @@ class StructProxy(Proxy):
 
             return
 
-        for k, v in self._data.items():
-            write_attribute(target, k, v, context)
+        try:
+            context.visit_state.path.append(key)
+            for k, v in self._data.items():
+                write_attribute(target, k, v, context)
+        finally:
+            context.visit_state.path.pop()
 
     def apply(
         self,
@@ -139,16 +149,22 @@ class StructProxy(Proxy):
 
         struct_update = struct_delta.value
         assert type(struct_update) == type(self)
-        for k, member_delta in struct_update._data.items():
-            try:
+
+        try:
+            context.visit_state.path.append(key)
+            for k, member_delta in struct_update._data.items():
                 current_value = self._data.get(k)
-                self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
-            except Exception as e:
-                logger.warning(f"Struct.apply(). Processing {member_delta}")
-                logger.warning(f"... for {struct}.{k}")
-                logger.warning(f"... Exception: {e}")
-                logger.warning("... Update ignored")
-                continue
+                try:
+                    self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
+                except Exception as e:
+                    logger.warning(f"Struct.apply(). Processing {member_delta}")
+                    logger.warning(f"... for {struct}.{k}")
+                    logger.warning(f"... Exception: {e}")
+                    logger.warning("... Update ignored")
+                    continue
+        finally:
+            context.visit_state.path.pop()
+
         return self
 
     def diff(self, struct: T.Struct, _: T.Property, context: Context) -> Optional[DeltaUpdate]:
@@ -175,23 +191,27 @@ class StructProxy(Proxy):
         # _data and the getting the properties with
         #   member_property = struct.bl_rna.properties[k]
         # line to which py-spy attributes 20% of the total diff !
+        try:
+            context.visit_state.path.append("HWAT?")
+            for k, member_property in context.synchronized_properties.properties(struct):
+                # TODO in test_differential.StructDatablockRef.test_remove
+                # target et a scene, k is world and v (current world value) is None
+                # so diff fails. v should be a BpyIDRefNoneProxy
 
-        for k, member_property in context.synchronized_properties.properties(struct):
-            # TODO in test_differential.StructDatablockRef.test_remove
-            # target et a scene, k is world and v (current world value) is None
-            # so diff fails. v should be a BpyIDRefNoneProxy
+                # make a difference between None value and no member
+                try:
+                    member = getattr(struct, k)
+                except AttributeError:
+                    logger.warning(f"diff: unknown attribute {k} in {struct}")
+                    continue
 
-            # make a difference between None value and no member
-            try:
-                member = getattr(struct, k)
-            except AttributeError:
-                logger.warning(f"diff: unknown attribute {k} in {struct}")
-                continue
+                proxy_data = self._data.get(k)
+                delta = diff_attribute(member, member_property, proxy_data, context)
 
-            proxy_data = self._data.get(k)
-            delta = diff_attribute(member, member_property, proxy_data, context)
-            if delta is not None:
-                diff._data[k] = delta
+                if delta is not None:
+                    diff._data[k] = delta
+        finally:
+            context.visit_state.path.pop()
 
         # if anything has changed, wrap the hollow proxy in a DeltaUpdate. This may be superfluous but
         # it is homogenous with additions and deletions

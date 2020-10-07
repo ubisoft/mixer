@@ -299,6 +299,10 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             node_type = proxy.data("bl_idname")
             return collection.new(node_type)
 
+        if isinstance(bl_rna, type(T.UVLoopLayers.bl_rna)):
+            name = proxy.data("name")
+            return collection.new(name=name)
+
         if isinstance(bl_rna, type(T.Sequences.bl_rna)):
             type_ = proxy.data("type")
             name = proxy.data("name")
@@ -336,10 +340,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             type_ = proxy.data("type")
             return collection.new(name, type_)
 
-    try:
         return collection.add()
-    except Exception:
-        pass
 
     # try our best
     new_or_add = getattr(collection, "new", None)

@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 import logging
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 from uuid import uuid4
 
 import bpy
@@ -161,7 +161,7 @@ class Proxy:
         else:
             return resolve(self._data.get(key))
 
-    def save(self, bl_instance: Any, attr_name: str):
+    def save(self, bl_instance: Any, attr_name: str, context: Context):
         """
         Save this proxy into a blender object
         """
@@ -181,6 +181,26 @@ class Proxy:
         self, container: Union[T.bpy_prop_collection, T.Struct], key: Union[str, int], context: Context
     ) -> Optional[DeltaUpdate]:
         raise NotImplementedError(f"diff for {container}[{key}]")
+
+    def find_by_path(
+        self, bl_item: Union[T.bpy_struct, T.bpy_prop_collection], path: List[Union[int, str]]
+    ) -> Optional[Tuple[Union[T.bpy_struct, T.bpy_prop_collection], Proxy]]:
+        if not path:
+            return bl_item, self
+
+        head, *tail = path
+        if isinstance(bl_item, T.bpy_struct):
+            bl = getattr(bl_item, head)
+        elif isinstance(bl_item, T.bpy_prop_collection):
+            bl = bl_item[head]
+        else:
+            return None
+
+        proxy = self.data(head)
+        if proxy is None:
+            logger.warning(f"find_by_path: No proxy for {bl_item} {path}")
+            return
+        return proxy.find_by_path(bl, tail)
 
 
 def ensure_uuid(item: bpy.types.ID) -> str:

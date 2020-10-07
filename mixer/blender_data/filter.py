@@ -246,7 +246,6 @@ _exclude_names = {
 
 default_exclusions = {
     None: [
-        TypeFilterOut(T.MeshVertex),
         # Temporary: parent and child are involved in circular reference
         TypeFilterOut(T.PoseBone),
         NameFilterOut(_exclude_names),
@@ -280,17 +279,29 @@ default_exclusions = {
     T.GreasePencil: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
-        NameFilterIn("name")
     ],
     T.Mesh: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
-        NameFilterIn("name")
+        # NameFilterIn("name")
+        NameFilterOut(
+            [
+                # views into uv_layers controlled by uv_layer_xxx_index
+                "uv_layer_clone",
+                "uv_layer_stencil",
+            ]
+        )
     ],
     T.MeshPolygon: [NameFilterOut("area")],
+    T.MeshPolygon: [NameFilterOut("select")],
     T.MeshVertex: [
-        # MeshVertex.groups is updated via Object.vertex_groups
-        NameFilterOut("groups")
+        NameFilterOut(
+            [
+                "select",
+                # MeshVertex.groups is updated via Object.vertex_groups
+                "groups",
+            ]
+        )
     ],
     #
     T.Node: [
