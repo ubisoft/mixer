@@ -167,7 +167,7 @@ class StructProxy(Proxy):
 
         return self
 
-    def diff(self, struct: T.Struct, _: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(self, struct: T.Struct, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
 
@@ -192,7 +192,7 @@ class StructProxy(Proxy):
         #   member_property = struct.bl_rna.properties[k]
         # line to which py-spy attributes 20% of the total diff !
         try:
-            context.visit_state.path.append("HWAT?")
+            context.visit_state.path.append(prop.identifier if prop is not None else None)
             for k, member_property in context.synchronized_properties.properties(struct):
                 # TODO in test_differential.StructDatablockRef.test_remove
                 # target et a scene, k is world and v (current world value) is None

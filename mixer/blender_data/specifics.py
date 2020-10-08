@@ -156,6 +156,15 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
 
+    if isinstance(bpy_struct, T.Mesh):
+        if not bpy_struct.use_auto_texspace:
+            # Empty
+            return properties
+        filtered = {}
+        filter_props = ["texspace_location", "texspace_size"]
+        filtered = {k: v for k, v in properties if k not in filter_props}
+        return filtered.items()
+
     if isinstance(bpy_struct, T.MetaBall):
         if not bpy_struct.use_auto_texspace:
             return properties

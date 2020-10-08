@@ -68,6 +68,8 @@ class NodeTreeProxy(DatablockProxy):
         # Saving NodeTree.links require access to NodeTree.nodes, so we need an implementation at the NodeTree level
 
         node_tree = getattr(bl_instance, attr_name)
+        if node_tree is None:
+            return
 
         # save links last
         for k, v in self._data.items():

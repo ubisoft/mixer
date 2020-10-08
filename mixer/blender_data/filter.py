@@ -296,6 +296,8 @@ default_exclusions = {
                 # views into uv_layers controlled by uv_layer_xxx_index
                 "uv_layer_clone",
                 "uv_layer_stencil",
+                # do not know how to update this, probably by vertices count
+                "vertex_paint_masks",
             ]
         )
     ],
