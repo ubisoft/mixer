@@ -114,8 +114,8 @@ def send_scene_data_to_server(scene, dummy):
     # i.e. Mesh, GreasePencil
     # Need to process changeset.creations while sending initial scene contents, depsgraph updates, but
     # subsequent creations are reported both as creations and updates, but must not be processed twice
-    # unhandled = unhandled_created_datablocks(changeset.creations)
-    # unhandled.update({update.id.original for update in depsgraph.updates})
-    # update_unhandled_updated_datablocks(unhandled)
+    unhandled = unhandled_created_datablocks(changeset.creations)
+    unhandled.update({update.id.original for update in depsgraph.updates})
+    update_unhandled_updated_datablocks(unhandled)
 
     logger.debug("send_scene_data_to_server: end")

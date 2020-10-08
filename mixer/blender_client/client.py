@@ -1164,13 +1164,13 @@ def send_scene_content():
         share_data.init_proxy()
         share_data.client.send_group_begin()
 
+        # Temporary waiting for material sync. Should move to send_scene_data_to_server
+        for material in bpy.data.materials:
+            share_data.client.send_material(material)
 
         if share_data.use_experimental_sync():
             generic.send_scene_data_to_server(None, None)
         else:
-            # Temporary waiting for material sync. Should move to send_scene_data_to_server
-            for material in bpy.data.materials:
-                share_data.client.send_material(material)
             send_scene_data_to_server(None, None)
 
         shot_manager.send_scene()
