@@ -474,7 +474,7 @@ def truncate_collection(target: T.bpy_prop_collection, proxy: Union[StructCollec
 
     if isinstance(target_rna, type(T.GPencilStrokePoints.bl_rna)):
         existing_length = len(target)
-        incoming_length = proxy._length
+        incoming_length = proxy.length
         delta = incoming_length - existing_length
         if delta > 0:
             target.add(delta)

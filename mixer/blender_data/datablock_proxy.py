@@ -340,3 +340,12 @@ class DatablockProxy(StructProxy):
         for element_name, buffer in soas:
             soa_proxy = container_proxy.data(element_name)
             soa_proxy.save_buffer(container, element_name, buffer)
+
+    def diff(self, datablock: T.ID, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+        try:
+            diff = self.__class__()
+            diff.init(datablock)
+            context.visit_state.datablock_proxy = diff
+            return super()._diff(datablock, prop, context, diff)
+        finally:
+            context.visit_state.datablock_proxy = None

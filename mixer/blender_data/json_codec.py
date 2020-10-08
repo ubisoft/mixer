@@ -60,7 +60,7 @@ _classes = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
 _classes.update({c.__name__: c for c in delta_classes})
 
-options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name", "_aos_length"]
+options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name"]
 MIXER_CLASS = "__mixer_class__"
 
 
@@ -90,6 +90,9 @@ def default(obj):
 
         for option in options:
             d.update(default_optional(obj, option))
+        if hasattr(class_, "_serialize"):
+            for option in class_._serialize:
+                d.update(default_optional(obj, option))
         return d
     return None
 
@@ -117,6 +120,9 @@ def decode_hook(x):
 
     for option in options:
         decode_optional(obj, x, option)
+    if hasattr(class_, "_serialize"):
+        for option in class_._serialize:
+            decode_optional(obj, x, option)
     return obj
 
 

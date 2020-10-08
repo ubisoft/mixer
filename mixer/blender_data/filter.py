@@ -415,12 +415,10 @@ safe_depsgraph_updates = (
     T.Camera,
     T.Collection,
     T.Image,
-    # no generic sync of GreasePencil, use VRtist message
-    # T.GreasePencil,
+    T.GreasePencil,
     T.Light,
     T.Material,
-    # no generic sync of Mesh, use VRtist message
-    # T.Mesh
+    T.Mesh,
     T.MetaBall,
     T.NodeTree,
     T.Object,

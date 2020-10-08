@@ -30,9 +30,8 @@ import bpy.types as T  # noqa
 from mixer.blender_data import specifics
 from mixer.blender_data.aos_soa_proxy import AosElement, SoaElement
 from mixer.blender_data.specifics import is_soable_property
-from mixer.blender_data.attributes import write_attribute
-from mixer.blender_data.proxy import DeltaUpdate
-from mixer.blender_data.proxy import Proxy
+from mixer.blender_data.attributes import diff_attribute, write_attribute
+from mixer.blender_data.proxy import DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
@@ -47,6 +46,8 @@ class AosProxy(Proxy):
     It can track an array (int keys) or a dictionnary(string keys). Both implementation are
     in the same class as it is not possible to know at creation time the type of an empty collection
     """
+
+    _serialize = ("_aos_length",)
 
     def __init__(self):
         self._data: Dict[str, SoaElement] = {}
@@ -89,6 +90,11 @@ class AosProxy(Proxy):
         """
         Save this proxy the Blender property
         """
+
+        if self.length == 0 and len(self._data) != 0:
+            logger.error(f"save(): length is {self.length} but _data is {self._data.keys()}")
+            return
+
         target = getattr(bl_instance, attr_name, None)
         if target is None:
             return
@@ -106,17 +112,29 @@ class AosProxy(Proxy):
     ) -> AosProxy:
         raise NotImplementedError("AosProxy.apply()")
 
-    def diff(
-        self, collection: T.bpy_prop_collection, collection_property: T.Property, context: Context
-    ) -> Optional[DeltaUpdate]:
-        """
-        Computes the difference between the state of an item tracked by this proxy and its Blender state.
+    def diff(self, bl_collection: T.bpy_prop_collection, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+        """"""
 
-        This proxy tracks a collection of items indexed by string (e.g Scene.render.views) or int.
-        The result will be a ProxyDiff that contains a Delta item per added, deleted or updated item
+        # Create a proxy that will be populated with attributes differences, resulting in a hollow dict,
+        # as opposed as the dense self
+        diff = self.__class__()
+        diff.init(bl_collection)
 
-        Args:
-            collection; the collection that must be diffed agains this proxy
-            collection_property; the property os collection as found in its enclosing object
-        """
-        raise NotImplementedError("AosProxy.diff")
+        try:
+            context.visit_state.path.append(prop.identifier if prop is not None else None)
+            item_bl_rna = prop.fixed_type.bl_rna
+            for attr_name, _ in context.synchronized_properties.properties(item_bl_rna):
+                # co, normals, ...
+                proxy_data = self._data.get(attr_name)
+                delta = diff_attribute(bl_collection, prop, proxy_data, context)
+                if delta is not None:
+                    diff._data[attr_name] = delta
+        finally:
+            context.visit_state.path.pop()
+
+        # if anything has changed, wrap the hollow proxy in a DeltaUpdate. This may be superfluous but
+        # it is homogenous with additions and deletions
+        if len(diff._data):
+            return DeltaUpdate(diff)
+
+        return None

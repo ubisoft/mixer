@@ -186,13 +186,16 @@ class StructProxy(Proxy):
         # as opposed as the dense self
         diff = self.__class__()
         diff.init(struct)
+        self._diff(struct, prop, context, diff)
 
+    def _diff(self, struct: T.Struct, prop: T.Property, context: Context, diff: StructProxy) -> Optional[DeltaUpdate]:
         # PERF accessing the properties from the synchronized_properties is **far** cheaper that iterating over
         # _data and the getting the properties with
         #   member_property = struct.bl_rna.properties[k]
         # line to which py-spy attributes 20% of the total diff !
         try:
-            context.visit_state.path.append(prop.identifier if prop is not None else None)
+            if prop is not None:
+                context.visit_state.path.append(prop.identifier)
             for k, member_property in context.synchronized_properties.properties(struct):
                 # TODO in test_differential.StructDatablockRef.test_remove
                 # target et a scene, k is world and v (current world value) is None
@@ -211,7 +214,8 @@ class StructProxy(Proxy):
                 if delta is not None:
                     diff._data[k] = delta
         finally:
-            context.visit_state.path.pop()
+            if prop is not None:
+                context.visit_state.path.pop()
 
         # if anything has changed, wrap the hollow proxy in a DeltaUpdate. This may be superfluous but
         # it is homogenous with additions and deletions

@@ -33,7 +33,7 @@ import bpy
 import bpy.types as T  # noqa
 
 
-from mixer.blender_data.proxy import Proxy
+from mixer.blender_data.proxy import DeltaUpdate, Proxy
 from mixer.blender_data.types import is_vector
 from mixer.blender_data.specifics import soa_initializers
 
@@ -124,8 +124,12 @@ class SoaElement(Proxy):
     For instance, Mesh.vertices[].co is loaded as an SoaElement of Mesh.vertices. Its _data is an array
     """
 
+    _serialize = ("_element_type", "_element_name")
+
     def __init__(self):
         self._buffer: Optional[array.array] = None
+        self._element_type: Optional[type] = None
+        self._element_name: Optional[str] = None
 
     def load(
         self, parent: bpy.types.bpy_prop_collection, element_name: str, prototype_item: T.bpy_struct, context: Context
@@ -155,18 +159,23 @@ class SoaElement(Proxy):
         if buffer is None or buffer.buffer_info()[1] != array_size or buffer.typecode != typecode:
             self._buffer = soa_initializer(element_type, array_size)
 
+        self._element_type = element_type
+        self._element_name = element_name
+
         # if foreach_get() raises "RuntimeError: internal error setting the array"
         # it means that the array is ill-formed.
         # Check rna_access.c:rna_raw_access()
         parent.foreach_get(element_name, self._buffer)
+        self._attach(context)
+        return self
 
+    def _attach(self, context: Context):
+        """Attach the buffer to the DatablockProxy or DeltaUpdate"""
         # Store the buffer information at the root of the datablock so that it is easy to find it for serialization
         visit_state = context.visit_state
         parent_path = tuple(visit_state.path)
-        datablock_proxy = visit_state.datablock_proxy
-        datablock_proxy._soas[parent_path].append((element_name, self))
-
-        return self
+        root = visit_state.datablock_proxy
+        root._soas[parent_path].append((self._element_name, self))
 
     def save(self, bl_instance: T.bpy_prop_collection, attr_name: str, context: Context):
         # This code is reached during save() of MeshVertex, but the data is in a SOA command
@@ -174,7 +183,6 @@ class SoaElement(Proxy):
         pass
 
     def save_buffer(self, bl_collection: T.bpy_prop_collection, attr_name, buffer: array.array):
-        # TODO : serialization currently not performed
         self._buffer = buffer
         try:
             bl_collection.foreach_set(attr_name, buffer)
@@ -182,3 +190,18 @@ class SoaElement(Proxy):
             logger.error(f"saving soa {bl_collection}.{attr_name} failed")
             logger.error(f"... member size: {len(bl_collection)}, array: ('{buffer.typecode}', {len(buffer)})")
             logger.error(f"... exception {e}")
+
+    def diff(self, parent: T.bpy_struct, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+        diff = self.__class__()
+        diff._element_name = self._element_name
+        diff._element_type = self._element_type
+
+        typecode = self._buffer.typecode
+        tmp_array = array.array(typecode, soa_initializer(self._element_type, len(self._buffer)))
+        parent.foreach_get(self._element_name, self._buffer)
+        if self._buffer == tmp_array:
+            return None
+
+        diff._buffer = tmp_array
+        diff._attach(context)
+        return DeltaUpdate(diff)
