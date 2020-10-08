@@ -404,6 +404,20 @@ class BlenderClient(Client):
                         curve.update()
                         return
 
+    def move_keyframe(self, ob, channel, channel_index, frame, new_frame):
+        if not hasattr(ob, channel):
+            ob = ob.data
+
+        curves = ob.animation_data.action.fcurves
+        for curve in curves:
+            if curve.data_path == channel and (channel_index == -1 or curve.array_index == channel_index):
+                keyframes = curve.keyframe_points
+                for i in range(len(keyframes)):
+                    if keyframes[i].co[0] == frame:
+                        keyframes[i].co[0] = new_frame
+                        curve.update()
+                        return
+
     def build_add_keyframe(self, data):
         index = 0
         name, index = common.decode_string(data, index)
@@ -433,6 +447,21 @@ class BlenderClient(Client):
         frame, index = common.decode_int(data, index)
         ob.keyframe_delete(channel, index=channel_index, frame=frame)
         return name
+
+    def build_move_keyframe(self, data):
+        index = 0
+        name, index = common.decode_string(data, index)
+        if name not in share_data.blender_objects:
+            return name
+        ob = share_data.blender_objects[name]
+        channel, index = common.decode_string(data, index)
+        channel_index, index = common.decode_int(data, index)
+        if not hasattr(ob, channel):
+            ob = ob.data
+        frame, index = common.decode_int(data, index)
+        new_frame, index = common.decode_int(data, index)
+
+        self.move_keyframe(ob, channel, channel_index, frame, new_frame)
 
     def build_query_animation_data(self, data):
         index = 0
@@ -986,6 +1015,8 @@ class BlenderClient(Client):
                         self.build_add_keyframe(command.data)
                     elif command.type == MessageType.REMOVE_KEYFRAME:
                         self.build_remove_keyframe(command.data)
+                    elif command.type == MessageType.MOVE_KEYFRAME:
+                        self.build_move_keyframe(command.data)
                     elif command.type == MessageType.QUERY_ANIMATION_DATA:
                         self.build_query_animation_data(command.data)
 
