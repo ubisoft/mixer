@@ -279,7 +279,6 @@ default_exclusions = {
     T.GreasePencil: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
-        NameFilterIn("name")
     ],
     T.GPencilLayer: [
         NameFilterOut(
@@ -291,7 +290,16 @@ default_exclusions = {
     T.Mesh: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
-        NameFilterIn("name")
+        # NameFilterIn("name")
+        NameFilterOut(
+            [
+                # views into uv_layers controlled by uv_layer_xxx_index
+                "uv_layer_clone",
+                "uv_layer_stencil",
+                # do not know how to update this, probably by vertices count
+                "vertex_paint_masks",
+            ]
+        )
     ],
     T.MeshPolygon: [NameFilterOut("area")],
     T.MeshPolygon: [NameFilterOut("select")],
