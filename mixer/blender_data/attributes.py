@@ -26,6 +26,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data.blenddata import bl_rna_to_type
 from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
+from mixer.blender_data.specifics import is_soable_collection
 from mixer.blender_data.types import is_builtin, is_vector, is_matrix
 
 if TYPE_CHECKING:
@@ -70,6 +71,10 @@ def read_attribute(attr: Any, attr_property: T.Property, context: Context):
                 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 
                 return DatablockCollectionProxy().load_as_IDref(attr, context)
+            elif is_soable_collection(attr_property):
+                from mixer.blender_data.aos_proxy import AosProxy
+
+                return AosProxy().load(attr, attr_property, context)
             else:
                 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 

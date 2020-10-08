@@ -31,7 +31,6 @@ import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
-from mixer.blender_data.aos_soa_proxy import is_soable_property, is_soable_collection, AosElement, SoaElement
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaAddition, DeltaDeletion, DeltaUpdate
 from mixer.blender_data.proxy import MIXER_SEQUENCE, Proxy
@@ -94,15 +93,12 @@ class StructCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of non-datablock Struct.
 
-    It can track an array (int keys) or a dictionnary(string keys).
-
-    TODO split into array and dictionary proxies
+    It can track an array (int keys) or a dictionnary(string keys). Both implementation are
+    in the same class as it is not possible to know at creation time the type of an empty collection
     """
 
     def __init__(self):
         self._data: Dict[Union[str, int], DatablockProxy] = {}
-        self._soa_length = 0
-        self._is_soa = False
 
     @classmethod
     def make(cls, attr_property: T.Property):
@@ -115,8 +111,6 @@ class StructCollectionProxy(Proxy):
         sequence = self._data.get(MIXER_SEQUENCE)
         if sequence:
             return len(sequence)
-        if self._is_soa:
-            return self._soa_length
         return len(self._data)
 
     def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, context: Context):
@@ -127,37 +121,15 @@ class StructCollectionProxy(Proxy):
 
         try:
             context.visit_state.path.append(bl_collection_property.identifier)
-            if is_soable_collection(bl_collection_property):
-                self._is_soa = True
-                # TODO too much work at l   oad time to find soable information. Do it once for all.
-
-                # Hybrid array_of_struct/ struct_of_array
-                # Hybrid because MeshVertex.groups does not have a fixed size and is not soa-able, but we want
-                # to treat other MeshVertex members as SOAs.
-                # Could be made more efficient later on. Keep the code simple until save() is implemented
-                # and we need better
-                prototype_item = bl_collection[0]
-                item_bl_rna = bl_collection_property.fixed_type.bl_rna
-                for attr_name, bl_rna_property in context.synchronized_properties.properties(item_bl_rna):
-                    if is_soable_property(bl_rna_property):
-                        # element type supported by foreach_get
-                        self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item, context)
-                    else:
-                        # no foreach_get (variable length arrays like MeshVertex.groups, enums, ...)
-                        self._data[attr_name] = AosElement().load(bl_collection, item_bl_rna, attr_name, context)
-                self._soa_length = len(bl_collection)
+            # no keys means it is a sequence. However bl_collection.items() returns [(index, item)...]
+            is_sequence = not bl_collection.keys()
+            if is_sequence:
+                # easier for the encoder to always have a dict
+                self._data = {
+                    MIXER_SEQUENCE: [StructProxy().load(v, i, context) for i, v in enumerate(bl_collection.values())]
+                }
             else:
-                # no keys means it is a sequence. However bl_collection.items() returns [(index, item)...]
-                is_sequence = not bl_collection.keys()
-                if is_sequence:
-                    # easier for the encoder to always have a dict
-                    self._data = {
-                        MIXER_SEQUENCE: [
-                            StructProxy().load(v, i, context) for i, v in enumerate(bl_collection.values())
-                        ]
-                    }
-                else:
-                    self._data = {k: StructProxy().load(v, k, context) for k, v in bl_collection.items()}
+                self._data = {k: StructProxy().load(v, k, context) for k, v in bl_collection.items()}
         finally:
             context.visit_state.path.pop()
         return self
@@ -182,6 +154,11 @@ class StructCollectionProxy(Proxy):
                         write_curvemappoints(target, sequence, context)
                     elif srna.bl_rna is bpy.types.MetaBallElements.bl_rna:
                         write_metaballelements(target, sequence, context)
+                    elif srna.bl_rna is bpy.types.MeshPolygons.bl_rna:
+                        # see soable_collection_properties
+                        target.add(len(sequence))
+                        for i, proxy in enumerate(sequence):
+                            write_attribute(target, i, proxy, context)
                     elif srna.bl_rna is bpy.types.GPencilFrames.bl_rna:
                         for i, proxy in enumerate(sequence):
                             frame_number = proxy.data("frame_number")
@@ -215,7 +192,7 @@ class StructCollectionProxy(Proxy):
                     )
             else:
                 # dictionary
-                specifics.truncate_collection(target, self)
+                specifics.truncate_collection(target, self, context)
                 for k, v in self._data.items():
                     write_attribute(target, k, v, context)
         finally:

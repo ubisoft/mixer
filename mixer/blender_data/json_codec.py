@@ -24,6 +24,7 @@ implementation that does the job.
 import json
 from typing import Any, Dict
 
+from mixer.blender_data.aos_proxy import AosProxy
 from mixer.blender_data.aos_soa_proxy import SoaElement
 from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaUpdate
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
@@ -40,7 +41,6 @@ struct_like_classes = [
     DatablockProxy,
     DatablockRefProxy,
     StructProxy,
-    StructProxy,
     NodeLinksProxy,
     NodeTreeProxy,
     SoaElement,
@@ -48,6 +48,7 @@ struct_like_classes = [
 collection_classes = [
     StructCollectionProxy,
     DatablockCollectionProxy,
+    AosProxy,
 ]
 delta_classes = [
     Delta,
@@ -59,7 +60,7 @@ _classes = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
 _classes.update({c.__name__: c for c in delta_classes})
 
-options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name", "_is_soa", "_soa_length"]
+options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name", "_aos_length"]
 MIXER_CLASS = "__mixer_class__"
 
 

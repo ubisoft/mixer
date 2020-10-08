@@ -25,7 +25,7 @@ from __future__ import annotations
 import array
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -106,6 +106,11 @@ class VisitState:
     ["layers", "fills", "frames", 0, "strokes", 1, "points", 0]"""
 
     recursion_guard: RecursionGuard = RecursionGuard()
+
+    funcs: Dict[str, Callable] = field(default_factory=dict)
+    """Functions transmitted from a property to another
+    (e.g Mesh transmits clear_geometry that is called if necessary
+    by the MeshVertices SoaProxy ) """
 
 
 @dataclass

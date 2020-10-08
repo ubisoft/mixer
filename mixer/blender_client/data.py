@@ -128,12 +128,12 @@ def build_data_create(buffer):
 
 def build_soa(buffer):
     try:
-        uuid, _ = common.decode_string(buffer, 0)
-        logger.info("%s: %s", "build_soa", uuid)
-
         uuid, index = common.decode_string(buffer, 0)
         path_string, index = common.decode_string(buffer, index)
         path = json.loads(path_string)
+
+        logger.info("%s: %s %s", "build_soa", uuid, path)
+
         element_count, index = common.decode_int(buffer, index)
         soas = []
         for _ in range(element_count):

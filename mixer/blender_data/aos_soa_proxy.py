@@ -31,66 +31,17 @@ from typing import List, Dict, Optional, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
-import mathutils
+
 
 from mixer.blender_data.proxy import Proxy
 from mixer.blender_data.types import is_vector
+from mixer.blender_data.specifics import soa_initializers
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
 
 
 logger = logging.getLogger(__name__)
-
-# in sync with soa_initializers
-soable_properties = {
-    T.BoolProperty,
-    T.IntProperty,
-    T.FloatProperty,
-    mathutils.Vector,
-    mathutils.Color,
-    mathutils.Quaternion,
-}
-
-# in sync with soa_initializers
-soa_initializers = {
-    bool: array.array("b", [0]),
-    int: array.array("l", [0]),
-    float: array.array("f", [0.0]),
-    mathutils.Vector: array.array("f", [0.0]),
-    mathutils.Color: array.array("f", [0.0]),
-    mathutils.Quaternion: array.array("f", [0.0]),
-}
-
-
-# TODO : is there any way to find these automatically ? Seems easy to determine if a struct is simple enough so that
-# an array of struct can be loaded as an Soa. Is it worth ?
-# Beware that MeshVertex must be handled as SOA although "groups" is a variable length item.
-# Enums are not handled by foreach_get()
-soable_collection_properties = {
-    T.GPencilStroke.bl_rna.properties["points"],
-    T.GPencilStroke.bl_rna.properties["triangles"],
-    T.Mesh.bl_rna.properties["edges"],
-    T.Mesh.bl_rna.properties["face_maps"],
-    T.Mesh.bl_rna.properties["loops"],
-    T.Mesh.bl_rna.properties["loop_triangles"],
-    T.Mesh.bl_rna.properties["polygons"],
-    T.Mesh.bl_rna.properties["polygon_layers_float"],
-    T.Mesh.bl_rna.properties["polygon_layers_int"],
-    T.Mesh.bl_rna.properties["vertices"],
-    # messy: :MeshPolygon.vertices has variable length, not 3 as stated in the doc, so ignore
-    # T.Mesh.bl_rna.properties["polygons"],
-    T.MeshUVLoopLayer.bl_rna.properties["data"],
-    T.MeshLoopColorLayer.bl_rna.properties["data"],
-}
-
-
-def is_soable_collection(prop):
-    return prop in soable_collection_properties
-
-
-def is_soable_property(bl_rna_property):
-    return any(isinstance(bl_rna_property, soable) for soable in soable_properties)
 
 
 def soa_initializer(attr_type, length):

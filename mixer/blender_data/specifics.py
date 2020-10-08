@@ -26,22 +26,73 @@ to control behavior with plugin data.
 
 from __future__ import annotations
 
+import array
 import logging
 from pathlib import Path
 import traceback
-from typing import Any, ItemsView, List, Optional, TypeVar, TYPE_CHECKING
+from typing import Any, ItemsView, Optional, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa N812
 import bpy.path
+import mathutils
 
 
 if TYPE_CHECKING:
+    from mixer.blender_data.aos_proxy import AosProxy
     from mixer.blender_data.proxy import Context, Proxy
+    from mixer.blender_data.bpy_data_proxy import VisitState
     from mixer.blender_data.datablock_proxy import DatablockProxy
     from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 logger = logging.getLogger(__name__)
+
+
+# Beware that MeshVertex must be handled as SOA although "groups" is a variable length item.
+# Enums are not handled by foreach_get()
+soable_collection_properties = {
+    T.GPencilStroke.bl_rna.properties["points"],
+    T.GPencilStroke.bl_rna.properties["triangles"],
+    T.Mesh.bl_rna.properties["edges"],
+    T.Mesh.bl_rna.properties["face_maps"],
+    T.Mesh.bl_rna.properties["loops"],
+    T.Mesh.bl_rna.properties["loop_triangles"],
+    # messy: :MeshPolygon.vertices has variable length, not 3 as stated in the doc, so ignore
+    # T.Mesh.bl_rna.properties["polygons"],
+    T.Mesh.bl_rna.properties["polygon_layers_float"],
+    T.Mesh.bl_rna.properties["polygon_layers_int"],
+    T.Mesh.bl_rna.properties["vertices"],
+    T.MeshUVLoopLayer.bl_rna.properties["data"],
+    T.MeshLoopColorLayer.bl_rna.properties["data"],
+}
+
+# in sync with soa_initializers
+soable_properties = (
+    T.BoolProperty,
+    T.IntProperty,
+    T.FloatProperty,
+    mathutils.Vector,
+    mathutils.Color,
+    mathutils.Quaternion,
+)
+
+# in sync with soa_initializers
+soa_initializers = {
+    bool: array.array("b", [0]),
+    int: array.array("l", [0]),
+    float: array.array("f", [0.0]),
+    mathutils.Vector: array.array("f", [0.0]),
+    mathutils.Color: array.array("f", [0.0]),
+    mathutils.Quaternion: array.array("f", [0.0]),
+}
+
+
+def is_soable_collection(prop):
+    return prop in soable_collection_properties
+
+
+def is_soable_property(bl_rna_property):
+    return isinstance(bl_rna_property, soable_properties)
 
 
 def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
@@ -240,6 +291,9 @@ def pre_save_id(proxy: Proxy, target: T.ID, context: Context) -> T.ID:
         use_nodes = proxy.data("use_nodes")
         if use_nodes:
             target.use_nodes = True
+    elif isinstance(target, T.Mesh):
+        context.visit_state.funcs["Mesh.clear_geometry"] = target.clear_geometry
+
     return target
 
 
@@ -383,8 +437,26 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
 always_clear = [type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl_rna), type(T.SequenceModifiers.bl_rna)]
 """Collections in this list are order dependent and should always be cleared"""
 
+_resize_geometry_types = tuple(type(t.bl_rna) for t in [T.MeshEdges, T.MeshLoops, T.MeshVertices, T.MeshPolygons])
 
-def truncate_collection(target: T.bpy_prop_collection, proxy: StructCollectionProxy):
+
+def resize_geometry(mesh_geometry_item: T.Property, proxy: AosProxy, visit_state: VisitState):
+    """
+    Args:
+        mesh_geometry_item : Mesh.vertices, Mesh.loops, ...
+        proxy : proxy to mesh_geometry_item
+    """
+    existing_length = len(mesh_geometry_item)
+    incoming_length = proxy.length
+    if existing_length != incoming_length:
+        if existing_length != 0:
+            visit_state.funcs["Mesh.clear_geometry"]()
+            # We should need it only once for a whole Mesh
+            del visit_state.funcs["Mesh.clear_geometry"]
+        mesh_geometry_item.add(incoming_length)
+
+
+def truncate_collection(target: T.bpy_prop_collection, proxy: Union[StructCollectionProxy, AosProxy], context: Context):
     """
     TODO check if this is obsolete since Delta updates
     """
@@ -396,9 +468,13 @@ def truncate_collection(target: T.bpy_prop_collection, proxy: StructCollectionPr
         target.clear()
         return
 
+    if isinstance(target_rna, _resize_geometry_types):
+        resize_geometry(target, proxy, context.visit_state)
+        return
+
     if isinstance(target_rna, type(T.GPencilStrokePoints.bl_rna)):
         existing_length = len(target)
-        incoming_length = proxy._soa_length
+        incoming_length = proxy._length
         delta = incoming_length - existing_length
         if delta > 0:
             target.add(delta)

@@ -1164,7 +1164,6 @@ def send_scene_content():
         share_data.init_proxy()
         share_data.client.send_group_begin()
 
-
         if share_data.use_experimental_sync():
             generic.send_scene_data_to_server(None, None)
         else:
