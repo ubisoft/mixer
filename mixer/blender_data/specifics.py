@@ -359,11 +359,10 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             # but it does not work for this case
             return None
 
-        try:
-            return collection.add()
-        except Exception as e:
-            logger.error(f"add_element not implemented for {collection}")
-            return None
+    try:
+        return collection.add()
+    except Exception:
+        pass
 
     # try our best
     new_or_add = getattr(collection, "new", None)
