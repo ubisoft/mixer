@@ -161,8 +161,19 @@ class StructCollectionProxy(Proxy):
                     write_curvemappoints(target, sequence, context)
                 elif srna.bl_rna is bpy.types.MetaBallElements.bl_rna:
                     write_metaballelements(target, sequence, context)
+                elif srna.bl_rna is bpy.types.CurveSplines.bl_rna:
+                    target.clear()
+                    for i, proxy in enumerate(sequence):
+                        type_ = proxy.data("type")
+                        target.new(type_)
+                        write_attribute(target, i, proxy, context)
+                elif srna.bl_rna is bpy.types.SplineBezierPoints.bl_rna:
+                    target.add(len(sequence) - len(target))
+                    for i, proxy in enumerate(sequence):
+                        write_attribute(target, i, proxy, context)
                 else:
                     # TODO WHAT ??
+                    logger.error(f"Unsupported sequence {srna}")
                     pass
 
             elif len(target) == len(sequence):

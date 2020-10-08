@@ -99,6 +99,10 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
 
         return id_
 
+    if collection_name == "curves":
+        name = proxy.data("name")
+        return bpy.data.curves.new(name, "CURVE")
+
     name = proxy.data("name")
     try:
         id_ = collection.new(name)

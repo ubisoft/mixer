@@ -394,6 +394,7 @@ safe_exclusions = {}
 safe_depsgraph_updates = (
     T.Camera,
     T.Collection,
+    T.Curve,
     T.Image,
     # no generic sync of GreasePencil, use VRtist message
     # T.GreasePencil,
@@ -419,6 +420,7 @@ safe_filter = FilterStack()
 safe_blenddata_collections = [
     "cameras",
     "collections",
+    "curves",
     "grease_pencils",
     "images",
     "lights",
