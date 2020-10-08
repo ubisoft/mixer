@@ -59,7 +59,7 @@ _classes = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
 _classes.update({c.__name__: c for c in delta_classes})
 
-options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name"]
+options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name", "_is_soa", "_soa_length"]
 MIXER_CLASS = "__mixer_class__"
 
 

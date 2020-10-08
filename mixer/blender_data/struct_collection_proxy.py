@@ -101,12 +101,23 @@ class StructCollectionProxy(Proxy):
 
     def __init__(self):
         self._data: Dict[Union[str, int], DatablockProxy] = {}
+        self._soa_length = 0
+        self._is_soa = False
 
     @classmethod
     def make(cls, attr_property: T.Property):
         if attr_property.srna == T.NodeLinks.bl_rna:
             return NodeLinksProxy()
         return StructCollectionProxy()
+
+    @property
+    def length(self) -> int:
+        sequence = self._data.get(MIXER_SEQUENCE)
+        if sequence:
+            return len(sequence)
+        if self._is_soa:
+            return self._soa_length
+        return len(self._data)
 
     def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, context: Context):
 
@@ -117,6 +128,7 @@ class StructCollectionProxy(Proxy):
         try:
             context.visit_state.path.append(bl_collection_property.identifier)
             if is_soable_collection(bl_collection_property):
+                self._is_soa = True
                 # TODO too much work at l   oad time to find soable information. Do it once for all.
 
                 # Hybrid array_of_struct/ struct_of_array
@@ -133,6 +145,7 @@ class StructCollectionProxy(Proxy):
                     else:
                         # no foreach_get (variable length arrays like MeshVertex.groups, enums, ...)
                         self._data[attr_name] = AosElement().load(bl_collection, item_bl_rna, attr_name, context)
+                self._soa_length = len(bl_collection)
             else:
                 # no keys means it is a sequence. However bl_collection.items() returns [(index, item)...]
                 is_sequence = not bl_collection.keys()
@@ -169,8 +182,21 @@ class StructCollectionProxy(Proxy):
                         write_curvemappoints(target, sequence, context)
                     elif srna.bl_rna is bpy.types.MetaBallElements.bl_rna:
                         write_metaballelements(target, sequence, context)
+                    elif srna.bl_rna is bpy.types.GPencilFrames.bl_rna:
+                        for i, proxy in enumerate(sequence):
+                            frame_number = proxy.data("frame_number")
+                            target.new(frame_number)
+                            write_attribute(target, i, proxy, context)
+                    elif srna.bl_rna is bpy.types.GPencilStrokes.bl_rna:
+                        for i, proxy in enumerate(sequence):
+                            target.new()
+                            write_attribute(target, i, proxy, context)
+                    elif srna.bl_rna is bpy.types.GPencilStrokePoints.bl_rna:
+                        target.new(len(sequence))
+                        for i, proxy in enumerate(sequence):
+                            write_attribute(target, i, proxy, context)
                     else:
-                        # TODO WHAT ??
+                        logger.error(f"unsupported sequence type {srna}")
                         pass
 
                 elif len(target) == len(sequence):
@@ -189,7 +215,7 @@ class StructCollectionProxy(Proxy):
                     )
             else:
                 # dictionary
-                specifics.truncate_collection(target, self._data.keys())
+                specifics.truncate_collection(target, self)
                 for k, v in self._data.items():
                     write_attribute(target, k, v, context)
         finally:

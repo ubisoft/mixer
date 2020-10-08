@@ -74,6 +74,7 @@ def send_data_creations(proxies: CreationChangeset):
                 items.append(common.encode_py_array(soa_proxy._buffer))
             buffer = b"".join(items)
             command = common.Command(common.MessageType.BLENDER_DATA_SOAS, buffer, 0)
+            logger.info("send_soa %s", path_string)
             share_data.client.add_command(command)
 
 

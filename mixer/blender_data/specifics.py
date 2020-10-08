@@ -23,19 +23,25 @@ Proxy implementation.
 TODO Enhance this module so that it is possible to reference types that do not exist in all Blender versions or
 to control behavior with plugin data.
 """
+
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 import traceback
-from typing import Any, ItemsView, List, Optional, TypeVar
+from typing import Any, ItemsView, List, Optional, TypeVar, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa N812
 import bpy.path
 
+
+if TYPE_CHECKING:
+    from mixer.blender_data.proxy import Context, Proxy
+    from mixer.blender_data.datablock_proxy import DatablockProxy
+    from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
+
 logger = logging.getLogger(__name__)
-Proxy = TypeVar("Proxy")
-DatablockProxy = TypeVar("DatablockProxy")
-Context = TypeVar("Context")
 
 
 def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
@@ -270,9 +276,26 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             modifier_type = proxy.data("type")
             return collection.new(name, modifier_type)
 
+        if isinstance(bl_rna, type(T.SequenceModifiers.bl_rna)):
+            name = proxy.data("name")
+            type_ = proxy.data("type")
+            return collection.new(name, type_)
+
         if isinstance(bl_rna, type(T.ObjectConstraints.bl_rna)):
             type_ = proxy.data("type")
             return collection.new(type_)
+
+        if isinstance(bl_rna, type(T.Nodes.bl_rna)):
+            node_type = proxy.data("bl_idname")
+            return collection.new(node_type)
+
+        if isinstance(bl_rna, type(T.UVLoopLayers.bl_rna)):
+            name = proxy.data("name")
+            return collection.new(name=name)
+
+        if isinstance(bl_rna, type(T.GreasePencilLayers.bl_rna)):
+            name = proxy.data("info")
+            return collection.new(name)
 
         if isinstance(bl_rna, type(T.KeyingSets.bl_rna)):
             idname = proxy.data("bl_idname")
@@ -294,14 +317,6 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             return collection.add(
                 target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
             )
-
-        if isinstance(bl_rna, type(T.Nodes.bl_rna)):
-            node_type = proxy.data("bl_idname")
-            return collection.new(node_type)
-
-        if isinstance(bl_rna, type(T.UVLoopLayers.bl_rna)):
-            name = proxy.data("name")
-            return collection.new(name=name)
 
         if isinstance(bl_rna, type(T.Sequences.bl_rna)):
             type_ = proxy.data("type")
@@ -335,12 +350,11 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             # but it does not work for this case
             return None
 
-        if isinstance(bl_rna, type(T.SequenceModifiers.bl_rna)):
-            name = proxy.data("name")
-            type_ = proxy.data("type")
-            return collection.new(name, type_)
-
-        return collection.add()
+        try:
+            return collection.add()
+        except Exception as e:
+            logger.error(f"add_element not implemented for {collection}")
+            return None
 
     # try our best
     new_or_add = getattr(collection, "new", None)
@@ -362,7 +376,7 @@ always_clear = [type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl
 """Collections in this list are order dependent and should always be cleared"""
 
 
-def truncate_collection(target: T.bpy_prop_collection, incoming_keys: List[str]):
+def truncate_collection(target: T.bpy_prop_collection, proxy: StructCollectionProxy):
     """
     TODO check if this is obsolete since Delta updates
     """
@@ -374,7 +388,19 @@ def truncate_collection(target: T.bpy_prop_collection, incoming_keys: List[str])
         target.clear()
         return
 
-    incoming_keys = set(incoming_keys)
+    if isinstance(target_rna, type(T.GPencilStrokePoints.bl_rna)):
+        existing_length = len(target)
+        incoming_length = proxy._soa_length
+        delta = incoming_length - existing_length
+        if delta > 0:
+            target.add(delta)
+        else:
+            while delta < 0:
+                target.pop()
+                delta += 1
+        return
+
+    incoming_keys = set(proxy._data.keys())
     existing_keys = set(target.keys())
     truncate_keys = existing_keys - incoming_keys
     if not truncate_keys:

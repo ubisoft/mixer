@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# storing everything in a single dictionary is easier for serialization
 MIXER_SEQUENCE = "__mixer_sequence__"
 
 Uuid = str
@@ -192,6 +191,12 @@ class Proxy:
         if isinstance(bl_item, T.bpy_struct):
             bl = getattr(bl_item, head)
         elif isinstance(bl_item, T.bpy_prop_collection):
+            if isinstance(head, int) and head + 1 > len(bl_item):
+                logger.error(f"Index {head} > len({bl_item}) ({len(bl_item)})")
+                return None
+            if isinstance(head, str) and head not in bl_item:
+                logger.error(f"Key {head} not in {bl_item}")
+                return None
             bl = bl_item[head]
         else:
             return None

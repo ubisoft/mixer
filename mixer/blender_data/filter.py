@@ -280,6 +280,13 @@ default_exclusions = {
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
     ],
+    T.GPencilLayer: [
+        NameFilterOut(
+            [
+                "active_frame",
+            ]
+        )
+    ],
     T.Mesh: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
