@@ -30,7 +30,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data import specifics
 from mixer.blender_data.aos_soa_proxy import AosElement, SoaElement
 from mixer.blender_data.specifics import is_soable_property
-from mixer.blender_data.attributes import diff_attribute, write_attribute
+from mixer.blender_data.attributes import apply_attribute, diff_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
@@ -99,18 +99,27 @@ class AosProxy(Proxy):
         if target is None:
             return
 
+        specifics.truncate_collection(target, self, context)
+        # nothing to do save here. The buffers that contains vertices and co are serialized apart from the json
+        # that contains the Mesh members. The children of this are SoaElement and have no child.
+        # They are updated directly bu SoaElement.save_array()
+
+    def apply(self, parent: T.bpy_struct, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True):
+        if delta is None:
+            return
+        struct_update = delta.value
+
+        struct = getattr(parent, key)
+
         try:
-            context.visit_state.path.append(attr_name)
-            specifics.truncate_collection(target, self, context)
-            for k, v in self._data.items():
-                write_attribute(target, k, v, context)
+            context.visit_state.path.append(key)
+            # probably the exact same as in save
+            # specifics.truncate_collection(target, self, context)
+            for k, member_delta in struct_update._data.items():
+                current_value = self.data(k)
+                self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
         finally:
             context.visit_state.path.pop()
-
-    def apply(
-        self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], context: Context, to_blender=True
-    ) -> AosProxy:
-        raise NotImplementedError("AosProxy.apply()")
 
     def diff(self, bl_collection: T.bpy_prop_collection, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         """"""

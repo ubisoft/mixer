@@ -84,7 +84,7 @@ def default(obj):
         if issubclass(class_, Delta):
             d.update({"value": obj.value})
         elif issubclass(class_, SoaElement):
-            return d
+            pass
         else:
             d.update({"_data": obj._data})
 

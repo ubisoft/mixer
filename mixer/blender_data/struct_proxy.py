@@ -186,7 +186,7 @@ class StructProxy(Proxy):
         # as opposed as the dense self
         diff = self.__class__()
         diff.init(struct)
-        self._diff(struct, prop, context, diff)
+        return self._diff(struct, prop, context, diff)
 
     def _diff(self, struct: T.Struct, prop: T.Property, context: Context, diff: StructProxy) -> Optional[DeltaUpdate]:
         # PERF accessing the properties from the synchronized_properties is **far** cheaper that iterating over

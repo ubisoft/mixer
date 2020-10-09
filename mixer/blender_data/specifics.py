@@ -76,7 +76,7 @@ soable_properties = (
     mathutils.Quaternion,
 )
 
-# in sync with soa_initializers
+# in sync with soable_properties
 soa_initializers = {
     bool: array.array("b", [0]),
     int: array.array("l", [0]),

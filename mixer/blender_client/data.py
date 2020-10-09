@@ -60,22 +60,25 @@ def send_data_creations(proxies: CreationChangeset):
         buffer = common.encode_string(encoded_proxy)
         command = common.Command(common.MessageType.BLENDER_DATA_CREATE, buffer, 0)
         share_data.client.add_command(command)
+        send_soas(proxy)
 
-        # send SOA commands i.e. one command for all items in MeshVertex.vertices
-        # TODO may be possible to group per structure, i.e send all MeshVertex element at once
-        uuid = common.encode_string(proxy._datablock_uuid)
-        for path, soa_proxies in proxy._soas.items():
-            items = [uuid]
-            path_string = json.dumps(path)
-            items.append(common.encode_string(path_string))
-            items.append(common.encode_int(len(soa_proxies)))
-            for element_name, soa_proxy in soa_proxies:
-                items.append(common.encode_string(element_name))
-                items.append(common.encode_py_array(soa_proxy._buffer))
-            buffer = b"".join(items)
-            command = common.Command(common.MessageType.BLENDER_DATA_SOAS, buffer, 0)
-            logger.info("send_soa %s", path_string)
-            share_data.client.add_command(command)
+
+def send_soas(proxy: Proxy):
+    # send SOA commands i.e. one command for all items in MeshVertex.vertices
+    # TODO may be possible to group per structure, i.e send all MeshVertex element at once
+    uuid = common.encode_string(proxy._datablock_uuid)
+    for path, soa_proxies in proxy._soas.items():
+        items = [uuid]
+        path_string = json.dumps(path)
+        items.append(common.encode_string(path_string))
+        items.append(common.encode_int(len(soa_proxies)))
+        for element_name, soa_proxy in soa_proxies:
+            items.append(common.encode_string(element_name))
+            items.append(common.encode_py_array(soa_proxy._array))
+        buffer = b"".join(items)
+        command = common.Command(common.MessageType.BLENDER_DATA_SOAS, buffer, 0)
+        logger.info("send_soa %s", path_string)
+        share_data.client.add_command(command)
 
 
 def send_data_updates(updates: UpdateChangeset):
@@ -97,6 +100,7 @@ def send_data_updates(updates: UpdateChangeset):
         buffer = common.encode_string(encoded_update)
         command = common.Command(common.MessageType.BLENDER_DATA_UPDATE, buffer, 0)
         share_data.client.add_command(command)
+        send_soas(update.value)
 
 
 def build_data_create(buffer):

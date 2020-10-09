@@ -124,48 +124,47 @@ class SoaElement(Proxy):
     For instance, Mesh.vertices[].co is loaded as an SoaElement of Mesh.vertices. Its _data is an array
     """
 
-    _serialize = ("_element_type", "_element_name")
+    _serialize = "_member_name"
 
     def __init__(self):
-        self._buffer: Optional[array.array] = None
-        self._element_type: Optional[type] = None
-        self._element_name: Optional[str] = None
+        self._array: Optional[array.array] = None
+        self._member_name: Optional[str] = None
+
+    def array_attr(self, aos: T.bpy_prop_collection, prototype_item: Any):
+        member_type = type(prototype_item)
+        array_size = len(aos)
+        if is_vector(member_type):
+            array_size *= len(prototype_item)
+        elif member_type is T.bpy_prop_array:
+            array_size *= len(prototype_item)
+            member_type = type(prototype_item[0])
+        return array_size, member_type
 
     def load(
-        self, parent: bpy.types.bpy_prop_collection, element_name: str, prototype_item: T.bpy_struct, context: Context
+        self, aos: bpy.types.bpy_prop_collection, member_name: str, prototype_item: T.bpy_struct, context: Context
     ):
         """
         Args:
-            parent : The collection that contains this element (e.g.  a_mesh.vertices, a_mesh.edges, ...)
-            attr_name : The name of this element (e.g, "co", "normal", ...)
-            prototype_item : an element pf parent collection
+            aos : The array or structures collection that contains this member (e.g.  a_mesh.vertices, a_mesh.edges, ...)
+            member_name : The name of this aos member (e.g, "co", "normal", ...)
+            prototype_item : an element of parent collection
         """
 
         # TODO: bool
 
-        # Determine what type and length of buffer we need
-        # TODO do not reallocate on re-read
-        attr = getattr(prototype_item, element_name)
-        element_type = type(attr)
-        array_size = len(parent)
-        if is_vector(element_type):
-            array_size *= len(attr)
-        elif element_type is T.bpy_prop_array:
-            array_size *= len(attr)
-            element_type = type(attr[0])
-
-        typecode = soa_initializers[element_type].typecode
-        buffer = self._buffer
+        attr = getattr(prototype_item, member_name)
+        array_size, member_type = self.array_attr(aos, attr)
+        typecode = soa_initializers[member_type].typecode
+        buffer = self._array
         if buffer is None or buffer.buffer_info()[1] != array_size or buffer.typecode != typecode:
-            self._buffer = soa_initializer(element_type, array_size)
+            self._array = soa_initializer(member_type, array_size)
 
-        self._element_type = element_type
-        self._element_name = element_name
+        self._member_name = member_name
 
         # if foreach_get() raises "RuntimeError: internal error setting the array"
         # it means that the array is ill-formed.
         # Check rna_access.c:rna_raw_access()
-        parent.foreach_get(element_name, self._buffer)
+        aos.foreach_get(member_name, self._array)
         self._attach(context)
         return self
 
@@ -175,33 +174,38 @@ class SoaElement(Proxy):
         visit_state = context.visit_state
         parent_path = tuple(visit_state.path)
         root = visit_state.datablock_proxy
-        root._soas[parent_path].append((self._element_name, self))
+        root._soas[parent_path].append((self._member_name, self))
 
-    def save(self, bl_instance: T.bpy_prop_collection, attr_name: str, context: Context):
-        # This code is reached during save() of MeshVertex, but the data is in a SOA command
-        # that will be received later and processed with save_buffer()
-        pass
-
-    def save_buffer(self, bl_collection: T.bpy_prop_collection, attr_name, buffer: array.array):
-        self._buffer = buffer
+    def save_array(self, aos: T.bpy_prop_collection, member_name, array_: array.array):
+        self._array = array_
         try:
-            bl_collection.foreach_set(attr_name, buffer)
+            aos.foreach_set(member_name, array_)
         except RuntimeError as e:
-            logger.error(f"saving soa {bl_collection}.{attr_name} failed")
-            logger.error(f"... member size: {len(bl_collection)}, array: ('{buffer.typecode}', {len(buffer)})")
+            logger.error(f"saving soa {aos}.{member_name} failed")
+            logger.error(f"... member size: {len(aos)}, array: ('{array_.typecode}', {len(array_)})")
             logger.error(f"... exception {e}")
 
-    def diff(self, parent: T.bpy_struct, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
-        diff = self.__class__()
-        diff._element_name = self._element_name
-        diff._element_type = self._element_type
+    def apply(
+        self, parent: T.bpy_prop_collection, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True
+    ):
 
-        typecode = self._buffer.typecode
-        tmp_array = array.array(typecode, soa_initializer(self._element_type, len(self._buffer)))
-        parent.foreach_get(self._element_name, self._buffer)
-        if self._buffer == tmp_array:
+        pass
+
+    def diff(self, aos: T.bpy_struct, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+        if len(aos) == 0:
             return None
 
-        diff._buffer = tmp_array
+        struct = aos[0]
+        member = getattr(struct, self._member_name)
+        array_size, member_type = self.array_attr(aos, member)
+        typecode = self._array.typecode
+        tmp_array = array.array(typecode, soa_initializer(member_type, len(self._array)))
+        aos.foreach_get(self._member_name, tmp_array)
+        if self._array == tmp_array:
+            return None
+
+        diff = self.__class__()
+        diff._member_name = self._member_name
+        diff._array = tmp_array
         diff._attach(context)
         return DeltaUpdate(diff)
