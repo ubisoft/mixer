@@ -61,7 +61,7 @@ def read_attribute(attr: Any, attr_property: T.Property, context: Context):
 
     # We have tested the types that are usefully reported by the python binding, now harder work.
     # These were implemented first and may be better implemented with the bl_rna property of the parent struct
-    # TODO flatten 
+    # TODO flatten
     if attr_type == T.bpy_prop_array:
         return list(attr)
 

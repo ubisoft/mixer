@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import array
 import logging
-from typing import List, Dict, Optional, TYPE_CHECKING
+from typing import Any, List, Dict, Optional, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa

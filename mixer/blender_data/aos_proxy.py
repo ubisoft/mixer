@@ -23,14 +23,14 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING, Union
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
 import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
 from mixer.blender_data.aos_soa_proxy import AosElement, SoaElement
 from mixer.blender_data.specifics import is_soable_property
-from mixer.blender_data.attributes import apply_attribute, diff_attribute, write_attribute
+from mixer.blender_data.attributes import apply_attribute, diff_attribute
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
 
 if TYPE_CHECKING:

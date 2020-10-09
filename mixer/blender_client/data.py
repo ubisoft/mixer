@@ -35,7 +35,7 @@ from mixer.share_data import share_data
 
 if TYPE_CHECKING:
     from mixer.blender_data.changeset import CreationChangeset, RemovalChangeset, UpdateChangeset, RenameChangeset
-    from mixer.blender_data.proxy import Delta
+    from mixer.blender_data.proxy import Delta, Proxy
 
 
 logger = logging.getLogger(__name__)
