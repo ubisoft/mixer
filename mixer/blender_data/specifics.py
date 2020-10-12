@@ -248,16 +248,12 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
 
 
 def pre_save_id(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
-    """Process attributes that must be saved first and return a possibly updated reference to the target
-
-    Args:
-        bpy_struct: The collection that contains the ID
-        attr_name: Its key
-
-    Returns:
-        [bpy.types.ID]: a possibly new ID
-    """
+    """Process attributes that must be saved first and return a possibly updated reference to the target"""
     if isinstance(target, bpy.types.Material):
+        use_nodes = proxy.data("use_nodes")
+        if use_nodes:
+            target.use_nodes = True
+
         is_grease_pencil = proxy.data("is_grease_pencil")
         # will be None for a DeltaUpdate that does not modify "is_grease_pencil"
         if is_grease_pencil is not None:
