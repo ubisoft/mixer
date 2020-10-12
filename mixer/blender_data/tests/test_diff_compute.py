@@ -7,7 +7,7 @@ import bpy
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
-from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
+from mixer.blender_data.datablock_collection_proxy import DatablockRefCollectionProxy
 from mixer.blender_data.proxy import DeltaAddition, DeltaDeletion, DeltaUpdate
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
@@ -174,7 +174,7 @@ class Collection(DifferentialCompute):
         objects_delta = collection_update.data("objects", resolve_delta=False)
         self.assertIsInstance(objects_delta, DeltaUpdate)
         objects_update = objects_delta.value
-        self.assertIsInstance(objects_update, DatablockCollectionProxy)
+        self.assertIsInstance(objects_update, DatablockRefCollectionProxy)
 
         deltas = {delta.value._initial_name: delta for delta in objects_update._data.values()}
         proxies = {name: delta.value for name, delta in deltas.items()}
@@ -221,7 +221,7 @@ class Collection(DifferentialCompute):
         objects_delta = collection_update.data("objects", resolve_delta=False)
         self.assertIsInstance(objects_delta, DeltaUpdate)
         objects_update = objects_delta.value
-        self.assertIsInstance(objects_update, DatablockCollectionProxy)
+        self.assertIsInstance(objects_update, DatablockRefCollectionProxy)
 
         #  test_diff_compute.Collection.test_bpy_collection
         deltas = {delta.value._initial_name: delta for delta in objects_update._data.values()}
