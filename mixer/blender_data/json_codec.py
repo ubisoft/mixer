@@ -27,7 +27,7 @@ from typing import Any, Dict
 from mixer.blender_data.aos_proxy import AosProxy
 from mixer.blender_data.aos_soa_proxy import SoaElement
 from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaUpdate
-from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
+from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy, DatablockRefCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.node_proxy import NodeLinksProxy, NodeTreeProxy
@@ -48,6 +48,7 @@ struct_like_classes = [
 collection_classes = [
     StructCollectionProxy,
     DatablockCollectionProxy,
+    DatablockRefCollectionProxy,
     AosProxy,
 ]
 delta_classes = [

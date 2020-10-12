@@ -69,9 +69,9 @@ def read_attribute(attr: Any, attr_property: T.Property, context: Context):
         context.visit_state.recursion_guard.push(attr_property.identifier)
         if attr_type == T.bpy_prop_collection:
             if isinstance(attr_property.fixed_type, bpy.types.ID):
-                from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
+                from mixer.blender_data.datablock_collection_proxy import DatablockRefCollectionProxy
 
-                return DatablockCollectionProxy().load_as_IDref(attr, context)
+                return DatablockRefCollectionProxy().load(attr, context)
             elif is_soable_collection(attr_property):
                 from mixer.blender_data.aos_proxy import AosProxy
 
@@ -227,6 +227,6 @@ def diff_attribute(item: Any, item_property: T.Property, value: Any, context: Co
 
     except Exception as e:
         logger.warning(f"diff exception for attr: {e}")
-        raise
+        return None
 
     return None

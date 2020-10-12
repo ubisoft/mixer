@@ -140,6 +140,9 @@ class DatablockRefProxy(Proxy):
         """
         The datablock referenced by this proxy
         """
+        if self.is_none():
+            return None
+            
         datablock = context.proxy_state.datablocks.get(self._datablock_uuid)
         if datablock is None:
             # HACK
