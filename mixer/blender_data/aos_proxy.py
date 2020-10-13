@@ -118,27 +118,28 @@ class AosProxy(Proxy):
             return
         struct_update = delta.value
 
-        struct = getattr(parent, key)
+        aos = getattr(parent, key)
 
         try:
             context.visit_state.path.append(key)
-            # probably the exact same as in save
-            # specifics.truncate_collection(target, self, context)
+            self._aos_length = struct_update._aos_length
+            specifics.truncate_collection(aos, self, context)
             for k, member_delta in struct_update._data.items():
                 current_value = self.data(k)
                 if current_value is not None:
-                    self._data[k] = current_value.apply(struct, k, member_delta, to_blender)
+                    self._data[k] = current_value.apply(aos, k, member_delta, to_blender)
         finally:
             context.visit_state.path.pop()
         return self
 
-    def diff(self, bl_collection: T.bpy_prop_collection, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(self, aos: T.bpy_prop_collection, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         """"""
 
         # Create a proxy that will be populated with attributes differences, resulting in a hollow dict,
         # as opposed as the dense self
         diff = self.__class__()
-        diff.init(bl_collection)
+        diff.init(aos)
+        diff._aos_length = len(aos)
 
         try:
             context.visit_state.path.append(prop.identifier if prop is not None else None)
@@ -146,7 +147,7 @@ class AosProxy(Proxy):
             for attr_name, _ in context.synchronized_properties.properties(item_bl_rna):
                 # co, normals, ...
                 proxy_data = self._data.get(attr_name)
-                delta = diff_attribute(bl_collection, prop, proxy_data, context)
+                delta = diff_attribute(aos, prop, proxy_data, context)
                 if delta is not None:
                     diff._data[attr_name] = delta
         finally:

@@ -180,11 +180,20 @@ class SoaElement(Proxy):
         self._member_name = attr_name
 
     def save_array(self, aos: T.bpy_prop_collection, member_name, array_: array.array):
-        logger.debug(f"save_array {aos}.{member_name}")
-        if self._array is not None:
-            logger.debug(f"... proxy    {len(self._array)} {self._array.typecode}")
-        logger.debug(f"... incoming {len(array_)} {array_.typecode}")
-        logger.debug(f"... blender_length {len(aos)}")
+        if logger.isEnabledFor(logging.DEBUG):
+            message = f"save_array {aos}.{member_name}"
+            if self._array is not None:
+                message += f" proxy ({len(self._array)} {self._array.typecode})"
+            message += f" incoming ({len(array_)} {array_.typecode})"
+            message += f" blender_length ({len(aos)})"
+            logger.debug(message)
+
+        if self._array and len(self._array) != len(array_):
+            logger.error(
+                f"Array size mismatch  {aos}.{member_name} proxy ({len(self._array)}) incoming ({len(array_)})"
+            )
+            return
+
         self._array = array_
         try:
             aos.foreach_set(member_name, array_)
@@ -196,6 +205,8 @@ class SoaElement(Proxy):
     def apply(
         self, parent: T.bpy_prop_collection, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True
     ) -> SoaElement:
+        # we expect save_array() to be called, this array is stale
+        self._array = None
         update = delta.value
         if update is None:
             return self
@@ -213,9 +224,11 @@ class SoaElement(Proxy):
         array_size, member_type = self.array_attr(aos, member)
         typecode = self._array.typecode
         tmp_array = array.array(typecode, soa_initializer(member_type, array_size))
-        logger.debug(f"diff {aos}.{self._member_name}")
-        logger.debug(f"... proxy length {len(self._array)} {typecode}")
-        logger.debug(f"... blender_length {len(aos)} {member_type}")
+        if logger.isEnabledFor(logging.DEBUG):
+            message = (
+                f"diff {aos}.{self._member_name} proxy({len(self._array)} {typecode}) blender'{len(aos)} {member_type}'"
+            )
+            logger.debug(message)
         aos.foreach_get(self._member_name, tmp_array)
         if self._array == tmp_array:
             return None

@@ -301,7 +301,9 @@ default_exclusions = {
             ]
         )
     ],
+    T.MeshEdge: [NameFilterOut(["select"])],
     T.MeshPolygon: [NameFilterOut(["area", "center", "normal", "select"])],
+    T.MeshUVLoop: [NameFilterOut(["select"])],
     T.MeshVertex: [
         NameFilterOut(
             [
