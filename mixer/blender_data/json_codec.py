@@ -91,8 +91,9 @@ def default(obj):
 
         for option in options:
             d.update(default_optional(obj, option))
-        if hasattr(class_, "_serialize"):
-            for option in class_._serialize:
+        serialize = getattr(class_, "_serialize", None)
+        if serialize is not None:
+            for option in serialize:
                 d.update(default_optional(obj, option))
         return d
     return None

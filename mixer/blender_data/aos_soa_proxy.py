@@ -124,7 +124,7 @@ class SoaElement(Proxy):
     For instance, Mesh.vertices[].co is loaded as an SoaElement of Mesh.vertices. Its _data is an array
     """
 
-    _serialize = "_member_name"
+    _serialize = ("_member_name",)
 
     def __init__(self):
         self._array: Optional[array.array] = None
@@ -176,7 +176,15 @@ class SoaElement(Proxy):
         root = visit_state.datablock_proxy
         root._soas[parent_path].append((self._member_name, self))
 
+    def save(self, bl_instance: Any, attr_name: str, context: Context):
+        self._member_name = attr_name
+
     def save_array(self, aos: T.bpy_prop_collection, member_name, array_: array.array):
+        logger.debug(f"save_array {aos}.{member_name}")
+        if self._array is not None:
+            logger.debug(f"... proxy    {len(self._array)} {self._array.typecode}")
+        logger.debug(f"... incoming {len(array_)} {array_.typecode}")
+        logger.debug(f"... blender_length {len(aos)}")
         self._array = array_
         try:
             aos.foreach_set(member_name, array_)
@@ -187,11 +195,16 @@ class SoaElement(Proxy):
 
     def apply(
         self, parent: T.bpy_prop_collection, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True
-    ):
+    ) -> SoaElement:
+        update = delta.value
+        if update is None:
+            return self
+        if self._member_name != update._member_name:
+            logger.error(f"apply: self._member_name != update._member_name {self._member_name} {update._member_name}")
+            return self
+        return self
 
-        pass
-
-    def diff(self, aos: T.bpy_struct, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(self, aos: T.bpy_prop_collection, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         if len(aos) == 0:
             return None
 
@@ -199,7 +212,10 @@ class SoaElement(Proxy):
         member = getattr(struct, self._member_name)
         array_size, member_type = self.array_attr(aos, member)
         typecode = self._array.typecode
-        tmp_array = array.array(typecode, soa_initializer(member_type, len(self._array)))
+        tmp_array = array.array(typecode, soa_initializer(member_type, array_size))
+        logger.debug(f"diff {aos}.{self._member_name}")
+        logger.debug(f"... proxy length {len(self._array)} {typecode}")
+        logger.debug(f"... blender_length {len(aos)} {member_type}")
         aos.foreach_get(self._member_name, tmp_array)
         if self._array == tmp_array:
             return None

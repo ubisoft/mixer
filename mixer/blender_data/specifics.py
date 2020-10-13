@@ -464,9 +464,11 @@ def resize_geometry(mesh_geometry_item: T.Property, proxy: AosProxy, visit_state
     incoming_length = proxy.length
     if existing_length != incoming_length:
         if existing_length != 0:
+            logger.debug(f"resize_geometry(): calling clear() for {mesh_geometry_item}")
             visit_state.funcs["Mesh.clear_geometry"]()
             # We should need it only once for a whole Mesh
             del visit_state.funcs["Mesh.clear_geometry"]
+        logger.debug(f"resize_geometry(): add({incoming_length}) for {mesh_geometry_item}")
         mesh_geometry_item.add(incoming_length)
 
 

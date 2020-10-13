@@ -184,9 +184,6 @@ class Proxy:
     def find_by_path(
         self, bl_item: Union[T.bpy_struct, T.bpy_prop_collection], path: List[Union[int, str]]
     ) -> Optional[Tuple[Union[T.bpy_struct, T.bpy_prop_collection], Proxy]]:
-        if not path:
-            return bl_item, self
-
         head, *tail = path
         if isinstance(bl_item, T.bpy_struct):
             bl = getattr(bl_item, head)
@@ -205,6 +202,10 @@ class Proxy:
         if proxy is None:
             logger.warning(f"find_by_path: No proxy for {bl_item} {path}")
             return
+
+        if not tail:
+            return bl, proxy
+
         return proxy.find_by_path(bl, tail)
 
 

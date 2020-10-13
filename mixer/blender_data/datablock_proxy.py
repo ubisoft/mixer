@@ -333,6 +333,7 @@ class DatablockProxy(StructProxy):
             context.visit_state.datablock_proxy = None
 
     def update_soa(self, bl_item, path: List[Union[int, str]], soas: List[Tuple[str, array.array]]):
+
         r = self.find_by_path(bl_item, path)
         if r is None:
             return
@@ -340,6 +341,10 @@ class DatablockProxy(StructProxy):
         for element_name, buffer in soas:
             soa_proxy = container_proxy.data(element_name)
             soa_proxy.save_array(container, element_name, buffer)
+
+        # HACK
+        if isinstance(bl_item, T.Mesh):
+            bl_item.update()
 
     def diff(self, datablock: T.ID, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         try:

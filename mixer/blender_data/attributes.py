@@ -167,7 +167,7 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any, context: Cont
             logger.warning(f" ... {line}")
 
 
-def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, context: Context, to_blender=True):
+def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, context: Context, to_blender=True) -> Any:
     """
     Applies a delta to the Blender attribute identified by bl_instance.key or bl_instance[key]
 

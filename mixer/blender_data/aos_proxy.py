@@ -30,7 +30,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data import specifics
 from mixer.blender_data.aos_soa_proxy import AosElement, SoaElement
 from mixer.blender_data.specifics import is_soable_property
-from mixer.blender_data.attributes import apply_attribute, diff_attribute
+from mixer.blender_data.attributes import apply_attribute, diff_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
@@ -86,14 +86,14 @@ class AosProxy(Proxy):
             context.visit_state.path.pop()
         return self
 
-    def save(self, bl_instance: Any, attr_name: str, context: Context):
+    def save(self, bl_instance: T.bpy_struct, attr_name: str, context: Context):
         """
         Save this proxy the Blender property
         """
 
         if self.length == 0 and len(self._data) != 0:
             logger.error(f"save(): length is {self.length} but _data is {self._data.keys()}")
-            return
+            # return
 
         target = getattr(bl_instance, attr_name, None)
         if target is None:
@@ -104,7 +104,16 @@ class AosProxy(Proxy):
         # that contains the Mesh members. The children of this are SoaElement and have no child.
         # They are updated directly bu SoaElement.save_array()
 
-    def apply(self, parent: T.bpy_struct, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True):
+        try:
+            context.visit_state.path.append(attr_name)
+            for k, v in self._data.items():
+                write_attribute(target, k, v, context)
+        finally:
+            context.visit_state.path.pop()
+
+    def apply(
+        self, parent: T.bpy_struct, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True
+    ) -> Optional[AosProxy]:
         if delta is None:
             return
         struct_update = delta.value
@@ -117,9 +126,11 @@ class AosProxy(Proxy):
             # specifics.truncate_collection(target, self, context)
             for k, member_delta in struct_update._data.items():
                 current_value = self.data(k)
-                self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
+                if current_value is not None:
+                    self._data[k] = current_value.apply(struct, k, member_delta, to_blender)
         finally:
             context.visit_state.path.pop()
+        return self
 
     def diff(self, bl_collection: T.bpy_prop_collection, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         """"""
