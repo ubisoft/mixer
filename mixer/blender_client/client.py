@@ -1134,13 +1134,17 @@ def clear_scene_content():
 
         # Cannot remove the last scene at this point, treat it differently
         for scene in bpy.data.scenes[:-1]:
+            logger.warning("clear_scene_contents. Removing {scene}")
             scene_api.delete_scene(scene)
 
         share_data.clear_before_state()
 
         if len(bpy.data.scenes) == 1:
             scene = bpy.data.scenes[0]
+            logger.warning(f"clear_scene_contents. leaving {scene} ...")
+            logger.warning(f"...  with uuid {scene.mixer_uuid}, renamed as _mixer_to_be_removed_")
             scene.name = "_mixer_to_be_removed_"
+            scene.mixer_uuid = "_mixer_to_be_removed_"
 
 
 @stats_timer(share_data)

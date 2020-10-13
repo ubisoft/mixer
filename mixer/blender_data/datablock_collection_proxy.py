@@ -107,15 +107,21 @@ class DatablockCollectionProxy(Proxy):
 
         datablock, renames = incoming_proxy.create_standalone_datablock(context)
 
-        # One existing scene from the document loaded at join time could not be removed. Remove it now
-        if (
-            incoming_proxy.collection_name == "scenes"
-            and len(bpy.data.scenes) == 2
-            and bpy.data.scenes[0].name == "_mixer_to_be_removed_"
-        ):
-            from mixer.blender_client.scene import delete_scene
+        if incoming_proxy.collection_name == "scenes":
+            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid()}'")
 
-            delete_scene(bpy.data.scenes[0])
+            # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
+            # Remove it now
+            scenes = bpy.data.scenes
+            if len(scenes) == 2 and ("_mixer_to_be_removed_" in scenes):
+                from mixer.blender_client.scene import delete_scene
+
+                scene_to_remove = scenes["_mixer_to_be_removed_"]
+                logger.warning(
+                    f"After create scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid()}''"
+                )
+                logger.warning(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
+                delete_scene(scene_to_remove)
 
         if not datablock:
             return None, None
