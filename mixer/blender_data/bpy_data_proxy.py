@@ -183,7 +183,7 @@ class BpyDataProxy(Proxy):
 
         for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
-            self._data[name] = DatablockCollectionProxy().load(collection, context)
+            self._data[name] = DatablockCollectionProxy().load(collection, name, context)
         return self
 
     def find(self, collection_name: str, key: str) -> DatablockProxy:

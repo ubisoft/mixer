@@ -62,16 +62,16 @@ class DatablockCollectionProxy(Proxy):
     def __len__(self):
         return len(self._data)
 
-    def load(self, bl_collection: bpy.types.bpy_prop_collection, context: Context):  # noqa N802
+    def load(self, bl_collection: bpy.types.bpy_prop_collection, key: str, context: Context):  # noqa N802
         """
         Load bl_collection elements as standalone datablocks.
         """
-        for _, item in bl_collection.items():
+        for name, item in bl_collection.items():
             collection_name = BlendData.instance().bl_collection_name_from_ID(item)
             if skip_bpy_data_item(collection_name, item):
                 continue
             uuid = ensure_uuid(item)
-            self._data[uuid] = DatablockProxy().load(item, context, bpy_data_collection_name=collection_name)
+            self._data[uuid] = DatablockProxy().load(item, name, context, bpy_data_collection_name=collection_name)
 
         return self
 
@@ -207,7 +207,7 @@ class DatablockCollectionProxy(Proxy):
                     continue
                 uuid = ensure_uuid(id_)
                 context.proxy_state.datablocks[uuid] = id_
-                proxy = DatablockProxy().load(id_, context, bpy_data_collection_name=collection_name)
+                proxy = DatablockProxy().load(id_, name, context, bpy_data_collection_name=collection_name)
                 context.proxy_state.proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
@@ -298,7 +298,7 @@ class DatablockRefCollectionProxy(Proxy):
     def __len__(self):
         return len(self._data)
 
-    def load(self, bl_collection: bpy.types.bpy_prop_collection, context: Context):  # noqa N802
+    def load(self, bl_collection: bpy.types.bpy_prop_collection, key: Union[int, str], context: Context):  # noqa N802
         """
         Load bl_collection elements as references to bpy.data collections
         """
@@ -313,7 +313,7 @@ class DatablockRefCollectionProxy(Proxy):
             proxy = DatablockRefProxy()
             if item is not None:
                 uuid = item.mixer_uuid
-                proxy.load(item, context)
+                proxy.load(item, item.name, context)
             self._data[uuid] = proxy
         return self
 
@@ -430,7 +430,7 @@ class DatablockRefCollectionProxy(Proxy):
         maybe_updated_keys = proxy_keys & blender_keys
 
         for k in added_keys:
-            value = read_attribute(blender_items[k], item_property, context)
+            value = read_attribute(blender_items[k], k, item_property, context)
             assert isinstance(value, (DatablockProxy, DatablockRefProxy))
             diff._data[k] = DeltaAddition(value)
 

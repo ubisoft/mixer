@@ -46,7 +46,7 @@ MAX_DEPTH = 30
 
 
 # @debug_check_stack_overflow
-def read_attribute(attr: Any, attr_property: T.Property, context: Context):
+def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, context: Context):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
     """
@@ -71,21 +71,21 @@ def read_attribute(attr: Any, attr_property: T.Property, context: Context):
             if isinstance(attr_property.fixed_type, bpy.types.ID):
                 from mixer.blender_data.datablock_collection_proxy import DatablockRefCollectionProxy
 
-                return DatablockRefCollectionProxy().load(attr, context)
+                return DatablockRefCollectionProxy().load(attr, key, context)
             elif is_soable_collection(attr_property):
                 from mixer.blender_data.aos_proxy import AosProxy
 
-                return AosProxy().load(attr, attr_property, context)
+                return AosProxy().load(attr, key, attr_property, context)
             else:
                 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
-                return StructCollectionProxy.make(attr_property).load(attr, attr_property, context)
+                return StructCollectionProxy.make(attr_property).load(attr, key, attr_property, context)
 
         # TODO merge with previous case
         if isinstance(attr_property, T.CollectionProperty):
             from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
-            return StructCollectionProxy().load(attr, attr_property, context)
+            return StructCollectionProxy().load(attr, key, attr_property, context)
 
         bl_rna = attr_property.bl_rna
         if bl_rna is None:
@@ -95,21 +95,21 @@ def read_attribute(attr: Any, attr_property: T.Property, context: Context):
         if issubclass(attr_type, T.PropertyGroup):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy().load(attr, attr_property.identifier, context)
+            return StructProxy().load(attr, key, context)
 
         if issubclass(attr_type, T.ID):
             if attr.is_embedded_data:
                 from mixer.blender_data.datablock_proxy import DatablockProxy
 
-                return DatablockProxy.make(attr_property).load(attr, context)
+                return DatablockProxy.make(attr_property).load(attr, key, context)
             else:
                 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
-                return DatablockRefProxy().load(attr, context)
+                return DatablockRefProxy().load(attr, key, context)
         elif issubclass(attr_type, T.bpy_struct):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy().load(attr, attr_property.identifier, context)
+            return StructProxy().load(attr, key, context)
 
         raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
     finally:
@@ -222,7 +222,7 @@ def diff_attribute(
 
         # An attribute mappable on a python builtin type
         # TODO overkill to call read_attribute because it is not a proxy type
-        blender_value = read_attribute(item, item_property, context)
+        blender_value = read_attribute(item, key, item_property, context)
         if blender_value != value:
             # TODO This is too coarse (whole lists)
             return DeltaUpdate(blender_value)

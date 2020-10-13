@@ -60,7 +60,7 @@ class StructProxy(Proxy):
             context.visit_state.path.append(parent_key)
             for name, bl_rna_property in properties:
                 attr = getattr(bl_instance, name)
-                attr_value = read_attribute(attr, bl_rna_property, context)
+                attr_value = read_attribute(attr, name, bl_rna_property, context)
 
                 # Also write None values. We use them to reset attributes like Camera.dof.focus_object
                 self._data[name] = attr_value

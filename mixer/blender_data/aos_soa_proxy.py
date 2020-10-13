@@ -70,7 +70,6 @@ class AosElement(Proxy):
     def load(
         self,
         bl_collection: bpy.types.bpy_prop_collection,
-        item_bl_rna,
         attr_name: str,
         context: Context,
     ):

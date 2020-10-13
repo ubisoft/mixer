@@ -104,6 +104,7 @@ class DatablockProxy(StructProxy):
     def load(
         self,
         bl_instance: T.ID,
+        key: str,
         context: Context,
         bpy_data_collection_name: str = None,
     ):
@@ -131,7 +132,7 @@ class DatablockProxy(StructProxy):
             context.visit_state.datablock_proxy = self
             for name, bl_rna_property in properties:
                 attr = getattr(bl_instance, name)
-                attr_value = read_attribute(attr, bl_rna_property, context)
+                attr_value = read_attribute(attr, name, bl_rna_property, context)
                 # Also write None values to reset attributes like Camera.dof.focus_object
                 # TODO for scene, test difference, only send update if dirty as continuous updates to scene
                 # master collection will conflicting writes with Master Collection

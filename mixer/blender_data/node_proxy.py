@@ -40,7 +40,7 @@ class NodeLinksProxy(StructProxy):
     def __init__(self):
         super().__init__()
 
-    def load(self, bl_instance, _, context: Context):
+    def load(self, bl_instance, key: str, _, context: Context):
         # NodeLink contain pointers to Node and NodeSocket.
         # Just keep the names to restore the links in ShaderNodeTreeProxy.save
 

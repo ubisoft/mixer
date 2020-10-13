@@ -113,14 +113,20 @@ class StructCollectionProxy(Proxy):
             return len(sequence)
         return len(self._data)
 
-    def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, context: Context):
+    def load(
+        self,
+        bl_collection: T.bpy_prop_collection,
+        key: Union[int, str],
+        bl_collection_property: T.Property,
+        context: Context,
+    ):
 
         if len(bl_collection) == 0:
             self._data.clear()
             return self
 
         try:
-            context.visit_state.path.append(bl_collection_property.identifier)
+            context.visit_state.path.append(key)
             # no keys means it is a sequence. However bl_collection.items() returns [(index, item)...]
             is_sequence = not bl_collection.keys()
             if is_sequence:
@@ -316,7 +322,7 @@ class StructCollectionProxy(Proxy):
         diff = self.__class__()
         item_property = collection_property.fixed_type
         try:
-            context.visit_state.path.append(collection_property.identifier)
+            context.visit_state.path.append(key)
             sequence = self._data.get(MIXER_SEQUENCE)
             if sequence:
                 # indexed by int
@@ -326,7 +332,7 @@ class StructCollectionProxy(Proxy):
                 # since the diff sequence is hollow, we cannot store it in a list. Use a dict with int keys instead
                 for i, (proxy_value, blender_value) in enumerate(itertools.zip_longest(sequence, collection)):
                     if proxy_value is None:
-                        value = read_attribute(collection[i], item_property, context)
+                        value = read_attribute(collection[i], i, item_property, context)
                         diff._data[i] = DeltaAddition(value)
                     elif blender_value is None:
                         diff._data[i] = DeltaDeletion(self.data(i))
@@ -364,7 +370,7 @@ class StructCollectionProxy(Proxy):
                         for name in proxy_names:
                             diff._data["D" + name] = DeltaDeletion(self.data(name))
                         for name in blender_names:
-                            value = read_attribute(collection[name], item_property, context)
+                            value = read_attribute(collection[name], name, item_property, context)
                             diff._data["A" + name] = DeltaAddition(value)
                 else:
                     # non order dependant, uniform types
@@ -372,7 +378,7 @@ class StructCollectionProxy(Proxy):
                     blender_keys = collection.keys()
                     added_keys = blender_keys - proxy_keys
                     for k in added_keys:
-                        value = read_attribute(collection[k], item_property, context)
+                        value = read_attribute(collection[k], k, item_property, context)
                         diff._data["A" + k] = DeltaAddition(value)
 
                     deleted_keys = proxy_keys - blender_keys

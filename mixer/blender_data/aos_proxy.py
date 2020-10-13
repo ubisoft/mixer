@@ -57,7 +57,9 @@ class AosProxy(Proxy):
     def length(self) -> int:
         return self._aos_length
 
-    def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, context: Context):
+    def load(
+        self, bl_collection: T.bpy_prop_collection, key: str, bl_collection_property: T.Property, context: Context
+    ):
         self._aos_length = len(bl_collection)
         if self._aos_length == 0:
             self._data.clear()
@@ -66,7 +68,7 @@ class AosProxy(Proxy):
         prototype_item = bl_collection[0]
 
         try:
-            context.visit_state.path.append(bl_collection_property.identifier)
+            context.visit_state.path.append(key)
             # TODO too much work at l   oad time to find soable information. Do it once for all.
 
             # Hybrid array_of_struct/ struct_of_array
@@ -81,7 +83,7 @@ class AosProxy(Proxy):
                     self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item, context)
                 else:
                     # no foreach_get (variable length arrays like MeshVertex.groups, enums, ...)
-                    self._data[attr_name] = AosElement().load(bl_collection, item_bl_rna, attr_name, context)
+                    self._data[attr_name] = AosElement().load(bl_collection, attr_name, item_bl_rna, context)
         finally:
             context.visit_state.path.pop()
         return self
