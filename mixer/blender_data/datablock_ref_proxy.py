@@ -195,7 +195,9 @@ class DatablockRefProxy(Proxy):
                 setattr(parent, key, datablock)
         return update
 
-    def diff(self, datablock: T.ID, datablock_property: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(
+        self, datablock: T.ID, key: Union[int, str], datablock_property: T.Property, context: Context
+    ) -> Optional[DeltaUpdate]:
         """
         Computes the difference between this proxy and its Blender state.
         """

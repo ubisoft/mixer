@@ -23,14 +23,14 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Dict, Optional, TYPE_CHECKING
 
 import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
 from mixer.blender_data.aos_soa_proxy import AosElement, SoaElement
 from mixer.blender_data.specifics import is_soable_property
-from mixer.blender_data.attributes import apply_attribute, diff_attribute, write_attribute
+from mixer.blender_data.attributes import diff_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
@@ -132,7 +132,7 @@ class AosProxy(Proxy):
             context.visit_state.path.pop()
         return self
 
-    def diff(self, aos: T.bpy_prop_collection, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(self, aos: T.bpy_prop_collection, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         """"""
 
         # Create a proxy that will be populated with attributes differences, resulting in a hollow dict,
@@ -147,7 +147,7 @@ class AosProxy(Proxy):
             for attr_name, _ in context.synchronized_properties.properties(item_bl_rna):
                 # co, normals, ...
                 proxy_data = self._data.get(attr_name)
-                delta = diff_attribute(aos, prop, proxy_data, context)
+                delta = diff_attribute(aos, attr_name, prop, proxy_data, context)
                 if delta is not None:
                     diff._data[attr_name] = delta
         finally:

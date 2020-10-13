@@ -346,11 +346,11 @@ class DatablockProxy(StructProxy):
         if isinstance(bl_item, T.Mesh):
             bl_item.update()
 
-    def diff(self, datablock: T.ID, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(self, datablock: T.ID, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         try:
             diff = self.__class__()
             diff.init(datablock)
             context.visit_state.datablock_proxy = diff
-            return super()._diff(datablock, prop, context, diff)
+            return super()._diff(datablock, key, prop, context, diff)
         finally:
             context.visit_state.datablock_proxy = None

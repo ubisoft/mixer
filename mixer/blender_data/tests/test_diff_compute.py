@@ -39,7 +39,7 @@ class Datablock(DifferentialCompute):
         # test_diff_compute.Datablock.test_datablock_builtin
         expected_float = 0.5
         self.scene.audio_volume = expected_float
-        diff = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        diff = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
 
         # there is a pending issue with use_curve_mapping. it is filtered on proxy load, but not during diff
         # and is sone struct it has a value despite use_curve_mapping = False
@@ -55,7 +55,7 @@ class Datablock(DifferentialCompute):
     def test_datablock_struct_builtin(self):
         expected_bool = not self.scene.eevee.use_bloom
         self.scene.eevee.use_bloom = expected_bool
-        diff = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        diff = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
 
         # there is a pending issue with use_curve_mapping. it is filtered on proxy load, but not during diff
         # and is sone struct it has a value despite use_curve_mapping = False
@@ -82,7 +82,7 @@ class StructDatablockRef(DifferentialCompute):
         world = bpy.data.worlds.new("W")
         self.scene.world = world
         self.generate_all_uuids()
-        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         self.assertIsInstance(scene_delta, DeltaUpdate)
         world_delta = scene_delta.value.data("world", resolve_delta=False)
         self.assertIsInstance(world_delta, DeltaUpdate)
@@ -100,7 +100,7 @@ class StructDatablockRef(DifferentialCompute):
         self.proxy.load(test_properties)
         self.scene.world = world2
         self.generate_all_uuids()
-        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         self.assertIsInstance(scene_delta, DeltaUpdate)
         world_delta = scene_delta.value.data("world", resolve_delta=False)
         self.assertIsInstance(world_delta, DeltaUpdate)
@@ -118,7 +118,7 @@ class StructDatablockRef(DifferentialCompute):
         self.proxy.load(test_properties)
         self.scene.world = None
         self.generate_all_uuids()
-        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         # TODO fails. should a null ref be implemented as a DatablockRefProxy
         # with a null ref (uuid is None)
         # or what else
@@ -158,7 +158,7 @@ class Collection(DifferentialCompute):
 
         self.generate_all_uuids()
 
-        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
 
         self.assertIsInstance(scene_delta, DeltaUpdate)
         scene_update = scene_delta.value
@@ -211,7 +211,9 @@ class Collection(DifferentialCompute):
         self.generate_all_uuids()
         collections_property = bpy.data.bl_rna.properties["scenes"]
 
-        collection_delta = self.collection_proxy.diff(self.collection, collections_property, self.proxy.context())
+        collection_delta = self.collection_proxy.diff(
+            self.collection, self.collection.name, collections_property, self.proxy.context()
+        )
 
         self.assertIsInstance(collection_delta, DeltaUpdate)
         collection_update = collection_delta.value
@@ -255,7 +257,7 @@ class Collection(DifferentialCompute):
 
         self.generate_all_uuids()
 
-        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
 
         self.assertIsInstance(scene_delta, DeltaUpdate)
         scene_update = scene_delta.value
@@ -312,7 +314,7 @@ class Collection(DifferentialCompute):
 
         self.generate_all_uuids()
 
-        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
 
         points_remove_proxy = (
             scene_delta.value.data("view_settings").data("curve_mapping").data("curves").data(0).data("points")

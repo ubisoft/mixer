@@ -167,7 +167,7 @@ class StructProxy(Proxy):
 
         return self
 
-    def diff(self, struct: T.Struct, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(self, struct: T.Struct, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
 
@@ -186,9 +186,11 @@ class StructProxy(Proxy):
         # as opposed as the dense self
         diff = self.__class__()
         diff.init(struct)
-        return self._diff(struct, prop, context, diff)
+        return self._diff(struct, key, prop, context, diff)
 
-    def _diff(self, struct: T.Struct, prop: T.Property, context: Context, diff: StructProxy) -> Optional[DeltaUpdate]:
+    def _diff(
+        self, struct: T.Struct, key: str, prop: T.Property, context: Context, diff: StructProxy
+    ) -> Optional[DeltaUpdate]:
         # PERF accessing the properties from the synchronized_properties is **far** cheaper that iterating over
         # _data and the getting the properties with
         #   member_property = struct.bl_rna.properties[k]
@@ -211,7 +213,7 @@ class StructProxy(Proxy):
                     continue
 
                 proxy_data = self._data.get(k)
-                delta = diff_attribute(member, member_property, proxy_data, context)
+                delta = diff_attribute(member, k, member_property, proxy_data, context)
 
                 if delta is not None:
                     diff._data[k] = delta

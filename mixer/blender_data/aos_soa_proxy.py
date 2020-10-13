@@ -215,7 +215,7 @@ class SoaElement(Proxy):
             return self
         return self
 
-    def diff(self, aos: T.bpy_prop_collection, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(self, aos: T.bpy_prop_collection, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         if len(aos) == 0:
             return None
 

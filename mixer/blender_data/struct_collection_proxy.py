@@ -300,7 +300,7 @@ class StructCollectionProxy(Proxy):
         return self
 
     def diff(
-        self, collection: T.bpy_prop_collection, collection_property: T.Property, context: Context
+        self, collection: T.bpy_prop_collection, key: Union[int, str], collection_property: T.Property, context: Context
     ) -> Optional[DeltaUpdate]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
@@ -331,7 +331,7 @@ class StructCollectionProxy(Proxy):
                     elif blender_value is None:
                         diff._data[i] = DeltaDeletion(self.data(i))
                     else:
-                        delta = diff_attribute(collection[i], item_property, proxy_value, context)
+                        delta = diff_attribute(collection[i], i, item_property, proxy_value, context)
                         if delta is not None:
                             diff._data[i] = delta
             else:
@@ -354,7 +354,7 @@ class StructCollectionProxy(Proxy):
                     if proxy_types == blender_types and proxy_names == blender_names:
                         # Same types and names : do sparse modification
                         for name in proxy_names:
-                            delta = diff_attribute(collection[name], item_property, self.data(name), context)
+                            delta = diff_attribute(collection[name], name, item_property, self.data(name), context)
                             if delta is not None:
                                 diff._data[name] = delta
                     else:
@@ -381,7 +381,7 @@ class StructCollectionProxy(Proxy):
 
                     maybe_updated_keys = proxy_keys & blender_keys
                     for k in maybe_updated_keys:
-                        delta = diff_attribute(collection[k], item_property, self.data(k), context)
+                        delta = diff_attribute(collection[k], k, item_property, self.data(k), context)
                         if delta is not None:
                             diff._data[k] = delta
         finally:

@@ -36,7 +36,7 @@ class Datablock(DifferentialApply):
         # test_diff_apply.Datablock.test_builtin
 
         self.scene.audio_volume = 0.5
-        delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         # the diff has audio_volume, updated to 0.5
 
         # rollback to anything else
@@ -58,7 +58,7 @@ class Datablock(DifferentialApply):
         self.scene_proxy: DatablockProxy = self.proxy.data("scenes").search_one("Scene")
         self.scene.eevee.use_bloom = True
 
-        delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         # diff is -> True
 
         # reset
@@ -87,7 +87,7 @@ class StructDatablockRef(DifferentialApply):
         world = bpy.data.worlds.new("W")
         self.scene.world = world
         self.generate_all_uuids()
-        delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         # diff -> set world
 
         # reset
@@ -109,7 +109,7 @@ class StructDatablockRef(DifferentialApply):
 
         self.scene.world = world2
         self.generate_all_uuids()
-        delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         # diff -> world2
 
         # reset
@@ -129,7 +129,7 @@ class StructDatablockRef(DifferentialApply):
         self.proxy.load(test_properties)
         self.scene.world = None
         self.generate_all_uuids()
-        _ = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        _ = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         # delta - > None
 
 
@@ -161,7 +161,7 @@ class Collection(DifferentialApply):
 
         self.generate_all_uuids()
 
-        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         # delta contains(deleted1, deleted 2, added1, added2)
 
         # reset
@@ -209,7 +209,7 @@ class Collection(DifferentialApply):
 
         self.generate_all_uuids()
 
-        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
 
         # reset to initial state
         views = bpy.data.scenes["Scene"].render.views
@@ -249,7 +249,7 @@ class Collection(DifferentialApply):
 
         self.generate_all_uuids()
 
-        scene_delta = self.scene_proxy.diff(self.scene, self.scenes_property, self.proxy.context())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         # the delta contains :
         #   curves[0]: Deletion of element 1
         #   curves[1]: Addition of element 2

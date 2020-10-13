@@ -255,7 +255,7 @@ class BpyDataProxy(Proxy):
                 # However, it is not obvious to detect the safe cases and remove the message in such cases
                 logger.info("depsgraph update: Ignoring embedded %s", datablock)
                 continue
-            delta = proxy.diff(datablock, None, context)
+            delta = proxy.diff(datablock, datablock.name, None, context)
             if delta:
                 logger.info("depsgraph update: update %s", datablock)
                 # TODO add an apply mode to diff instead to avoid two traversals ?

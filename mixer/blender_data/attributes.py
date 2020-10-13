@@ -204,7 +204,9 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, con
         raise
 
 
-def diff_attribute(item: Any, item_property: T.Property, value: Any, context: Context) -> Optional[Delta]:
+def diff_attribute(
+    item: Any, key: Union[int, str], item_property: T.Property, value: Any, context: Context
+) -> Optional[Delta]:
     """
     Computes a difference between a blender item and a proxy value
 
@@ -216,7 +218,7 @@ def diff_attribute(item: Any, item_property: T.Property, value: Any, context: Co
     """
     try:
         if isinstance(value, Proxy):
-            return value.diff(item, item_property, context)
+            return value.diff(item, key, item_property, context)
 
         # An attribute mappable on a python builtin type
         # TODO overkill to call read_attribute because it is not a proxy type
