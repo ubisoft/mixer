@@ -197,7 +197,7 @@ class StructProxy(Proxy):
         # line to which py-spy attributes 20% of the total diff !
         try:
             if prop is not None:
-                context.visit_state.path.append(prop.identifier)
+                context.visit_state.path.append(key)
             properties = context.synchronized_properties.properties(struct)
             properties = specifics.conditional_properties(struct, properties)
             for k, member_property in properties:

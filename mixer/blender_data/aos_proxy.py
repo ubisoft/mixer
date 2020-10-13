@@ -142,7 +142,7 @@ class AosProxy(Proxy):
         diff._aos_length = len(aos)
 
         try:
-            context.visit_state.path.append(prop.identifier if prop is not None else None)
+            context.visit_state.path.append(key)
             item_bl_rna = prop.fixed_type.bl_rna
             for attr_name, _ in context.synchronized_properties.properties(item_bl_rna):
                 # co, normals, ...

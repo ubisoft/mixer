@@ -188,12 +188,6 @@ class SoaElement(Proxy):
             message += f" blender_length ({len(aos)})"
             logger.debug(message)
 
-        if self._array and len(self._array) != len(array_):
-            logger.error(
-                f"Array size mismatch  {aos}.{member_name} proxy ({len(self._array)}) incoming ({len(array_)})"
-            )
-            return
-
         self._array = array_
         try:
             aos.foreach_set(member_name, array_)
@@ -205,8 +199,6 @@ class SoaElement(Proxy):
     def apply(
         self, parent: T.bpy_prop_collection, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True
     ) -> SoaElement:
-        # we expect save_array() to be called, this array is stale
-        self._array = None
         update = delta.value
         if update is None:
             return self

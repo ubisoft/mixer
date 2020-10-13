@@ -287,6 +287,15 @@ default_exclusions = {
             ]
         )
     ],
+    T.GPencilStroke: [
+        NameFilterOut(
+            [
+                # readonly
+                "bound_box_min",
+                "bound_box_max",
+            ]
+        )
+    ],
     T.Mesh: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
@@ -346,6 +355,7 @@ default_exclusions = {
             [
                 # bounding box, will be computed
                 "dimensions",
+                "bound_box",
                 # TODO triggers an error on metaballs
                 #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
                 #   looks like a bpy_prop_collection and the key is and empty string
