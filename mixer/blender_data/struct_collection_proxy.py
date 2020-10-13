@@ -243,25 +243,26 @@ class StructCollectionProxy(Proxy):
                     ), "all(a + 1 == b for a, b in zip(indices, iter(indices[1:])))"
 
                 for k, delta in update._data.items():
+                    i = int(k)
                     try:
                         if isinstance(delta, DeltaUpdate):
-                            sequence[k] = apply_attribute(collection, k, sequence[k], delta, context, to_blender)
+                            sequence[i] = apply_attribute(collection, i, sequence[i], delta, context, to_blender)
                         elif isinstance(delta, DeltaDeletion):
-                            item = collection[k]
                             if to_blender:
+                                item = collection[i]
                                 collection.remove(item)
-                            del sequence[k]
+                            del sequence[i]
                         else:  # DeltaAddition
-                            raise NotImplementedError("Not implemented: DeltaAddition for array")
                             # TODO pre save for use_curves
                             # since ordering does not include this requirement
                             if to_blender:
-                                write_attribute(collection, k, delta.value, context)
-                            sequence[k] = delta.value
+                                raise NotImplementedError("Not implemented: DeltaAddition for array")
+                                write_attribute(collection, i, delta.value, context)
+                            sequence.append(delta.value)
 
                     except Exception as e:
                         logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
-                        logger.warning(f"... for {collection}[{k}]")
+                        logger.warning(f"... for {collection}[{i}]")
                         logger.warning(f"... Exception: {e}")
                         logger.warning("... Update ignored")
                         continue
