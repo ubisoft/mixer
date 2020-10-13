@@ -196,7 +196,9 @@ class StructProxy(Proxy):
         try:
             if prop is not None:
                 context.visit_state.path.append(prop.identifier)
-            for k, member_property in context.synchronized_properties.properties(struct):
+            properties = context.synchronized_properties.properties(struct)
+            properties = specifics.conditional_properties(struct, properties)
+            for k, member_property in properties:
                 # TODO in test_differential.StructDatablockRef.test_remove
                 # target et a scene, k is world and v (current world value) is None
                 # so diff fails. v should be a BpyIDRefNoneProxy
