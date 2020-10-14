@@ -28,7 +28,7 @@ from typing import Dict, Optional, TYPE_CHECKING
 import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
-from mixer.blender_data.aos_soa_proxy import AosElement, SoaElement
+from mixer.blender_data.aos_soa_proxy import SoaElement
 from mixer.blender_data.specifics import is_soable_property
 from mixer.blender_data.attributes import diff_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaUpdate, Proxy

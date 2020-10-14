@@ -154,10 +154,6 @@ class SoaElement(Proxy):
             member_name : The name of this aos member (e.g, "co", "normal", ...)
             prototype_item : an element of parent collection
         """
-
-        # TODO: bool
-
-        attr = getattr(aos[0], member_name)
         array_size, member_type = self.array_attr(aos, member_name, bl_rna)
         typecode = soa_initializers[member_type].typecode
         buffer = self._array
@@ -217,8 +213,6 @@ class SoaElement(Proxy):
         if len(aos) == 0:
             return None
 
-        struct = aos[0]
-        member = getattr(struct, self._member_name)
         array_size, member_type = self.array_attr(aos, self._member_name, prop.bl_rna)
         typecode = self._array.typecode
         tmp_array = array.array(typecode, soa_initializer(member_type, array_size))
