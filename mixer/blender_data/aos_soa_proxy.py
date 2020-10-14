@@ -129,19 +129,25 @@ class SoaElement(Proxy):
         self._array: Optional[array.array] = None
         self._member_name: Optional[str] = None
 
-    def array_attr(self, aos: T.bpy_prop_collection, prototype_item: Any):
+    def array_attr(self, aos: T.bpy_prop_collection, member_name: str, bl_rna: T.bpy_struct):
+        prototype_item = getattr(aos[0], member_name)
         member_type = type(prototype_item)
-        array_size = len(aos)
+
         if is_vector(member_type):
-            array_size *= len(prototype_item)
+            array_size = len(aos) * len(prototype_item)
         elif member_type is T.bpy_prop_array:
-            array_size *= len(prototype_item)
             member_type = type(prototype_item[0])
+            if isinstance(bl_rna, T.MeshPolygon) and member_name == "vertices":
+                # polygon sizes can differ
+                array_size = sum((len(polygon.vertices) for polygon in aos))
+            else:
+                array_size = len(aos) * len(prototype_item)
+        else:
+            array_size = len(aos)
+
         return array_size, member_type
 
-    def load(
-        self, aos: bpy.types.bpy_prop_collection, member_name: str, prototype_item: T.bpy_struct, context: Context
-    ):
+    def load(self, aos: bpy.types.bpy_prop_collection, member_name: str, bl_rna: T.bpy_struct, context: Context):
         """
         Args:
             aos : The array or structures collection that contains this member (e.g.  a_mesh.vertices, a_mesh.edges, ...)
@@ -151,8 +157,8 @@ class SoaElement(Proxy):
 
         # TODO: bool
 
-        attr = getattr(prototype_item, member_name)
-        array_size, member_type = self.array_attr(aos, attr)
+        attr = getattr(aos[0], member_name)
+        array_size, member_type = self.array_attr(aos, member_name, bl_rna)
         typecode = soa_initializers[member_type].typecode
         buffer = self._array
         if buffer is None or buffer.buffer_info()[1] != array_size or buffer.typecode != typecode:
@@ -201,6 +207,7 @@ class SoaElement(Proxy):
         update = delta.value
         if update is None:
             return self
+        self._array = update._array
         if self._member_name != update._member_name:
             logger.error(f"apply: self._member_name != update._member_name {self._member_name} {update._member_name}")
             return self
@@ -212,7 +219,7 @@ class SoaElement(Proxy):
 
         struct = aos[0]
         member = getattr(struct, self._member_name)
-        array_size, member_type = self.array_attr(aos, member)
+        array_size, member_type = self.array_attr(aos, self._member_name, prop.bl_rna)
         typecode = self._array.typecode
         tmp_array = array.array(typecode, soa_initializer(member_type, array_size))
         if logger.isEnabledFor(logging.DEBUG):

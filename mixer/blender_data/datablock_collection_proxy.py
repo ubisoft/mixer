@@ -316,11 +316,11 @@ class DatablockRefCollectionProxy(Proxy):
         # but len(bl_collection.items()) == 1 (excludes the None)
         # so iterate on bl_collection
         for item in bl_collection:
-            proxy = DatablockRefProxy()
             if item is not None:
+                proxy = DatablockRefProxy()
                 uuid = item.mixer_uuid
                 proxy.load(item, item.name, context)
-            self._data[uuid] = proxy
+                self._data[uuid] = proxy
         return self
 
     def save(self, parent: Any, key: str, context: Context):

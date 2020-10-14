@@ -65,8 +65,6 @@ class AosProxy(Proxy):
             self._data.clear()
             return self
 
-        prototype_item = bl_collection[0]
-
         try:
             context.visit_state.path.append(key)
             # TODO too much work at l   oad time to find soable information. Do it once for all.
@@ -80,10 +78,13 @@ class AosProxy(Proxy):
             for attr_name, bl_rna_property in context.synchronized_properties.properties(item_bl_rna):
                 if is_soable_property(bl_rna_property):
                     # element type supported by foreach_get
-                    self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item, context)
+                    self._data[attr_name] = SoaElement().load(bl_collection, attr_name, item_bl_rna, context)
                 else:
-                    # no foreach_get (variable length arrays like MeshVertex.groups, enums, ...)
-                    self._data[attr_name] = AosElement().load(bl_collection, attr_name, item_bl_rna, context)
+                    logger.error(f"Unhandled item {bl_collection}.{key}")
+                    # Member for which foreach_get is not available
+                    # (variable length arrays like MeshVertex.groups, enums, ...)
+                    # Not implemented
+                    # self._data[attr_name] = AosElement().load(bl_collection, attr_name, item_bl_rna, context)
         finally:
             context.visit_state.path.pop()
         return self

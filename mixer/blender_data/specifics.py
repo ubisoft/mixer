@@ -30,7 +30,7 @@ import array
 import logging
 from pathlib import Path
 import traceback
-from typing import Any, ItemsView, Optional, TYPE_CHECKING, Union
+from typing import Any, Dict, ItemsView, Optional, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -58,7 +58,7 @@ soable_collection_properties = {
     T.Mesh.bl_rna.properties["loops"],
     T.Mesh.bl_rna.properties["loop_triangles"],
     # messy: :MeshPolygon.vertices has variable length, not 3 as stated in the doc, so ignore
-    # T.Mesh.bl_rna.properties["polygons"],
+    T.Mesh.bl_rna.properties["polygons"],
     T.Mesh.bl_rna.properties["polygon_layers_float"],
     T.Mesh.bl_rna.properties["polygon_layers_int"],
     T.Mesh.bl_rna.properties["vertices"],
@@ -77,7 +77,7 @@ soable_properties = (
 )
 
 # in sync with soable_properties
-soa_initializers = {
+soa_initializers: Dict[type, array.array] = {
     bool: array.array("b", [0]),
     int: array.array("l", [0]),
     float: array.array("f", [0.0]),
@@ -342,6 +342,8 @@ def add_datablock_ref_element(collection: T.bpy_prop_collection, datablock: T.ID
 non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}
 effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - non_effect_sequences
 
+_new_name_types = (type(T.UVLoopLayers.bl_rna), type(T.LoopColors.bl_rna), type(T.FaceMaps.bl_rna))
+
 
 def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, context: Context):
     """Add an element to a bpy_prop_collection using the collection specific API"""
@@ -366,7 +368,7 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             node_type = proxy.data("bl_idname")
             return collection.new(node_type)
 
-        if isinstance(bl_rna, type(T.UVLoopLayers.bl_rna)):
+        if isinstance(bl_rna, _new_name_types):
             name = proxy.data("name")
             return collection.new(name=name)
 

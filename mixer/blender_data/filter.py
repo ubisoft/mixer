@@ -261,6 +261,7 @@ default_exclusions = {
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foreach_get()
+    T.FaceMap: [NameFilterOut(["index"])],
     T.Image: [
         NameFilterOut("pixels"),
         # meaningless to sync these, since they are handled by Image.pack() ?
@@ -305,14 +306,21 @@ default_exclusions = {
                 # views into uv_layers controlled by uv_layer_xxx_index
                 "uv_layer_clone",
                 "uv_layer_stencil",
+                # readonly
+                "is_editmode",
+                "total_vert_sel",
+                "total_edge_sel",
+                "total_face_sel",
                 # do not know how to update this, probably by vertices count
                 "vertex_paint_masks",
             ]
         )
     ],
     T.MeshEdge: [NameFilterOut(["select"])],
+    T.MeshLoopColorLayer: [NameFilterOut(["active"])],
     T.MeshPolygon: [NameFilterOut(["area", "center", "normal", "select"])],
     T.MeshUVLoop: [NameFilterOut(["select"])],
+    T.MeshUVLoopLayer: [NameFilterOut(["active", "active_clone"])],
     T.MeshVertex: [
         NameFilterOut(
             [
