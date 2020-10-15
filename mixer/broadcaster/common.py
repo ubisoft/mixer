@@ -150,7 +150,7 @@ class MessageType(IntEnum):
     FRAME = 205
     PLAY = 206
     PAUSE = 207
-
+    WORLD_SKY = 208
     END_OPTIMIZED_COMMANDS = 999
 
     CLIENT_ID_WRAPPER = 1000
