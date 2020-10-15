@@ -267,3 +267,41 @@ class Collection(DifferentialApply):
         self.assertEqual(list(points1[0].location), [0.0, 0.0])
         self.assertEqual(list(points1[1].location), [1.0, 1.0])
         self.assertEqual(list(points1[2].location), [2.0, 2.0])
+
+
+class Aos(DifferentialApply):
+    # test_diff_compute.Aos
+
+    # @unittest.skip("AttributeError: 'CollectionObjects' object has no attribute 'fixed_type'")
+    def test_modify_value(self):
+        # modify a vertex coordinate in a mesh
+
+        # test_diff_apply.Aos.test_modify_value
+
+        mesh = bpy.data.meshes.new("Mesh")
+        mesh.vertices.add(4)
+        for i in [0, 1, 2, 3]:
+            v = 10 * i
+            mesh.vertices[i].co = [v, v + 1, v + 2]
+
+        expected_vertices = [list(vertex.co) for vertex in mesh.vertices]
+
+        self.proxy = BpyDataProxy()
+        self.proxy.load(test_properties)
+        mesh_proxy = self.proxy.data("meshes").search_one("Mesh")
+        mesh = bpy.data.meshes["Mesh"]
+
+        modified_vertex = (-1.0, -2.0, -3.0)
+        mesh.vertices[0].co = modified_vertex
+
+        self.generate_all_uuids()
+
+        mesh_delta = mesh_proxy.diff(mesh, mesh.name, None, self.proxy.context())
+
+        # reset mesh state
+        mesh.vertices[0].co = (0.0, 1.0, 2.0)
+
+        mesh_proxy.apply(bpy.data.meshes, mesh.name, mesh_delta, self.proxy.context())
+
+        vertices = [list(vertex.co) for vertex in mesh.vertices]
+        self.assertEqual(vertices, expected_vertices)

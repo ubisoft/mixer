@@ -4,6 +4,8 @@ import unittest
 
 import bpy
 
+from mixer.blender_data.aos_proxy import AosProxy
+from mixer.blender_data.aos_soa_proxy import SoaElement
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
@@ -346,3 +348,54 @@ class Collection(DifferentialCompute):
         location = point.data("location")
         self.assertAlmostEqual(location[0], 2.0)
         self.assertAlmostEqual(location[1], 2.0)
+
+
+class Aos(DifferentialCompute):
+    # test_diff_compute.Aos
+
+    # @unittest.skip("AttributeError: 'CollectionObjects' object has no attribute 'fixed_type'")
+    def test_modify_value(self):
+        # modify a vertex coordinate in a mesh
+
+        # test_diff_compute.Aos.test_modify_value
+
+        mesh = bpy.data.meshes.new("Mesh")
+        mesh.vertices.add(4)
+        for i in [0, 1, 2, 3]:
+            v = 10 * i
+            mesh.vertices[i].co = [v, v + 1, v + 2]
+
+        self.proxy = BpyDataProxy()
+        self.proxy.load(test_properties)
+        mesh_proxy = self.proxy.data("meshes").search_one("Mesh")
+        plane_mesh = bpy.data.meshes["Mesh"]
+
+        expected_vertex = (-1.0, -2.0, -3.0)
+        plane_mesh.vertices[0].co = expected_vertex
+        expected_vertices = [list(vertex.co) for vertex in mesh.vertices]
+
+        self.generate_all_uuids()
+
+        mesh_delta = mesh_proxy.diff(plane_mesh, plane_mesh.name, None, self.proxy.context())
+
+        self.assertIsInstance(mesh_delta, DeltaUpdate)
+        mesh_update = mesh_delta.value
+        self.assertIsInstance(mesh_update, DatablockProxy)
+        self.assertTrue(mesh_update.is_standalone_datablock)
+
+        vertices_delta = mesh_update.data("vertices", resolve_delta=False)
+        self.assertIsInstance(vertices_delta, DeltaUpdate)
+        vertices_update = vertices_delta.value
+        self.assertIsInstance(vertices_update, AosProxy)
+        self.assertTrue(vertices_update)
+
+        co_delta = vertices_update.data("co", resolve_delta=False)
+        self.assertIsInstance(co_delta, DeltaUpdate)
+        co_update = co_delta.value
+        self.assertIsInstance(co_update, SoaElement)
+
+        array_ = co_update._array
+        self.assertEqual(len(array_), 4 * 3)
+        vertices = [[x, y, z] for x, y, z in zip(array_[0::3], array_[1::3], array_[2::3])]
+
+        self.assertEqual(vertices, expected_vertices)
