@@ -1007,8 +1007,6 @@ class BlenderClient(Client):
                         data_api.build_data_create(command.data)
                     elif command.type == MessageType.BLENDER_DATA_RENAME:
                         data_api.build_data_rename(command.data)
-                    elif command.type == MessageType.BLENDER_DATA_SOAS:
-                        data_api.build_soa(command.data)
                     else:
                         # Command is ignored, so no depsgraph update can be triggered
                         command_triggers_depsgraph_update = False

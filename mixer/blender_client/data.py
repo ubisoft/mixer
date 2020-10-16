@@ -27,15 +27,27 @@ import itertools
 import json
 import logging
 import traceback
-from typing import TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Union
 
 from mixer.blender_data.json_codec import Codec
-from mixer.broadcaster import common
+from mixer.broadcaster.common import (
+    Command,
+    decode_int,
+    decode_py_array,
+    decode_string,
+    decode_string_array,
+    encode_int,
+    encode_py_array,
+    encode_string,
+    encode_string_array,
+    MessageType,
+)
 from mixer.share_data import share_data
 
 if TYPE_CHECKING:
     from mixer.blender_data.changeset import CreationChangeset, RemovalChangeset, UpdateChangeset, RenameChangeset
-    from mixer.blender_data.proxy import Delta, Proxy
+    from mixer.blender_data.datablock_proxy import DatablockProxy
+    from mixer.blender_data.proxy import DeltaUpdate, Uuid
 
 
 logger = logging.getLogger(__name__)
@@ -46,39 +58,53 @@ def send_data_creations(proxies: CreationChangeset):
         return
 
     codec = Codec()
-    for proxy in proxies:
-        logger.info("%s %s", "send_data_create", proxy)
+    for datablock_proxy in proxies:
+        logger.info("%s %s", "send_data_create", datablock_proxy)
 
         try:
-            encoded_proxy = codec.encode(proxy)
+            encoded_proxy = codec.encode(datablock_proxy)
         except Exception:
-            logger.error(f"send_data_create: encode exception for {proxy}")
+            logger.error(f"send_data_create: encode exception for {datablock_proxy}")
             for line in traceback.format_exc().splitlines():
                 logger.error(line)
             continue
 
-        buffer = common.encode_string(encoded_proxy)
-        command = common.Command(common.MessageType.BLENDER_DATA_CREATE, buffer, 0)
+        items: List[bytes] = []
+        items.append(encode_string(encoded_proxy))
+        items.extend(soa_buffers(datablock_proxy))
+        command = Command(MessageType.BLENDER_DATA_CREATE, b"".join(items), 0)
         share_data.client.add_command(command)
-        send_soas(proxy)
 
 
-def send_soas(proxy: Proxy):
-    # send SOA commands i.e. one command for all items in MeshVertex.vertices
-    # TODO may be possible to group per structure, i.e send all MeshVertex element at once
-    uuid = common.encode_string(proxy._datablock_uuid)
-    for path, soa_proxies in proxy._soas.items():
-        items = [uuid]
+def soa_buffers(datablock_proxy: Optional[DatablockProxy]) -> List[bytes]:
+    if datablock_proxy is None:
+        # empty update, should not happen
+        return [encode_int(0)]
+
+    # Layout is
+    #   number of AosProxy: 2
+    #       soa path in datablock : ("vertices")
+    #       number of SoaElement : 2
+    #           element name: "co"
+    #           array
+    #           element name: "normals"
+    #           array
+    #       soa path in datablock : ("edges")
+    #       number of SoaElement : 1
+    #           element name: "vertices"
+    #           array
+
+    items: List[bytes] = []
+    items.append(encode_int(len(datablock_proxy._soas)))
+    for path, soa_proxies in datablock_proxy._soas.items():
         path_string = json.dumps(path)
-        items.append(common.encode_string(path_string))
-        items.append(common.encode_int(len(soa_proxies)))
-        for element_name, soa_proxy in soa_proxies:
-            items.append(common.encode_string(element_name))
-            items.append(common.encode_py_array(soa_proxy._array))
-        buffer = b"".join(items)
-        command = common.Command(common.MessageType.BLENDER_DATA_SOAS, buffer, 0)
-        logger.info("send_soa %s", path_string)
-        share_data.client.add_command(command)
+        items.append(encode_string(path_string))
+        items.append(encode_int(len(soa_proxies)))
+        for element_name, soa_element in soa_proxies:
+            if soa_element._array is not None:
+                items.append(encode_string(element_name))
+                items.append(encode_py_array(soa_element._array))
+    return items
 
 
 def send_data_updates(updates: UpdateChangeset):
@@ -97,26 +123,30 @@ def send_data_updates(updates: UpdateChangeset):
                 logger.error(line)
             continue
 
-        buffer = common.encode_string(encoded_update)
-        command = common.Command(common.MessageType.BLENDER_DATA_UPDATE, buffer, 0)
+        items: List[bytes] = []
+        items.append(encode_string(encoded_update))
+        items.extend(soa_buffers(update.value))
+        command = Command(MessageType.BLENDER_DATA_UPDATE, b"".join(items), 0)
         share_data.client.add_command(command)
-        send_soas(update.value)
 
 
 def build_data_create(buffer):
     if not share_data.use_experimental_sync():
         return
 
-    buffer, _ = common.decode_string(buffer, 0)
+    proxy_string, index = decode_string(buffer, 0)
     codec = Codec()
     rename_changeset = None
 
     try:
-        id_proxy = codec.decode(buffer)
-        logger.info("%s: %s", "build_data_create", id_proxy)
+        datablock_proxy: DatablockProxy = codec.decode(proxy_string)
+        logger.info("%s: %s", "build_data_create", datablock_proxy)
+
         # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
         share_data.set_dirty()
-        _, rename_changeset = share_data.bpy_data_proxy.create_datablock(id_proxy)
+
+        _, rename_changeset = share_data.bpy_data_proxy.create_datablock(datablock_proxy)
+        _decode_and_build_soas(datablock_proxy.mixer_uuid(), buffer, index)
     except Exception:
         logger.error("Exception during build_data_create")
         for line in traceback.format_exc().splitlines():
@@ -130,41 +160,48 @@ def build_data_create(buffer):
         send_data_renames(rename_changeset)
 
 
-def build_soa(buffer):
+def _decode_and_build_soas(uuid: Uuid, buffer: bytes, index: int):
+    path: List[Union[int, str]] = ["unknown"]
+    name = "unknown"
     try:
-        uuid, index = common.decode_string(buffer, 0)
-        path_string, index = common.decode_string(buffer, index)
-        path = json.loads(path_string)
+        # see soa_buffers()
+        aos_count, index = decode_int(buffer, index)
+        for _ in range(aos_count):
+            path_string, index = decode_string(buffer, index)
+            path = json.loads(path_string)
 
-        logger.info("%s: %s %s", "build_soa", uuid, path)
+            logger.info("%s: %s %s", "build_soa", uuid, path)
 
-        element_count, index = common.decode_int(buffer, index)
-        soas = []
-        for _ in range(element_count):
-            name, index = common.decode_string(buffer, index)
-            array, index = common.decode_py_array(buffer, index)
-            soas.append((name, array))
-        share_data.bpy_data_proxy.update_soa(uuid, path, soas)
+            element_count, index = decode_int(buffer, index)
+            soas = []
+            for _ in range(element_count):
+                name, index = decode_string(buffer, index)
+                array, index = decode_py_array(buffer, index)
+                soas.append((name, array))
+            share_data.bpy_data_proxy.update_soa(uuid, path, soas)
     except Exception:
-        logger.error("Exception during build_soa")
+        logger.error(f"Exception during build_soa for {uuid} {path} {name}")
         for line in traceback.format_exc().splitlines():
             logger.error(line)
         logger.error("ignored")
 
 
-def build_data_update(buffer):
+def build_data_update(buffer: bytes):
     if not share_data.use_experimental_sync():
         return
 
-    buffer, _ = common.decode_string(buffer, 0)
+    proxy_string, index = decode_string(buffer, 0)
     codec = Codec()
 
     try:
-        delta: Delta = codec.decode(buffer)
+        delta: DeltaUpdate = codec.decode(proxy_string)
         logger.info("%s: %s", "build_data_update", delta)
         # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
         share_data.set_dirty()
         share_data.bpy_data_proxy.update_datablock(delta)
+        datablock_proxy = delta.value
+        if datablock_proxy is not None:
+            _decode_and_build_soas(datablock_proxy.mixer_uuid(), buffer, index)
     except Exception:
         logger.error("Exception during build_data_update")
         for line in traceback.format_exc().splitlines():
@@ -182,8 +219,8 @@ def send_data_removals(removals: RemovalChangeset):
 
     for uuid, debug_info in removals:
         logger.info("send_removal: %s (%s)", uuid, debug_info)
-        buffer = common.encode_string(uuid) + common.encode_string(debug_info)
-        command = common.Command(common.MessageType.BLENDER_DATA_REMOVE, buffer, 0)
+        buffer = encode_string(uuid) + encode_string(debug_info)
+        command = Command(MessageType.BLENDER_DATA_REMOVE, buffer, 0)
         share_data.client.add_command(command)
 
 
@@ -191,8 +228,8 @@ def build_data_remove(buffer):
     if not share_data.use_experimental_sync():
         return
 
-    uuid, index = common.decode_string(buffer, 0)
-    debug_info, index = common.decode_string(buffer, index)
+    uuid, index = decode_string(buffer, 0)
+    debug_info, index = decode_string(buffer, index)
     logger.info("build_data_remove: %s (%s)", uuid, debug_info)
     share_data.bpy_data_proxy.remove_datablock(uuid)
 
@@ -211,8 +248,8 @@ def send_data_renames(renames: RenameChangeset):
         logger.info("send_rename: %s (%s) into %s", uuid, debug_info, new_name)
         items.extend([uuid, old_name, new_name])
 
-    buffer = common.encode_string_array(items)
-    command = common.Command(common.MessageType.BLENDER_DATA_RENAME, buffer, 0)
+    buffer = encode_string_array(items)
+    command = Command(MessageType.BLENDER_DATA_RENAME, buffer, 0)
     share_data.client.add_command(command)
 
 
@@ -220,7 +257,7 @@ def build_data_rename(buffer):
     if not share_data.use_experimental_sync():
         return
 
-    strings, _ = common.decode_string_array(buffer, 0)
+    strings, _ = decode_string_array(buffer, 0)
 
     # (uuid1, old1, new1, uuid2, old2, new2, ...) to ((uuid1, old1, new1), (uuid2, old2, new2), ...)
     args = [iter(strings)] * 3
