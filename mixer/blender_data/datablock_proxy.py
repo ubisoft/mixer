@@ -61,7 +61,11 @@ class DatablockProxy(StructProxy):
         self._class_name: str = ""
         self._datablock_uuid: Optional[str] = None
 
-        self._soas: Dict[VisitState.Path, SoaElement] = defaultdict(list)
+        self._soas: Dict[VisitState.Path, List[Tuple[str, SoaElement]]] = defaultdict(list)
+        """e.g. {
+            ("vertices"): [("co", co_soa), ("normals", normals_soa)]
+            ("edges"): ...
+        }"""
 
     def init(self, datablock: T.ID):
         if datablock is not None:

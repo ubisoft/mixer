@@ -129,8 +129,8 @@ def decode_hook(x):
 
 
 class Codec:
-    def encode(self, obj):
+    def encode(self, obj) -> str:
         return json.dumps(obj, default=default)
 
-    def decode(self, message):
+    def decode(self, message: str):
         return json.loads(message, object_hook=decode_hook)
