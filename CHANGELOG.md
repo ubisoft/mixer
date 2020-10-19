@@ -1,3 +1,15 @@
+# WIP
+
+## Features
+
+- Shading trees for objects, worlds and lights (except grouped nodes)
+
+## Fixes
+
+- Transfer less mesh data when modifiers are modified
+- Trasnfer less mesh data with linked meshes
+
+
 # 0.17.0 (2020-10-15)
 
 ## Features
