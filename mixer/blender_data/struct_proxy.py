@@ -46,6 +46,15 @@ class StructProxy(Proxy):
         self._data = {}
         pass
 
+    @classmethod
+    def make(cls, attr_property):
+
+        # if isinstance(attr_property, T.NodeLink):
+        #     from mixer.blender_data.node_proxy import NodeLinkProxy
+
+        #     return NodeLinkProxy()
+        return cls()
+
     def load(self, bl_instance: Any, parent_key: Union[int, str], context: Context):
 
         """
@@ -90,7 +99,6 @@ class StructProxy(Proxy):
         if target is None:
             if isinstance(bl_instance, T.bpy_prop_collection):
                 logger.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist.")
-                logger.warning("Note: Not implemented write to dict")
             else:
                 # Don't log this because it produces too many log messages when participants have plugins
                 # f"Note: May be due to a plugin used by the sender and not on this Blender"

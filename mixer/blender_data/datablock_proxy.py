@@ -34,7 +34,7 @@ from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 from mixer.blender_data.attributes import apply_attribute, read_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaUpdate
 from mixer.blender_data.struct_proxy import StructProxy
-from mixer.blender_data.types import is_pointer_to, sub_id_type
+from mixer.blender_data.types import sub_id_type
 
 if TYPE_CHECKING:
     import array
@@ -74,15 +74,6 @@ class DatablockProxy(StructProxy):
                 self._bpy_data_collection = rna_identifier_to_collection_name[type_name]
                 self._datablock_uuid = datablock.mixer_uuid
             self._class_name = datablock.__class__.__name__
-
-    @classmethod
-    def make(cls, attr_property):
-
-        if is_pointer_to(attr_property, T.NodeTree):
-            from mixer.blender_data.node_proxy import NodeTreeProxy
-
-            return NodeTreeProxy()
-        return DatablockProxy()
 
     @property
     def is_standalone_datablock(self):

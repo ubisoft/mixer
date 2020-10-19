@@ -22,6 +22,7 @@ This module and the resulting encoding are by no way optimal. It is just a simpl
 implementation that does the job.
 """
 import json
+import logging
 from typing import Any, Dict
 
 from mixer.blender_data.aos_proxy import AosProxy
@@ -30,9 +31,11 @@ from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaU
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy, DatablockRefCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
-from mixer.blender_data.node_proxy import NodeLinksProxy, NodeTreeProxy
+from mixer.blender_data.node_proxy import NodeLinksProxy
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
+
+logger = logging.getLogger(__name__)
 
 # https://stackoverflow.com/questions/38307068/make-a-dict-json-from-string-with-duplicate-keys-python/38307621#38307621
 # https://stackoverflow.com/questions/31085153/easiest-way-to-serialize-object-in-a-nested-dictionary
@@ -41,8 +44,6 @@ struct_like_classes = [
     DatablockProxy,
     DatablockRefProxy,
     StructProxy,
-    NodeLinksProxy,
-    NodeTreeProxy,
     SoaElement,
 ]
 collection_classes = [
@@ -50,7 +51,9 @@ collection_classes = [
     DatablockCollectionProxy,
     DatablockRefCollectionProxy,
     AosProxy,
+    NodeLinksProxy,
 ]
+
 delta_classes = [
     Delta,
     DeltaAddition,
@@ -60,6 +63,8 @@ delta_classes = [
 _classes = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
 _classes.update({c.__name__: c for c in delta_classes})
+
+_classes_tuple = tuple(_classes.values())
 
 options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name"]
 MIXER_CLASS = "__mixer_class__"
@@ -78,7 +83,7 @@ def default(obj):
 
     # TODO AOS and SOA
 
-    is_known = issubclass(class_, (StructProxy, DatablockRefProxy, Delta, SoaElement)) or class_ in collection_classes
+    is_known = issubclass(class_, _classes_tuple)
     if is_known:
         # Add the proxy class so that the decoder and instantiate the right type
         d = {MIXER_CLASS: class_.__name__}

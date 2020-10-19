@@ -34,7 +34,6 @@ from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaAddition, DeltaDeletion, DeltaUpdate
 from mixer.blender_data.proxy import MIXER_SEQUENCE, Proxy
-from mixer.blender_data.node_proxy import NodeLinksProxy
 from mixer.blender_data.struct_proxy import StructProxy
 
 if TYPE_CHECKING:
@@ -103,6 +102,8 @@ class StructCollectionProxy(Proxy):
     @classmethod
     def make(cls, attr_property: T.Property):
         if attr_property.srna == T.NodeLinks.bl_rna:
+            from mixer.blender_data.node_proxy import NodeLinksProxy
+
             return NodeLinksProxy()
         return StructCollectionProxy()
 
@@ -132,7 +133,9 @@ class StructCollectionProxy(Proxy):
             if is_sequence:
                 # easier for the encoder to always have a dict
                 self._data = {
-                    MIXER_SEQUENCE: [StructProxy().load(v, i, context) for i, v in enumerate(bl_collection.values())]
+                    MIXER_SEQUENCE: [
+                        StructProxy.make(v).load(v, i, context) for i, v in enumerate(bl_collection.values())
+                    ]
                 }
             else:
                 self._data = {k: StructProxy().load(v, k, context) for k, v in bl_collection.items()}
