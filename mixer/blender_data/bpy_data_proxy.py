@@ -22,9 +22,10 @@ See synchronization.md
 """
 from __future__ import annotations
 
+import array
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -95,7 +96,21 @@ class VisitState:
     Gathers proxy system state (mainly known datablocks) and properties to synchronize
     """
 
+    Path = List[Union[str, int]]
+
+    datablock_proxy: Optional[DatablockProxy] = None
+    """The datablock proxy being visited"""
+
+    path: Path = field(default_factory=list)
+    """The path to the current property from the datablock, for instance in GreasePencil
+    ["layers", "fills", "frames", 0, "strokes", 1, "points", 0]"""
+
     recursion_guard: RecursionGuard = RecursionGuard()
+
+    funcs: Dict[str, Callable] = field(default_factory=dict)
+    """Functions transmitted from a property to another
+    (e.g Mesh transmits clear_geometry that is called if necessary
+    by the MeshVertices SoaProxy ) """
 
 
 @dataclass
@@ -168,7 +183,7 @@ class BpyDataProxy(Proxy):
 
         for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
-            self._data[name] = DatablockCollectionProxy().load_as_ID(collection, context)
+            self._data[name] = DatablockCollectionProxy().load(collection, name, context)
         return self
 
     def find(self, collection_name: str, key: str) -> DatablockProxy:
@@ -226,6 +241,7 @@ class BpyDataProxy(Proxy):
                 logger.info("depsgraph update: ignoring untracked type %s", datablock)
                 continue
             if isinstance(datablock, T.Scene) and datablock.name == "_mixer_to_be_removed_":
+                logger.error(f"Skipping scene {datablock.name} uuid: '{datablock.mixer_uuid}'")
                 continue
             proxy = self.state.proxies.get(datablock.mixer_uuid)
             if proxy is None:
@@ -240,7 +256,7 @@ class BpyDataProxy(Proxy):
                 # However, it is not obvious to detect the safe cases and remove the message in such cases
                 logger.info("depsgraph update: Ignoring embedded %s", datablock)
                 continue
-            delta = proxy.diff(datablock, None, context)
+            delta = proxy.diff(datablock, datablock.name, None, context)
             if delta:
                 logger.info("depsgraph update: update %s", datablock)
                 # TODO add an apply mode to diff instead to avoid two traversals ?
@@ -371,3 +387,8 @@ class BpyDataProxy(Proxy):
         if len(diff._data):
             return diff
         return None
+
+    def update_soa(self, uuid: Uuid, path: List[Union[int, str]], soas: List[Tuple[str, array.array]]):
+        datablock_proxy = self.state.proxies[uuid]
+        datablock = self.state.datablocks[uuid]
+        datablock_proxy.update_soa(datablock, path, soas)

@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 import logging
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 from uuid import uuid4
 
 import bpy
@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# storing everything in a single dictionary is easier for serialization
 MIXER_SEQUENCE = "__mixer_sequence__"
 
 Uuid = str
@@ -161,7 +160,7 @@ class Proxy:
         else:
             return resolve(self._data.get(key))
 
-    def save(self, bl_instance: Any, attr_name: str):
+    def save(self, bl_instance: Any, attr_name: str, context: Context):
         """
         Save this proxy into a blender object
         """
@@ -181,6 +180,33 @@ class Proxy:
         self, container: Union[T.bpy_prop_collection, T.Struct], key: Union[str, int], context: Context
     ) -> Optional[DeltaUpdate]:
         raise NotImplementedError(f"diff for {container}[{key}]")
+
+    def find_by_path(
+        self, bl_item: Union[T.bpy_struct, T.bpy_prop_collection], path: List[Union[int, str]]
+    ) -> Optional[Tuple[Union[T.bpy_struct, T.bpy_prop_collection], Proxy]]:
+        head, *tail = path
+        if isinstance(bl_item, T.bpy_struct):
+            bl = getattr(bl_item, head)
+        elif isinstance(bl_item, T.bpy_prop_collection):
+            if isinstance(head, int) and head + 1 > len(bl_item):
+                logger.error(f"Index {head} > len({bl_item}) ({len(bl_item)})")
+                return None
+            if isinstance(head, str) and head not in bl_item:
+                logger.error(f"Key {head} not in {bl_item}")
+                return None
+            bl = bl_item[head]
+        else:
+            return None
+
+        proxy = self.data(head)
+        if proxy is None:
+            logger.warning(f"find_by_path: No proxy for {bl_item} {path}")
+            return
+
+        if not tail:
+            return bl, proxy
+
+        return proxy.find_by_path(bl, tail)
 
 
 def ensure_uuid(item: bpy.types.ID) -> str:

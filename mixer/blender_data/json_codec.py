@@ -24,8 +24,10 @@ implementation that does the job.
 import json
 from typing import Any, Dict
 
+from mixer.blender_data.aos_proxy import AosProxy
+from mixer.blender_data.aos_soa_proxy import SoaElement
 from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaUpdate
-from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
+from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy, DatablockRefCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.node_proxy import NodeLinksProxy, NodeTreeProxy
@@ -39,13 +41,15 @@ struct_like_classes = [
     DatablockProxy,
     DatablockRefProxy,
     StructProxy,
-    StructProxy,
     NodeLinksProxy,
     NodeTreeProxy,
+    SoaElement,
 ]
 collection_classes = [
     StructCollectionProxy,
     DatablockCollectionProxy,
+    DatablockRefCollectionProxy,
+    AosProxy,
 ]
 delta_classes = [
     Delta,
@@ -74,17 +78,23 @@ def default(obj):
 
     # TODO AOS and SOA
 
-    is_known = issubclass(class_, (StructProxy, DatablockRefProxy, Delta)) or class_ in collection_classes
+    is_known = issubclass(class_, (StructProxy, DatablockRefProxy, Delta, SoaElement)) or class_ in collection_classes
     if is_known:
         # Add the proxy class so that the decoder and instantiate the right type
         d = {MIXER_CLASS: class_.__name__}
         if issubclass(class_, Delta):
             d.update({"value": obj.value})
+        elif issubclass(class_, SoaElement):
+            pass
         else:
             d.update({"_data": obj._data})
 
         for option in options:
             d.update(default_optional(obj, option))
+        serialize = getattr(class_, "_serialize", None)
+        if serialize is not None:
+            for option in serialize:
+                d.update(default_optional(obj, option))
         return d
     return None
 
@@ -105,17 +115,22 @@ def decode_hook(x):
     obj = class_()
     if class_ in delta_classes:
         obj.value = x["value"]
+    elif class_ is SoaElement:
+        pass
     else:
         obj._data.update(x["_data"])
 
     for option in options:
         decode_optional(obj, x, option)
+    if hasattr(class_, "_serialize"):
+        for option in class_._serialize:
+            decode_optional(obj, x, option)
     return obj
 
 
 class Codec:
-    def encode(self, obj):
+    def encode(self, obj) -> str:
         return json.dumps(obj, default=default)
 
-    def decode(self, message):
+    def decode(self, message: str):
         return json.loads(message, object_hook=decode_hook)

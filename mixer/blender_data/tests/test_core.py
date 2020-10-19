@@ -35,7 +35,7 @@ class TestCore(unittest.TestCase):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
         register_bl_equals(self, test_properties)
         self._proxy = BpyDataProxy()
-        self._visit_state = self._proxy.context()
+        self._context = self._proxy.context()
 
     def test_issubclass(self):
 
@@ -126,7 +126,7 @@ class TestCore(unittest.TestCase):
 
     def test_skip_ShaderNodeTree(self):  # noqa N802
         world = D.worlds["World"]
-        proxy = StructProxy().load(world, self._visit_state)
+        proxy = StructProxy().load(world, "", self._context)
         self.assertTrue("color" in proxy._data)
         # self.assertFalse("node_tree" in proxy._data)
 

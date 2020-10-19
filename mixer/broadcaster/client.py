@@ -205,7 +205,7 @@ class Client:
     def _handle_join_room(self, command: common.Command):
         room_name, _ = common.decode_string(command.data, 0)
 
-        logger.info("Join room %s confirmed by server", room_name)
+        logger.warning("Info: Join room '%s' confirmed by server", room_name)
         self.current_room = room_name
 
     def _handle_send_error(self, command: common.Command):

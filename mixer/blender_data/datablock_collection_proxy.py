@@ -15,12 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-Proxy of a datablock collection
+Proxies for collections of datablock (e.g. bpy.data.objects) or datablock references (e.g. Scene.objects)
 
 See synchronization.md
 """
 from __future__ import annotations
 
+import functools
 import logging
 import traceback
 from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING, Union
@@ -30,13 +31,14 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data.attributes import diff_attribute, read_attribute, write_attribute
 from mixer.blender_data.blenddata import BlendData
+from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.diff import BpyPropCollectionDiff
 from mixer.blender_data.filter import skip_bpy_data_item
 from mixer.blender_data.proxy import DeltaUpdate, DeltaAddition, DeltaDeletion, MaxDepthExceeded
 from mixer.blender_data.proxy import ensure_uuid, Proxy
-from mixer.blender_data.changeset import Changeset, RenameChangeset
+from mixer.blender_data import specifics
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
@@ -47,16 +49,10 @@ logger = logging.getLogger(__name__)
 
 class DatablockCollectionProxy(Proxy):
     """
-    Proxy to a bpy_prop_collection of standalone datablocks, be it one of bpy.data collections
-    or a collection like Scene.collection.objects.
+    Proxy to a bpy_prop_collection of standalone datablocks, i.e. of bpy.data collections
 
-    This proxy keeps track of the state of the whole collection. If the tracked collection is a bpy.data
-    collection (e.g.bpy.data.objects), the proxy contents will be instances of DatablockProxy.
-    Otherwise (e.g. Scene.collection.objects) the proxy contents are instances of DatablockRefProxy
-    that reference items in bpy.data collections.
-
-    TODO Split this class into proxy to collections of standalone datablocks (bpy.data collections)
-    and proxy to collection of datablock references (e.g. Scene.objects)
+    This proxy keeps track of the state of the whole collection. The proxy contents are be instances
+    of DatablockProxy.
     """
 
     def __init__(self):
@@ -66,26 +62,17 @@ class DatablockCollectionProxy(Proxy):
     def __len__(self):
         return len(self._data)
 
-    def load_as_ID(self, bl_collection: bpy.types.bpy_prop_collection, context: Context):  # noqa N802
+    def load(self, bl_collection: bpy.types.bpy_prop_collection, key: str, context: Context):  # noqa N802
         """
         Load bl_collection elements as standalone datablocks.
         """
-        for _, item in bl_collection.items():
+        for name, item in bl_collection.items():
             collection_name = BlendData.instance().bl_collection_name_from_ID(item)
             if skip_bpy_data_item(collection_name, item):
                 continue
             uuid = ensure_uuid(item)
-            self._data[uuid] = DatablockProxy().load(item, context, bpy_data_collection_name=collection_name)
+            self._data[uuid] = DatablockProxy().load(item, name, context, bpy_data_collection_name=collection_name)
 
-        return self
-
-    def load_as_IDref(self, bl_collection: bpy.types.bpy_prop_collection, context: Context):  # noqa N802
-        """
-        Load bl_collection elements as references to bpy.data collections
-        """
-        for _, item in bl_collection.items():
-            uuid = item.mixer_uuid
-            self._data[uuid] = DatablockRefProxy().load(item, context)
         return self
 
     def save(self, parent: Any, key: str, context: Context):
@@ -102,24 +89,9 @@ class DatablockCollectionProxy(Proxy):
             # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
             return
 
-        link = getattr(target, "link", None)
-        unlink = getattr(target, "unlink", None)
-        if link is not None and unlink is not None:
-            # Collection of datablock references
-            if not len(target):
-                for _, ref_proxy in self._data.items():
-                    datablock = ref_proxy.target(context)
-                    if datablock:
-                        link(datablock)
-                    else:
-                        logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy.display_string()}")
-                        context.proxy_state.unresolved_refs.append(ref_proxy.mixer_uuid, link)
-            else:
-                logger.warning(f"Saving into non empty collection: {target}. Ignored")
-        else:
-            # collection of standalone datablocks
-            for k, v in self._data.items():
-                write_attribute(target, k, v, context)
+        # collection of standalone datablocks
+        for k, v in self._data.items():
+            write_attribute(target, k, v, context)
 
     def find(self, key: str):
         return self._data.get(key)
@@ -135,15 +107,21 @@ class DatablockCollectionProxy(Proxy):
 
         datablock, renames = incoming_proxy.create_standalone_datablock(context)
 
-        # One existing scene from the document loaded at join time could not be removed. Remove it now
-        if (
-            incoming_proxy.collection_name == "scenes"
-            and len(bpy.data.scenes) == 2
-            and bpy.data.scenes[0].name == "_mixer_to_be_removed_"
-        ):
-            from mixer.blender_client.scene import delete_scene
+        if incoming_proxy.collection_name == "scenes":
+            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid()}'")
 
-            delete_scene(bpy.data.scenes[0])
+            # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
+            # Remove it now
+            scenes = bpy.data.scenes
+            if len(scenes) == 2 and ("_mixer_to_be_removed_" in scenes):
+                from mixer.blender_client.scene import delete_scene
+
+                scene_to_remove = scenes["_mixer_to_be_removed_"]
+                logger.warning(
+                    f"After create scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid()}''"
+                )
+                logger.warning(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
+                delete_scene(scene_to_remove)
 
         if not datablock:
             return None, None
@@ -235,7 +213,7 @@ class DatablockCollectionProxy(Proxy):
                     continue
                 uuid = ensure_uuid(id_)
                 context.proxy_state.datablocks[uuid] = id_
-                proxy = DatablockProxy().load(id_, context, bpy_data_collection_name=collection_name)
+                proxy = DatablockProxy().load(id_, name, context, bpy_data_collection_name=collection_name)
                 context.proxy_state.proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
@@ -293,6 +271,81 @@ class DatablockCollectionProxy(Proxy):
 
         return changeset
 
+    def search(self, name: str) -> [DatablockProxy]:
+        """Convenience method to find proxies by name instead of uuid (for tests only)"""
+        results = []
+        for uuid in self._data.keys():
+            proxy_or_update = self.data(uuid)
+            proxy = proxy_or_update if isinstance(proxy_or_update, Proxy) else proxy_or_update.value
+            if proxy.data("name") == name:
+                results.append(proxy)
+        return results
+
+    def search_one(self, name: str) -> DatablockProxy:
+        """Convenience method to find a proxy by name instead of uuid (for tests only)"""
+        results = self.search(name)
+        return None if not results else results[0]
+
+
+class DatablockRefCollectionProxy(Proxy):
+    """
+    Proxy to a bpy_prop_collection of datablock references like Scene.collection.objects or Object.materials
+
+
+    TODO
+    SceneObjects behave like dictionaries and IDMaterials bahave like sequence. Only the dictionary case
+    is is correctly implemented.handles and having multiple items in IDMaterials is not supported
+    """
+
+    def __init__(self):
+        # On item per datablock. The key is the uuid, which eases rename management
+        self._data: Dict[str, DatablockRefProxy] = {}
+
+    def __len__(self):
+        return len(self._data)
+
+    def load(self, bl_collection: bpy.types.bpy_prop_collection, key: Union[int, str], context: Context):  # noqa N802
+        """
+        Load bl_collection elements as references to bpy.data collections
+        """
+
+        # Warning:
+        # - for Scene.object, can use uuids as no references are None
+        # - for Mesh.matrials, more than one reference may be none, so cannot use a map, it is a sequence
+        # Also, if Mesh.materials has a None item, len(bl_collection) == 2 (includes the None),
+        # but len(bl_collection.items()) == 1 (excludes the None)
+        # so iterate on bl_collection
+        for item in bl_collection:
+            if item is not None:
+                proxy = DatablockRefProxy()
+                uuid = item.mixer_uuid
+                proxy.load(item, item.name, context)
+                self._data[uuid] = proxy
+        return self
+
+    def save(self, parent: Any, key: str, context: Context):
+        """
+        Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data
+        or a collection of referenced datablocks like bpy.type.Collection.children
+        """
+        if not self._data:
+            return
+
+        collection = getattr(parent, key, None)
+        if collection is None:
+            # Don't log this, too many messages
+            # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
+            return
+
+        for _, ref_proxy in self._data.items():
+            datablock = ref_proxy.target(context)
+            if datablock:
+                specifics.add_datablock_ref_element(collection, datablock)
+            else:
+                logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy.display_string()}")
+                add_element = functools.partial(specifics.add_datablock_ref_element, collection)
+                context.proxy_state.unresolved_refs.append(ref_proxy.mixer_uuid, add_element)
+
     def apply(
         self,
         parent: Any,
@@ -300,7 +353,7 @@ class DatablockCollectionProxy(Proxy):
         collection_delta: Optional[DeltaUpdate],
         context: Context,
         to_blender: bool = True,
-    ) -> DatablockCollectionProxy:
+    ) -> DatablockRefCollectionProxy:
         """
         Apply a received Delta to this proxy.
 
@@ -352,7 +405,7 @@ class DatablockCollectionProxy(Proxy):
         return self
 
     def diff(
-        self, collection: T.bpy_prop_collection, collection_property: T.Property, context: Context
+        self, collection: T.bpy_prop_collection, key: str, collection_property: T.Property, context: Context
     ) -> Optional[DeltaUpdate]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
@@ -383,7 +436,7 @@ class DatablockCollectionProxy(Proxy):
         maybe_updated_keys = proxy_keys & blender_keys
 
         for k in added_keys:
-            value = read_attribute(blender_items[k], item_property, context)
+            value = read_attribute(blender_items[k], k, item_property, context)
             assert isinstance(value, (DatablockProxy, DatablockRefProxy))
             diff._data[k] = DeltaAddition(value)
 
@@ -391,7 +444,7 @@ class DatablockCollectionProxy(Proxy):
             diff._data[k] = DeltaDeletion(self._data[k])
 
         for k in maybe_updated_keys:
-            delta = diff_attribute(blender_items[k], item_property, self.data(k), context)
+            delta = diff_attribute(blender_items[k], k, item_property, self.data(k), context)
             if delta is not None:
                 assert isinstance(delta, DeltaUpdate)
                 diff._data[k] = delta
@@ -400,18 +453,3 @@ class DatablockCollectionProxy(Proxy):
             return DeltaUpdate(diff)
 
         return None
-
-    def search(self, name: str) -> [DatablockProxy]:
-        """Convenience method to find proxies by name instead of uuid (for tests only)"""
-        results = []
-        for uuid in self._data.keys():
-            proxy_or_update = self.data(uuid)
-            proxy = proxy_or_update if isinstance(proxy_or_update, Proxy) else proxy_or_update.value
-            if proxy.data("name") == name:
-                results.append(proxy)
-        return results
-
-    def search_one(self, name: str) -> DatablockProxy:
-        """Convenience method to find a proxy by name instead of uuid (for tests only)"""
-        results = self.search(name)
-        return None if not results else results[0]

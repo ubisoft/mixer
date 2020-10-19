@@ -23,19 +23,76 @@ Proxy implementation.
 TODO Enhance this module so that it is possible to reference types that do not exist in all Blender versions or
 to control behavior with plugin data.
 """
+
+from __future__ import annotations
+
+import array
 import logging
 from pathlib import Path
 import traceback
-from typing import Any, ItemsView, List, Optional, TypeVar
+from typing import Any, Dict, ItemsView, Optional, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa N812
 import bpy.path
+import mathutils
+
+
+if TYPE_CHECKING:
+    from mixer.blender_data.aos_proxy import AosProxy
+    from mixer.blender_data.proxy import Context, Proxy
+    from mixer.blender_data.bpy_data_proxy import VisitState
+    from mixer.blender_data.datablock_proxy import DatablockProxy
+    from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 logger = logging.getLogger(__name__)
-Proxy = TypeVar("Proxy")
-DatablockProxy = TypeVar("DatablockProxy")
-Context = TypeVar("Context")
+
+
+# Beware that MeshVertex must be handled as SOA although "groups" is a variable length item.
+# Enums are not handled by foreach_get()
+soable_collection_properties = {
+    T.GPencilStroke.bl_rna.properties["points"],
+    T.GPencilStroke.bl_rna.properties["triangles"],
+    T.Mesh.bl_rna.properties["edges"],
+    T.Mesh.bl_rna.properties["face_maps"],
+    T.Mesh.bl_rna.properties["loops"],
+    T.Mesh.bl_rna.properties["loop_triangles"],
+    # messy: :MeshPolygon.vertices has variable length, not 3 as stated in the doc, so ignore
+    T.Mesh.bl_rna.properties["polygons"],
+    T.Mesh.bl_rna.properties["polygon_layers_float"],
+    T.Mesh.bl_rna.properties["polygon_layers_int"],
+    T.Mesh.bl_rna.properties["vertices"],
+    T.MeshUVLoopLayer.bl_rna.properties["data"],
+    T.MeshLoopColorLayer.bl_rna.properties["data"],
+}
+
+# in sync with soa_initializers
+soable_properties = (
+    T.BoolProperty,
+    T.IntProperty,
+    T.FloatProperty,
+    mathutils.Vector,
+    mathutils.Color,
+    mathutils.Quaternion,
+)
+
+# in sync with soable_properties
+soa_initializers: Dict[type, array.array] = {
+    bool: array.array("b", [0]),
+    int: array.array("l", [0]),
+    float: array.array("f", [0.0]),
+    mathutils.Vector: array.array("f", [0.0]),
+    mathutils.Color: array.array("f", [0.0]),
+    mathutils.Quaternion: array.array("f", [0.0]),
+}
+
+
+def is_soable_collection(prop):
+    return prop in soable_collection_properties
+
+
+def is_soable_property(bl_rna_property):
+    return isinstance(bl_rna_property, soable_properties)
 
 
 def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
@@ -150,6 +207,15 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
 
+    if isinstance(bpy_struct, T.Mesh):
+        if not bpy_struct.use_auto_texspace:
+            # Empty
+            return properties
+        filtered = {}
+        filter_props = ["texspace_location", "texspace_size"]
+        filtered = {k: v for k, v in properties if k not in filter_props}
+        return filtered.items()
+
     if isinstance(bpy_struct, T.MetaBall):
         if not bpy_struct.use_auto_texspace:
             return properties
@@ -181,17 +247,13 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
     return properties
 
 
-def pre_save_id(proxy: Proxy, target: T.ID, context: Context) -> T.ID:
-    """Process attributes that must be saved first and return a possibly updated reference to the target
-
-    Args:
-        bpy_struct: The collection that contgains the ID
-        attr_name: Its key
-
-    Returns:
-        [bpy.types.ID]: a possibly new ID
-    """
+def pre_save_id(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
+    """Process attributes that must be saved first and return a possibly updated reference to the target"""
     if isinstance(target, bpy.types.Material):
+        use_nodes = proxy.data("use_nodes")
+        if use_nodes:
+            target.use_nodes = True
+
         is_grease_pencil = proxy.data("is_grease_pencil")
         # will be None for a DeltaUpdate that does not modify "is_grease_pencil"
         if is_grease_pencil is not None:
@@ -225,6 +287,9 @@ def pre_save_id(proxy: Proxy, target: T.ID, context: Context) -> T.ID:
         use_nodes = proxy.data("use_nodes")
         if use_nodes:
             target.use_nodes = True
+    elif isinstance(target, T.Mesh):
+        context.visit_state.funcs["Mesh.clear_geometry"] = target.clear_geometry
+
     return target
 
 
@@ -256,8 +321,28 @@ def post_save_id(proxy: Proxy, bpy_id: T.ID):
             proxy._data[attr_name] = bpy.path.abspath(path)
 
 
+_link_collections = tuple(type(t.bl_rna) for t in [T.CollectionObjects, T.CollectionChildren, T.SceneObjects])
+
+
+def add_datablock_ref_element(collection: T.bpy_prop_collection, datablock: T.ID):
+    """Add an element to a bpy_prop_collection using the collection specific API"""
+    bl_rna = getattr(collection, "bl_rna", None)
+    if bl_rna is not None:
+        if isinstance(bl_rna, _link_collections):
+            collection.link(datablock)
+            return
+
+        if isinstance(bl_rna, type(T.IDMaterials.bl_rna)):
+            collection.append(datablock)
+            return
+
+    logging.warning(f"add_datablock_ref_element : no implementation for {collection} ")
+
+
 non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}
 effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - non_effect_sequences
+
+_new_name_types = (type(T.UVLoopLayers.bl_rna), type(T.LoopColors.bl_rna), type(T.FaceMaps.bl_rna))
 
 
 def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, context: Context):
@@ -270,9 +355,26 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             modifier_type = proxy.data("type")
             return collection.new(name, modifier_type)
 
+        if isinstance(bl_rna, type(T.SequenceModifiers.bl_rna)):
+            name = proxy.data("name")
+            type_ = proxy.data("type")
+            return collection.new(name, type_)
+
         if isinstance(bl_rna, type(T.ObjectConstraints.bl_rna)):
             type_ = proxy.data("type")
             return collection.new(type_)
+
+        if isinstance(bl_rna, type(T.Nodes.bl_rna)):
+            node_type = proxy.data("bl_idname")
+            return collection.new(node_type)
+
+        if isinstance(bl_rna, _new_name_types):
+            name = proxy.data("name")
+            return collection.new(name=name)
+
+        if isinstance(bl_rna, type(T.GreasePencilLayers.bl_rna)):
+            name = proxy.data("info")
+            return collection.new(name)
 
         if isinstance(bl_rna, type(T.KeyingSets.bl_rna)):
             idname = proxy.data("bl_idname")
@@ -294,10 +396,6 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             return collection.add(
                 target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
             )
-
-        if isinstance(bl_rna, type(T.Nodes.bl_rna)):
-            node_type = proxy.data("bl_idname")
-            return collection.new(node_type)
 
         if isinstance(bl_rna, type(T.Sequences.bl_rna)):
             type_ = proxy.data("type")
@@ -331,11 +429,6 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             # but it does not work for this case
             return None
 
-        if isinstance(bl_rna, type(T.SequenceModifiers.bl_rna)):
-            name = proxy.data("name")
-            type_ = proxy.data("type")
-            return collection.new(name, type_)
-
     try:
         return collection.add()
     except Exception:
@@ -360,8 +453,28 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
 always_clear = [type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl_rna), type(T.SequenceModifiers.bl_rna)]
 """Collections in this list are order dependent and should always be cleared"""
 
+_resize_geometry_types = tuple(type(t.bl_rna) for t in [T.MeshEdges, T.MeshLoops, T.MeshVertices, T.MeshPolygons])
 
-def truncate_collection(target: T.bpy_prop_collection, incoming_keys: List[str]):
+
+def resize_geometry(mesh_geometry_item: T.Property, proxy: AosProxy, visit_state: VisitState):
+    """
+    Args:
+        mesh_geometry_item : Mesh.vertices, Mesh.loops, ...
+        proxy : proxy to mesh_geometry_item
+    """
+    existing_length = len(mesh_geometry_item)
+    incoming_length = proxy.length
+    if existing_length != incoming_length:
+        if existing_length != 0:
+            logger.debug(f"resize_geometry(): calling clear() for {mesh_geometry_item}")
+            visit_state.funcs["Mesh.clear_geometry"]()
+            # We should need it only once for a whole Mesh
+            del visit_state.funcs["Mesh.clear_geometry"]
+        logger.debug(f"resize_geometry(): add({incoming_length}) for {mesh_geometry_item}")
+        mesh_geometry_item.add(incoming_length)
+
+
+def truncate_collection(target: T.bpy_prop_collection, proxy: Union[StructCollectionProxy, AosProxy], context: Context):
     """
     TODO check if this is obsolete since Delta updates
     """
@@ -373,7 +486,23 @@ def truncate_collection(target: T.bpy_prop_collection, incoming_keys: List[str])
         target.clear()
         return
 
-    incoming_keys = set(incoming_keys)
+    if isinstance(target_rna, _resize_geometry_types):
+        resize_geometry(target, proxy, context.visit_state)
+        return
+
+    if isinstance(target_rna, type(T.GPencilStrokePoints.bl_rna)):
+        existing_length = len(target)
+        incoming_length = proxy.length
+        delta = incoming_length - existing_length
+        if delta > 0:
+            target.add(delta)
+        else:
+            while delta < 0:
+                target.pop()
+                delta += 1
+        return
+
+    incoming_keys = set(proxy._data.keys())
     existing_keys = set(target.keys())
     truncate_keys = existing_keys - incoming_keys
     if not truncate_keys:

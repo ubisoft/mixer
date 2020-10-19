@@ -246,7 +246,6 @@ _exclude_names = {
 
 default_exclusions = {
     None: [
-        TypeFilterOut(T.MeshVertex),
         # Temporary: parent and child are involved in circular reference
         TypeFilterOut(T.PoseBone),
         NameFilterOut(_exclude_names),
@@ -262,6 +261,7 @@ default_exclusions = {
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foreach_get()
+    T.FaceMap: [NameFilterOut(["index"])],
     T.Image: [
         NameFilterOut("pixels"),
         # meaningless to sync these, since they are handled by Image.pack() ?
@@ -280,17 +280,55 @@ default_exclusions = {
     T.GreasePencil: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
-        NameFilterIn("name")
+    ],
+    T.GPencilLayer: [
+        NameFilterOut(
+            [
+                "active_frame",
+            ]
+        )
+    ],
+    T.GPencilStroke: [
+        NameFilterOut(
+            [
+                # readonly
+                "bound_box_min",
+                "bound_box_max",
+            ]
+        )
     ],
     T.Mesh: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
-        NameFilterIn("name")
+        # NameFilterIn("name")
+        NameFilterOut(
+            [
+                # views into uv_layers controlled by uv_layer_xxx_index
+                "uv_layer_clone",
+                "uv_layer_stencil",
+                # readonly
+                "is_editmode",
+                "total_vert_sel",
+                "total_edge_sel",
+                "total_face_sel",
+                # do not know how to update this, probably by vertices count
+                "vertex_paint_masks",
+            ]
+        )
     ],
-    T.MeshPolygon: [NameFilterOut("area")],
+    T.MeshEdge: [NameFilterOut(["select"])],
+    T.MeshLoopColorLayer: [NameFilterOut(["active"])],
+    T.MeshPolygon: [NameFilterOut(["area", "center", "normal", "select"])],
+    T.MeshUVLoop: [NameFilterOut(["select"])],
+    T.MeshUVLoopLayer: [NameFilterOut(["active", "active_clone"])],
     T.MeshVertex: [
-        # MeshVertex.groups is updated via Object.vertex_groups
-        NameFilterOut("groups")
+        NameFilterOut(
+            [
+                "select",
+                # MeshVertex.groups is updated via Object.vertex_groups
+                "groups",
+            ]
+        )
     ],
     #
     T.Node: [
@@ -325,6 +363,7 @@ default_exclusions = {
             [
                 # bounding box, will be computed
                 "dimensions",
+                "bound_box",
                 # TODO triggers an error on metaballs
                 #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
                 #   looks like a bpy_prop_collection and the key is and empty string
@@ -395,12 +434,10 @@ safe_depsgraph_updates = (
     T.Camera,
     T.Collection,
     T.Image,
-    # no generic sync of GreasePencil, use VRtist message
-    # T.GreasePencil,
+    T.GreasePencil,
     T.Light,
     T.Material,
-    # no generic sync of Mesh, use VRtist message
-    # T.Mesh
+    T.Mesh,
     T.MetaBall,
     T.NodeTree,
     T.Object,

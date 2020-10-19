@@ -24,8 +24,9 @@
 This module defines types and utilities used by client and server code.
 """
 
+import array
 from enum import IntEnum
-from typing import Dict, Mapping, Any, Optional, List
+from typing import Dict, Mapping, Any, Optional, List, Tuple
 import select
 import struct
 import json
@@ -407,6 +408,23 @@ def decode_vector3_array(data, index):
 
 def decode_vector2_array(data, index):
     return decode_array(data, index, "2f", 2 * 4)
+
+
+def encode_py_array(data: array.array) -> bytes:
+    typecode = data.typecode
+    count = data.buffer_info()[1]
+    byte_count = count * data.itemsize
+    buffer = encode_string(typecode) + encode_int(byte_count) + data.tobytes()
+    return buffer
+
+
+def decode_py_array(buffer: bytes, index: int) -> Tuple[array.array, int]:
+    typecode, index = decode_string(buffer, index)
+    byte_count, index = decode_int(buffer, index)
+    array_ = array.array(typecode, b"")
+    slice_ = buffer[index : index + byte_count]
+    array_.frombytes(slice_)
+    return array_, index + byte_count
 
 
 class Command:

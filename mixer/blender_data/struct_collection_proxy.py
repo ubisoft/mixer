@@ -25,13 +25,12 @@ from __future__ import annotations
 
 import itertools
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING, Union
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
-from mixer.blender_data.aos_soa_proxy import is_soable_property, is_soable_collection, AosElement, SoaElement
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaAddition, DeltaDeletion, DeltaUpdate
 from mixer.blender_data.proxy import MIXER_SEQUENCE, Proxy
@@ -94,9 +93,8 @@ class StructCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of non-datablock Struct.
 
-    It can track an array (int keys) or a dictionnary(string keys).
-
-    TODO split into array and dictionary proxies
+    It can track an array (int keys) or a dictionnary(string keys). Both implementation are
+    in the same class as it is not possible to know at creation time the type of an empty collection
     """
 
     def __init__(self):
@@ -108,38 +106,38 @@ class StructCollectionProxy(Proxy):
             return NodeLinksProxy()
         return StructCollectionProxy()
 
-    def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, context: Context):
+    @property
+    def length(self) -> int:
+        sequence = self._data.get(MIXER_SEQUENCE)
+        if sequence:
+            return len(sequence)
+        return len(self._data)
+
+    def load(
+        self,
+        bl_collection: T.bpy_prop_collection,
+        key: Union[int, str],
+        bl_collection_property: T.Property,
+        context: Context,
+    ):
 
         if len(bl_collection) == 0:
             self._data.clear()
             return self
 
-        if is_soable_collection(bl_collection_property):
-            # TODO too much work at load time to find soable information. Do it once for all.
-
-            # Hybrid array_of_struct/ struct_of_array
-            # Hybrid because MeshVertex.groups does not have a fixed size and is not soa-able, but we want
-            # to treat other MeshVertex members as SOAs.
-            # Could be made more efficient later on. Keep the code simple until save() is implemented
-            # and we need better
-            prototype_item = bl_collection[0]
-            item_bl_rna = bl_collection_property.fixed_type.bl_rna
-            for attr_name, bl_rna_property in context.synchronized_properties.properties(item_bl_rna):
-                if is_soable_property(bl_rna_property):
-                    # element type supported by foreach_get
-                    self._data[attr_name] = SoaElement().load(bl_collection, attr_name, prototype_item)
-                else:
-                    # no foreach_get (variable length arrays like MeshVertex.groups, enums, ...)
-                    self._data[attr_name] = AosElement().load(bl_collection, item_bl_rna, attr_name, context)
-        else:
+        try:
+            context.visit_state.path.append(key)
             # no keys means it is a sequence. However bl_collection.items() returns [(index, item)...]
             is_sequence = not bl_collection.keys()
             if is_sequence:
                 # easier for the encoder to always have a dict
-                self._data = {MIXER_SEQUENCE: [StructProxy().load(v, context) for v in bl_collection.values()]}
+                self._data = {
+                    MIXER_SEQUENCE: [StructProxy().load(v, i, context) for i, v in enumerate(bl_collection.values())]
+                }
             else:
-                self._data = {k: StructProxy().load(v, context) for k, v in bl_collection.items()}
-
+                self._data = {k: StructProxy().load(v, k, context) for k, v in bl_collection.items()}
+        finally:
+            context.visit_state.path.pop()
         return self
 
     def save(self, bl_instance: Any, attr_name: str, context: Context):
@@ -151,39 +149,60 @@ class StructCollectionProxy(Proxy):
             # # Don't log this, too many messages
             # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
             return
+        try:
+            context.visit_state.path.append(attr_name)
+            sequence = self._data.get(MIXER_SEQUENCE)
+            if sequence:
+                srna = bl_instance.bl_rna.properties[attr_name].srna
+                if srna:
+                    # TODO move to specifics
+                    if srna.bl_rna is bpy.types.CurveMapPoints.bl_rna:
+                        write_curvemappoints(target, sequence, context)
+                    elif srna.bl_rna is bpy.types.MetaBallElements.bl_rna:
+                        write_metaballelements(target, sequence, context)
+                    elif srna.bl_rna is bpy.types.MeshPolygons.bl_rna:
+                        # see soable_collection_properties
+                        target.add(len(sequence))
+                        for i, proxy in enumerate(sequence):
+                            write_attribute(target, i, proxy, context)
+                    elif srna.bl_rna is bpy.types.GPencilFrames.bl_rna:
+                        for i, proxy in enumerate(sequence):
+                            frame_number = proxy.data("frame_number")
+                            target.new(frame_number)
+                            write_attribute(target, i, proxy, context)
+                    elif srna.bl_rna is bpy.types.GPencilStrokes.bl_rna:
+                        for i, proxy in enumerate(sequence):
+                            target.new()
+                            write_attribute(target, i, proxy, context)
+                    elif srna.bl_rna is bpy.types.GPencilStrokePoints.bl_rna:
+                        target.new(len(sequence))
+                        for i, proxy in enumerate(sequence):
+                            write_attribute(target, i, proxy, context)
+                    else:
+                        logger.error(f"unsupported sequence type {srna}")
+                        pass
 
-        sequence = self._data.get(MIXER_SEQUENCE)
-        if sequence:
-            srna = bl_instance.bl_rna.properties[attr_name].srna
-            if srna:
-                # TODO move to specifics
-                if srna.bl_rna is bpy.types.CurveMapPoints.bl_rna:
-                    write_curvemappoints(target, sequence, context)
-                elif srna.bl_rna is bpy.types.MetaBallElements.bl_rna:
-                    write_metaballelements(target, sequence, context)
+                elif len(target) == len(sequence):
+                    for i, v in enumerate(sequence):
+                        # TODO this way can only save items at pre-existing slots. The bpy_prop_collection API
+                        # uses struct specific API and ctors:
+                        # - CurveMapPoints uses: .new(x, y) and .remove(point), no .clear(). new() inserts in head !
+                        #   Must have at least 2 points left !
+                        # - NodeTreeOutputs uses: .new(type, name), .remove(socket), has .clear()
+                        # - ActionFCurves uses: .new(data_path, index=0, action_group=""), .remove(fcurve)
+                        # - GPencilStrokePoints: .add(count), .pop()
+                        write_attribute(target, i, v, context)
                 else:
-                    # TODO WHAT ??
-                    pass
-
-            elif len(target) == len(sequence):
-                for i, v in enumerate(sequence):
-                    # TODO this way can only save items at pre-existing slots. The bpy_prop_collection API
-                    # uses struct specific API and ctors:
-                    # - CurveMapPoints uses: .new(x, y) and .remove(point), no .clear(). new() inserts in head !
-                    #   Must have at least 2 points left !
-                    # - NodeTreeOutputs uses: .new(type, name), .remove(socket), has .clear()
-                    # - ActionFCurves uses: .new(data_path, index=0, action_group=""), .remove(fcurve)
-                    # - GPencilStrokePoints: .add(count), .pop()
-                    write_attribute(target, i, v, context)
+                    logger.warning(
+                        f"Not implemented: write sequence of different length (incoming: {len(sequence)}, existing: {len(target)})for {bl_instance}.{attr_name}"
+                    )
             else:
-                logger.warning(
-                    f"Not implemented: write sequence of different length (incoming: {len(sequence)}, existing: {len(target)})for {bl_instance}.{attr_name}"
-                )
-        else:
-            # dictionary
-            specifics.truncate_collection(target, self._data.keys())
-            for k, v in self._data.items():
-                write_attribute(target, k, v, context)
+                # dictionary
+                specifics.truncate_collection(target, self, context)
+                for k, v in self._data.items():
+                    write_attribute(target, k, v, context)
+        finally:
+            context.visit_state.path.pop()
 
     def apply(
         self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], context: Context, to_blender=True
@@ -208,81 +227,86 @@ class StructCollectionProxy(Proxy):
         update = delta.value
         assert type(update) == type(self)
 
-        sequence = self._data.get(MIXER_SEQUENCE)
-        if sequence:
+        try:
+            context.visit_state.path.append(key)
+            sequence = self._data.get(MIXER_SEQUENCE)
+            if sequence:
 
-            # input validity assertions
-            add_indices = [i for i, delta in enumerate(update._data.values()) if isinstance(delta, DeltaAddition)]
-            del_indices = [i for i, delta in enumerate(update._data.values()) if isinstance(delta, DeltaDeletion)]
-            if add_indices or del_indices:
-                # Cannot have deletions and additions
-                assert not add_indices or not del_indices, "not add_indices or not del_indices"
-                indices = add_indices if add_indices else del_indices
-                # Check that adds and deleted are at the end
-                assert (
-                    not indices or indices[-1] == len(update._data) - 1
-                ), "not indices or indices[-1] == len(update._data) - 1"
-                # check that adds and deletes are contiguous
-                assert all(
-                    a + 1 == b for a, b in zip(indices, iter(indices[1:]))
-                ), "all(a + 1 == b for a, b in zip(indices, iter(indices[1:])))"
+                # input validity assertions
+                add_indices = [i for i, delta in enumerate(update._data.values()) if isinstance(delta, DeltaAddition)]
+                del_indices = [i for i, delta in enumerate(update._data.values()) if isinstance(delta, DeltaDeletion)]
+                if add_indices or del_indices:
+                    # Cannot have deletions and additions
+                    assert not add_indices or not del_indices, "not add_indices or not del_indices"
+                    indices = add_indices if add_indices else del_indices
+                    # Check that adds and deleted are at the end
+                    assert (
+                        not indices or indices[-1] == len(update._data) - 1
+                    ), "not indices or indices[-1] == len(update._data) - 1"
+                    # check that adds and deletes are contiguous
+                    assert all(
+                        a + 1 == b for a, b in zip(indices, iter(indices[1:]))
+                    ), "all(a + 1 == b for a, b in zip(indices, iter(indices[1:])))"
 
-            for k, delta in update._data.items():
-                try:
-                    if isinstance(delta, DeltaUpdate):
-                        sequence[k] = apply_attribute(collection, k, sequence[k], delta, context, to_blender)
-                    elif isinstance(delta, DeltaDeletion):
-                        item = collection[k]
-                        if to_blender:
-                            collection.remove(item)
-                        del sequence[k]
-                    else:  # DeltaAddition
-                        raise NotImplementedError("Not implemented: DeltaAddition for array")
-                        # TODO pre save for use_curves
-                        # since ordering does not include this requirement
-                        if to_blender:
-                            write_attribute(collection, k, delta.value, context)
-                        sequence[k] = delta.value
+                for k, delta in update._data.items():
+                    i = int(k)
+                    try:
+                        if isinstance(delta, DeltaUpdate):
+                            sequence[i] = apply_attribute(collection, i, sequence[i], delta, context, to_blender)
+                        elif isinstance(delta, DeltaDeletion):
+                            if to_blender:
+                                item = collection[i]
+                                collection.remove(item)
+                            del sequence[i]
+                        else:  # DeltaAddition
+                            # TODO pre save for use_curves
+                            # since ordering does not include this requirement
+                            if to_blender:
+                                raise NotImplementedError("Not implemented: DeltaAddition for array")
+                                write_attribute(collection, i, delta.value, context)
+                            sequence.append(delta.value)
 
-                except Exception as e:
-                    logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
-                    logger.warning(f"... for {collection}[{k}]")
-                    logger.warning(f"... Exception: {e}")
-                    logger.warning("... Update ignored")
-                    continue
-        else:
-            for k, delta in update._data.items():
-                try:
-                    if isinstance(delta, DeltaDeletion):
-                        # TODO do all collections have remove ?
-                        # see "name collision" in diff()
-                        k = k[1:]
-                        if to_blender:
-                            item = collection[k]
-                            collection.remove(item)
-                        del self._data[k]
-                    elif isinstance(delta, DeltaAddition):
-                        # TODO pre save for use_curves
-                        # since ordering does not include this requirement
+                    except Exception as e:
+                        logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
+                        logger.warning(f"... for {collection}[{i}]")
+                        logger.warning(f"... Exception: {e}")
+                        logger.warning("... Update ignored")
+                        continue
+            else:
+                for k, delta in update._data.items():
+                    try:
+                        if isinstance(delta, DeltaDeletion):
+                            # TODO do all collections have remove ?
+                            # see "name collision" in diff()
+                            k = k[1:]
+                            if to_blender:
+                                item = collection[k]
+                                collection.remove(item)
+                            del self._data[k]
+                        elif isinstance(delta, DeltaAddition):
+                            # TODO pre save for use_curves
+                            # since ordering does not include this requirement
 
-                        # see "name collision" in diff()
-                        k = k[1:]
-                        if to_blender:
-                            write_attribute(collection, k, delta.value, context)
-                        self._data[k] = delta.value
-                    else:
-                        self._data[k] = apply_attribute(collection, k, self._data[k], delta, context, to_blender)
-                except Exception as e:
-                    logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
-                    logger.warning(f"... for {collection}[{k}]")
-                    logger.warning(f"... Exception: {e}")
-                    logger.warning("... Update ignored")
-                    continue
+                            # see "name collision" in diff()
+                            k = k[1:]
+                            if to_blender:
+                                write_attribute(collection, k, delta.value, context)
+                            self._data[k] = delta.value
+                        else:
+                            self._data[k] = apply_attribute(collection, k, self._data[k], delta, context, to_blender)
+                    except Exception as e:
+                        logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
+                        logger.warning(f"... for {collection}[{k}]")
+                        logger.warning(f"... Exception: {e}")
+                        logger.warning("... Update ignored")
+                        continue
+        finally:
+            context.visit_state.path.pop()
 
         return self
 
     def diff(
-        self, collection: T.bpy_prop_collection, collection_property: T.Property, context: Context
+        self, collection: T.bpy_prop_collection, key: Union[int, str], collection_property: T.Property, context: Context
     ) -> Optional[DeltaUpdate]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
@@ -297,75 +321,86 @@ class StructCollectionProxy(Proxy):
 
         diff = self.__class__()
         item_property = collection_property.fixed_type
+        try:
+            context.visit_state.path.append(key)
+            sequence = self._data.get(MIXER_SEQUENCE)
+            if sequence:
+                # indexed by int
+                # TODO This produces one DeltaDeletion by removed item. Produce a range in case may items are
+                # deleted
 
-        sequence = self._data.get(MIXER_SEQUENCE)
-        if sequence:
-            # indexed by int
-            # TODO This produces one DeltaDeletion by removed item. Produce a range in case may items are
-            # deleted
-
-            # since the diff sequence is hollow, we cannot store it in a list. Use a dict with int keys instead
-            for i, (proxy_value, blender_value) in enumerate(itertools.zip_longest(sequence, collection)):
-                if proxy_value is None:
-                    value = read_attribute(collection[i], item_property, context)
-                    diff._data[i] = DeltaAddition(value)
-                elif blender_value is None:
-                    diff._data[i] = DeltaDeletion(self.data(i))
-                else:
-                    delta = diff_attribute(collection[i], item_property, proxy_value, context)
-                    if delta is not None:
-                        diff._data[i] = delta
-        else:
-            # index by string. This is similar to DatablockCollectionProxy.diff
-            # Renames are detected as Deletion + Addition
-
-            # This assumes that keys ordring is the same in the proxy and in blender, which is
-            # guaranteed by the fact that proxy load uses SynchronizedProperties.properties()
-
-            bl_rna = getattr(collection, "bl_rna", None)
-            if bl_rna is not None and isinstance(
-                bl_rna, (type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers))
-            ):
-                # TODO move this into specifics.py
-                # order-dependant collections with different types like Modifiers
-                proxy_names = list(self._data.keys())
-                blender_names = collection.keys()
-                proxy_types = [self.data(name).data("type") for name in proxy_names]
-                blender_types = [collection[name].type for name in blender_names]
-                if proxy_types == blender_types and proxy_names == blender_names:
-                    # Same types and names : do sparse modification
-                    for name in proxy_names:
-                        delta = diff_attribute(collection[name], item_property, self.data(name), context)
+                # since the diff sequence is hollow, we cannot store it in a list. Use a dict with int keys instead
+                for i, (proxy_value, blender_value) in enumerate(itertools.zip_longest(sequence, collection)):
+                    if proxy_value is None:
+                        value = read_attribute(collection[i], i, item_property, context)
+                        diff._data[i] = DeltaAddition(value)
+                    elif blender_value is None:
+                        diff._data[i] = DeltaDeletion(self.data(i))
+                    else:
+                        delta = diff_attribute(collection[i], i, item_property, proxy_value, context)
                         if delta is not None:
-                            diff._data[name] = delta
-                else:
-                    # names or types do not match, rebuild all
-                    # There are name collisions during Modifier order change for instance, so prefix
-                    # the names to avoid them (using a tuple fails in the json encoder)
-                    for name in proxy_names:
-                        diff._data["D" + name] = DeltaDeletion(self.data(name))
-                    for name in blender_names:
-                        value = read_attribute(collection[name], item_property, context)
-                        diff._data["A" + name] = DeltaAddition(value)
+                            diff._data[i] = delta
             else:
-                # non order dependant, uniform types
-                proxy_keys = self._data.keys()
-                blender_keys = collection.keys()
-                added_keys = blender_keys - proxy_keys
-                for k in added_keys:
-                    value = read_attribute(collection[k], item_property, context)
-                    diff._data["A" + k] = DeltaAddition(value)
+                # index by string. This is similar to DatablockCollectionProxy.diff
+                # Renames are detected as Deletion + Addition
 
-                deleted_keys = proxy_keys - blender_keys
-                for k in deleted_keys:
-                    diff._data["D" + k] = DeltaDeletion(self.data(k))
+                # This assumes that keys ordring is the same in the proxy and in blender, which is
+                # guaranteed by the fact that proxy load uses SynchronizedProperties.properties()
 
-                maybe_updated_keys = proxy_keys & blender_keys
-                for k in maybe_updated_keys:
-                    delta = diff_attribute(collection[k], item_property, self.data(k), context)
-                    if delta is not None:
-                        diff._data[k] = delta
+                bl_rna = getattr(collection, "bl_rna", None)
+                if bl_rna is not None and isinstance(
+                    bl_rna, (type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers))
+                ):
+                    # TODO move this into specifics.py
+                    # order-dependant collections with different types like Modifiers
+                    proxy_names = list(self._data.keys())
+                    blender_names = collection.keys()
+                    proxy_types = [self.data(name).data("type") for name in proxy_names]
+                    blender_types = [collection[name].type for name in blender_names]
+                    if proxy_types == blender_types and proxy_names == blender_names:
+                        # Same types and names : do sparse modification
+                        for name in proxy_names:
+                            delta = diff_attribute(collection[name], name, item_property, self.data(name), context)
+                            if delta is not None:
+                                diff._data[name] = delta
+                    else:
+                        # names or types do not match, rebuild all
+                        # There are name collisions during Modifier order change for instance, so prefix
+                        # the names to avoid them (using a tuple fails in the json encoder)
+                        for name in proxy_names:
+                            diff._data["D" + name] = DeltaDeletion(self.data(name))
+                        for name in blender_names:
+                            value = read_attribute(collection[name], name, item_property, context)
+                            diff._data["A" + name] = DeltaAddition(value)
+                else:
+                    # non order dependant, uniform types
+                    proxy_keys = self._data.keys()
+                    blender_keys = collection.keys()
+                    added_keys = blender_keys - proxy_keys
+                    for k in added_keys:
+                        value = read_attribute(collection[k], k, item_property, context)
+                        diff._data["A" + k] = DeltaAddition(value)
+
+                    deleted_keys = proxy_keys - blender_keys
+                    for k in deleted_keys:
+                        diff._data["D" + k] = DeltaDeletion(self.data(k))
+
+                    maybe_updated_keys = proxy_keys & blender_keys
+                    for k in maybe_updated_keys:
+                        delta = diff_attribute(collection[k], k, item_property, self.data(k), context)
+                        if delta is not None:
+                            diff._data[k] = delta
+        finally:
+            context.visit_state.path.pop()
+
         if len(diff._data):
             return DeltaUpdate(diff)
 
         return None
+
+    def find(self, path: List[Union[int, str]]) -> Proxy:
+        if not path:
+            return self
+
+        head, *tail = path
+        return self._data[head].find(tail)

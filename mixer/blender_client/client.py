@@ -36,6 +36,7 @@ we register.
 import logging
 import os
 import struct
+import time
 import traceback
 from typing import Set, Tuple, Optional
 from enum import IntEnum
@@ -851,7 +852,7 @@ class BlenderClient(Client):
         # Loop remains infinite while we have GROUP_BEGIN commands without their corresponding GROUP_END received
         # todo Change this -> probably not a good idea because the sending client might disconnect before GROUP_END occurs
         # or it needs to be guaranteed by the server
-        group_count = 0
+        groups = []
         while True:
             received_commands = self.fetch_commands(get_mixer_prefs().commands_send_interval)
 
@@ -869,11 +870,13 @@ class BlenderClient(Client):
                         redraw_panels()
 
                 if command.type == MessageType.GROUP_BEGIN:
-                    group_count += 1
+                    groups.append(time.monotonic())
                     continue
 
                 if command.type == MessageType.GROUP_END:
-                    group_count -= 1
+                    elapse = time.monotonic() - groups.pop()
+                    group_id = len(groups)
+                    logger.warning(f"Command group {group_id} processed in {elapse:.1f} seconds")
                     continue
 
                 if self.has_default_handler(command.type):
@@ -1053,7 +1056,7 @@ class BlenderClient(Client):
                 finally:
                     self.block_signals = False
 
-            if group_count == 0:
+            if not groups:
                 break
 
         if not set_dirty:
@@ -1163,13 +1166,17 @@ def clear_scene_content():
 
         # Cannot remove the last scene at this point, treat it differently
         for scene in bpy.data.scenes[:-1]:
+            logger.warning("clear_scene_contents. Removing {scene}")
             scene_api.delete_scene(scene)
 
         share_data.clear_before_state()
 
         if len(bpy.data.scenes) == 1:
             scene = bpy.data.scenes[0]
+            logger.warning(f"clear_scene_contents. leaving {scene} ...")
+            logger.warning(f"...  with uuid {scene.mixer_uuid}, renamed as _mixer_to_be_removed_")
             scene.name = "_mixer_to_be_removed_"
+            scene.mixer_uuid = "_mixer_to_be_removed_"
 
 
 @stats_timer(share_data)
@@ -1193,14 +1200,17 @@ def send_scene_content():
         share_data.init_proxy()
         share_data.client.send_group_begin()
 
-        # Temporary waiting for material sync. Should move to send_scene_data_to_server
-        for material in bpy.data.materials:
-            share_data.client.send_material(material)
-
+        timer = time.monotonic()
         if share_data.use_experimental_sync():
             generic.send_scene_data_to_server(None, None)
         else:
+            # Temporary waiting for material sync. Should move to send_scene_data_to_server
+            for material in bpy.data.materials:
+                share_data.client.send_material(material)
             send_scene_data_to_server(None, None)
+
+        elapse = time.monotonic() - timer
+        logger.warning(f"Scene data send in {elapse:.1f} seconds")
 
         shot_manager.send_scene()
         share_data.client.send_frame_start_end(bpy.context.scene.frame_start, bpy.context.scene.frame_end)

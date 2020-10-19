@@ -73,7 +73,7 @@ class DatablockRefProxy(Proxy):
 
         return not self._datablock_uuid
 
-    def load(self, datablock: T.ID, context: Context) -> DatablockRefProxy:
+    def load(self, datablock: T.ID, key: Union[int, str], context: Context) -> DatablockRefProxy:
         """
         Load a reference to a standalone datablock into this proxy
         """
@@ -140,6 +140,9 @@ class DatablockRefProxy(Proxy):
         """
         The datablock referenced by this proxy
         """
+        if self.is_none():
+            return None
+
         datablock = context.proxy_state.datablocks.get(self._datablock_uuid)
         if datablock is None:
             # HACK
@@ -192,7 +195,9 @@ class DatablockRefProxy(Proxy):
                 setattr(parent, key, datablock)
         return update
 
-    def diff(self, datablock: T.ID, datablock_property: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(
+        self, datablock: T.ID, key: Union[int, str], datablock_property: T.Property, context: Context
+    ) -> Optional[DeltaUpdate]:
         """
         Computes the difference between this proxy and its Blender state.
         """
@@ -200,7 +205,7 @@ class DatablockRefProxy(Proxy):
         if datablock is None:
             return DeltaUpdate(DatablockRefProxy())
 
-        value = read_attribute(datablock, datablock_property, context)
+        value = read_attribute(datablock, key, datablock_property, context)
         assert isinstance(value, DatablockRefProxy)
         if value._datablock_uuid != self._datablock_uuid:
             return DeltaUpdate(value)

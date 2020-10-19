@@ -40,7 +40,7 @@ class NodeLinksProxy(StructProxy):
     def __init__(self):
         super().__init__()
 
-    def load(self, bl_instance, _, context: Context):
+    def load(self, bl_instance, key: str, _, context: Context):
         # NodeLink contain pointers to Node and NodeSocket.
         # Just keep the names to restore the links in ShaderNodeTreeProxy.save
 
@@ -68,6 +68,8 @@ class NodeTreeProxy(DatablockProxy):
         # Saving NodeTree.links require access to NodeTree.nodes, so we need an implementation at the NodeTree level
 
         node_tree = getattr(bl_instance, attr_name)
+        if node_tree is None:
+            return
 
         # save links last
         for k, v in self._data.items():
