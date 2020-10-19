@@ -203,7 +203,8 @@ class TestProperties(unittest.TestCase):
             "cycles",
         }
         names = {prop[0] for prop in synchronized_properties.properties(camera)}
-        self.assertSetEqual(names, expected_names, "Expected list from 2.83.4, check version")
+        for name in expected_names:
+            self.assertIn(name, names, "Expected list from 2.83.4, check version")
 
 
 class TestBlendData(unittest.TestCase):
