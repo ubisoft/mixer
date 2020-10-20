@@ -95,6 +95,13 @@ def is_soable_property(bl_rna_property):
     return isinstance(bl_rna_property, soable_properties)
 
 
+node_tree_type = {
+    "SHADER": "ShaderNodeTree",
+    "COMPOSITOR": "CompositorNodeTree",
+    "TEXTURE": "TextureNodeTree",
+}
+
+
 def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
     """
     Create an element in a bpy.data collection.
@@ -146,6 +153,11 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
         light_type = proxy.data("type")
         light = collection.new(name, light_type)
         return light
+
+    if collection_name == "node_groups":
+        name = proxy.data("name")
+        type_ = node_tree_type[proxy.data("type")]
+        return collection.new(name, type_)
 
     if collection_name == "sounds":
         filepath = proxy.data("filepath")
@@ -229,6 +241,14 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
 
         # not hidden: saving width_hidden is ignored
         filter_props = ["width_hidden"]
+        filtered = {k: v for k, v in properties if k not in filter_props}
+        return filtered.items()
+
+    if isinstance(bpy_struct, T.NodeTree):
+        if not bpy_struct.is_embedded_data:
+            return properties
+
+        filter_props = ["name"]
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
 
@@ -396,6 +416,23 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
             return collection.add(
                 target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
             )
+
+        if isinstance(bl_rna, type(T.Nodes.bl_rna)):
+            node_type = proxy.data("bl_idname")
+            return collection.new(node_type)
+
+        if isinstance(
+            bl_rna,
+            (
+                type(T.NodeInputs.bl_rna),
+                type(T.NodeOutputs.bl_rna),
+                type(T.NodeTreeInputs.bl_rna),
+                type(T.NodeTreeOutputs.bl_rna),
+            ),
+        ):
+            socket_type = proxy.data("type")
+            name = proxy.data("name")
+            return collection.new(socket_type, name)
 
         if isinstance(bl_rna, type(T.Sequences.bl_rna)):
             type_ = proxy.data("type")

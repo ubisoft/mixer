@@ -342,19 +342,19 @@ default_exclusions = {
     ],
     T.NodeLink: [
         # see NodeLinkProxy
-        NameFilterOut(["from_node", "from_socket", "to_node", "to_socket", "is_hidden"])
+        NameFilterOut(["is_hidden"])
     ],
     T.NodeSocket: [
         # Currently synchronize builtin shading node sockets only, so assume these attributes are
         # managed only at the Node creation
-        NameFilterOut(["bl_idname", "identifier", "is_linked", "is_output", "link_limit", "name", "node", "type"])
+        # NameFilterOut(["identifier", "is_linked", "is_output", "link_limit", "name", "node", "type"])
+        NameFilterOut(["bl_idname", "is_linked", "is_output", "node"])
     ],
     T.NodeTree: [
         NameFilterOut(
             [
                 # read only
                 "view_center",
-                "name",
             ]
         )
     ],
