@@ -93,9 +93,6 @@ class DatablockProxy(StructProxy):
     def __str__(self) -> str:
         return f"DatablockProxy {self.mixer_uuid()} for bpy.data.{self.collection_name}[{self.data('name')}]"
 
-    def update_from_datablock(self, bl_instance: T.ID, context: Context):
-        self.load(bl_instance, context, bpy_data_collection_name=None)
-
     def load(
         self,
         bl_instance: T.ID,
@@ -224,9 +221,9 @@ class DatablockProxy(StructProxy):
 
         datablock.mixer_uuid = self.mixer_uuid()
 
-        datablock = specifics.pre_save_id(self, datablock, context)
+        datablock = specifics.pre_save(self, datablock, context)
         if datablock is None:
-            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
+            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
             return None, None
         try:
             context.visit_state.datablock_proxy = self
@@ -241,9 +238,9 @@ class DatablockProxy(StructProxy):
         """
         Update this proxy and datablock according to delta
         """
-        datablock = specifics.pre_save_id(delta.value, datablock, context)
+        datablock = specifics.pre_save(delta.value, datablock, context)
         if datablock is None:
-            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
+            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
             return None
 
         try:
@@ -281,11 +278,11 @@ class DatablockProxy(StructProxy):
                 id_.mixer_uuid = self.mixer_uuid()
         else:
             logger.info(f"IDproxy save embedded {self}")
-            # an is_embedded_data datablock. pre_save id will retrieve it by calling target
+            # an is_embedded_data datablock. pre_save will retrieve it by calling target
             id_ = getattr(bl_instance, attr_name)
             pass
 
-        target = specifics.pre_save_id(self, id_, context)
+        target = specifics.pre_save(self, id_, context)
         if target is None:
             logger.warning(f"DatablockProxy.save() {bl_instance}.{attr_name} is None")
             return None
