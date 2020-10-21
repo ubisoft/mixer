@@ -106,8 +106,10 @@ class BpyPropCollectionDiff(BpyDiff):
             uuid = item.mixer_uuid
             if uuid in blender_items.keys():
                 # duplicate uuid, from an object duplication
-                original_item = blender_items[uuid]
-                logger.info(f"Duplicate uuid {uuid} for {original_item[1]} and {item.name}...")
+                duplicate_name, duplicate_collection_name = blender_items[uuid]
+                logger.info(
+                    f"Duplicate uuid {uuid} in bpy.data.{duplicate_collection_name} for {duplicate_name} and bpy.data.{collection_name} for {name}..."
+                )
                 logger.info("... assuming object was duplicated. Resetting (not an error)")
                 # reset the uuid, ensure will regenerate
                 item.mixer_uuid = ""
