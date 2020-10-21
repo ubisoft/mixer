@@ -222,7 +222,9 @@ class SoaElement(Proxy):
             )
             logger.debug(message)
         aos.foreach_get(self._member_name, tmp_array)
-        if self._array == tmp_array:
+
+        force_diff = context.visit_state.scratchpad.get("force_soa_diff", False)
+        if self._array == tmp_array and not force_diff:
             return None
 
         diff = self.__class__()

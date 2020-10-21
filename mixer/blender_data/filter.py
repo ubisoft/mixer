@@ -364,6 +364,7 @@ default_exclusions = {
                 # bounding box, will be computed
                 "dimensions",
                 "bound_box",
+                "mode",
                 # TODO triggers an error on metaballs
                 #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
                 #   looks like a bpy_prop_collection and the key is and empty string

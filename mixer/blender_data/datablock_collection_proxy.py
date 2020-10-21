@@ -24,7 +24,7 @@ from __future__ import annotations
 import functools
 import logging
 import traceback
-from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -213,7 +213,7 @@ class DatablockCollectionProxy(Proxy):
                     continue
                 uuid = ensure_uuid(id_)
                 context.proxy_state.datablocks[uuid] = id_
-                proxy = DatablockProxy().load(id_, name, context, bpy_data_collection_name=collection_name)
+                proxy = DatablockProxy.make(id_).load(id_, name, context, bpy_data_collection_name=collection_name)
                 context.proxy_state.proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
@@ -271,7 +271,7 @@ class DatablockCollectionProxy(Proxy):
 
         return changeset
 
-    def search(self, name: str) -> [DatablockProxy]:
+    def search(self, name: str) -> List[DatablockProxy]:
         """Convenience method to find proxies by name instead of uuid (for tests only)"""
         results = []
         for uuid in self._data.keys():

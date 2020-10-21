@@ -25,7 +25,7 @@ from __future__ import annotations
 import array
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -82,7 +82,7 @@ class ProxyState:
     """
 
     proxies: Dict[Uuid, DatablockProxy] = field(default_factory=dict)
-    """known proxies"""
+    """Known proxies"""
 
     datablocks: Dict[Uuid, T.ID] = field(default_factory=dict)
     """Known datablocks"""
@@ -97,6 +97,9 @@ class VisitState:
     """
 
     Path = List[Union[str, int]]
+    """The current visit path relative to the datablock, for instance in a GreasePencil datablock
+    ("layers", "MyLayer", "frames", 0, "strokes", 0, "points").
+    Used to identify SoaElement buffer updates"""
 
     datablock_proxy: Optional[DatablockProxy] = None
     """The datablock proxy being visited"""
@@ -107,10 +110,10 @@ class VisitState:
 
     recursion_guard: RecursionGuard = RecursionGuard()
 
-    funcs: Dict[str, Callable] = field(default_factory=dict)
-    """Functions transmitted from a property to another
-    (e.g Mesh transmits clear_geometry that is called if necessary
-    by the MeshVertices SoaProxy ) """
+    scratchpad: Dict[str, Any] = field(default_factory=dict)
+    """Custom data attached to the load/save/diff/apply visits that some data nodes may attach
+    in order to modify the processing at other data nodes
+    """
 
 
 @dataclass
@@ -138,6 +141,8 @@ class BpyDataProxy(Proxy):
         self._data: Dict[str, DatablockCollectionProxy] = {
             name: DatablockCollectionProxy() for name in BlendData.instance().collection_names()
         }
+
+        self._delayed_updates: Set[T.ID] = set()
 
     def clear(self):
         self._data.clear()
@@ -198,8 +203,9 @@ class BpyDataProxy(Proxy):
     def update(
         self,
         diff: BpyBlendDiff,
+        updates: Set[T.ID],
+        process_delayed_updates: bool,
         synchronized_properties: SynchronizedProperties = safe_properties,
-        depsgraph_updates: T.bpy_prop_collection = (),
     ) -> Changeset:
         """
         Process local changes, i.e. created, removed and renames datablocks as well as depsgraph updates.
@@ -223,20 +229,11 @@ class BpyDataProxy(Proxy):
             changeset.removals.extend(collection_changeset.removals)
             changeset.renames.extend(collection_changeset.renames)
 
-        # Update the ID proxies from the depsgraph update
-        # this should iterate inside_out (Object.data, Object) in the adequate creation order
-        # (creating an Object requires its data)
-
-        # WARNING:
-        #   depsgraph_updates[i].id.original IS NOT bpy.lights['Point']
-        # or whatever as you might expect, so you cannot use it to index into the map
-        # to find the proxy to update.
-        # However
-        #   - mixer_uuid attributes have the same value
-        #   - __hash__() returns the same value
-
-        depsgraph_updated_ids = reversed([update.id.original for update in depsgraph_updates])
-        for datablock in depsgraph_updated_ids:
+        all_updates = updates
+        if process_delayed_updates:
+            all_updates |= self._delayed_updates
+            self._delayed_updates.clear()
+        for datablock in all_updates:
             if not isinstance(datablock, safe_depsgraph_updates):
                 logger.info("depsgraph update: ignoring untracked type %s", datablock)
                 continue
@@ -392,3 +389,6 @@ class BpyDataProxy(Proxy):
         datablock_proxy = self.state.proxies[uuid]
         datablock = self.state.datablocks[uuid]
         datablock_proxy.update_soa(datablock, path, soas)
+
+    def append_delayed_updates(self, delayed_updates: Set[T.ID]):
+        self._delayed_updates |= delayed_updates

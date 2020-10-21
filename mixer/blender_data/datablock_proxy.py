@@ -75,6 +75,15 @@ class DatablockProxy(StructProxy):
                 self._datablock_uuid = datablock.mixer_uuid
             self._class_name = datablock.__class__.__name__
 
+    @classmethod
+    def make(cls, attr_property):
+
+        if isinstance(attr_property, T.Mesh):
+            from mixer.blender_data.mesh_proxy import MeshProxy
+
+            return MeshProxy()
+        return DatablockProxy()
+
     @property
     def is_standalone_datablock(self):
         return self._bpy_data_collection is not None
@@ -92,9 +101,6 @@ class DatablockProxy(StructProxy):
 
     def __str__(self) -> str:
         return f"DatablockProxy {self.mixer_uuid()} for bpy.data.{self.collection_name}[{self.data('name')}]"
-
-    def update_from_datablock(self, bl_instance: T.ID, context: Context):
-        self.load(bl_instance, context, bpy_data_collection_name=None)
 
     def load(
         self,
@@ -224,9 +230,9 @@ class DatablockProxy(StructProxy):
 
         datablock.mixer_uuid = self.mixer_uuid()
 
-        datablock = specifics.pre_save_id(self, datablock, context)
+        datablock = self._pre_save(datablock, context)
         if datablock is None:
-            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
+            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
             return None, None
         try:
             context.visit_state.datablock_proxy = self
@@ -241,9 +247,9 @@ class DatablockProxy(StructProxy):
         """
         Update this proxy and datablock according to delta
         """
-        datablock = specifics.pre_save_id(delta.value, datablock, context)
+        datablock = delta.value._pre_save(datablock, context)
         if datablock is None:
-            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
+            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
             return None
 
         try:
@@ -281,11 +287,11 @@ class DatablockProxy(StructProxy):
                 id_.mixer_uuid = self.mixer_uuid()
         else:
             logger.info(f"IDproxy save embedded {self}")
-            # an is_embedded_data datablock. pre_save id will retrieve it by calling target
+            # an is_embedded_data datablock. pre_save will retrieve it by calling target
             id_ = getattr(bl_instance, attr_name)
             pass
 
-        target = specifics.pre_save_id(self, id_, context)
+        target = self._pre_save(id_, context)
         if target is None:
             logger.warning(f"DatablockProxy.save() {bl_instance}.{attr_name} is None")
             return None
@@ -320,7 +326,7 @@ class DatablockProxy(StructProxy):
                     current_value = self._data.get(k)
                     self._data[k] = apply_attribute(datablock, k, current_value, delta, context, to_blender=False)
                 except Exception as e:
-                    logger.warning(f"Datablock.apply(). Processing {delta}")
+                    logger.warning(f"apply_to_proxy(). Processing {delta}")
                     logger.warning(f"... for {datablock}.{k}")
                     logger.warning(f"... Exception: {e}")
                     logger.warning("... Update ignored")
@@ -347,6 +353,9 @@ class DatablockProxy(StructProxy):
             diff = self.__class__()
             diff.init(datablock)
             context.visit_state.datablock_proxy = diff
-            return super()._diff(datablock, key, prop, context, diff)
+            return self._diff(datablock, key, prop, context, diff)
         finally:
             context.visit_state.datablock_proxy = None
+
+    def _pre_save(self, target: T.bpy_struct, context: Context) -> T.ID:
+        return specifics.pre_save_datablock(self, target, context)
