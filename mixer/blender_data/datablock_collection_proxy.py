@@ -213,7 +213,7 @@ class DatablockCollectionProxy(Proxy):
                     continue
                 uuid = ensure_uuid(id_)
                 context.proxy_state.datablocks[uuid] = id_
-                proxy = DatablockProxy().load(id_, name, context, bpy_data_collection_name=collection_name)
+                proxy = DatablockProxy.make(id_).load(id_, name, context, bpy_data_collection_name=collection_name)
                 context.proxy_state.proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)

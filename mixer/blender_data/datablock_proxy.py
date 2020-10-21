@@ -75,6 +75,15 @@ class DatablockProxy(StructProxy):
                 self._datablock_uuid = datablock.mixer_uuid
             self._class_name = datablock.__class__.__name__
 
+    @classmethod
+    def make(cls, attr_property):
+
+        if isinstance(attr_property, T.Mesh):
+            from mixer.blender_data.mesh_proxy import MeshProxy
+
+            return MeshProxy()
+        return DatablockProxy()
+
     @property
     def is_standalone_datablock(self):
         return self._bpy_data_collection is not None
@@ -317,7 +326,7 @@ class DatablockProxy(StructProxy):
                     current_value = self._data.get(k)
                     self._data[k] = apply_attribute(datablock, k, current_value, delta, context, to_blender=False)
                 except Exception as e:
-                    logger.warning(f"Datablock.apply(). Processing {delta}")
+                    logger.warning(f"apply_to_proxy(). Processing {delta}")
                     logger.warning(f"... for {datablock}.{k}")
                     logger.warning(f"... Exception: {e}")
                     logger.warning("... Update ignored")
@@ -344,7 +353,7 @@ class DatablockProxy(StructProxy):
             diff = self.__class__()
             diff.init(datablock)
             context.visit_state.datablock_proxy = diff
-            return super()._diff(datablock, key, prop, context, diff)
+            return self._diff(datablock, key, prop, context, diff)
         finally:
             context.visit_state.datablock_proxy = None
 

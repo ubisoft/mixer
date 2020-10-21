@@ -25,7 +25,7 @@ from __future__ import annotations
 import array
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -82,7 +82,7 @@ class ProxyState:
     """
 
     proxies: Dict[Uuid, DatablockProxy] = field(default_factory=dict)
-    """known proxies"""
+    """Known proxies"""
 
     datablocks: Dict[Uuid, T.ID] = field(default_factory=dict)
     """Known datablocks"""
@@ -97,6 +97,9 @@ class VisitState:
     """
 
     Path = List[Union[str, int]]
+    """The current visit path relative to the datablock, for instance in a GreasePencil datablock
+    ("layers", "MyLayer", "frames", 0, "strokes", 0, "points").
+    Used to identify SoaElement buffer updates"""
 
     datablock_proxy: Optional[DatablockProxy] = None
     """The datablock proxy being visited"""
@@ -107,10 +110,10 @@ class VisitState:
 
     recursion_guard: RecursionGuard = RecursionGuard()
 
-    funcs: Dict[str, Callable] = field(default_factory=dict)
-    """Functions transmitted from a property to another
-    (e.g Mesh transmits clear_geometry that is called if necessary
-    by the MeshVertices SoaProxy ) """
+    scratchpad: Dict[str, Any] = field(default_factory=dict)
+    """Custom data attached to the load/save/diff/apply visits that some data nodes may attach
+    in order to modify the processing at other data nodes
+    """
 
 
 @dataclass

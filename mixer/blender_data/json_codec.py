@@ -31,6 +31,7 @@ from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaU
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy, DatablockRefCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+from mixer.blender_data.mesh_proxy import MeshProxy
 from mixer.blender_data.node_proxy import NodeLinksProxy
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
@@ -43,6 +44,7 @@ logger = logging.getLogger(__name__)
 struct_like_classes = [
     DatablockProxy,
     DatablockRefProxy,
+    MeshProxy,
     StructProxy,
     SoaElement,
 ]

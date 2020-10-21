@@ -33,6 +33,7 @@ import bpy.types as T  # noqa
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+    from mixer.blender_data.struct_proxy import StructProxy
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,11 @@ class Delta:
     A Delta records the difference between the proxy state and Blender state.
 
     It is created with Proxy.diff() and applied with Proxy.apply()
+
+    TODO this was added to emphasize the existence of deltas when differential updates were implemented
+    but is not strictly required. As an alternative, Deltas could be implemented as  hollow Proxy
+    with and addition flag indicating that it should be processed as a set(ordinary proxy), or a
+    add, remove or update operation
     """
 
     def __init__(self, value: Optional[Any] = None):
@@ -106,7 +112,13 @@ class DeltaDeletion(Delta):
 
 
 class DeltaUpdate(Delta):
-    pass
+    @classmethod
+    def deep_wrap(cls, proxy: StructProxy) -> DeltaUpdate:
+        """Recursively wraps proxy members in DeltaUpdate items."""
+        p = proxy.__class__()
+        for k, v in proxy._data.items():
+            p.data[k] = DeltaUpdate.deep_wrap(v)
+        return cls(p)
 
 
 class Proxy:
