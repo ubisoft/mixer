@@ -139,6 +139,8 @@ class BpyDataProxy(Proxy):
             name: DatablockCollectionProxy() for name in BlendData.instance().collection_names()
         }
 
+        self._delayed_updates: Set[T.ID] = set()
+
     def clear(self):
         self._data.clear()
         self.state.proxies.clear()
@@ -198,8 +200,9 @@ class BpyDataProxy(Proxy):
     def update(
         self,
         diff: BpyBlendDiff,
+        updates: Set[T.ID],
+        process_delayed_updates: bool,
         synchronized_properties: SynchronizedProperties = safe_properties,
-        depsgraph_updates: T.bpy_prop_collection = (),
     ) -> Changeset:
         """
         Process local changes, i.e. created, removed and renames datablocks as well as depsgraph updates.
@@ -223,20 +226,11 @@ class BpyDataProxy(Proxy):
             changeset.removals.extend(collection_changeset.removals)
             changeset.renames.extend(collection_changeset.renames)
 
-        # Update the ID proxies from the depsgraph update
-        # this should iterate inside_out (Object.data, Object) in the adequate creation order
-        # (creating an Object requires its data)
-
-        # WARNING:
-        #   depsgraph_updates[i].id.original IS NOT bpy.lights['Point']
-        # or whatever as you might expect, so you cannot use it to index into the map
-        # to find the proxy to update.
-        # However
-        #   - mixer_uuid attributes have the same value
-        #   - __hash__() returns the same value
-
-        depsgraph_updated_ids = reversed([update.id.original for update in depsgraph_updates])
-        for datablock in depsgraph_updated_ids:
+        all_updates = updates
+        if process_delayed_updates:
+            all_updates |= self._delayed_updates
+            self._delayed_updates.clear()
+        for datablock in all_updates:
             if not isinstance(datablock, safe_depsgraph_updates):
                 logger.info("depsgraph update: ignoring untracked type %s", datablock)
                 continue
@@ -392,3 +386,6 @@ class BpyDataProxy(Proxy):
         datablock_proxy = self.state.proxies[uuid]
         datablock = self.state.datablocks[uuid]
         datablock_proxy.update_soa(datablock, path, soas)
+
+    def append_delayed_updates(self, delayed_updates: Set[T.ID]):
+        self._delayed_updates |= delayed_updates
