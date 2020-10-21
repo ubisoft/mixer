@@ -78,6 +78,9 @@ class StructProxy(Proxy):
 
         return self
 
+    def _pre_save(self, target: T.bpy_struct, context: Context) -> T.bpy_struct:
+        return specifics.pre_save_struct(self, target, context)
+
     def save(self, bl_instance: Any, key: Union[int, str], context: Context):
         """
         Save this proxy into a Blender attribute
@@ -93,8 +96,9 @@ class StructProxy(Proxy):
             if target is None:
                 target = specifics.add_element(self, bl_instance, key, context)
         else:
-            specifics.pre_save_struct(self, bl_instance, key)
             target = getattr(bl_instance, key, None)
+            if target is not None:
+                self._pre_save(target, context)
 
         if target is None:
             if isinstance(bl_instance, T.bpy_prop_collection):
@@ -141,7 +145,7 @@ class StructProxy(Proxy):
 
         assert isinstance(key, (int, str))
 
-        # TODO factorize with save
+        struct_update = struct_delta.value
 
         if isinstance(key, int):
             struct = parent[key]
@@ -149,13 +153,13 @@ class StructProxy(Proxy):
             # TODO append an element :
             # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             struct = parent.get(key)
-            if struct is None:
+            if struct is None and to_blender:
                 struct = specifics.add_element(self, parent, key, context)
         else:
-            specifics.pre_save_struct(self, parent, key)
             struct = getattr(parent, key, None)
+            if to_blender:
+                struct = struct_update._pre_save(struct, context)
 
-        struct_update = struct_delta.value
         assert type(struct_update) == type(self)
 
         try:

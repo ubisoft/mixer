@@ -40,9 +40,10 @@ import mathutils
 
 if TYPE_CHECKING:
     from mixer.blender_data.aos_proxy import AosProxy
-    from mixer.blender_data.proxy import Context, Proxy
     from mixer.blender_data.bpy_data_proxy import VisitState
     from mixer.blender_data.datablock_proxy import DatablockProxy
+    from mixer.blender_data.proxy import Context, Proxy
+    from mixer.blender_data.struct_proxy import StructProxy
     from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 logger = logging.getLogger(__name__)
@@ -267,9 +268,9 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
     return properties
 
 
-def pre_save_id(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
+def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
     """Process attributes that must be saved first and return a possibly updated reference to the target"""
-    if isinstance(target, bpy.types.Material):
+    if isinstance(target, T.Material):
         use_nodes = proxy.data("use_nodes")
         if use_nodes:
             target.use_nodes = True
@@ -299,29 +300,22 @@ def pre_save_id(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
             target.type = light_type
             # must reload the reference
             target = proxy.target(context)
-    elif isinstance(target, T.ColorManagedViewSettings):
-        use_curve_mapping = proxy.data("use_curve_mapping")
-        if use_curve_mapping:
-            target.use_curve_mapping = True
-    elif isinstance(target, bpy.types.World):
+    elif isinstance(target, T.World):
         use_nodes = proxy.data("use_nodes")
         if use_nodes:
             target.use_nodes = True
     elif isinstance(target, T.Mesh):
         context.visit_state.funcs["Mesh.clear_geometry"] = target.clear_geometry
-
     return target
 
 
-def pre_save_struct(proxy: Proxy, bpy_struct: T.Struct, attr_name: str):
+def pre_save_struct(proxy: StructProxy, target: T.bpy_struct, context: Context) -> T.bpy_struct:
     """Process attributes that must be saved first"""
-    target = getattr(bpy_struct, attr_name, None)
-    if target is None:
-        return None
     if isinstance(target, T.ColorManagedViewSettings):
         use_curve_mapping = proxy.data("use_curve_mapping")
         if use_curve_mapping:
             target.use_curve_mapping = True
+    return target
 
 
 def post_save_id(proxy: Proxy, bpy_id: T.ID):

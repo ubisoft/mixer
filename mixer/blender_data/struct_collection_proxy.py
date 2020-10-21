@@ -224,7 +224,6 @@ class StructCollectionProxy(Proxy):
             if collection is None:
                 collection = specifics.add_element(self, parent, key, context)
         else:
-            specifics.pre_save_struct(self, parent, key)
             collection = getattr(parent, key, None)
 
         update = delta.value

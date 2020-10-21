@@ -221,7 +221,7 @@ class DatablockProxy(StructProxy):
 
         datablock.mixer_uuid = self.mixer_uuid()
 
-        datablock = specifics.pre_save(self, datablock, context)
+        datablock = self._pre_save(datablock, context)
         if datablock is None:
             logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
             return None, None
@@ -238,7 +238,7 @@ class DatablockProxy(StructProxy):
         """
         Update this proxy and datablock according to delta
         """
-        datablock = specifics.pre_save(delta.value, datablock, context)
+        datablock = delta.value._pre_save(datablock, context)
         if datablock is None:
             logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
             return None
@@ -282,7 +282,7 @@ class DatablockProxy(StructProxy):
             id_ = getattr(bl_instance, attr_name)
             pass
 
-        target = specifics.pre_save(self, id_, context)
+        target = self._pre_save(id_, context)
         if target is None:
             logger.warning(f"DatablockProxy.save() {bl_instance}.{attr_name} is None")
             return None
@@ -347,3 +347,6 @@ class DatablockProxy(StructProxy):
             return super()._diff(datablock, key, prop, context, diff)
         finally:
             context.visit_state.datablock_proxy = None
+
+    def _pre_save(self, target: T.bpy_struct, context: Context) -> T.ID:
+        return specifics.pre_save_datablock(self, target, context)
