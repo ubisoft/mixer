@@ -2,7 +2,8 @@
 
 ## Features
 
-- Shading trees for objects, worlds and lights (except node groups)
+- Shading trees for objects, worlds and lights (except grouped nodes)
+- Log OS, Blender, Mixer version and enabled addons list when joining room
 - VRtist: sky
 
 ## Fixes
