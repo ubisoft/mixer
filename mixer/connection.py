@@ -34,6 +34,7 @@ from mixer.stats import save_statistics, get_stats_filename
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import SendSceneContentFailed, BlenderClient
 from mixer.handlers import HandlerManager
+from mixer.os_utils import tech_infos
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,9 @@ def set_client_attributes():
 
 def join_room(room_name: str, experimental_sync: bool):
     logger.info("join_room")
+
+    for line in tech_infos():
+        logger.warning(line)
 
     assert share_data.client.current_room is None
     share_data.session_id += 1
