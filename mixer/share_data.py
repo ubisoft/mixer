@@ -22,7 +22,7 @@ This module defines global state of the addon. It is encapsulated in a ShareData
 from collections import namedtuple
 from datetime import datetime
 import logging
-from typing import List, Mapping, Set
+from typing import Dict, List, Mapping, Set
 from uuid import uuid4
 
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
@@ -30,6 +30,8 @@ from mixer.blender_data.filter import test_properties
 from mixer.bl_utils import get_mixer_prefs
 
 import bpy
+import bpy.types as T  # noqa N812
+
 from mixer.shot_manager_data import ShotManager
 
 logger = logging.getLogger(__name__)
@@ -369,7 +371,11 @@ class ShareData:
         for obj in self.blender_objects.values():
             self.objects_transforms[obj.name_full] = obj.matrix_local.copy()
 
-    def sanitize_blender_ids(self, id_dict):
+    def sanitize_blender_ids(self, id_dict: Dict[str, T.ID], is_dirty: bool) -> Dict[str, T.ID]:
+        if is_dirty:
+            # avoid useless warnings if we are to rebuild anyway
+            return id_dict
+
         # todo investigate this
         # the classic error is ReferenceError: StructRNA of type Object has been removed
         # I think we should remove the lazy update of dicts, because references become stale, we don't know why
@@ -387,7 +393,7 @@ class ShareData:
         return sanitized
 
     def update_current_data(self):
-        self._blender_objects = self.sanitize_blender_ids(self._blender_objects)
+        self._blender_objects = self.sanitize_blender_ids(self._blender_objects, self.blender_objects_dirty)
 
         self.update_scenes_info()
         self.update_collections_info()

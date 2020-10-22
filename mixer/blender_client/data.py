@@ -217,7 +217,7 @@ def send_data_removals(removals: RemovalChangeset):
     if not share_data.use_experimental_sync():
         return
 
-    for uuid, debug_info in removals:
+    for uuid, _, debug_info in removals:
         logger.info("send_removal: %s (%s)", uuid, debug_info)
         buffer = encode_string(uuid) + encode_string(debug_info)
         command = Command(MessageType.BLENDER_DATA_REMOVE, buffer, 0)
