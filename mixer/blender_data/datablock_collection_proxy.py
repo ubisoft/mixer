@@ -376,20 +376,19 @@ class DatablockRefCollectionProxy(Proxy):
 
                 assert isinstance(ref_update, DatablockRefProxy)
                 if to_blender:
-                    # TODO another case for rename trouble ik k remains the name
-                    # should be fixed automatically if the key is the uuid at
-                    # DatablockCollectionProxy load
                     uuid = ref_update._datablock_uuid
                     datablock = context.proxy_state.datablocks.get(uuid)
-                    if datablock is None:
-                        logger.warning(
-                            f"delta apply for {parent}[{key}]: unregistered uuid {uuid} for {ref_update._debug_name}"
-                        )
-                        continue
                     if isinstance(ref_delta, DeltaAddition):
-                        collection.link(datablock)
+                        if datablock is not None:
+                            logger.warning(
+                                f"delta apply add for {parent}[{key}]: unregistered uuid {uuid} for {ref_update._debug_name}"
+                            )
+                            collection.link(datablock)
                     else:
-                        collection.unlink(datablock)
+                        if datablock is not None:
+                            collection.unlink(datablock)
+                        # else
+                        #   we have already processed an Objet removal. Not an error
 
                 if isinstance(ref_delta, DeltaAddition):
                     self._data[k] = ref_update
