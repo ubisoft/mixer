@@ -71,6 +71,7 @@ def send_scene_data_to_server(scene, dummy):
     # Ask the proxy to compute the list of elements to synchronize and update itself
     changeset = bpy_data_proxy.update(diff, updates, process_delayed_updates, safe_properties)
 
+    # Send creations before update so that collection updates for new object have a valid target
     data_api.send_data_creations(changeset.creations)
     data_api.send_data_removals(changeset.removals)
     data_api.send_data_renames(changeset.renames)

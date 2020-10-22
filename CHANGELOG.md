@@ -1,13 +1,16 @@
-# WIP
+# 0.18.0 wip
 
 ## Features
 
-- Shading trees for objects, worlds and lights (except grouped nodes)
+- Shading trees for objects, worlds and lights (except node groups)
+- VRtist: sky
 
 ## Fixes
 
 - Transfer less mesh data when modifiers are modified
-- Trasnfer less mesh data with linked meshes
+- Transfer less mesh data with linked meshes
+- Fix new mesh part not linked to its collection after mesh separate
+- Remove logging of meaningless ReferenceError messages
 
 
 # 0.17.0 (2020-10-15)

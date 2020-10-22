@@ -30,7 +30,7 @@ from mixer.blender_data.filter import test_properties
 from mixer.bl_utils import get_mixer_prefs
 
 import bpy
-import bpy.types as T
+import bpy.types as T  # noqa N812
 
 from mixer.shot_manager_data import ShotManager
 
