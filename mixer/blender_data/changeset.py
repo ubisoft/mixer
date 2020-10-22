@@ -24,15 +24,18 @@ from typing import List, Tuple
 import bpy.types as T  # noqa
 
 from mixer.blender_data.datablock_proxy import DatablockProxy
-from mixer.blender_data.proxy import DeltaUpdate
+from mixer.blender_data.proxy import DeltaUpdate, Uuid
 
 
 CreationChangeset = List[DatablockProxy]
 UpdateChangeset = List[DeltaUpdate]
-# uuid, debug_display
-RemovalChangeset = List[Tuple[str, str]]
-# uuid, old_name, new_name, debug_display
-RenameChangeset = List[Tuple[str, str, str, str]]
+
+Removal = Tuple[Uuid, str, str]
+RemovalChangeset = List[Removal]
+"""uuid, collection name, debug_display"""
+
+RenameChangeset = List[Tuple[Uuid, str, str, str]]
+"""uuid, old_name, new_name, debug_display"""
 
 
 class Changeset:

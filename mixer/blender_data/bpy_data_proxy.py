@@ -25,7 +25,7 @@ from __future__ import annotations
 import array
 from dataclasses import dataclass, field
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -38,21 +38,22 @@ from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import SynchronizedProperties, safe_depsgraph_updates, safe_properties
 from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy, MaxDepthExceeded, UnresolvedRefs, Uuid
 
+if TYPE_CHECKING:
+    from mixer.blender_data.changeset import Removal
+
 logger = logging.getLogger(__name__)
 
-# to sort delta in the bottom up order in rough reference hierarchy
-# TODO useless since unresolved references are handled
-_creation_order = {
-    # anything before objects (meshes, lights, cameras)
-    # Mesh must be received before Object because Object creation requires the Mesh, that cannot be updated afterwards
-    "objects": 10,
-    "collections": 20,
-    "scenes": 30,
-}
+
+def _objects_last(item: Tuple[str, Any]):
+    if item[0] == "objects":
+        return 1
+    return 0
 
 
-def _pred_by_creation_order(item: Tuple[str, Any]):
-    return _creation_order.get(item[0], 0)
+def _objects_first(removal: Removal):
+    if removal[1] == "objects":
+        return 0
+    return 1
 
 
 class RecursionGuard:
@@ -220,14 +221,18 @@ class BpyDataProxy(Proxy):
         # There is no difference between a creation and a subsequent update
         context = self.context(synchronized_properties)
 
-        # sort the updates deppmost first so that the receiver will create meshes and lights
-        # before objects, for instance
-        deltas = sorted(diff.collection_deltas, key=_pred_by_creation_order)
+        # sort the creation so that Object.data target is created before Object
+        deltas = sorted(diff.collection_deltas, key=_objects_last)
         for delta_name, delta in deltas:
             collection_changeset = self._data[delta_name].update(delta, context)
             changeset.creations.extend(collection_changeset.creations)
             changeset.removals.extend(collection_changeset.removals)
             changeset.renames.extend(collection_changeset.renames)
+
+        # Everything is sorted with Object last, but the removals need to be sorted the other way round,
+        # otherwise the receiver might get a Mesh remove (that removes the Object as well), then an Object remove
+        # message for a non existent objjet that triggers a noisy warning, otherwise useful
+        changeset.removals = sorted(changeset.removals, key=_objects_first)
 
         all_updates = updates
         if process_delayed_updates:

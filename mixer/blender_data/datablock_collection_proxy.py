@@ -230,7 +230,7 @@ class DatablockCollectionProxy(Proxy):
             try:
                 logger.info("Perform removal for %s", proxy)
                 uuid = proxy.mixer_uuid()
-                changeset.removals.append((uuid, str(proxy)))
+                changeset.removals.append((uuid, proxy.collection_name, str(proxy)))
                 del self._data[uuid]
                 id_ = context.proxy_state.datablocks[uuid]
                 del context.proxy_state.proxies[uuid]
