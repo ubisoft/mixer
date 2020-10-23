@@ -85,6 +85,7 @@ class CreateRoomOperator(bpy.types.Operator):
         if not is_client_connected():
             return {"CANCELLED"}
 
+        logger.warning("CreateRoomOperator.execute({room})")
         join_room(get_mixer_prefs().room, get_mixer_prefs().experimental_sync)
 
         return {"FINISHED"}
@@ -141,6 +142,7 @@ class JoinRoomOperator(bpy.types.Operator):
         room_index = props.room_index
         room = props.rooms[room_index].name
         experimental_sync = get_mixer_prefs().experimental_sync
+        logger.warning("JoinRoomOperator.execute({room})")
         join_room(room, experimental_sync)
 
         return {"FINISHED"}
@@ -332,6 +334,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
                 self.report({"ERROR"}, f"vrtist.launch connect error : {e}")
                 return {"CANCELLED"}
 
+            logger.warning("LaunchVRtistOperator.execute({mixer_prefs.room})")
             join_room(mixer_prefs.room, mixer_prefs.experimental)
 
         color = share_data.client.clients_attributes[share_data.client.client_id].get(

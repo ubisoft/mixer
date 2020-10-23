@@ -21,6 +21,14 @@ Utility functions that may require os/platform specific adjustments
 
 import getpass
 import os
+import platform
+import sys
+from typing import List
+
+import mixer
+
+import bpy
+import addon_utils
 
 
 def getuser() -> str:
@@ -28,3 +36,24 @@ def getuser() -> str:
         return getpass.getuser()
     except Exception:
         return os.getlogin()
+
+
+def tech_infos() -> List[str]:
+    lines = [
+        f"Platform : {platform.platform()}",
+        f"Blender  : {bpy.app.version_string}",
+    ]
+
+    date = getattr(mixer, "version_date", None)
+    date_string = f"({date})" if date is not None else ""
+    lines.append(f"Mixer    : {mixer.display_version} {date_string}")
+
+    for bl_module in addon_utils.modules():
+        name = bl_module.bl_info["name"]
+        module = sys.modules.get(bl_module.__name__)
+        enabled = module is not None and getattr(module, "__addon_enabled__", False)
+        if enabled:
+            version = bl_module.bl_info.get("version", (-1, -1, -1))
+            lines.append(f"Addon    : {name} {version}")
+
+    return lines
