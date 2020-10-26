@@ -321,6 +321,8 @@ class DatablockRefCollectionProxy(Proxy):
                 uuid = item.mixer_uuid
                 proxy.load(item, item.name, context)
                 self._data[uuid] = proxy
+            else:
+                logger.error(f"unexpected None in {bl_collection}.{key}")
         return self
 
     def save(self, parent: Any, key: str, context: Context):
@@ -380,10 +382,12 @@ class DatablockRefCollectionProxy(Proxy):
                     datablock = context.proxy_state.datablocks.get(uuid)
                     if isinstance(ref_delta, DeltaAddition):
                         if datablock is not None:
+                            collection.link(datablock)
+                        else:
                             logger.warning(
                                 f"delta apply add for {parent}[{key}]: unregistered uuid {uuid} for {ref_update._debug_name}"
                             )
-                            collection.link(datablock)
+
                     else:
                         if datablock is not None:
                             collection.unlink(datablock)

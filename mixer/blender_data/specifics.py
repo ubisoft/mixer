@@ -165,20 +165,22 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
         return image
 
     if collection_name == "objects":
+        from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+        from mixer.blender_data.misc_proxies import NonePtrProxy
+
         name = proxy.data("name")
         target = None
         target_proxy = proxy.data("data")
-        if target_proxy is not None:
-            # use class name to work around circular references with proxy.py
-            target_proxy_class = target_proxy.__class__.__name__
-            if target_proxy_class != "DatablockRefProxy":
-                # error on the sender side
-                logger.warning(
-                    f"bpy.data.objects[{name}].data proxy is a {target_proxy_class}. Expected a DatablockRefProxy"
-                )
-                logger.warning("... loaded as Empty")
-            else:
-                target = target_proxy.target(context)
+        if isinstance(target_proxy, DatablockRefProxy):
+            target = target_proxy.target(context)
+        elif isinstance(target_proxy, NonePtrProxy):
+            target = None
+        else:
+            # error on the sender side
+            logger.warning(f"bpy.data.objects[{name}].data proxy is a {target_proxy.__class__}.")
+            logger.warning("... loaded as Empty")
+            target = None
+
         object_ = collection.new(name, target)
         return object_
 
@@ -335,6 +337,11 @@ def update_requires_clear_geometry(incoming_update: MeshProxy, existing_proxy: M
 
 def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
     """Process attributes that must be saved first and return a possibly updated reference to the target"""
+
+    # WARNING this is called from save() and from apply()
+    # When called from save, the proxy has  all the synchronized properties
+    # WHen called from apply, the proxy only contains the updated properties
+
     if isinstance(target, T.Mesh) and proxy_requires_clear_geometry(proxy, target):
         target.clear_geometry()
     elif isinstance(target, T.Material):
@@ -345,21 +352,26 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
         is_grease_pencil = proxy.data("is_grease_pencil")
         # will be None for a DeltaUpdate that does not modify "is_grease_pencil"
         if is_grease_pencil is not None:
-            # is_grease_pencil is modified
-            if is_grease_pencil:
-                if not target.grease_pencil:
-                    bpy.data.materials.create_gpencil_data(target)
-            else:
-                if target.grease_pencil:
-                    bpy.data.materials.remove_gpencil_data(target)
+            # Seems to be write once as no depsgraph update is fired
+            if is_grease_pencil and not target.grease_pencil:
+                bpy.data.materials.create_gpencil_data(target)
+            elif not is_grease_pencil and target.grease_pencil:
+                bpy.data.materials.remove_gpencil_data(target)
     elif isinstance(target, T.Scene):
+        from mixer.blender_data.misc_proxies import NonePtrProxy
+
         # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
         use_nodes = proxy.data("use_nodes")
         if use_nodes:
             target.use_nodes = True
+
         sequence_editor = proxy.data("sequence_editor")
-        if sequence_editor is not None and target.sequence_editor is None:
-            target.sequence_editor_create()
+        if sequence_editor is not None:
+            # NonePtrProxy or StructProxy
+            if not isinstance(sequence_editor, NonePtrProxy) and target.sequence_editor is None:
+                target.sequence_editor_create()
+            elif isinstance(sequence_editor, NonePtrProxy) and target.sequence_editor is not None:
+                target.sequence_editor_clear()
     elif isinstance(target, T.Light):
         # required first to have access to new light type attributes
         light_type = proxy.data("type")
