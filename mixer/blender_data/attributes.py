@@ -106,12 +106,20 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
                 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
                 return DatablockRefProxy().load(attr, key, context)
-        elif issubclass(attr_type, T.bpy_struct):
+
+        if issubclass(attr_type, T.bpy_struct):
             from mixer.blender_data.struct_proxy import StructProxy
 
             return StructProxy().load(attr, key, context)
 
-        raise ValueError(f"Unsupported attribute type {attr_type} without bl_rna for attribute {attr} ")
+        if attr is None and isinstance(attr_property, T.PointerProperty):
+            from mixer.blender_data.misc_proxies import NonePtrProxy
+
+            return NonePtrProxy()
+
+        logger.error(
+            f"Unsupported attribute {attr_type} {attr_property} {attr_property.fixed_type} at {context.visit_state.datablock_proxy._class_name}.{context.visit_state.path}.{attr_property.identifier}"
+        )
     finally:
         context.visit_state.recursion_guard.pop()
 
@@ -196,11 +204,11 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, con
                 setattr(parent, key, value)
             except Exception as e:
                 logger.warning(f"apply_attribute: setattr({parent}, {key}, {value})")
-                logger.warning(f"... exception {e})")
+                logger.warning(f"... exception {e!r})")
         return value
 
     except Exception as e:
-        logger.warning(f"apply exception for attr: {e}")
+        logger.warning(f"apply exception for attr: {e!r}")
         raise
 
 
