@@ -381,9 +381,11 @@ default_exclusions = {
         )
     ],
     T.RenderSettings: [
-        NameFilterOut(
+        NameFilterOut([
             # just a view of "right" and "left" from RenderSettings.views
-            "stereo_views"
+            "stereo_views",
+            # Causes error in pass_filter, maybe not useful
+            "bake",]
         )
     ],
     T.Scene: [
@@ -398,6 +400,8 @@ default_exclusions = {
                 # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
                 # it is unclear how to do it.
                 "tool_settings",
+                # Probably per user setting. Causes a readonly error for StudioLight.spherical_harmonics_coefficients
+                "display",
                 # TODO temporary, not implemented
                 "node_tree",
                 "view_layers",
