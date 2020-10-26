@@ -382,10 +382,12 @@ class DatablockRefCollectionProxy(Proxy):
                     datablock = context.proxy_state.datablocks.get(uuid)
                     if isinstance(ref_delta, DeltaAddition):
                         if datablock is not None:
+                            collection.link(datablock)
+                        else:
                             logger.warning(
                                 f"delta apply add for {parent}[{key}]: unregistered uuid {uuid} for {ref_update._debug_name}"
                             )
-                            collection.link(datablock)
+
                     else:
                         if datablock is not None:
                             collection.unlink(datablock)

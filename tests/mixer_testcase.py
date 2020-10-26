@@ -238,7 +238,7 @@ class MixerTestCase(unittest.TestCase):
             self.assertListEqual(keys_a, keys_b, msg=msg)
             for k in keys_a:
                 try:
-                    self.assert_any_almost_equal(dict_a[k], dict_b[k], msg=msg)
+                    self.assert_any_almost_equal(dict_a[k], dict_a[k], msg=msg)
                 except AssertionError as e:
                     raise AssertionError(k, *e.args) from None
 
