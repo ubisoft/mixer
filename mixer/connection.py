@@ -50,7 +50,8 @@ def set_client_attributes():
 
 
 def join_room(room_name: str, experimental_sync: bool):
-    logger.info("join_room")
+    prefs = get_mixer_prefs()
+    logger.warning(f"join: room: {room_name}, user: {prefs.user}")
 
     for line in tech_infos():
         logger.warning(line)
@@ -69,11 +70,10 @@ def join_room(room_name: str, experimental_sync: bool):
         "session_id": share_data.session_id,
         "blendfile": bpy.data.filepath,
         "statsfile": get_stats_filename(share_data.run_id, share_data.session_id),
-        "user": get_mixer_prefs().user,
+        "user": prefs.user,
         "room": room_name,
         "children": {},
     }
-    prefs = get_mixer_prefs()
     share_data.auto_save_statistics = prefs.auto_save_statistics
     share_data.statistics_directory = prefs.statistics_directory
     share_data.set_experimental_sync(experimental_sync)
