@@ -381,11 +381,13 @@ default_exclusions = {
         )
     ],
     T.RenderSettings: [
-        NameFilterOut([
-            # just a view of "right" and "left" from RenderSettings.views
-            "stereo_views",
-            # Causes error in pass_filter, maybe not useful
-            "bake",]
+        NameFilterOut(
+            [
+                # just a view of "right" and "left" from RenderSettings.views
+                "stereo_views",
+                # Causes error in pass_filter, maybe not useful
+                "bake",
+            ]
         )
     ],
     T.Scene: [
