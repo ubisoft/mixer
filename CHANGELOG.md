@@ -12,6 +12,7 @@
 - Transfer less mesh data with linked meshes
 - Fix new mesh part not linked to its collection after mesh separate
 - Remove logging of meaningless ReferenceError messages
+- Fix error when setting datablock reference after initial synchronization (e.g. TextureNodeImage.image, ArrayModifier.object_offset, Scene.camera)
 
 
 # 0.17.0 (2020-10-15)
