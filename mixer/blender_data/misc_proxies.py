@@ -48,7 +48,15 @@ class NonePtrProxy(Proxy):
     """
 
     def save(self, bl_instance: Any, attr_name: str, context: Context):
-        setattr(bl_instance, attr_name, None)
+        try:
+            setattr(bl_instance, attr_name, None)
+        except AttributeError as e:
+            # Motsly errors like
+            #   AttributeError: bpy_struct: attribute "node_tree" from "Material" is read-only
+            # Avoiding them would require filtering attrivutes on save in order not to set
+            # Material.node_tree if Material.use_nodes is False
+            logger.debug("NonePtrProxy.save() exception ...")
+            logger.debug(f"... {repr(e)}")
 
     def apply(
         self,
