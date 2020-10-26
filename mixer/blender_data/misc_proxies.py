@@ -65,7 +65,7 @@ class NonePtrProxy(Proxy):
         delta: DeltaUpdate,
         context: Context,
         to_blender: bool = True,
-    ) -> Optional[DatablockRefProxy]:
+    ) -> Optional[NonePtrProxy]:
         """
         Apply a delta to this proxy, which occurs when Scene.camera is set from None to a valid reference
         """

@@ -321,6 +321,8 @@ class DatablockRefCollectionProxy(Proxy):
                 uuid = item.mixer_uuid
                 proxy.load(item, item.name, context)
                 self._data[uuid] = proxy
+            else:
+                logger.error(f"unexpected None in {bl_collection}.{key}")
         return self
 
     def save(self, parent: Any, key: str, context: Context):
