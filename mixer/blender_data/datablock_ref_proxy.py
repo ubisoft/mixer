@@ -109,7 +109,7 @@ class DatablockRefProxy(Proxy):
                     logger.warning(
                         f"DatablockRefProxy.save() exception while saving {ref_target} into {container}[{key}]..."
                     )
-                    logger.warning(f"...{e}")
+                    logger.warning(f"...{e!r}")
             else:
                 # is there a case for this ?
                 logger.warning(

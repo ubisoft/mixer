@@ -49,7 +49,7 @@ def delete_scene(scene) -> bool:
         logger.warning(f"... OK. Remaining scenes: {bpy.data.scenes.keys()}")
         return True
     except RuntimeError as e:
-        logger.warning(f"delete_scene {scene}: exception {e}")
+        logger.warning(f"delete_scene {scene}: exception {e!r}")
         return False
 
 
@@ -151,7 +151,7 @@ def build_collection_to_scene(data):
             logger.info(f"build_collection_to_scene(): scene {scene_name}, collection {collection_name}...")
             logger.info("... Exception during scene.collection.children.link() ...")
             logger.info("... Safe in experimental_sync ...")
-            logger.info(f"... {e}")
+            logger.info(f"... {e!r}")
         else:
             raise
     share_data.update_collection_temporary_visibility(collection_name)
@@ -183,7 +183,7 @@ def build_remove_collection_from_scene(data):
             scene.collection.children.unlink(collection)
         except Exception as e:
             logger.info("build_remove_collection_from_scene: exception during unlink... ")
-            logger.info(f"... {e} ")
+            logger.info(f"... {e!r} ")
 
 
 def send_add_object_to_vrtist(client: Client, scene_name: str, obj_name: str):
@@ -240,4 +240,4 @@ def build_remove_object_from_scene(data):
             scene.collection.objects.unlink(object_)
         except Exception as e:
             logger.info("build_remove_object_from_scene: exception during unlink... ")
-            logger.info(f"... {e} ")
+            logger.info(f"... {e!r} ")

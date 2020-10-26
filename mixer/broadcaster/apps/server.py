@@ -94,7 +94,7 @@ class Connection:
             try:
                 self._server.join_room(self, room_name)
             except Exception as e:
-                _send_error(f"{e}")
+                _send_error(f"{e!r}")
 
         def _leave_room(command: common.Command):
             if self.room is None:

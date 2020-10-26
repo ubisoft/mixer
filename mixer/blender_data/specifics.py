@@ -158,7 +158,7 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
                     image = collection.load(path)
                 except RuntimeError as e:
                     logger.warning(f'Cannot load image at path "{path}". Exception: ')
-                    logger.warning(f"... {e}")
+                    logger.warning(f"... {e!r}")
                     return None
                 # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
                 image.name = proxy.data("name")
@@ -209,7 +209,7 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
         id_ = collection.new(name)
     except TypeError as e:
         logger.error(f"Exception while calling : bpy.data.{collection_name}.new({name})")
-        logger.error(f"TypeError : {e}")
+        logger.error(f"TypeError : {e!r}")
         return None
 
     return id_

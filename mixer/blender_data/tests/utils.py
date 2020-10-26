@@ -103,7 +103,7 @@ def bl_equals(attr_a, attr_b, msg=None, skip_name=False, synchronized_properties
                 )
             except failureException as e:
                 raise failureException(
-                    f'{e}\nDifferent values for collection items at key "{key}" : {attr_a_i} and {attr_b_i}'
+                    f'{e!r}\nDifferent values for collection items at key "{key}" : {attr_a_i} and {attr_b_i}'
                 ) from None
             if not equal:
                 raise failureException(
@@ -122,7 +122,7 @@ def bl_equals(attr_a, attr_b, msg=None, skip_name=False, synchronized_properties
                 )
             except failureException as e:
                 raise failureException(
-                    f'{e}\nDifferent values for struct items at key "{name}" : {attr_a_i} and {attr_b_i}'
+                    f'{e!r}\nDifferent values for struct items at key "{name}" : {attr_a_i} and {attr_b_i}'
                 ) from None
             if not equal:
                 raise failureException(f'Different values for struct items at key "{name}" : {attr_a_i} and {attr_b_i}')

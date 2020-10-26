@@ -85,8 +85,10 @@ class CreateRoomOperator(bpy.types.Operator):
         if not is_client_connected():
             return {"CANCELLED"}
 
-        logger.warning("CreateRoomOperator.execute({room})")
-        join_room(get_mixer_prefs().room, get_mixer_prefs().experimental_sync)
+        prefs = get_mixer_prefs()
+        room = prefs.room
+        logger.warning(f"CreateRoomOperator.execute({room})")
+        join_room(room, prefs.experimental_sync)
 
         return {"FINISHED"}
 
@@ -142,7 +144,7 @@ class JoinRoomOperator(bpy.types.Operator):
         room_index = props.room_index
         room = props.rooms[room_index].name
         experimental_sync = get_mixer_prefs().experimental_sync
-        logger.warning("JoinRoomOperator.execute({room})")
+        logger.warning(f"JoinRoomOperator.execute({room})")
         join_room(room, experimental_sync)
 
         return {"FINISHED"}
@@ -273,7 +275,7 @@ class ConnectOperator(bpy.types.Operator):
             try:
                 connect()
             except Exception as e:
-                self.report({"ERROR"}, f"mixer.connect error : {e}")
+                self.report({"ERROR"}, f"mixer.connect error : {e!r}")
                 return {"CANCELLED"}
 
             self.report({"INFO"}, f'Connected to "{prefs.host}:{prefs.port}" ...')
@@ -331,7 +333,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
             try:
                 connect()
             except Exception as e:
-                self.report({"ERROR"}, f"vrtist.launch connect error : {e}")
+                self.report({"ERROR"}, f"vrtist.launch connect error : {e!r}")
                 return {"CANCELLED"}
 
             logger.warning("LaunchVRtistOperator.execute({mixer_prefs.room})")

@@ -99,7 +99,7 @@ def build_collection_removed(data):
             bpy.data.collections.remove(collection)
         except Exception as e:
             logger.info("build_remove_collection_from_scene: exception during unlink... ")
-            logger.info(f"... {e} ")
+            logger.info(f"... {e!r} ")
 
 
 def send_add_collection_to_collection(client: Client, parent_collection_name, collection_name):
@@ -132,11 +132,11 @@ def build_collection_to_collection(data):
             logger.info(f"build_collection_to_collection(): parent {parent_name}, child {child_name}...")
             logger.info("... Exception during parent.children.link() ...")
             logger.info("... Safe in experimental_sync ...")
-            logger.info(f"... {e}")
+            logger.info(f"... {e!r}")
         else:
             logger.warning(f"build_collection_to_collection(): parent {parent_name}, child {child_name}...")
             logger.warning("... Exception during parent.children.link() ...")
-            logger.warning(f"... {e}")
+            logger.warning(f"... {e!r}")
 
 
 def send_remove_collection_from_collection(client: Client, parent_collection_name, collection_name):
@@ -221,7 +221,7 @@ def build_remove_object_from_collection(data):
             collection.objects.unlink(object_)
         except Exception as e:
             logger.info("build_remove_object_from_collection: exception during unlink... ")
-            logger.info(f"... {e} ")
+            logger.info(f"... {e!r} ")
 
 
 def send_collection_instance(client: Client, obj):

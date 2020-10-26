@@ -261,6 +261,7 @@ default_exclusions = {
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foreach_get()
+    T.DecimateModifier: [NameFilterOut(["face_count"])],
     T.FaceMap: [NameFilterOut(["index"])],
     T.Image: [
         NameFilterOut("pixels"),
@@ -381,8 +382,12 @@ default_exclusions = {
     ],
     T.RenderSettings: [
         NameFilterOut(
-            # just a view of "right" and "left" from RenderSettings.views
-            "stereo_views"
+            [
+                # just a view of "right" and "left" from RenderSettings.views
+                "stereo_views",
+                # Causes error in pass_filter, maybe not useful
+                "bake",
+            ]
         )
     ],
     T.Scene: [
@@ -397,6 +402,8 @@ default_exclusions = {
                 # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
                 # it is unclear how to do it.
                 "tool_settings",
+                # Probably per user setting. Causes a readonly error for StudioLight.spherical_harmonics_coefficients
+                "display",
                 # TODO temporary, not implemented
                 "node_tree",
                 "view_layers",

@@ -182,7 +182,7 @@ class DatablockCollectionProxy(Proxy):
             # but deleting the light on this side has already deleted the object.
             # Alternatively we could try to sort messages on the sender side
             logger.warning(f"Exception during remove_datablock for {proxy}")
-            logger.warning(f"... {e}")
+            logger.warning(f"... {e!r}")
         uuid = proxy.mixer_uuid()
         del self._data[uuid]
 
@@ -220,7 +220,7 @@ class DatablockCollectionProxy(Proxy):
             except MaxDepthExceeded as e:
                 logger.error(f"MaxDepthExceeded while loading {collection_name}[{name}]:")
                 logger.error("... Nested attribute depth is too large: ")
-                logger.error(f"... {e}")
+                logger.error(f"... {e!r}")
             except Exception:
                 logger.error(f"Exception while loading {collection_name}[{name}]:")
                 for line in traceback.format_exc().splitlines():
@@ -401,7 +401,7 @@ class DatablockRefCollectionProxy(Proxy):
             except Exception as e:
                 logger.warning(f"DatablockCollectionProxy.apply(). Processing {ref_delta} to_blender {to_blender}")
                 logger.warning(f"... for {collection}[{k}]")
-                logger.warning(f"... Exception: {e}")
+                logger.warning(f"... Exception: {e!r}")
                 logger.warning("... Update ignored")
                 continue
 

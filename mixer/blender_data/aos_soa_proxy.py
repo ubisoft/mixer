@@ -195,7 +195,7 @@ class SoaElement(Proxy):
         except RuntimeError as e:
             logger.error(f"saving soa {aos}.{member_name} failed")
             logger.error(f"... member size: {len(aos)}, array: ('{array_.typecode}', {len(array_)})")
-            logger.error(f"... exception {e}")
+            logger.error(f"... exception {e!r}")
 
     def apply(
         self, parent: T.bpy_prop_collection, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True
