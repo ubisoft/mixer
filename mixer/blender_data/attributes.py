@@ -236,7 +236,7 @@ def diff_attribute(
             return DeltaUpdate(blender_value)
 
     except Exception as e:
-        logger.warning(f"diff exception for attr: {e}")
+        logger.warning(f"diff exception for attr: {e!r}")
         return None
 
     return None

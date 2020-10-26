@@ -171,7 +171,7 @@ class StructProxy(Proxy):
                 except Exception as e:
                     logger.warning(f"Struct.apply(). Processing {member_delta}")
                     logger.warning(f"... for {struct}.{k}")
-                    logger.warning(f"... Exception: {e}")
+                    logger.warning(f"... Exception: {e!r}")
                     logger.warning("... Update ignored")
                     continue
         finally:

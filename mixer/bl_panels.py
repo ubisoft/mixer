@@ -415,7 +415,7 @@ def update_panels_category(self, context):
             bpy.utils.register_class(panel)
 
     except Exception as e:
-        logger.error(f"Updating Panel category has failed {e}")
+        logger.error(f"Updating Panel category has failed {e!r}")
 
 
 classes = (ROOM_UL_ItemRenderer, MixerSettingsPanel, VRtistSettingsPanel)

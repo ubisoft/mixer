@@ -273,7 +273,7 @@ class ConnectOperator(bpy.types.Operator):
             try:
                 connect()
             except Exception as e:
-                self.report({"ERROR"}, f"mixer.connect error : {e}")
+                self.report({"ERROR"}, f"mixer.connect error : {e!r}")
                 return {"CANCELLED"}
 
             self.report({"INFO"}, f'Connected to "{prefs.host}:{prefs.port}" ...')
@@ -331,7 +331,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
             try:
                 connect()
             except Exception as e:
-                self.report({"ERROR"}, f"vrtist.launch connect error : {e}")
+                self.report({"ERROR"}, f"vrtist.launch connect error : {e!r}")
                 return {"CANCELLED"}
 
             logger.warning("LaunchVRtistOperator.execute({mixer_prefs.room})")

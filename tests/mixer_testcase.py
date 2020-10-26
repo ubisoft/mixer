@@ -148,7 +148,7 @@ class MixerTestCase(unittest.TestCase):
             # time.sleep(1)
             self._receiver.disconnect_mixer()
         except Exception as e:
-            raise self.failureException(f"Exception during disconnect():\n{e}\nPossible Blender crash") from None
+            raise self.failureException(f"Exception during disconnect():\n{e!r}\nPossible Blender crash") from None
 
         # wait for disconnect before killing the server. Avoids a disconnect operator context error message
         time.sleep(0.5)
@@ -383,14 +383,14 @@ class MixerTestCase(unittest.TestCase):
             for blender in self._blenders:
                 blender.disconnect_mixer()
         except Exception as e:
-            raise self.failureException(f"Exception {e} during disconnect_mixer(). Possible Blender crash")
+            raise self.failureException(f"Exception {e!r} during disconnect_mixer(). Possible Blender crash")
 
     def send_string(self, s: str, to: Optional[int] = 0, sleep: float = 0.5):
         try:
             self._blenders[to].send_string(s, sleep)
         except Exception as e:
             raise self.failureException(
-                f"Exception {e}\n" "during send command :\n" "{s}\n" "to Blender {to}.\n" "Possible Blender crash"
+                f"Exception {e!r}\n" "during send command :\n" "{s}\n" "to Blender {to}.\n" "Possible Blender crash"
             )
 
     def send_strings(self, strings: List[str], to: Optional[int] = 0, sleep: float = 0.5):

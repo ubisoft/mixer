@@ -328,7 +328,7 @@ class DatablockProxy(StructProxy):
                 except Exception as e:
                     logger.warning(f"apply_to_proxy(). Processing {delta}")
                     logger.warning(f"... for {datablock}.{k}")
-                    logger.warning(f"... Exception: {e}")
+                    logger.warning(f"... Exception: {e!r}")
                     logger.warning("... Update ignored")
                     continue
         finally:

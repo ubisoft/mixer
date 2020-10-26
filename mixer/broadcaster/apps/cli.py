@@ -196,7 +196,7 @@ def interactive_loop(args):
                 else:
                     pass
         except Exception as e:
-            logger.error(f"Exception: {e}", exc_info=True)
+            logger.error(f"Exception: {e!r}", exc_info=True)
 
 
 def main():

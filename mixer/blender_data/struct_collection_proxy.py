@@ -271,7 +271,7 @@ class StructCollectionProxy(Proxy):
                     except Exception as e:
                         logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
                         logger.warning(f"... for {collection}[{i}]")
-                        logger.warning(f"... Exception: {e}")
+                        logger.warning(f"... Exception: {e!r}")
                         logger.warning("... Update ignored")
                         continue
             else:
@@ -299,7 +299,7 @@ class StructCollectionProxy(Proxy):
                     except Exception as e:
                         logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
                         logger.warning(f"... for {collection}[{k}]")
-                        logger.warning(f"... Exception: {e}")
+                        logger.warning(f"... Exception: {e!r}")
                         logger.warning("... Update ignored")
                         continue
         finally:
