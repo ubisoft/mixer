@@ -279,15 +279,12 @@ class ConnectOperator(bpy.types.Operator):
                 return {"CANCELLED"}
 
             self.report({"INFO"}, f'Connected to "{prefs.host}:{prefs.port}" ...')
-        except socket.gaierror as e:
+        except socket.gaierror:
             msg = f'Cannot connect to "{prefs.host}": invalid host name or address'
             self.report({"ERROR"}, msg)
-            if prefs.env != "production":
-                raise e
+            return {"CANCELLED"}
         except Exception as e:
             self.report({"ERROR"}, repr(e))
-            if prefs.env != "production":
-                raise e
             return {"CANCELLED"}
 
         return {"FINISHED"}

@@ -177,7 +177,6 @@ def draw_connection_settings_ui(layout: bpy.types.UILayout):
 def draw_advanced_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
     layout.prop(mixer_prefs, "log_level")
-    layout.prop(mixer_prefs, "env")
     layout.prop(mixer_prefs, "show_server_console")
 
 
