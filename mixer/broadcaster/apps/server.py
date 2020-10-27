@@ -199,6 +199,10 @@ class Connection:
                 _handle_outgoing_commands()
             except common.ClientDisconnectedException:
                 break
+            except Exception:
+                logger.exception("Exception during command processing. Disconnecting")
+                logger.error(f"Disconnecting {self.custom_attributes.get(common.ClientAttributes.USERNAME, 'Unknown')}")
+                break
 
         self._server.handle_client_disconnect(self)
 
