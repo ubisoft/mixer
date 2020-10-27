@@ -81,6 +81,9 @@ class Connection:
             common.ClientAttributes.ROOM: self.room.name if self.room is not None else None,
         }
 
+    def broadcast_error(self, command: common.Command):
+        self._server.broadcast_to_all_clients(command)
+
     def run(self):
         def _send_error(s: str):
             logger.error("Sending error %s", s)
@@ -153,6 +156,7 @@ class Connection:
             common.MessageType.LEAVE_ROOM: _leave_room,
             common.MessageType.LIST_ROOMS: _list_rooms,
             common.MessageType.DELETE_ROOM: _delete_room,
+            common.MessageType.SEND_ERROR: lambda x: self.broadcast_error(x),
             common.MessageType.SET_ROOM_CUSTOM_ATTRIBUTES: _set_room_custom_attributes,
             common.MessageType.SET_ROOM_KEEP_OPEN: _set_room_keep_open,
             common.MessageType.LIST_CLIENTS: _list_clients,
