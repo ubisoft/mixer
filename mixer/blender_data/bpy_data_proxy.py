@@ -140,7 +140,7 @@ class BpyDataProxy(Proxy):
         self.state: ProxyState = ProxyState()
 
         self._data: Dict[str, DatablockCollectionProxy] = {
-            name: DatablockCollectionProxy() for name in BlendData.instance().collection_names()
+            name: DatablockCollectionProxy(name) for name in BlendData.instance().collection_names()
         }
 
         self._delayed_updates: Set[T.ID] = set()
@@ -149,6 +149,13 @@ class BpyDataProxy(Proxy):
         self._data.clear()
         self.state.proxies.clear()
         self.state.datablocks.clear()
+
+    def reload_datablocks(self):
+        datablocks = self.state.datablocks
+        datablocks.clear()
+
+        for collection_proxy in self._data.values():
+            collection_proxy.reload_datablocks(datablocks)
 
     def context(self, synchronized_properties: SynchronizedProperties = safe_properties) -> Context:
         return Context(self.state, synchronized_properties)
@@ -189,7 +196,7 @@ class BpyDataProxy(Proxy):
 
         for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
             collection = getattr(bpy.data, name)
-            self._data[name] = DatablockCollectionProxy().load(collection, name, context)
+            self._data[name] = DatablockCollectionProxy(name).load(collection, name, context)
         return self
 
     def find(self, collection_name: str, key: str) -> DatablockProxy:
