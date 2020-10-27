@@ -77,18 +77,6 @@ class MixerPreferences(bpy.types.AddonPreferences):
         update=update_panels_category,
     )
 
-    # Allows to change behavior according to environment: production or development
-    env: bpy.props.EnumProperty(
-        name="Execution Environment",
-        description="Execution environment: production, development or testing",
-        items=[
-            ("production", "production", "", 0),
-            ("development", "development", "", 1),
-            ("testing", "testing", "", 2),
-        ],
-        default=os.environ.get("MIXER_ENV", "production"),
-    )
-
     host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
     port: bpy.props.IntProperty(name="Port", default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)))
     room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", getuser()))

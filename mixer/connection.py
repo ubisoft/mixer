@@ -190,8 +190,6 @@ def network_consumer_timer():
     if not share_data.client.is_connected():
         error_msg = "Timer still registered but client disconnected."
         logger.error(error_msg)
-        if get_mixer_prefs().env != "production":
-            raise RuntimeError(error_msg)
         # Returning None from a timer unregister it
         return None
 
@@ -207,9 +205,7 @@ def network_consumer_timer():
         disconnect()
         return None
     except Exception as e:
-        logger.error(e, stack_info=True)
-        if get_mixer_prefs().env == "development":
-            raise
+        logger.error(f"{e!r}", stack_info=True)
 
     # Run every 1 / 100 seconds
     return 0.01
