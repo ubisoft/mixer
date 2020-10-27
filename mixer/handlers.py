@@ -879,7 +879,7 @@ def handler_on_undo_redo_post(scene, dummy):
 
     if share_data.use_experimental_sync():
         # reload all datablocks
-
+        share_data.bpy_data_proxy.reload_datablocks()
         # generic.send_scene_data_to_server(scene, None)
         return
 

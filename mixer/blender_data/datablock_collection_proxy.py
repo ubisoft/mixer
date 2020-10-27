@@ -55,12 +55,17 @@ class DatablockCollectionProxy(Proxy):
     of DatablockProxy.
     """
 
-    def __init__(self):
+    def __init__(self, name: str):
+        self._name: str = name
         # On item per datablock. The key is the uuid, which eases rename management
         self._data: Dict[str, DatablockProxy] = {}
 
     def __len__(self):
         return len(self._data)
+
+    def reload_datablocks(self, datablocks: Dict[str, T.ID]):
+        collection = getattr(bpy.data, self._name)
+        datablocks.update({datablock.mixer_uuid: datablock for datablock in collection})
 
     def load(self, bl_collection: bpy.types.bpy_prop_collection, key: str, context: Context):  # noqa N802
         """
