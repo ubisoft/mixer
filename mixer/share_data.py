@@ -27,7 +27,6 @@ from uuid import uuid4
 
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.filter import test_properties
-from mixer.bl_utils import get_mixer_prefs
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -387,7 +386,7 @@ class ShareData:
                     value.name_full
                 ] = value  # the access value.name_full should trigger the error if the ID is invalid
             except ReferenceError as e:
-                logger.error("{e!r}")
+                logger.error(f"{e!r}")
         return sanitized
 
     def update_current_data(self):
