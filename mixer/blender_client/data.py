@@ -42,6 +42,7 @@ from mixer.broadcaster.common import (
     encode_string_array,
     MessageType,
 )
+from mixer.local_data import get_local_or_create_cache_file
 from mixer.share_data import share_data
 
 if TYPE_CHECKING:
@@ -51,6 +52,26 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+def send_media_creations(proxy: DatablockProxy):
+    media_desc = getattr(proxy, "_media", None)
+    if media_desc is None:
+        return
+
+    path, bytes_ = media_desc
+    items = [encode_string(path), bytes_]
+    command = Command(MessageType.BLENDER_DATA_MEDIA, b"".join(items), 0)
+    share_data.client.add_command(command)
+
+
+def build_data_media(buffer: bytes):
+    # TODO save to resolved path.
+    # The packed data with be saved to file, not a problem
+    path, index = decode_string(buffer, 0)
+    bytes_ = buffer[index:]
+    # TODO this does not overwrite outdated local files
+    get_local_or_create_cache_file(path, bytes_)
 
 
 def send_data_creations(proxies: CreationChangeset):
@@ -69,6 +90,8 @@ def send_data_creations(proxies: CreationChangeset):
                 logger.error(line)
             continue
 
+        send_media_creations(datablock_proxy)
+        # creation so that it is available at bpy_data_ctor() time
         items: List[bytes] = []
         items.append(encode_string(encoded_proxy))
         items.extend(soa_buffers(datablock_proxy))

@@ -35,6 +35,7 @@ from mixer.blender_data.attributes import apply_attribute, read_attribute, write
 from mixer.blender_data.proxy import DeltaUpdate
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.types import sub_id_type
+from mixer.local_data import get_source_file_path
 
 if TYPE_CHECKING:
     import array
@@ -66,6 +67,8 @@ class DatablockProxy(StructProxy):
             ("vertices"): [("co", co_soa), ("normals", normals_soa)]
             ("edges"): ...
         }"""
+
+        self._media: Optional[Tuple[str, bytes]] = None
 
     def init(self, datablock: T.ID):
         if datablock is not None:
@@ -156,7 +159,26 @@ class DatablockProxy(StructProxy):
             self._datablock_uuid = bl_instance.mixer_uuid
             context.proxy_state.proxies[uuid] = self
 
+        self.attach_media_descriptor(bl_instance)
         return self
+
+    def attach_media_descriptor(self, datablock: T.ID):
+        # if Image, Sound, Library, MovieClip, Text, VectorFont, Volume
+        # create a self._media with the data to be sent
+        # - filepath
+        # - reference to the packed data if packed
+        #
+        #
+        if isinstance(datablock, T.Image):
+            path = get_source_file_path(datablock.filepath)
+            packed_file = datablock.packed_file
+            data = None
+            if packed_file is not None:
+                data = packed_file.data
+            else:
+                with open(bpy.path.abspath(path), "rb") as data_file:
+                    data = data_file.read()
+            self._media = (path, data)
 
     @property
     def collection_name(self) -> Optional[str]:
@@ -225,7 +247,7 @@ class DatablockProxy(StructProxy):
 
         if DEBUG:
             name = self.data("name")
-            if self.collection.get(name) != datablock:
+            if self.collection.get(name).name != datablock.name:
                 logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
         datablock.mixer_uuid = self.mixer_uuid()

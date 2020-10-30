@@ -38,7 +38,7 @@ import os
 import struct
 import time
 import traceback
-from typing import Set, Tuple, Optional
+from typing import Dict, Tuple, Optional
 from enum import IntEnum
 
 import bpy
@@ -65,6 +65,7 @@ from mixer.draw_handlers import set_draw_handlers
 
 from mixer.blender_client.camera import send_camera
 from mixer.blender_client.light import send_light
+from mixer.local_data import get_local_or_create_cache_file, get_source_file_path
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,14 @@ class SendSceneContentFailed(Exception):
     pass
 
 
+class TextureData:
+    def __init__(self, *args, **kwargs):
+        self.packed = kwargs.get("packed")
+        self.data = kwargs.get("data")
+        self.width = kwargs.get("width")
+        self.height = kwargs.get("height")
+
+
 class BlenderClient(Client):
     """
     Client specialized for Blender. Extends Client base class by adding and handling data related to Blender.
@@ -123,7 +132,7 @@ class BlenderClient(Client):
         # Is set to True for messages emitted from a frame change event
         self.synced_time_messages = False
 
-        self.textures: Set[str] = set()
+        self.textures: Dict[str, TextureData] = dict()
 
         self.skip_next_depsgraph_update = False
         # skip_next_depsgraph_update is set to True in the main timer function when a received command
@@ -333,35 +342,47 @@ class BlenderClient(Client):
         self.add_command(common.Command(MessageType.TRANSFORM, transform_buffer, 0))
 
     def build_texture_file(self, data):
-        path, index = common.decode_string(data, 0)
-        if not os.path.exists(path):
-            size, index = common.decode_int(data, index)
-            try:
-                f = open(path, "wb")
-                f.write(data[index : index + size])
-                f.close()
-                self.textures.add(path)
-            except Exception as e:
-                logger.error("could not write file %s ...", path)
-                logger.error("... %s", e)
+        name_or_path, index = common.decode_string(data, 0)
+        packed, index = common.decode_bool(data, index)
+        width, index = common.decode_int(data, index)
+        height, index = common.decode_int(data, index)
+        size, index = common.decode_int(data, index)
+        buffer = buffer = data[index : index + size]
+        if not packed:
+            get_local_or_create_cache_file(name_or_path, buffer)
+            buffer = None
 
-    def send_texture_file(self, path):
-        if path in self.textures:
+        self.textures[name_or_path] = TextureData(packed=packed, data=buffer, width=width, height=height)
+
+    def send_texture_file(self, path, width, height):
+        texture_data = self.textures.get(path)
+        if texture_data is not None and texture_data.packed:
             return
         if os.path.exists(path):
             try:
                 f = open(path, "rb")
                 data = f.read()
                 f.close()
-                self.send_texture_data(path, data)
+                self.send_texture_data(get_source_file_path(path), False, width, height, data)
             except Exception as e:
                 logger.error("could not read file %s ...", path)
                 logger.error("... %s", e)
 
-    def send_texture_data(self, path, data):
+    def send_texture_data(self, path, packed, width, height, data):
         name_buffer = common.encode_string(path)
-        self.textures.add(path)
-        self.add_command(common.Command(MessageType.TEXTURE, name_buffer + common.encode_int(len(data)) + data, 0))
+        self.textures[path] = TextureData(packed=packed, width=width, height=height, data=data if packed else None)
+        self.add_command(
+            common.Command(
+                MessageType.TEXTURE,
+                name_buffer
+                + common.encode_bool(packed)
+                + common.encode_int(width)
+                + common.encode_int(height)
+                + common.encode_int(len(data))
+                + data,
+                0,
+            )
+        )
 
     def get_texture(self, inputs):
         if not inputs:
@@ -374,11 +395,12 @@ class BlenderClient(Client):
                 path = bpy.path.abspath(image.filepath)
                 path = path.replace("\\", "/")
                 if pack:
-                    self.send_texture_data(image.name_full, pack.data)
+                    # if texture is packed, send its name rather than its fil path
+                    self.send_texture_data(image.name_full, True, image.size[0], image.size[1], pack.data)
                     return image.name_full
                 else:
-                    self.send_texture_file(path)
-                    return path
+                    self.send_texture_file(path, image.size[0], image.size[1])
+                    return get_source_file_path(path)
         return None
 
     def insert_key(self, ob, channel, channel_index, frame, value, interpolation):
@@ -1038,6 +1060,9 @@ class BlenderClient(Client):
                         data_api.build_data_create(command.data)
                     elif command.type == MessageType.BLENDER_DATA_RENAME:
                         data_api.build_data_rename(command.data)
+                    elif command.type == MessageType.BLENDER_DATA_MEDIA:
+                        data_api.build_data_media(command.data)
+
                     else:
                         # Command is ignored, so no depsgraph update can be triggered
                         command_triggers_depsgraph_update = False
