@@ -264,9 +264,18 @@ default_exclusions = {
     T.DecimateModifier: [NameFilterOut(["face_count"])],
     T.FaceMap: [NameFilterOut(["index"])],
     T.Image: [
-        NameFilterOut("pixels"),
-        # meaningless to sync these, since they are handled by Image.pack() ?
-        NameFilterOut(["packed_file", "packed_files"]),
+        NameFilterOut(
+            [
+                "is_float",  # and others
+                # is packed_files[0]
+                "packed_file",
+                "pixels",
+                "bindcode",
+                "has_data",
+                "depth",
+                "channels",
+            ]
+        ),
     ],
     # TODO see comment in specifics.py:add_element()
     T.KeyingSets: [NameFilterOut("paths")],
@@ -379,6 +388,10 @@ default_exclusions = {
                 "vertex_groups",
             ]
         )
+    ],
+    T.PackedFile: [
+        # send by a BLENDER_DATA_MEDIA command, not serialized with proxies
+        NameFilterOut("data")
     ],
     T.RenderSettings: [
         NameFilterOut(

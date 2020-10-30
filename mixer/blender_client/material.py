@@ -19,6 +19,8 @@ import logging
 from mixer.broadcaster import common
 from mixer.broadcaster.client import Client
 from mixer.share_data import share_data
+from mixer.local_data import get_resolved_file_path
+
 import bpy
 
 logger = logging.getLogger(__name__)
@@ -37,16 +39,46 @@ def get_or_create_material(material_name):
 
 
 def build_texture(principled, material, channel, is_color, data, index):
-    file_name, index = common.decode_string(data, index)
-    if len(file_name) > 0:
+    name_or_path, index = common.decode_string(data, index)
+    if len(name_or_path) == 0:
+        return index
+
+    texture_data = share_data.client.textures.get(name_or_path)
+    if texture_data is None:
+        logger.error("%s not registered", name_or_path)
+        return index
+
+    tex_image = None
+    for link in material.node_tree.links:
+        if link.to_socket == principled.inputs[channel]:
+            connected_node = link.from_socket.node
+            if connected_node.type == "TEX_IMAGE":
+                tex_image = connected_node
+                break
+
+    if tex_image is None:
         tex_image = material.node_tree.nodes.new("ShaderNodeTexImage")
+
+    if texture_data.packed:
+        if tex_image.image and tex_image.image.packed_file:
+            return index
+        buffer = texture_data.data
+        tex_image.image = bpy.data.images.new(name_or_path, width=texture_data.width, height=texture_data.height)
+        tex_image.image.pack(data=buffer, data_len=len(buffer))
+        tex_image.image.source = "FILE"
+    else:
+        resolved_filename = get_resolved_file_path(name_or_path)
+        if tex_image.image and tex_image.image.filepath == resolved_filename:
+            return index
+
         try:
-            tex_image.image = bpy.data.images.load(file_name)
-            if not is_color:
-                tex_image.image.colorspace_settings.name = "Non-Color"
+            tex_image.image = bpy.data.images.load(resolved_filename)
         except Exception as e:
             logger.error(e)
-        material.node_tree.links.new(principled.inputs[channel], tex_image.outputs["Color"])
+
+    if not is_color:
+        tex_image.image.colorspace_settings.name = "Non-Color"
+    material.node_tree.links.new(principled.inputs[channel], tex_image.outputs["Color"])
     return index
 
 
@@ -83,10 +115,10 @@ def build_material(data):
         material.node_tree.links.new(principled.inputs["Transmission"], invert.outputs["Color"])
         tex_image = material.node_tree.nodes.new("ShaderNodeTexImage")
         try:
-            tex_image.image = bpy.data.images.load(file_name)
+            tex_image.image = bpy.data.images.load(get_resolved_file_path(file_name))
             tex_image.image.colorspace_settings.name = "Non-Color"
         except Exception as e:
-            logger.error("could not load file %s ...", file_name)
+            logger.error("could not load file %s ...", get_resolved_file_path(file_name))
             logger.error("... %s", e)
         material.node_tree.links.new(invert.inputs["Color"], tex_image.outputs["Color"])
 
@@ -113,10 +145,10 @@ def build_material(data):
         material.node_tree.links.new(principled.inputs["Normal"], normal_map.outputs["Normal"])
         tex_image = material.node_tree.nodes.new("ShaderNodeTexImage")
         try:
-            tex_image.image = bpy.data.images.load(file_name)
+            tex_image.image = bpy.data.images.load(get_resolved_file_path(file_name))
             tex_image.image.colorspace_settings.name = "Non-Color"
         except Exception as e:
-            logger.error("could not load file %s ...", file_name)
+            logger.error("could not load file %s ...", get_resolved_file_path(file_name))
             logger.error("... %s", e)
         material.node_tree.links.new(normal_map.inputs["Color"], tex_image.outputs["Color"])
 

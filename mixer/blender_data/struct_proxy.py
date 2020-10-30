@@ -233,6 +233,9 @@ class StructProxy(Proxy):
             if prop is not None:
                 context.visit_state.path.pop()
 
+        # TODO detect media updates (reload(), and attach a media descriptor to diff)
+        # difficult ?
+
         # if anything has changed, wrap the hollow proxy in a DeltaUpdate. This may be superfluous but
         # it is homogenous with additions and deletions
         if len(diff._data):
