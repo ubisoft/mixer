@@ -57,7 +57,6 @@ soable_collection_properties = {
     T.GPencilStroke.bl_rna.properties["points"],
     T.GPencilStroke.bl_rna.properties["triangles"],
     T.Mesh.bl_rna.properties["edges"],
-    T.Mesh.bl_rna.properties["face_maps"],
     T.Mesh.bl_rna.properties["loops"],
     T.Mesh.bl_rna.properties["loop_triangles"],
     T.Mesh.bl_rna.properties["polygons"],
