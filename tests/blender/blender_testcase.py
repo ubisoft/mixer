@@ -21,6 +21,8 @@ class BlenderTestCase(MixerTestCase):
         super().__init__(*args, **kwargs)
 
     def setUp(self, *args, **kwargs):
+        if not hasattr(self, "vrtist_protocol"):
+            self.vrtist_protocol = False
         super().setUp(*args, **kwargs)
 
     def assertDictAlmostEqual(self, a, b, msg=None):  # noqa N802
