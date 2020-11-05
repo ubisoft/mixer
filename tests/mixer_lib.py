@@ -24,13 +24,13 @@ def set_log_level(log_level):
     set_log_level(None, log_level)
 
 
-def create_room(room_name: str = "mixer_unittest", experimental_sync: bool = False):
+def create_room(room_name: str = "mixer_unittest", vrtist_protocol: bool = False):
     from mixer.connection import join_room
 
-    join_room(room_name, experimental_sync)
+    join_room(room_name, vrtist_protocol)
 
 
-def join_room(room_name: str = "mixer_unittest", experimental_sync: bool = False):
+def join_room(room_name: str = "mixer_unittest", vrtist_protocol: bool = False):
     from mixer.connection import join_room
     from mixer.broadcaster.common import RoomAttributes
     from mixer.share_data import share_data
@@ -57,7 +57,7 @@ def join_room(room_name: str = "mixer_unittest", experimental_sync: bool = False
         return room_attributes is not None and room_attributes.get(RoomAttributes.JOINABLE, False)
 
     if wait_joinable():
-        join_room(room_name, experimental_sync)
+        join_room(room_name, vrtist_protocol)
     else:
         print(f"ERROR: Cannot join room after {max_wait} seconds. Abort")
         time.sleep(5)

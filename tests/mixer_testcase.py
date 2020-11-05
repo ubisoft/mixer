@@ -56,10 +56,10 @@ class MixerTestCase(unittest.TestCase):
         """
         Tweak test case name for parameterized (from parameterized doc)
         """
-        if params_dict["experimental_sync"]:
-            suffix = "_Generic"
-        else:
+        if params_dict["vrtist_protocol"]:
             suffix = "_VRtist"
+        else:
+            suffix = "_Generic"
 
         return test_class.__name__ + suffix
 
@@ -105,9 +105,9 @@ class MixerTestCase(unittest.TestCase):
                 if join:
                     blender.connect_mixer()
                     if i == 0:
-                        blender.create_room(experimental_sync=self.experimental_sync)
+                        blender.create_room(vrtist_protocol=self.vrtist_protocol)
                     else:
-                        blender.join_room(experimental_sync=self.experimental_sync)
+                        blender.join_room(vrtist_protocol=self.vrtist_protocol)
 
                 self._blenders.append(blender)
 
@@ -172,7 +172,7 @@ class MixerTestCase(unittest.TestCase):
 
             # sender upload the room
             self._sender.connect_mixer()
-            self._sender.create_room("mixer_grab_sender", keep_room_open=True, experimental_sync=self.experimental_sync)
+            self._sender.create_room("mixer_grab_sender", keep_room_open=True, vrtist_protocol=self.vrtist_protocol)
             time.sleep(scene_upload_delay)
             self._sender.disconnect_mixer()
 
@@ -185,9 +185,7 @@ class MixerTestCase(unittest.TestCase):
 
             # receiver upload the room
             self._receiver.connect_mixer()
-            self._receiver.create_room(
-                "mixer_grab_receiver", keep_room_open=True, experimental_sync=self.experimental_sync
-            )
+            self._receiver.create_room("mixer_grab_receiver", keep_room_open=True, vrtist_protocol=self.vrtist_protocol)
             time.sleep(scene_upload_delay)
             self._receiver.disconnect_mixer()
 
@@ -374,9 +372,9 @@ class MixerTestCase(unittest.TestCase):
         for i, blender in enumerate(self._blenders):
             blender.connect_mixer()
             if i == 0:
-                blender.create_room_mixer(experimental=self.experimental_sync)
+                blender.create_room_mixer(vrtist_protocol=self.vrtist_protocol)
             else:
-                blender.join_room(experimental=self.experimental_sync)
+                blender.join_room(vrtist_protocol=self.vrtist_protocol)
 
     def disconnect(self):
         try:

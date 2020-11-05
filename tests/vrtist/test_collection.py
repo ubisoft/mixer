@@ -8,7 +8,7 @@ from tests.vrtist.vrtist_testcase import VRtistTestCase
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}],
+    [{"vrtist_protocol": False}, {"vrtist_protocol": True}],
     class_name_func=VRtistTestCase.get_class_name,
 )
 class TestCollection(VRtistTestCase):
@@ -133,8 +133,8 @@ class TestCollection(VRtistTestCase):
         self.new_collection_instance("src", "src_instance_in_dst")
         self.link_object_to_collection("Collection", "src_instance_in_Collection")
         self.link_object_to_collection("dst", "src_instance_in_dst")
-        self._sender.connect_and_join_mixer(experimental=self.experimental_sync)
-        self._receiver.connect_and_join_mixer(experimental=self.experimental_sync)
+        self._sender.connect_and_join_mixer(vrtist_protocol=self.vrtist_protocol)
+        self._receiver.connect_and_join_mixer(vrtist_protocol=self.vrtist_protocol)
         self.assert_matches()
 
     def test_rename_collection(self):
@@ -152,7 +152,7 @@ class TestCollection(VRtistTestCase):
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}], class_name_func=VRtistTestCase.get_class_name
+    [{"vrtist_protocol": False}, {"vrtist_protocol": True}], class_name_func=VRtistTestCase.get_class_name
 )
 class TestCollectionFromEmpty(VRtistTestCase):
     def setUp(self):

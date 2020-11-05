@@ -143,7 +143,6 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         split.alignment = "CENTER"
         split.label(text="Name")
         split.label(text="Users")
-        split.label(text="Experimental Sync")
         split.label(text="Keep Open")
         if get_mixer_props().display_rooms_details:
             split.label(text="Command Count")
@@ -154,7 +153,6 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         split = layout.split()
         split.label(text=item.name)  # avoids renaming the item by accident
         split.label(text=f"{item.users_count if item.users_count >= 0 else '?'} users")
-        split.prop(item, "experimental_sync", text="")
         split.prop(item, "keep_open", text="")
         if get_mixer_props().display_rooms_details:
             split.prop(item, "command_count", text="")
@@ -179,6 +177,7 @@ def draw_advanced_settings_ui(layout: bpy.types.UILayout):
     layout.prop(mixer_prefs, "data_directory", text="Data Directory")
     layout.prop(mixer_prefs, "log_level")
     layout.prop(mixer_prefs, "show_server_console")
+    layout.prop(mixer_prefs, "vrtist_protocol")
 
 
 def draw_developer_settings_ui(layout: bpy.types.UILayout):
@@ -213,7 +212,6 @@ def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Contex
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Room Settings")
     layout.prop(mixer_prefs, "room", text="Default Room Name")
-    layout.prop(mixer_prefs, "experimental_sync")
 
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Advanced Settings")
@@ -322,17 +320,9 @@ class MixerSettingsPanel(bpy.types.Panel):
                 split = layout.split(factor=0.6)
                 split.prop(mixer_prefs, "room", text="Room")
                 split.operator(bl_operators.CreateRoomOperator.bl_idname)
-                row = layout.row()
-                row.prop(
-                    mixer_prefs,
-                    "experimental_sync",
-                    text="Experimental sync (should be checked/unchecked before joining room)",
-                )
             else:
                 split = layout.split(factor=0.6)
-                split.label(
-                    text=f"Room: {share_data.client.current_room}{(' (experimental sync)' if mixer_prefs.experimental_sync else '')}"
-                )
+                split.label(text=f"Room: {share_data.client.current_room}")
                 split.label(text=f"Join: {get_mixer_props().joining_percentage * 100:.2f} %")
                 split.operator(bl_operators.LeaveRoomOperator.bl_idname, text="Leave Room")
 
@@ -385,15 +375,20 @@ class VRtistSettingsPanel(bpy.types.Panel):
     bl_idname = "MIXER_PT_vrtist_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Mixer"
+    bl_category = "VRtist"
 
     def draw(self, context):
         layout = self.layout
         mixer_prefs = get_mixer_prefs()
+
+        draw_user_settings_ui(layout.row())
+        draw_connection_settings_ui(layout.row())
+        layout.prop(mixer_prefs, "room", text="Room")
+
+        layout.operator(bl_operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
         layout.prop(
             mixer_prefs, "VRtist", text="Path", icon=("ERROR" if not os.path.exists(mixer_prefs.VRtist) else "NONE")
         )
-        layout.operator(bl_operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
 
 
 panels = (
@@ -411,7 +406,10 @@ def update_panels_category(self, context):
                 bpy.utils.unregister_class(panel)
 
         for panel in panels:
-            panel.bl_category = mixer_prefs.category
+            if panel.bl_label == "VRtist":
+                panel.bl_category = mixer_prefs.vrtist_category
+            else:
+                panel.bl_category = mixer_prefs.category
             bpy.utils.register_class(panel)
 
     except Exception as e:

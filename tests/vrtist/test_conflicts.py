@@ -41,7 +41,7 @@ class ThrottledTestCase(BlenderTestCase):
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}],
+    [{"vrtist_protocol": False}, {"vrtist_protocol": True}],
     class_name_func=ThrottledTestCase.get_class_name,
 )
 class TestSimultaneousCreate(ThrottledTestCase):
@@ -50,7 +50,7 @@ class TestSimultaneousCreate(ThrottledTestCase):
 
     def test_empty_unlinked(self):
         empties = 2
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             self.expected_counts = {MessageType.TRANSFORM: empties}
             raise unittest.SkipTest("FAILS: Only one empty remains")
         else:
@@ -67,7 +67,7 @@ class TestSimultaneousCreate(ThrottledTestCase):
 
     def test_empty_unlinked_many(self):
         empties = 2 * 5
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             self.expected_counts = {MessageType.TRANSFORM: empties}
             raise unittest.SkipTest("FAILS: Only half of empties remains")
         else:
@@ -85,7 +85,7 @@ class TestSimultaneousCreate(ThrottledTestCase):
 
     def test_object_in_master_collection(self):
         lights = 2
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             self.expected_counts = {MessageType.LIGHT: lights}
             raise unittest.SkipTest("FAILS: Only one point light remains")
 
@@ -107,12 +107,12 @@ class TestSimultaneousCreate(ThrottledTestCase):
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}],
+    [{"vrtist_protocol": False}, {"vrtist_protocol": True}],
     class_name_func=ThrottledTestCase.get_class_name,
 )
 class TestCollectionInMasterRename(ThrottledTestCase):
     def setUp(self):
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             self.skipTest("Fails in VRtist")
         super().setUp()
 
@@ -280,7 +280,7 @@ bpy.data.scenes.remove(bpy.data.scenes["Scene.001"])
         # on 1
         # - Scene and SceneRenames are present
         # - data_collections_new is linked to Scene_renamed instead of Scene
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             self.expected_counts = {MessageType.ADD_COLLECTION_TO_SCENE: 2 + 1}
         self.assert_matches()
 
@@ -333,6 +333,6 @@ bpy.data.scenes.remove(bpy.data.scenes["Scene.001"])
         # 2020-08-14 19:15:43,123 W mixer.blender_client                  - KeyError: 'Scene'                                                                [.\mixer\log_utils.py:62]
 
         # in 1 the collection is not unlinked
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             self.expected_counts = {MessageType.ADD_COLLECTION_TO_SCENE: 2 - 1}
         self.assert_matches()
