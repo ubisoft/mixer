@@ -352,7 +352,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
                 time.sleep(0.5)
                 timeout -= 0.5
             if timeout <= 0:
-                self.report({"ERROR"}, f"vrtist.launch connect error : unable to connect")
+                self.report({"ERROR"}, "vrtist.launch connect error : unable to connect")
                 return {"CANCELLED"}
 
             logger.warning("LaunchVRtistOperator.execute({mixer_prefs.room})")
@@ -364,7 +364,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
                 time.sleep(0.5)
                 timeout -= 0.5
             if timeout <= 0:
-                self.report({"ERROR"}, f"vrtist.launch connect error : unable to join room")
+                self.report({"ERROR"}, "vrtist.launch connect error : unable to join room")
                 return {"CANCELLED"}
 
             # Wait for client id
@@ -374,7 +374,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
                 time.sleep(0.1)
                 timeout -= 0.1
             if timeout <= 0:
-                self.report({"ERROR"}, f"vrtist.launch connect error : unable to retrieve client id")
+                self.report({"ERROR"}, "vrtist.launch connect error : unable to retrieve client id")
                 return {"CANCELLED"}
 
         color = share_data.client.clients_attributes[share_data.client.client_id].get(
