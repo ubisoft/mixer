@@ -61,6 +61,7 @@ soable_collection_properties = {
     T.Mesh.bl_rna.properties["loop_triangles"],
     T.Mesh.bl_rna.properties["polygons"],
     T.Mesh.bl_rna.properties["vertices"],
+    T.Spline.bl_rna.properties["bezier_points"],
     T.MeshFaceMapLayer.bl_rna.properties["data"],
     T.MeshLoopColorLayer.bl_rna.properties["data"],
     T.MeshUVLoopLayer.bl_rna.properties["data"],
@@ -603,6 +604,14 @@ def truncate_collection(target: T.bpy_prop_collection, proxy: Union[StructCollec
             while delta < 0:
                 target.pop()
                 delta += 1
+        return
+
+    if isinstance(target_rna, type(T.SplineBezierPoints.bl_rna)):
+        existing_length = len(target)
+        incoming_length = proxy.length
+        delta = incoming_length - existing_length
+        if delta > 0:
+            target.add(delta)
         return
 
     incoming_keys = set(proxy._data.keys())

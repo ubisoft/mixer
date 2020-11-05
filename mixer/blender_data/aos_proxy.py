@@ -28,7 +28,7 @@ from typing import Dict, Optional, TYPE_CHECKING
 import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
-from mixer.blender_data.aos_soa_proxy import SoaElement
+from mixer.blender_data.aos_soa_proxy import SoaElement, AosElement
 from mixer.blender_data.specifics import is_soable_property
 from mixer.blender_data.attributes import diff_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
@@ -80,11 +80,7 @@ class AosProxy(Proxy):
                     # element type supported by foreach_get
                     self._data[attr_name] = SoaElement().load(bl_collection, attr_name, item_bl_rna, context)
                 else:
-                    logger.error(f"Unhandled item {bl_collection}.{key}")
-                    # Member for which foreach_get is not available
-                    # (variable length arrays like MeshVertex.groups, enums, ...)
-                    # Not implemented
-                    # self._data[attr_name] = AosElement().load(bl_collection, attr_name, item_bl_rna, context)
+                    self._data[attr_name] = AosElement().load(bl_collection, attr_name, item_bl_rna, context)
         finally:
             context.visit_state.path.pop()
         return self

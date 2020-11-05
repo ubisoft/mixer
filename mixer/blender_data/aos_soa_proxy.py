@@ -36,6 +36,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
 from mixer.blender_data.types import is_vector
 from mixer.blender_data.specifics import soa_initializers
+from mixer.blender_data.attributes import read_attribute, write_attribute
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
@@ -71,6 +72,7 @@ class AosElement(Proxy):
         self,
         bl_collection: bpy.types.bpy_prop_collection,
         attr_name: str,
+        attr_property: T.Property,
         context: Context,
     ):
         """
@@ -79,41 +81,14 @@ class AosElement(Proxy):
         - attr_name: a member if the structure to be loaded as a sequence, e.g. "groups"
         """
 
-        logger.warning(f"Not implemented. Load AOS  element for {bl_collection}.{attr_name} ")
+        for index, item in enumerate(bl_collection):
+            self._data[index] = read_attribute(getattr(item, attr_name), index, attr_property, context)
+
         return self
 
-        # The code below was initially written for MeshVertex.groups, but MeshVertex.groups is updated
-        # via Object.vertex_groups so it is useless in this case. Any other usage ?
-
-        # self._data.clear()
-        # attr_property = item_bl_rna.properties[attr_name]
-        # # A bit overkill:
-        # # for T.Mesh.vertices[...].groups, generates a StructCollectionProxy per Vertex even if empty
-        # self._data[MIXER_SEQUENCE] = [
-        #     read_attribute(getattr(item, attr_name), attr_property, synchronized_properties, visit_context) for item in bl_collection
-        # ]
-        # return self
-
     def save(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str, context: Context):
-
-        logger.warning(f"Not implemented. Save AOS  element for {bl_collection}.{attr_name} ")
-
-        # see comment in load()
-
-        # sequence = self._data.get(MIXER_SEQUENCE)
-        # if sequence is None:
-        #     return
-
-        # if len(sequence) != len(bl_collection):
-        #     # Avoid by writing SOA first ? Is is enough to resize the target
-        #     logger.warning(
-        #         f"Not implemented. Save AO size mistmatch (incoming {len(sequence)}, target {len(bl_collection)}for {bl_collection}.{attr_name} "
-        #     )
-        #     return
-
-        # for i, value in enumerate(sequence):
-        #     target = bl_collection[i]
-        #     write_attribute(target, attr_name, value)
+        for index, item in self._data.items():
+            write_attribute(bl_collection[index], index, item, context)
 
 
 class SoaElement(Proxy):
