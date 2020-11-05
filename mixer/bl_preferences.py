@@ -78,6 +78,13 @@ class MixerPreferences(bpy.types.AddonPreferences):
         update=update_panels_category,
     )
 
+    vrtist_category: bpy.props.StringProperty(
+        name="Tab Category",
+        description="VRtist Panel.",
+        default=os.environ.get("VRTIST_CATEGORY", "VRtist"),
+        update=update_panels_category,
+    )
+
     host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
     port: bpy.props.IntProperty(name="Port", default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)))
     room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", getuser()))

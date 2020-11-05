@@ -385,15 +385,20 @@ class VRtistSettingsPanel(bpy.types.Panel):
     bl_idname = "MIXER_PT_vrtist_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Mixer"
+    bl_category = "VRtist"
 
     def draw(self, context):
         layout = self.layout
         mixer_prefs = get_mixer_prefs()
+
+        draw_user_settings_ui(layout.row())
+        draw_connection_settings_ui(layout.row())
+        layout.prop(mixer_prefs, "room", text="Room")
+
+        layout.operator(bl_operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
         layout.prop(
             mixer_prefs, "VRtist", text="Path", icon=("ERROR" if not os.path.exists(mixer_prefs.VRtist) else "NONE")
         )
-        layout.operator(bl_operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
 
 
 panels = (
@@ -411,7 +416,10 @@ def update_panels_category(self, context):
                 bpy.utils.unregister_class(panel)
 
         for panel in panels:
-            panel.bl_category = mixer_prefs.category
+            if panel.bl_label == "VRtist":
+                panel.bl_category = mixer_prefs.vrtist_category
+            else:
+                panel.bl_category = mixer_prefs.category
             bpy.utils.register_class(panel)
 
     except Exception as e:
