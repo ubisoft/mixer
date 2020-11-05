@@ -29,7 +29,7 @@ import logging
 import traceback
 from typing import List, Optional, TYPE_CHECKING, Union
 
-from mixer.blender_data.json_codec import Codec
+from mixer.blender_data.json_codec import Codec, DecodeError
 from mixer.broadcaster.common import (
     Command,
     decode_int,
@@ -170,6 +170,10 @@ def build_data_create(buffer):
 
         _, rename_changeset = share_data.bpy_data_proxy.create_datablock(datablock_proxy)
         _decode_and_build_soas(datablock_proxy.mixer_uuid(), buffer, index)
+    except DecodeError as e:
+        logger.error(f"Decode error for {str(e.args[1])[:100]} ...")
+        logger.error("... possible version mismatch")
+        return
     except Exception:
         logger.error("Exception during build_data_create")
         for line in traceback.format_exc().splitlines():
@@ -178,6 +182,7 @@ def build_data_create(buffer):
         logger.error("...")
         logger.error(buffer[-200:0])
         logger.error("ignored")
+        return
 
     if rename_changeset:
         send_data_renames(rename_changeset)
@@ -225,6 +230,9 @@ def build_data_update(buffer: bytes):
         datablock_proxy = delta.value
         if datablock_proxy is not None:
             _decode_and_build_soas(datablock_proxy.mixer_uuid(), buffer, index)
+    except DecodeError as e:
+        logger.error(f"Decode error for {str(e.args[1])[:100]} ...")
+        logger.error("... possible version mismatch")
     except Exception:
         logger.error("Exception during build_data_update")
         for line in traceback.format_exc().splitlines():
