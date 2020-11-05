@@ -90,11 +90,7 @@ class StructProxy(Proxy):
         if isinstance(key, int):
             target = bl_instance[key]
         elif isinstance(bl_instance, T.bpy_prop_collection):
-            # TODO append an element :
-            # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             target = bl_instance.get(key)
-            if target is None:
-                target = specifics.add_element(self, bl_instance, key, context)
         else:
             target = getattr(bl_instance, key, None)
             if target is not None:
@@ -150,15 +146,12 @@ class StructProxy(Proxy):
         if isinstance(key, int):
             struct = parent[key]
         elif isinstance(parent, T.bpy_prop_collection):
-            # TODO append an element :
-            # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             struct = parent.get(key)
-            if struct is None and to_blender:
-                struct = specifics.add_element(self, parent, key, context)
         else:
             struct = getattr(parent, key, None)
-            if to_blender:
-                struct = struct_update._pre_save(struct, context)
+
+        if to_blender:
+            struct = struct_update._pre_save(struct, context)
 
         assert type(struct_update) == type(self)
 

@@ -30,7 +30,7 @@ import array
 import logging
 from pathlib import Path
 import traceback
-from typing import Any, Dict, ItemsView, Optional, TYPE_CHECKING, Union
+from typing import Any, Dict, ItemsView, List, Optional, TYPE_CHECKING
 
 from mixer.local_data import get_resolved_file_path
 
@@ -38,7 +38,6 @@ import bpy
 import bpy.types as T  # noqa N812
 import bpy.path
 import mathutils
-
 
 if TYPE_CHECKING:
     from mixer.blender_data.aos_proxy import AosProxy
@@ -441,8 +440,10 @@ effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.key
 _new_name_types = (type(T.UVLoopLayers.bl_rna), type(T.LoopColors.bl_rna), type(T.FaceMaps.bl_rna))
 
 
-def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, context: Context):
+def add_element(proxy: Proxy, collection: T.bpy_prop_collection, context: Context):
     """Add an element to a bpy_prop_collection using the collection specific API"""
+
+    # TODO not optimal as when adding multiple items the type search is repeated for each item
 
     bl_rna = getattr(collection, "bl_rna", None)
     if bl_rna is not None:
@@ -474,7 +475,8 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
 
         if isinstance(bl_rna, type(T.KeyingSets.bl_rna)):
             idname = proxy.data("bl_idname")
-            return collection.new(name=key, idname=idname)
+            label = proxy.data("bl_label")
+            return collection.new(name=label, idname=idname)
 
         if isinstance(bl_rna, type(T.KeyingSetPaths.bl_rna)):
             # TODO current implementation fails
@@ -552,9 +554,10 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
     if new_or_add is None:
         new_or_add = getattr(collection, "add", None)
     if new_or_add is None:
-        logger.warning(f"Not implemented new or add for bpy.data.{collection}[{key}] ...")
+        logger.warning(f"Not implemented new or add for {collection} ...")
         return None
     try:
+        key = proxy.data("name")
         return new_or_add(key)
     except Exception:
         logger.warning(f"Not implemented new or add for type {type(collection)} for {collection}[{key}] ...")
@@ -563,20 +566,15 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
         return None
 
 
-always_clear = [type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl_rna), type(T.SequenceModifiers.bl_rna)]
-"""Collections in this list are order dependent and should always be cleared"""
+def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
+    """
+    Adjust the size of a bpy_prop_collection proxified as an array of structures (e.g. MeshVertices)
+    """
 
-
-def truncate_collection(target: T.bpy_prop_collection, proxy: Union[StructCollectionProxy, AosProxy], context: Context):
-    """"""
     if not hasattr(target, "bl_rna"):
         return
 
     target_rna = target.bl_rna
-    if any(isinstance(target_rna, t) for t in always_clear):
-        target.clear()
-        return
-
     if isinstance(target_rna, _resize_geometry_types):
         existing_length = len(target)
         incoming_length = proxy.length
@@ -601,20 +599,103 @@ def truncate_collection(target: T.bpy_prop_collection, proxy: Union[StructCollec
                 delta += 1
         return
 
-    incoming_keys = set(proxy._data.keys())
-    existing_keys = set(target.keys())
-    truncate_keys = existing_keys - incoming_keys
-    if not truncate_keys:
-        return
-    if isinstance(target_rna, type(T.KeyingSets.bl_rna)):
-        for k in truncate_keys:
-            target.active_index = target.find(k)
-            bpy.ops.anim.keying_set_remove()
-    else:
-        try:
-            for k in truncate_keys:
-                target.remove(target[k])
-        except Exception:
-            logger.warning(f"Not implemented truncate_collection for type {target.bl_rna} for {target} ...")
-            for s in traceback.format_exc().splitlines():
-                logger.warning(f"...{s}")
+    logger.error(f"Not implemented fit_aos for type {target.bl_rna} for {target} ...")
+
+
+_cannot_morph = (
+    type(T.ObjectModifiers.bl_rna),
+    type(T.ObjectGpencilModifiers.bl_rna),
+    type(T.SequenceModifiers.bl_rna),
+    type(T.Nodes.bl_rna),
+)
+"""Items in these collections cannot be morphed in-place"""
+
+_cannot_morph_type = (
+    type(T.ObjectModifiers.bl_rna),
+    type(T.ObjectGpencilModifiers.bl_rna),
+    type(T.SequenceModifiers.bl_rna),
+)
+"""Sequences with typed items that cannot be morphed and a type property named 'type'"""
+
+
+_cannot_morph_bl_idname = (type(T.Nodes.bl_rna),)
+"""Sequences with typed items that cannot be morphed and a type property named 'bl_idtype'"""
+
+
+def clear_from(sequence: List[DatablockProxy], collection: T.bpy_prop_collection) -> int:
+    """
+    Returns the index of the first item in collection that has a type that does not match the
+    coresponding item in sequence
+    """
+    default_value = min(len(sequence), len(collection))
+    if not hasattr(collection, "bl_rna"):
+        return default_value
+
+    collection_rna = collection.bl_rna
+    if isinstance(collection_rna, _cannot_morph_type):
+        for i, (proxy, item) in enumerate(zip(sequence, collection)):
+            if proxy.data("type") != item.type:
+                return i
+        return i + 1
+
+    if isinstance(collection_rna, _cannot_morph_bl_idname):
+        for i, (proxy, item) in enumerate(zip(sequence, collection)):
+            if proxy.data("bl_idname") != item.bl_idname:
+                return i
+        return i + 1
+
+    return default_value
+
+
+def truncate_collection(
+    target: T.bpy_prop_collection, proxy: StructCollectionProxy, attr_property: T.Property, context: Context
+):
+    """"""
+
+    try:
+        if not hasattr(target, "bl_rna"):
+            return
+
+        target_rna = target.bl_rna
+
+        # TODO now useless ??
+        if any(isinstance(target_rna, t) for t in _cannot_morph):
+            target.clear()
+            return
+
+        srna = attr_property.srna
+        if not srna:
+            return
+
+        incoming_sequence = proxy._sequence
+        incoming_length = len(incoming_sequence)
+
+        srna_bl_rna = srna.bl_rna
+        if srna_bl_rna is bpy.types.CurveMapPoints.bl_rna:
+            if incoming_length < 2:
+                logger.error(f"Invalid length for curvemap: {incoming_length}. Expected at least 2")
+                return
+            while incoming_length < len(target):
+                target.remove(target[-1])
+            while incoming_length > len(target):
+                target.new(0.0, 0.0)
+        elif srna_bl_rna is bpy.types.MetaBallElements.bl_rna:
+            while incoming_length < len(target):
+                target.remove(target[-1])
+            while incoming_length > len(target):
+                # Creates a BALL, but will be changed by write_attribute
+                target.new()
+        elif srna_bl_rna is bpy.types.GPencilStrokes.bl_rna:
+            while incoming_length < len(target):
+                target.remove(target[-1])
+            while incoming_length > len(target):
+                target.new()
+        elif srna_bl_rna is bpy.types.GPencilFrames.bl_rna:
+            while incoming_length < len(target):
+                target.remove(target[-1])
+            for proxy in incoming_sequence:
+                frame_number = proxy.data("frame_number")
+                target.new(frame_number)
+    except Exception:
+        # for debugging
+        raise
