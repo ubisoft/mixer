@@ -96,7 +96,7 @@ class CreateRoomOperator(bpy.types.Operator):
         prefs = get_mixer_prefs()
         room = prefs.room
         logger.warning(f"CreateRoomOperator.execute({room})")
-        join_room(room, prefs.experimental_sync)
+        join_room(room)
 
         return {"FINISHED"}
 
@@ -122,13 +122,13 @@ class JoinRoomOperator(bpy.types.Operator):
             (lambda: get_mixer_props().room_index < len(get_mixer_props().rooms), "Invalid room selection"),
             (
                 lambda: (
-                    ("experimental_sync" not in get_selected_room_dict() and not get_mixer_prefs().experimental_sync)
+                    ("vrtist_protocol" not in get_selected_room_dict() and not get_mixer_prefs().vrtist_protocol)
                     or (
-                        "experimental_sync" in get_selected_room_dict()
-                        and get_mixer_prefs().experimental_sync == get_selected_room_dict()["experimental_sync"]
+                        "vrtist_protocol" in get_selected_room_dict()
+                        and get_mixer_prefs().vrtist_protocol == get_selected_room_dict()["vrtist_protocol"]
                     )
                 ),
-                "Experimental flag does not match selected room",
+                "vrtist_protocol flag does not match selected room",
             ),
             (
                 lambda: get_selected_room_dict().get(RoomAttributes.JOINABLE, False),
@@ -151,9 +151,8 @@ class JoinRoomOperator(bpy.types.Operator):
         props = get_mixer_props()
         room_index = props.room_index
         room = props.rooms[room_index].name
-        experimental_sync = get_mixer_prefs().experimental_sync
         logger.warning(f"JoinRoomOperator.execute({room})")
-        join_room(room, experimental_sync)
+        join_room(room)
 
         return {"FINISHED"}
 
@@ -357,7 +356,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
                 return {"CANCELLED"}
 
             logger.warning("LaunchVRtistOperator.execute({mixer_prefs.room})")
-            join_room(mixer_prefs.room, False)
+            join_room(mixer_prefs.room, True)
 
             # Wait for room creation/join
             timeout = 10

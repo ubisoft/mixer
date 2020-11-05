@@ -249,9 +249,9 @@ class BlenderClient(Client):
         if old_object is not None:
             share_data.blender_objects.get(old_name).name = new_name
         else:
-            if share_data.use_experimental_sync():
+            if not share_data.use_vrtist_protocol():
                 # Renamed by the Blender Protocol
-                logger.info(f"build_rename(): old object {old_name} not found. Safe in experimental mode")
+                logger.info(f"build_rename(): old object {old_name} not found. Safe in generic mode")
             else:
                 logger.info(f"build_rename(): old object {old_name} not found.")
 
@@ -565,7 +565,7 @@ class BlenderClient(Client):
     def send_mesh(self, obj):
         logger.info("send_mesh %s", obj.name_full)
         mesh = obj.data
-        if share_data.use_experimental_sync():
+        if not share_data.use_vrtist_protocol():
             # see build_mesh_generic()
             path = ensure_uuid(mesh)
             mesh_name = mesh.name
@@ -596,7 +596,7 @@ class BlenderClient(Client):
 
     @stats_timer(share_data)
     def build_mesh(self, command_data):
-        if share_data.use_experimental_sync():
+        if not share_data.use_vrtist_protocol():
             return self.build_mesh_generic(command_data)
         else:
             return self.build_mesh_vrtist(command_data)
@@ -995,8 +995,7 @@ class BlenderClient(Client):
                             assert share_data.client.current_room is not None
                             self.set_room_attributes(
                                 share_data.client.current_room,
-                                # Documentation to update if you change "experimental_sync": doc/protocol.md
-                                {"experimental_sync": get_mixer_prefs().experimental_sync},
+                                {"vrtist_protocol": get_mixer_prefs().vrtist_protocol},
                             )
                             send_scene_content()
                             # Inform end of content
@@ -1288,7 +1287,7 @@ def send_scene_content():
         share_data.client.send_group_begin()
 
         timer = time.monotonic()
-        if share_data.use_experimental_sync():
+        if not share_data.use_vrtist_protocol():
             generic.send_scene_data_to_server(None, None)
         else:
             # Temporary waiting for material sync. Should move to send_scene_data_to_server

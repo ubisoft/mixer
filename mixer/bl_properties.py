@@ -31,13 +31,13 @@ logger = logging.getLogger(__name__)
 
 
 class RoomItem(bpy.types.PropertyGroup):
-    def is_room_experimental(self):
+    def is_room_vrtist_protocol(self):
         if (
             share_data.client is not None
             and self.name in share_data.client.rooms_attributes
-            and "experimental_sync" in share_data.client.rooms_attributes[self.name]
+            and "vrtist_protocol" in share_data.client.rooms_attributes[self.name]
         ):
-            return share_data.client.rooms_attributes[self.name]["experimental_sync"]
+            return share_data.client.rooms_attributes[self.name]["vrtist_protocol"]
         return False
 
     def is_kept_open(self):
@@ -82,7 +82,7 @@ class RoomItem(bpy.types.PropertyGroup):
 
     name: bpy.props.StringProperty(name="Name")
     users_count: bpy.props.IntProperty(name="Users Count")
-    experimental_sync: bpy.props.BoolProperty(name="Experimental Sync", get=is_room_experimental)
+    vrtist_protocol: bpy.props.BoolProperty(name="VRtist Protocol", get=is_room_vrtist_protocol)
     keep_open: bpy.props.BoolProperty(name="Keep Open", default=False, get=is_kept_open, set=on_keep_open_changed)
     command_count: bpy.props.IntProperty(name="Command Count", get=get_command_count)
     mega_byte_size: bpy.props.FloatProperty(name="Mega Byte Size", get=get_mega_byte_size)

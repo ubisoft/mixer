@@ -143,7 +143,6 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         split.alignment = "CENTER"
         split.label(text="Name")
         split.label(text="Users")
-        split.label(text="Experimental Sync")
         split.label(text="Keep Open")
         if get_mixer_props().display_rooms_details:
             split.label(text="Command Count")
@@ -154,7 +153,6 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         split = layout.split()
         split.label(text=item.name)  # avoids renaming the item by accident
         split.label(text=f"{item.users_count if item.users_count >= 0 else '?'} users")
-        split.prop(item, "experimental_sync", text="")
         split.prop(item, "keep_open", text="")
         if get_mixer_props().display_rooms_details:
             split.prop(item, "command_count", text="")
@@ -213,7 +211,6 @@ def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Contex
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Room Settings")
     layout.prop(mixer_prefs, "room", text="Default Room Name")
-    layout.prop(mixer_prefs, "experimental_sync")
 
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Advanced Settings")
@@ -322,17 +319,9 @@ class MixerSettingsPanel(bpy.types.Panel):
                 split = layout.split(factor=0.6)
                 split.prop(mixer_prefs, "room", text="Room")
                 split.operator(bl_operators.CreateRoomOperator.bl_idname)
-                row = layout.row()
-                row.prop(
-                    mixer_prefs,
-                    "experimental_sync",
-                    text="Experimental sync (should be checked/unchecked before joining room)",
-                )
             else:
                 split = layout.split(factor=0.6)
-                split.label(
-                    text=f"Room: {share_data.client.current_room}{(' (experimental sync)' if mixer_prefs.experimental_sync else '')}"
-                )
+                split.label(text=f"Room: {share_data.client.current_room}")
                 split.label(text=f"Join: {get_mixer_props().joining_percentage * 100:.2f} %")
                 split.operator(bl_operators.LeaveRoomOperator.bl_idname, text="Leave Room")
 

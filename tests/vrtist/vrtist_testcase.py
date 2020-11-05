@@ -20,8 +20,8 @@ class VRtistTestCase(MixerTestCase):
 
     def __init__(self, *args, **kwargs):
         # in case @parameterized_class is missing
-        if not hasattr(self, "experimental_sync"):
-            self.experimental_sync = False
+        if not hasattr(self, "vrtist_protocol"):
+            self.vrtist_protocol = True
         super().__init__(*args, **kwargs)
 
     def set_active_scene(self, name: str):

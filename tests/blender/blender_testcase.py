@@ -21,9 +21,6 @@ class BlenderTestCase(MixerTestCase):
         super().__init__(*args, **kwargs)
 
     def setUp(self, *args, **kwargs):
-        # in case @parameterized_class is missing
-        if not hasattr(self, "experimental_sync"):
-            self.experimental_sync = True
         super().setUp(*args, **kwargs)
 
     def assertDictAlmostEqual(self, a, b, msg=None):  # noqa N802
