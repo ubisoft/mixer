@@ -49,7 +49,6 @@ from mixer.share_data import object_visibility
 from mixer.stats import StatsTimer
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import update_params
-from mixer.bl_utils import get_mixer_prefs
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +87,7 @@ class HandlerManager:
     def _set_handlers(cls, connect: bool):
         try:
             if connect:
-                bpy.app.handlers.frame_change_post.append(handler_send_frame_changed)
+                # bpy.app.handlers.frame_change_post.append(handler_send_frame_changed)
                 bpy.app.handlers.depsgraph_update_post.append(handler_send_scene_data_to_server)
                 bpy.app.handlers.undo_pre.append(handler_on_undo_redo_pre)
                 bpy.app.handlers.redo_pre.append(handler_on_undo_redo_pre)
@@ -97,7 +96,7 @@ class HandlerManager:
                 bpy.app.handlers.load_post.append(handler_on_load)
             else:
                 bpy.app.handlers.load_post.remove(handler_on_load)
-                bpy.app.handlers.frame_change_post.remove(handler_send_frame_changed)
+                # bpy.app.handlers.frame_change_post.remove(handler_send_frame_changed)
                 bpy.app.handlers.depsgraph_update_post.remove(handler_send_scene_data_to_server)
                 bpy.app.handlers.undo_pre.remove(handler_on_undo_redo_pre)
                 bpy.app.handlers.redo_pre.remove(handler_on_undo_redo_pre)
@@ -835,12 +834,7 @@ def send_scene_data_to_server(scene, dummy):
 
 @persistent
 def handler_on_undo_redo_pre(scene):
-    logger.error(f"Undo/redo pre on {scene}")
-    share_data.client.send_error(f"Undo/redo pre from {get_mixer_prefs().user}")
-    if share_data.use_experimental_sync():
-        # generic.send_scene_data_to_server(scene, None)
-        return
-
+    logger.info("on_undo_redo_pre")
     send_scene_data_to_server(scene, None)
 
 
@@ -874,14 +868,7 @@ def remap_objects_info():
 @stats_timer(share_data)
 @persistent
 def handler_on_undo_redo_post(scene, dummy):
-    logger.error(f"Undo/redo post on {scene}")
-    share_data.client.send_error(f"Undo/redo post from {get_mixer_prefs().user}")
-
-    if share_data.use_experimental_sync():
-        # reload all datablocks
-        share_data.bpy_data_proxy.reload_datablocks()
-        # generic.send_scene_data_to_server(scene, None)
-        return
+    logger.info("on_undo_redo_post")
 
     share_data.set_dirty()
     share_data.clear_lists()

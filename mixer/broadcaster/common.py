@@ -380,7 +380,15 @@ def decode_array(data, index, schema, inc):
 
 
 def decode_float_array(data, index):
-    return decode_array(data, index, "f", 4)
+    count = bytes_to_int(data[index : index + 4])
+    start = index + 4
+    values = []
+    end = start
+    for _ in range(count):
+        end = start + 4
+        values.extend(struct.unpack("f", data[start:end]))
+        start = end
+    return values, end
 
 
 def decode_int_array(data, index):
