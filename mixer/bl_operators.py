@@ -85,7 +85,10 @@ class CreateRoomOperator(bpy.types.Operator):
         if not is_client_connected():
             return {"CANCELLED"}
 
-        join_room(get_mixer_prefs().room, get_mixer_prefs().experimental_sync)
+        prefs = get_mixer_prefs()
+        room = prefs.room
+        logger.warning(f"CreateRoomOperator.execute({room})")
+        join_room(room, prefs.experimental_sync)
 
         return {"FINISHED"}
 
@@ -141,6 +144,7 @@ class JoinRoomOperator(bpy.types.Operator):
         room_index = props.room_index
         room = props.rooms[room_index].name
         experimental_sync = get_mixer_prefs().experimental_sync
+        logger.warning(f"JoinRoomOperator.execute({room})")
         join_room(room, experimental_sync)
 
         return {"FINISHED"}
@@ -271,19 +275,16 @@ class ConnectOperator(bpy.types.Operator):
             try:
                 connect()
             except Exception as e:
-                self.report({"ERROR"}, f"mixer.connect error : {e}")
+                self.report({"ERROR"}, f"mixer.connect error : {e!r}")
                 return {"CANCELLED"}
 
             self.report({"INFO"}, f'Connected to "{prefs.host}:{prefs.port}" ...')
-        except socket.gaierror as e:
+        except socket.gaierror:
             msg = f'Cannot connect to "{prefs.host}": invalid host name or address'
             self.report({"ERROR"}, msg)
-            if prefs.env != "production":
-                raise e
+            return {"CANCELLED"}
         except Exception as e:
             self.report({"ERROR"}, repr(e))
-            if prefs.env != "production":
-                raise e
             return {"CANCELLED"}
 
         return {"FINISHED"}
@@ -329,9 +330,10 @@ class LaunchVRtistOperator(bpy.types.Operator):
             try:
                 connect()
             except Exception as e:
-                self.report({"ERROR"}, f"vrtist.launch connect error : {e}")
+                self.report({"ERROR"}, f"vrtist.launch connect error : {e!r}")
                 return {"CANCELLED"}
 
+            logger.warning("LaunchVRtistOperator.execute({mixer_prefs.room})")
             join_room(mixer_prefs.room, mixer_prefs.experimental)
 
         color = share_data.client.clients_attributes[share_data.client.client_id].get(

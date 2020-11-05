@@ -48,7 +48,7 @@ class TestWorld(unittest.TestCase):
         sent_ids = {}
         sent_ids.update({("worlds", world.name): world})
 
-        changeset = self.bpy_data_proxy.update(self.diff, safe_properties)
+        changeset = self.bpy_data_proxy.update(self.diff, {}, False, safe_properties)
         updates = changeset.creations
         # avoid clash on restore
         world.name = world.name + "_bak"
@@ -79,7 +79,7 @@ class TestWorld(unittest.TestCase):
         sent_ids = {}
         sent_ids.update({("worlds", world.name): world})
 
-        changeset = self.bpy_data_proxy.update(self.diff, safe_properties)
+        changeset = self.bpy_data_proxy.update(self.diff, {}, False, safe_properties)
         creations = changeset.creations
         # avoid clash on restore
         world.name = world.name + "_bak"

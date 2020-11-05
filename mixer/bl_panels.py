@@ -176,8 +176,8 @@ def draw_connection_settings_ui(layout: bpy.types.UILayout):
 
 def draw_advanced_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
+    layout.prop(mixer_prefs, "data_directory", text="Data Directory")
     layout.prop(mixer_prefs, "log_level")
-    layout.prop(mixer_prefs, "env")
     layout.prop(mixer_prefs, "show_server_console")
 
 
@@ -415,7 +415,7 @@ def update_panels_category(self, context):
             bpy.utils.register_class(panel)
 
     except Exception as e:
-        logger.error(f"Updating Panel category has failed {e}")
+        logger.error(f"Updating Panel category has failed {e!r}")
 
 
 classes = (ROOM_UL_ItemRenderer, MixerSettingsPanel, VRtistSettingsPanel)

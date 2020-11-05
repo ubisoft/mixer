@@ -21,8 +21,9 @@ See synchronization.md
 """
 from __future__ import annotations
 
+from collections import defaultdict
 import logging
-from typing import Any, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -33,10 +34,13 @@ from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 from mixer.blender_data.attributes import apply_attribute, read_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaUpdate
 from mixer.blender_data.struct_proxy import StructProxy
-from mixer.blender_data.types import is_pointer_to, sub_id_type
+from mixer.blender_data.types import sub_id_type
+from mixer.local_data import get_source_file_path
 
 if TYPE_CHECKING:
-    from mixer.blender_data.bpy_data_proxy import RenameChangeset, Context
+    import array
+    from mixer.blender_data.bpy_data_proxy import RenameChangeset, Context, VisitState
+    from mixer.blender_data.aos_soa_proxy import SoaElement
 
 
 DEBUG = True
@@ -58,6 +62,14 @@ class DatablockProxy(StructProxy):
         self._class_name: str = ""
         self._datablock_uuid: Optional[str] = None
 
+        self._soas: Dict[VisitState.Path, List[Tuple[str, SoaElement]]] = defaultdict(list)
+        """e.g. {
+            ("vertices"): [("co", co_soa), ("normals", normals_soa)]
+            ("edges"): ...
+        }"""
+
+        self._media: Optional[Tuple[str, bytes]] = None
+
     def init(self, datablock: T.ID):
         if datablock is not None:
             if not datablock.is_embedded_data:
@@ -69,10 +81,10 @@ class DatablockProxy(StructProxy):
     @classmethod
     def make(cls, attr_property):
 
-        if is_pointer_to(attr_property, T.NodeTree):
-            from mixer.blender_data.node_proxy import NodeTreeProxy
+        if isinstance(attr_property, T.Mesh):
+            from mixer.blender_data.mesh_proxy import MeshProxy
 
-            return NodeTreeProxy()
+            return MeshProxy()
         return DatablockProxy()
 
     @property
@@ -93,12 +105,10 @@ class DatablockProxy(StructProxy):
     def __str__(self) -> str:
         return f"DatablockProxy {self.mixer_uuid()} for bpy.data.{self.collection_name}[{self.data('name')}]"
 
-    def update_from_datablock(self, bl_instance: T.ID, context: Context):
-        self.load(bl_instance, context, bpy_data_collection_name=None)
-
     def load(
         self,
         bl_instance: T.ID,
+        key: str,
         context: Context,
         bpy_data_collection_name: str = None,
     ):
@@ -122,13 +132,17 @@ class DatablockProxy(StructProxy):
         properties = context.synchronized_properties.properties(bl_instance)
         # this assumes that specifics.py apply only to ID, not Struct
         properties = specifics.conditional_properties(bl_instance, properties)
-        for name, bl_rna_property in properties:
-            attr = getattr(bl_instance, name)
-            attr_value = read_attribute(attr, bl_rna_property, context)
-            # Also write None values to reset attributes like Camera.dof.focus_object
-            # TODO for scene, test difference, only send update if dirty as continuous updates to scene
-            # master collection will conflicting writes with Master Collection
-            self._data[name] = attr_value
+        try:
+            context.visit_state.datablock_proxy = self
+            for name, bl_rna_property in properties:
+                attr = getattr(bl_instance, name)
+                attr_value = read_attribute(attr, name, bl_rna_property, context)
+                # Also write None values to reset attributes like Camera.dof.focus_object
+                # TODO for scene, test difference, only send update if dirty as continuous updates to scene
+                # master collection will conflicting writes with Master Collection
+                self._data[name] = attr_value
+        finally:
+            context.visit_state.datablock_proxy = None
 
         specifics.post_save_id(self, bl_instance)
 
@@ -145,7 +159,26 @@ class DatablockProxy(StructProxy):
             self._datablock_uuid = bl_instance.mixer_uuid
             context.proxy_state.proxies[uuid] = self
 
+        self.attach_media_descriptor(bl_instance)
         return self
+
+    def attach_media_descriptor(self, datablock: T.ID):
+        # if Image, Sound, Library, MovieClip, Text, VectorFont, Volume
+        # create a self._media with the data to be sent
+        # - filepath
+        # - reference to the packed data if packed
+        #
+        #
+        if isinstance(datablock, T.Image):
+            path = get_source_file_path(datablock.filepath)
+            packed_file = datablock.packed_file
+            data = None
+            if packed_file is not None:
+                data = packed_file.data
+            else:
+                with open(bpy.path.abspath(path), "rb") as data_file:
+                    data = data_file.read()
+            self._media = (path, data)
 
     @property
     def collection_name(self) -> Optional[str]:
@@ -214,18 +247,21 @@ class DatablockProxy(StructProxy):
 
         if DEBUG:
             name = self.data("name")
-            if self.collection.get(name) != datablock:
+            if self.collection.get(name).name != datablock.name:
                 logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
         datablock.mixer_uuid = self.mixer_uuid()
 
-        datablock = specifics.pre_save_id(self, datablock, context)
+        datablock = self._pre_save(datablock, context)
         if datablock is None:
-            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
+            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
             return None, None
-
-        for k, v in self._data.items():
-            write_attribute(datablock, k, v, context)
+        try:
+            context.visit_state.datablock_proxy = self
+            for k, v in self._data.items():
+                write_attribute(datablock, k, v, context)
+        finally:
+            context.visit_state.datablock_proxy = None
 
         return datablock, renames
 
@@ -233,12 +269,17 @@ class DatablockProxy(StructProxy):
         """
         Update this proxy and datablock according to delta
         """
-        datablock = specifics.pre_save_id(delta.value, datablock, context)
+        datablock = delta.value._pre_save(datablock, context)
         if datablock is None:
-            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save_id returns None")
+            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
             return None
 
-        self.apply(self.collection, datablock.name, delta, context)
+        try:
+            context.visit_state.datablock_proxy = self
+            self.apply(self.collection, datablock.name, delta, context)
+        finally:
+            context.visit_state.datablock_proxy = None
+
         return datablock
 
     def save(self, bl_instance: Any = None, attr_name: str = None, context: Context = None) -> T.ID:
@@ -268,28 +309,23 @@ class DatablockProxy(StructProxy):
                 id_.mixer_uuid = self.mixer_uuid()
         else:
             logger.info(f"IDproxy save embedded {self}")
-            # an is_embedded_data datablock. pre_save id will retrieve it by calling target
+            # an is_embedded_data datablock. pre_save will retrieve it by calling target
             id_ = getattr(bl_instance, attr_name)
             pass
 
-        target = specifics.pre_save_id(self, id_, context)
+        target = self._pre_save(id_, context)
         if target is None:
             logger.warning(f"DatablockProxy.save() {bl_instance}.{attr_name} is None")
             return None
 
-        for k, v in self._data.items():
-            write_attribute(target, k, v, context)
+        try:
+            context.visit_state.datablock_proxy = self
+            for k, v in self._data.items():
+                write_attribute(target, k, v, context)
+        finally:
+            context.visit_state.datablock_proxy = None
 
         return target
-
-    def update_from_proxy(self, other: DatablockProxy):
-        """Obsolete"""
-        # Currently, we receive the full list of attributes, so replace everything.
-        # Do not keep existing attribute as they may not be applicable any more to the new object. For instance
-        # if a light has been morphed from POINT to SUN, the 'falloff_curve' attribute no more exists
-        #
-        # To perform differential updates in the future, we will need markers for removed attributes
-        self._data = other._data
 
     def apply_to_proxy(
         self,
@@ -305,13 +341,43 @@ class DatablockProxy(StructProxy):
 
         update = delta.value
         assert type(update) == type(self)
-        for k, delta in update._data.items():
-            try:
-                current_value = self._data.get(k)
-                self._data[k] = apply_attribute(datablock, k, current_value, delta, context, to_blender=False)
-            except Exception as e:
-                logger.warning(f"Datablock.apply(). Processing {delta}")
-                logger.warning(f"... for {datablock}.{k}")
-                logger.warning(f"... Exception: {e}")
-                logger.warning("... Update ignored")
-                continue
+        try:
+            context.visit_state.datablock_proxy = self
+            for k, delta in update._data.items():
+                try:
+                    current_value = self._data.get(k)
+                    self._data[k] = apply_attribute(datablock, k, current_value, delta, context, to_blender=False)
+                except Exception as e:
+                    logger.warning(f"apply_to_proxy(). Processing {delta}")
+                    logger.warning(f"... for {datablock}.{k}")
+                    logger.warning(f"... Exception: {e!r}")
+                    logger.warning("... Update ignored")
+                    continue
+        finally:
+            context.visit_state.datablock_proxy = None
+
+    def update_soa(self, bl_item, path: List[Union[int, str]], soas: List[Tuple[str, array.array]]):
+
+        r = self.find_by_path(bl_item, path)
+        if r is None:
+            return
+        container, container_proxy = r
+        for element_name, buffer in soas:
+            soa_proxy = container_proxy.data(element_name)
+            soa_proxy.save_array(container, element_name, buffer)
+
+        # HACK
+        if isinstance(bl_item, T.Mesh):
+            bl_item.update()
+
+    def diff(self, datablock: T.ID, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+        try:
+            diff = self.__class__()
+            diff.init(datablock)
+            context.visit_state.datablock_proxy = diff
+            return self._diff(datablock, key, prop, context, diff)
+        finally:
+            context.visit_state.datablock_proxy = None
+
+    def _pre_save(self, target: T.bpy_struct, context: Context) -> T.ID:
+        return specifics.pre_save_datablock(self, target, context)

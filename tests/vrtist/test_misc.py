@@ -148,7 +148,7 @@ class TestRenameDatablock(MiscTestCase):
     [{"experimental_sync": True}, {"experimental_sync": False}],
     class_name_func=VRtistTestCase.get_class_name,
 )
-class TestParenting(MiscTestCase):
+class TestSetDatablockRef(MiscTestCase):
     """
     Check that parenting works regardless of parent and child creation order
     """
@@ -183,4 +183,53 @@ coll1.children.link(coll0)
 coll0.children.link(coll2)
 """
         self.send_string(create, to=0)
+        self.assert_matches()
+
+    def test_set_datablock_ref_from_none(self):
+        # 3 empties or which the creation order is not the parent order
+        create = """
+import bpy
+scene = bpy.data.scenes[0]
+obj0 = bpy.data.objects.new("obj0", None)
+obj1 = bpy.data.objects.new("obj1", None)
+scene.collection.objects.link(obj0)
+scene.collection.objects.link(obj1)
+"""
+        self.send_string(create, to=0)
+
+        set_parent = """
+import bpy
+scene = bpy.data.scenes[0]
+obj0 = bpy.data.objects["obj0"]
+obj1 = bpy.data.objects["obj1"]
+obj0.parent = obj1
+"""
+        self.send_string(set_parent, to=0)
+
+        self.assert_matches()
+
+    def test_set_datablock_ref_to_none(self):
+
+        if not self.experimental_sync:
+            raise unittest.SkipTest("Broken in VRtist-only")
+
+        create = """
+import bpy
+scene = bpy.data.scenes[0]
+obj0 = bpy.data.objects.new("obj0", None)
+obj1 = bpy.data.objects.new("obj1", None)
+scene.collection.objects.link(obj0)
+scene.collection.objects.link(obj1)
+obj0.parent = obj1
+"""
+        self.send_string(create, to=0)
+
+        remove_parent = """
+import bpy
+scene = bpy.data.scenes[0]
+obj0 = bpy.data.objects["obj0"]
+obj0.parent = None
+"""
+        self.send_string(remove_parent, to=0)
+
         self.assert_matches()

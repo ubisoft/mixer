@@ -34,6 +34,7 @@ from mixer.stats import save_statistics, get_stats_filename
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import SendSceneContentFailed, BlenderClient
 from mixer.handlers import HandlerManager
+from mixer.os_utils import tech_infos
 
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,11 @@ def set_client_attributes():
 
 
 def join_room(room_name: str, experimental_sync: bool):
-    logger.info("join_room")
+    prefs = get_mixer_prefs()
+    logger.warning(f"join: room: {room_name}, user: {prefs.user}")
+
+    for line in tech_infos():
+        logger.warning(line)
 
     assert share_data.client.current_room is None
     share_data.session_id += 1
@@ -65,11 +70,10 @@ def join_room(room_name: str, experimental_sync: bool):
         "session_id": share_data.session_id,
         "blendfile": bpy.data.filepath,
         "statsfile": get_stats_filename(share_data.run_id, share_data.session_id),
-        "user": get_mixer_prefs().user,
+        "user": prefs.user,
         "room": room_name,
         "children": {},
     }
-    prefs = get_mixer_prefs()
     share_data.auto_save_statistics = prefs.auto_save_statistics
     share_data.statistics_directory = prefs.statistics_directory
     share_data.set_experimental_sync(experimental_sync)
@@ -186,8 +190,6 @@ def network_consumer_timer():
     if not share_data.client.is_connected():
         error_msg = "Timer still registered but client disconnected."
         logger.error(error_msg)
-        if get_mixer_prefs().env != "production":
-            raise RuntimeError(error_msg)
         # Returning None from a timer unregister it
         return None
 
@@ -203,9 +205,7 @@ def network_consumer_timer():
         disconnect()
         return None
     except Exception as e:
-        logger.error(e, stack_info=True)
-        if get_mixer_prefs().env == "development":
-            raise
+        logger.error(f"{e!r}", stack_info=True)
 
     # Run every 1 / 100 seconds
     return 0.01

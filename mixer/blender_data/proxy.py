@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 import logging
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 from uuid import uuid4
 
 import bpy
@@ -33,10 +33,10 @@ import bpy.types as T  # noqa
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+    from mixer.blender_data.struct_proxy import StructProxy
 
 logger = logging.getLogger(__name__)
 
-# storing everything in a single dictionary is easier for serialization
 MIXER_SEQUENCE = "__mixer_sequence__"
 
 Uuid = str
@@ -89,6 +89,11 @@ class Delta:
     A Delta records the difference between the proxy state and Blender state.
 
     It is created with Proxy.diff() and applied with Proxy.apply()
+
+    TODO this was added to emphasize the existence of deltas when differential updates were implemented
+    but is not strictly required. As an alternative, Deltas could be implemented as  hollow Proxy
+    with and addition flag indicating that it should be processed as a set(ordinary proxy), or a
+    add, remove or update operation
     """
 
     def __init__(self, value: Optional[Any] = None):
@@ -107,7 +112,13 @@ class DeltaDeletion(Delta):
 
 
 class DeltaUpdate(Delta):
-    pass
+    @classmethod
+    def deep_wrap(cls, proxy: StructProxy) -> DeltaUpdate:
+        """Recursively wraps proxy members in DeltaUpdate items."""
+        p = proxy.__class__()
+        for k, v in proxy._data.items():
+            p.data[k] = DeltaUpdate.deep_wrap(v)
+        return cls(p)
 
 
 class Proxy:
@@ -161,7 +172,7 @@ class Proxy:
         else:
             return resolve(self._data.get(key))
 
-    def save(self, bl_instance: Any, attr_name: str):
+    def save(self, bl_instance: Any, attr_name: str, context: Context):
         """
         Save this proxy into a blender object
         """
@@ -181,6 +192,33 @@ class Proxy:
         self, container: Union[T.bpy_prop_collection, T.Struct], key: Union[str, int], context: Context
     ) -> Optional[DeltaUpdate]:
         raise NotImplementedError(f"diff for {container}[{key}]")
+
+    def find_by_path(
+        self, bl_item: Union[T.bpy_struct, T.bpy_prop_collection], path: List[Union[int, str]]
+    ) -> Optional[Tuple[Union[T.bpy_struct, T.bpy_prop_collection], Proxy]]:
+        head, *tail = path
+        if isinstance(bl_item, T.bpy_struct):
+            bl = getattr(bl_item, head)
+        elif isinstance(bl_item, T.bpy_prop_collection):
+            if isinstance(head, int) and head + 1 > len(bl_item):
+                logger.error(f"Index {head} > len({bl_item}) ({len(bl_item)})")
+                return None
+            if isinstance(head, str) and head not in bl_item:
+                logger.error(f"Key {head} not in {bl_item}")
+                return None
+            bl = bl_item[head]
+        else:
+            return None
+
+        proxy = self.data(head)
+        if proxy is None:
+            logger.warning(f"find_by_path: No proxy for {bl_item} {path}")
+            return
+
+        if not tail:
+            return bl, proxy
+
+        return proxy.find_by_path(bl, tail)
 
 
 def ensure_uuid(item: bpy.types.ID) -> str:

@@ -56,12 +56,10 @@ def equals(attr_a, attr_b, synchronized_properties=test_properties):
     if type_a != type_b:
         return False
 
-    if is_builtin(type_a) or is_vector(type_a) or is_matrix(type_a):
-        if attr_a != attr_b:
-            return False
+    if attr_a is None or is_builtin(type_a) or is_vector(type_a) or is_matrix(type_a):
+        return attr_a == attr_b
     elif type_a == T.bpy_prop_array:
-        if attr_a != attr_b:
-            return False
+        return attr_a == attr_b
     elif issubclass(type_a, T.bpy_prop_collection):
         for key in attr_a.keys():
             attr_a_i = attr_a[key]
@@ -75,7 +73,7 @@ def equals(attr_a, attr_b, synchronized_properties=test_properties):
             if not equals(attr_a_i, attr_b_i):
                 return False
     else:
-        raise NotImplementedError
+        raise TypeError("equals: Unexpected type {type_a}")
 
     return True
 
@@ -89,7 +87,7 @@ def bl_equals(attr_a, attr_b, msg=None, skip_name=False, synchronized_properties
     type_b = type(attr_b)
     if type_a != type_b:
         raise failureException(f"Different types : {type_a} and {type_b}")
-    if is_builtin(type_a) or is_vector(type_a) or is_matrix(type_a):
+    if attr_a is None or is_builtin(type_a) or is_vector(type_a) or is_matrix(type_a):
         if attr_a != attr_b:
             raise failureException(f"Different values : {attr_a} and {attr_b}")
     elif type_a == T.bpy_prop_array:
@@ -105,7 +103,7 @@ def bl_equals(attr_a, attr_b, msg=None, skip_name=False, synchronized_properties
                 )
             except failureException as e:
                 raise failureException(
-                    f'{e}\nDifferent values for collection items at key "{key}" : {attr_a_i} and {attr_b_i}'
+                    f'{e!r}\nDifferent values for collection items at key "{key}" : {attr_a_i} and {attr_b_i}'
                 ) from None
             if not equal:
                 raise failureException(
@@ -124,7 +122,7 @@ def bl_equals(attr_a, attr_b, msg=None, skip_name=False, synchronized_properties
                 )
             except failureException as e:
                 raise failureException(
-                    f'{e}\nDifferent values for struct items at key "{name}" : {attr_a_i} and {attr_b_i}'
+                    f'{e!r}\nDifferent values for struct items at key "{name}" : {attr_a_i} and {attr_b_i}'
                 ) from None
             if not equal:
                 raise failureException(f'Different values for struct items at key "{name}" : {attr_a_i} and {attr_b_i}')

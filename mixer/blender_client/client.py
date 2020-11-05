@@ -36,8 +36,9 @@ we register.
 import logging
 import os
 import struct
+import time
 import traceback
-from typing import Set, Tuple, Optional
+from typing import Dict, Tuple, Optional
 from enum import IntEnum
 
 import bpy
@@ -64,6 +65,7 @@ from mixer.draw_handlers import set_draw_handlers
 
 from mixer.blender_client.camera import send_camera
 from mixer.blender_client.light import send_light
+from mixer.local_data import get_local_or_create_cache_file, get_source_file_path
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +110,14 @@ class SendSceneContentFailed(Exception):
     pass
 
 
+class TextureData:
+    def __init__(self, *args, **kwargs):
+        self.packed = kwargs.get("packed")
+        self.data = kwargs.get("data")
+        self.width = kwargs.get("width")
+        self.height = kwargs.get("height")
+
+
 class BlenderClient(Client):
     """
     Client specialized for Blender. Extends Client base class by adding and handling data related to Blender.
@@ -122,7 +132,7 @@ class BlenderClient(Client):
         # Is set to True for messages emitted from a frame change event
         self.synced_time_messages = False
 
-        self.textures: Set[str] = set()
+        self.textures: Dict[str, TextureData] = dict()
 
         self.skip_next_depsgraph_update = False
         # skip_next_depsgraph_update is set to True in the main timer function when a received command
@@ -332,35 +342,47 @@ class BlenderClient(Client):
         self.add_command(common.Command(MessageType.TRANSFORM, transform_buffer, 0))
 
     def build_texture_file(self, data):
-        path, index = common.decode_string(data, 0)
-        if not os.path.exists(path):
-            size, index = common.decode_int(data, index)
-            try:
-                f = open(path, "wb")
-                f.write(data[index : index + size])
-                f.close()
-                self.textures.add(path)
-            except Exception as e:
-                logger.error("could not write file %s ...", path)
-                logger.error("... %s", e)
+        name_or_path, index = common.decode_string(data, 0)
+        packed, index = common.decode_bool(data, index)
+        width, index = common.decode_int(data, index)
+        height, index = common.decode_int(data, index)
+        size, index = common.decode_int(data, index)
+        buffer = buffer = data[index : index + size]
+        if not packed:
+            get_local_or_create_cache_file(name_or_path, buffer)
+            buffer = None
 
-    def send_texture_file(self, path):
-        if path in self.textures:
+        self.textures[name_or_path] = TextureData(packed=packed, data=buffer, width=width, height=height)
+
+    def send_texture_file(self, path, width, height):
+        texture_data = self.textures.get(path)
+        if texture_data is not None and texture_data.packed:
             return
         if os.path.exists(path):
             try:
                 f = open(path, "rb")
                 data = f.read()
                 f.close()
-                self.send_texture_data(path, data)
+                self.send_texture_data(get_source_file_path(path), False, width, height, data)
             except Exception as e:
                 logger.error("could not read file %s ...", path)
                 logger.error("... %s", e)
 
-    def send_texture_data(self, path, data):
+    def send_texture_data(self, path, packed, width, height, data):
         name_buffer = common.encode_string(path)
-        self.textures.add(path)
-        self.add_command(common.Command(MessageType.TEXTURE, name_buffer + common.encode_int(len(data)) + data, 0))
+        self.textures[path] = TextureData(packed=packed, width=width, height=height, data=data if packed else None)
+        self.add_command(
+            common.Command(
+                MessageType.TEXTURE,
+                name_buffer
+                + common.encode_bool(packed)
+                + common.encode_int(width)
+                + common.encode_int(height)
+                + common.encode_int(len(data))
+                + data,
+                0,
+            )
+        )
 
     def get_texture(self, inputs):
         if not inputs:
@@ -373,11 +395,12 @@ class BlenderClient(Client):
                 path = bpy.path.abspath(image.filepath)
                 path = path.replace("\\", "/")
                 if pack:
-                    self.send_texture_data(image.name_full, pack.data)
+                    # if texture is packed, send its name rather than its fil path
+                    self.send_texture_data(image.name_full, True, image.size[0], image.size[1], pack.data)
                     return image.name_full
                 else:
-                    self.send_texture_file(path)
-                    return path
+                    self.send_texture_file(path, image.size[0], image.size[1])
+                    return get_source_file_path(path)
         return None
 
     def insert_key(self, ob, channel, channel_index, frame, value, interpolation):
@@ -404,6 +427,20 @@ class BlenderClient(Client):
                         curve.update()
                         return
 
+    def move_keyframe(self, ob, channel, channel_index, frame, new_frame):
+        if not hasattr(ob, channel):
+            ob = ob.data
+
+        curves = ob.animation_data.action.fcurves
+        for curve in curves:
+            if curve.data_path == channel and (channel_index == -1 or curve.array_index == channel_index):
+                keyframes = curve.keyframe_points
+                for i in range(len(keyframes)):
+                    if keyframes[i].co[0] == frame:
+                        keyframes[i].co[0] = new_frame
+                        curve.update()
+                        return
+
     def build_add_keyframe(self, data):
         index = 0
         name, index = common.decode_string(data, index)
@@ -416,6 +453,8 @@ class BlenderClient(Client):
         value, index = common.decode_float(data, index)
         interpolation, index = common.decode_int(data, index)
 
+        if channel == "rotation_euler":
+            ob.rotation_mode = "ZXY"
         self.insert_key(ob, channel, channel_index, frame, value, interpolation)
 
         return name
@@ -433,6 +472,53 @@ class BlenderClient(Client):
         frame, index = common.decode_int(data, index)
         ob.keyframe_delete(channel, index=channel_index, frame=frame)
         return name
+
+    def build_add_animation(self, data):
+        index = 0
+        name, index = common.decode_string(data, index)
+        if name not in share_data.blender_objects:
+            return name
+        ob = share_data.blender_objects[name]
+        channel, index = common.decode_string(data, index)
+        channel_index, index = common.decode_int(data, index)
+        if not hasattr(ob, channel):
+            ob = ob.data
+        frames, index = common.decode_int_array(data, index)
+        values, index = common.decode_float_array(data, index)
+        interpolations, index = common.decode_int_array(data, index)
+
+        animation_data = ob.animation_data
+        if animation_data:
+            curves = animation_data.action.fcurves
+            for curve in curves:
+                if curve.data_path == channel and (channel_index == -1 or curve.array_index == channel_index):
+                    remove_frames = []
+                    keyframes = curve.keyframe_points
+                    for i in range(len(keyframes)):
+                        remove_frames.append(keyframes[i].co[0])
+                    for frame in remove_frames:
+                        ob.keyframe_delete(channel, index=channel_index, frame=frame)
+                    curve.update()
+
+        ob.rotation_mode = "ZXY"
+
+        for i in range(len(frames)):
+            self.insert_key(ob, channel, channel_index, frames[i], values[i], interpolations[i])
+
+    def build_move_keyframe(self, data):
+        index = 0
+        name, index = common.decode_string(data, index)
+        if name not in share_data.blender_objects:
+            return name
+        ob = share_data.blender_objects[name]
+        channel, index = common.decode_string(data, index)
+        channel_index, index = common.decode_int(data, index)
+        if not hasattr(ob, channel):
+            ob = ob.data
+        frame, index = common.decode_int(data, index)
+        new_frame, index = common.decode_int(data, index)
+
+        self.move_keyframe(ob, channel, channel_index, frame, new_frame)
 
     def build_query_animation_data(self, data):
         index = 0
@@ -593,6 +679,30 @@ class BlenderClient(Client):
         if interpolation == InterpolationTypes.BEZIER:
             keyframe.interpolation = "BEZIER"
 
+    def send_object_animations(self, obj):
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "location", 0)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "location", 1)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "location", 2)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 0)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 1)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "scale", 0)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "scale", 1)
+        self.send_animation_buffer(obj.name_full, obj.animation_data, "scale", 2)
+
+        if isinstance(obj.data, bpy.types.Camera):
+            self.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
+
+        if isinstance(obj.data, bpy.types.Light):
+            self.send_animation_buffer(obj.name_full, obj.data.animation_data, "energy")
+            self.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 0)
+            self.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 1)
+            self.send_animation_buffer(obj.name_full, obj.data.animation_data, "color", 2)
+
+    def send_animations(self):
+        for obj in bpy.data.objects:
+            self.send_object_animations(obj)
+
     def send_animation_buffer(self, obj_name, animation_data, channel_name, channel_index=-1):
         if not animation_data:
             return
@@ -623,7 +733,9 @@ class BlenderClient(Client):
                         + common.encode_int(channel_index)
                         + common.int_to_bytes(key_count, 4)
                         + struct.pack(f"{len(times)}i", *times)
+                        + common.int_to_bytes(key_count, 4)
                         + struct.pack(f"{len(values)}f", *values)
+                        + common.int_to_bytes(key_count, 4)
                         + struct.pack(f"{len(interpolations)}i", *interpolations)
                     )
                     self.add_command(common.Command(MessageType.ANIMATION, buffer, 0))
@@ -822,7 +934,7 @@ class BlenderClient(Client):
         # Loop remains infinite while we have GROUP_BEGIN commands without their corresponding GROUP_END received
         # todo Change this -> probably not a good idea because the sending client might disconnect before GROUP_END occurs
         # or it needs to be guaranteed by the server
-        group_count = 0
+        groups = []
         while True:
             received_commands = self.fetch_commands(get_mixer_prefs().commands_send_interval)
 
@@ -840,11 +952,13 @@ class BlenderClient(Client):
                         redraw_panels()
 
                 if command.type == MessageType.GROUP_BEGIN:
-                    group_count += 1
+                    groups.append(time.monotonic())
                     continue
 
                 if command.type == MessageType.GROUP_END:
-                    group_count -= 1
+                    elapse = time.monotonic() - groups.pop()
+                    group_id = len(groups)
+                    logger.warning(f"Command group {group_id} processed in {elapse:.1f} seconds")
                     continue
 
                 if self.has_default_handler(command.type):
@@ -986,6 +1100,10 @@ class BlenderClient(Client):
                         self.build_add_keyframe(command.data)
                     elif command.type == MessageType.REMOVE_KEYFRAME:
                         self.build_remove_keyframe(command.data)
+                    elif command.type == MessageType.MOVE_KEYFRAME:
+                        self.build_move_keyframe(command.data)
+                    elif command.type == MessageType.ANIMATION:
+                        self.build_add_animation(command.data)
                     elif command.type == MessageType.QUERY_ANIMATION_DATA:
                         self.build_query_animation_data(command.data)
 
@@ -1004,6 +1122,9 @@ class BlenderClient(Client):
                         data_api.build_data_create(command.data)
                     elif command.type == MessageType.BLENDER_DATA_RENAME:
                         data_api.build_data_rename(command.data)
+                    elif command.type == MessageType.BLENDER_DATA_MEDIA:
+                        data_api.build_data_media(command.data)
+
                     else:
                         # Command is ignored, so no depsgraph update can be triggered
                         command_triggers_depsgraph_update = False
@@ -1016,13 +1137,13 @@ class BlenderClient(Client):
                     for line in traceback.format_exc().splitlines():
                         logger.warning(line)
 
-                    if get_mixer_prefs().env == "development" or isinstance(e, SendSceneContentFailed):
+                    if isinstance(e, SendSceneContentFailed):
                         raise
 
                 finally:
                     self.block_signals = False
 
-            if group_count == 0:
+            if not groups:
                 break
 
         if not set_dirty:
@@ -1132,13 +1253,17 @@ def clear_scene_content():
 
         # Cannot remove the last scene at this point, treat it differently
         for scene in bpy.data.scenes[:-1]:
+            logger.warning("clear_scene_contents. Removing {scene}")
             scene_api.delete_scene(scene)
 
         share_data.clear_before_state()
 
         if len(bpy.data.scenes) == 1:
             scene = bpy.data.scenes[0]
+            logger.warning(f"clear_scene_contents. leaving {scene} ...")
+            logger.warning(f"...  with uuid {scene.mixer_uuid}, renamed as _mixer_to_be_removed_")
             scene.name = "_mixer_to_be_removed_"
+            scene.mixer_uuid = "_mixer_to_be_removed_"
 
 
 @stats_timer(share_data)
@@ -1162,14 +1287,19 @@ def send_scene_content():
         share_data.init_proxy()
         share_data.client.send_group_begin()
 
-        # Temporary waiting for material sync. Should move to send_scene_data_to_server
-        for material in bpy.data.materials:
-            share_data.client.send_material(material)
-
+        timer = time.monotonic()
         if share_data.use_experimental_sync():
             generic.send_scene_data_to_server(None, None)
         else:
+            # Temporary waiting for material sync. Should move to send_scene_data_to_server
+            for material in bpy.data.materials:
+                share_data.client.send_material(material)
             send_scene_data_to_server(None, None)
+            # Temporary send initial animations
+            share_data.client.send_animations()
+
+        elapse = time.monotonic() - timer
+        logger.warning(f"Scene data send in {elapse:.1f} seconds")
 
         shot_manager.send_scene()
         share_data.client.send_frame_start_end(bpy.context.scene.frame_start, bpy.context.scene.frame_end)

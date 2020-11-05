@@ -30,11 +30,12 @@ import bpy.types as T  # noqa
 from mixer.blender_data.attributes import read_attribute
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
-from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.types import bases_of
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Uuid, Context
+    from mixer.blender_data.misc_proxies import NonePtrProxy
+
 
 logger = logging.getLogger(__name__)
 
@@ -66,14 +67,7 @@ class DatablockRefProxy(Proxy):
     def mixer_uuid(self) -> Uuid:
         return self._datablock_uuid
 
-    def is_none(self) -> bool:
-        """
-        Returns True if the reference is None (like if Scene.camera is not set)
-        """
-
-        return not self._datablock_uuid
-
-    def load(self, datablock: T.ID, context: Context) -> DatablockRefProxy:
+    def load(self, datablock: T.ID, key: Union[int, str], context: Context) -> DatablockRefProxy:
         """
         Load a reference to a standalone datablock into this proxy
         """
@@ -115,7 +109,7 @@ class DatablockRefProxy(Proxy):
                     logger.warning(
                         f"DatablockRefProxy.save() exception while saving {ref_target} into {container}[{key}]..."
                     )
-                    logger.warning(f"...{e}")
+                    logger.warning(f"...{e!r}")
             else:
                 # is there a case for this ?
                 logger.warning(
@@ -159,7 +153,7 @@ class DatablockRefProxy(Proxy):
             if datablock.mixer_uuid != "":
                 logger.error(f"{self}: found datablock with uuid in bpy.data.{self._bpy_data_collection}")
                 logger.error(f'... "{self._bpy_data_collection}" may be missing from clear_scene_contents()')
-                return
+                return None
 
             datablock.mixer_uuid = self._datablock_uuid
             context.proxy_state.datablocks[self._datablock_uuid] = datablock
@@ -174,33 +168,36 @@ class DatablockRefProxy(Proxy):
         delta: Optional[DeltaUpdate],
         context: Context,
         to_blender: bool = True,
-    ) -> StructProxy:
+    ) -> Union[NonePtrProxy, DatablockRefProxy]:
         """
         Apply a delta to this proxy, which occurs when Scene.camera changes, for instance
         """
-        update: DatablockRefProxy = delta.value
+        update = delta.value
         if to_blender:
-            if update.is_none():
+            from mixer.blender_data.misc_proxies import NonePtrProxy
+
+            if isinstance(update, NonePtrProxy):
                 setattr(parent, key, None)
             else:
                 assert type(update) == type(self), "type(update) == type(self)"
-                assert (
-                    self.is_none() or self._bpy_data_collection == update._bpy_data_collection
-                ), "self.is_none() or self._bpy_data_collection == update._bpy_data_collection"
 
                 datablock = context.proxy_state.datablocks.get(update._datablock_uuid)
                 setattr(parent, key, datablock)
         return update
 
-    def diff(self, datablock: T.ID, datablock_property: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(
+        self, datablock: T.ID, key: Union[int, str], datablock_property: T.Property, context: Context
+    ) -> Optional[DeltaUpdate]:
         """
         Computes the difference between this proxy and its Blender state.
         """
 
         if datablock is None:
-            return DeltaUpdate(DatablockRefProxy())
+            from mixer.blender_data.misc_proxies import NonePtrProxy
 
-        value = read_attribute(datablock, datablock_property, context)
+            return DeltaUpdate(NonePtrProxy())
+
+        value = read_attribute(datablock, key, datablock_property, context)
         assert isinstance(value, DatablockRefProxy)
         if value._datablock_uuid != self._datablock_uuid:
             return DeltaUpdate(value)

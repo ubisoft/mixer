@@ -1,32 +1,61 @@
-# WIP
+# 0.18.0 wip
 
-## Documentation
+## Features
 
-- Update synchronization.md
+- Shading trees for objects, worlds and lights (except grouped nodes)
+- Log OS, Blender, Mixer version and enabled addons list when joining room
+- VRtist: sky
 
-## Refactor
+## Fixes
 
-- blender_data: split proxy.py
+- Transfer less mesh data when modifiers are modified
+- Transfer less mesh data with linked meshes
+- Fix new mesh part not linked to its collection after mesh separate
+- Remove logging of meaningless ReferenceError messages
+- Fix error when setting datablock reference after initial synchronization (e.g. TextureNodeImage.image, ArrayModifier.object_offset, Scene.camera)
+- Add exception type when logging an exception
 
-# 0.17.0-alpha1 (2020-09-30) 
+
+# 0.17.0 (2020-10-15)
 
 ## Features
 
 - Object modifiers (except those using Image and Curve)
 - GreasePencil modifiers
 - Change instances collection
+- VRtist: move animations keys times
+- VRtist: now receives start/end frame
+- VRtist: per keyframe interpolation
+- VRtist: baked mesh optimization
 
 ## Bugfix
 
-- Fix: synchronization problems after renaming
-- Fix: synchronization problems after simultaneous creation
-- Fix: create object and edit with object popup breaks synchronization
-- Fix: _last_scene_to_be_removed_ is sometimes in the list of scenes
+- Fix synchronization problems after renaming
+- Fix synchronization problems after simultaneous creation
+- Fix create object and edit with object popup breaks synchronization
+- Fix synchronization problem after loading an asset with unsupported features, such as armatures
+- Fix synchronization problem after creating an object then editing its properties with the properties popup
+- Guard against infinite recursion when synchronized data has circular references
+
+## Tests
+
+- Add tests with multiple Blender that perform simultaneous modifications
+- Add a server option to simulate network latency
 
 ## CI/CD
 
 - Add optional build info to the version tag
 - Upgrade Flake and Black
+
+## Documentation
+
+- Update docs/synchronization.md to describe incremental synchronization
+- Update docs/hosting.md with instructions about Zerotier
+
+## Refactor
+
+- Split blender_data/proxy.py into multiple files
+
 
 # 0.16.1 (2020-09-22)
 

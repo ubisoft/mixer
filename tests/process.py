@@ -80,7 +80,7 @@ class Process:
             logger.info("subprocess.popen: success")
         except Exception as e:
             logger.error("Python.start(): Exception raised during subprocess.Popen(): ")
-            logger.error(f"{e}")
+            logger.error(f"{e!r}")
             logger.error(f"args:   {args}")
             logger.error(f"kwargs: {kwargs}")
             logger.error(f"command line: {self.command_line}")
@@ -294,7 +294,7 @@ class ServerProcess(PythonProcess):
                 raise
             if waited >= timeout:
                 message = f"Cannot connect to broadcaster at {self.host}{self.port} after {waited} seconds.\n"
-                f"Exception: {e}\n"
+                f"Exception: {e!r}\n"
                 f"Command line was: {self.command_line}"
                 raise RuntimeError(message)
             delay = 0.2

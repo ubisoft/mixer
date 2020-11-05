@@ -24,8 +24,9 @@
 This module defines types and utilities used by client and server code.
 """
 
+import array
 from enum import IntEnum
-from typing import Dict, Mapping, Any, Optional, List
+from typing import Dict, Mapping, Any, Optional, List, Tuple
 import select
 import struct
 import json
@@ -122,24 +123,26 @@ class MessageType(IntEnum):
 
     ADD_KEYFRAME = 135
     REMOVE_KEYFRAME = 136
-    QUERY_CURRENT_FRAME = 137
-    QUERY_ANIMATION_DATA = 138
+    MOVE_KEYFRAME = 137
+    QUERY_CURRENT_FRAME = 138
+    QUERY_ANIMATION_DATA = 139
 
-    BLENDER_DATA_UPDATE = 139
-    CAMERA_ATTRIBUTES = 140
-    LIGHT_ATTRIBUTES = 141
+    BLENDER_DATA_UPDATE = 140
+    CAMERA_ATTRIBUTES = 141
+    LIGHT_ATTRIBUTES = 142
 
-    BLENDER_DATA_REMOVE = 142
-    BLENDER_DATA_RENAME = 143
+    BLENDER_DATA_REMOVE = 143
+    BLENDER_DATA_RENAME = 144
 
-    CLEAR_ANIMATIONS = 144
-    CURRENT_CAMERA = 145
-    SHOT_MANAGER_MONTAGE_MODE = 146
-    SHOT_MANAGER_CONTENT = 147
-    SHOT_MANAGER_CURRENT_SHOT = 148
-    SHOT_MANAGER_ACTION = 149
+    CLEAR_ANIMATIONS = 145
+    CURRENT_CAMERA = 146
+    SHOT_MANAGER_MONTAGE_MODE = 147
+    SHOT_MANAGER_CONTENT = 148
+    SHOT_MANAGER_CURRENT_SHOT = 149
+    SHOT_MANAGER_ACTION = 150
 
-    BLENDER_DATA_CREATE = 150
+    BLENDER_DATA_CREATE = 151
+    BLENDER_DATA_MEDIA = 152
 
     OPTIMIZED_COMMANDS = 200
     TRANSFORM = 201
@@ -149,7 +152,7 @@ class MessageType(IntEnum):
     FRAME = 205
     PLAY = 206
     PAUSE = 207
-
+    WORLD_SKY = 208
     END_OPTIMIZED_COMMANDS = 999
 
     CLIENT_ID_WRAPPER = 1000
@@ -377,7 +380,15 @@ def decode_array(data, index, schema, inc):
 
 
 def decode_float_array(data, index):
-    return decode_array(data, index, "f", 4)
+    count = bytes_to_int(data[index : index + 4])
+    start = index + 4
+    values = []
+    end = start
+    for _ in range(count):
+        end = start + 4
+        values.extend(struct.unpack("f", data[start:end]))
+        start = end
+    return values, end
 
 
 def decode_int_array(data, index):
@@ -406,6 +417,23 @@ def decode_vector3_array(data, index):
 
 def decode_vector2_array(data, index):
     return decode_array(data, index, "2f", 2 * 4)
+
+
+def encode_py_array(data: array.array) -> bytes:
+    typecode = data.typecode
+    count = data.buffer_info()[1]
+    byte_count = count * data.itemsize
+    buffer = encode_string(typecode) + encode_int(byte_count) + data.tobytes()
+    return buffer
+
+
+def decode_py_array(buffer: bytes, index: int) -> Tuple[array.array, int]:
+    typecode, index = decode_string(buffer, index)
+    byte_count, index = decode_int(buffer, index)
+    array_ = array.array(typecode, b"")
+    slice_ = buffer[index : index + byte_count]
+    array_.frombytes(slice_)
+    return array_, index + byte_count
 
 
 class Command:

@@ -20,13 +20,11 @@ Proxies for bpy.types.NodeTree and bpy.types.NodeLinks
 from __future__ import annotations
 
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 import bpy.types as T  # noqa
 
-from mixer.blender_data.datablock_proxy import DatablockProxy
-from mixer.blender_data.proxy import MIXER_SEQUENCE
-from mixer.blender_data.attributes import write_attribute
-from mixer.blender_data.struct_proxy import StructProxy
+from mixer.blender_data.proxy import DeltaUpdate, MIXER_SEQUENCE
+from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
@@ -34,49 +32,88 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class NodeLinksProxy(StructProxy):
+class NodeLinksProxy(StructCollectionProxy):
     """Proxy for bpy.types.NodeLinks"""
 
-    def __init__(self):
-        super().__init__()
-
-    def load(self, bl_instance, _, context: Context):
-        # NodeLink contain pointers to Node and NodeSocket.
-        # Just keep the names to restore the links in ShaderNodeTreeProxy.save
-
+    def _load(self, links: T.NodeLinks) -> List[Dict[str, str]]:
         seq = []
-        for link in bl_instance:
-            link_data = (
-                link.from_node.name,
-                link.from_socket.name,
-                link.to_node.name,
-                link.to_socket.name,
-            )
-            seq.append(link_data)
-        self._data[MIXER_SEQUENCE] = seq
+        for link in links:
+            item = {}
+            # NodeLink contain pointers to Node and NodeSocket.
+            # Just keep the names to restore the links in ShaderNodeTreeProxy.save
+            item["from_node"] = link.from_node.name
+            item["from_socket"] = link.from_socket.name
+            item["to_node"] = link.to_node.name
+            item["to_socket"] = link.to_socket.name
+            seq.append(item)
+        return seq
+
+    def load(self, links: T.NodeLinks, key: str, _, context: Context) -> NodeLinksProxy:
+        self._data[MIXER_SEQUENCE] = self._load(links)
         return self
 
-
-class NodeTreeProxy(DatablockProxy):
-    """Proxies for bpy.types.NodeTree"""
-
-    def __init__(self):
-        super().__init__()
-
-    def save(self, bl_instance: Any, attr_name: str, context: Context):
-        # see https://stackoverflow.com/questions/36185377/how-i-can-create-a-material-select-it-create-new-nodes-with-this-material-and
-        # Saving NodeTree.links require access to NodeTree.nodes, so we need an implementation at the NodeTree level
-
-        node_tree = getattr(bl_instance, attr_name)
-
-        # save links last
-        for k, v in self._data.items():
-            if k != "links":
-                write_attribute(node_tree, k, v, context)
+    def save(self, node_tree: T.NodeTree, links: str, context: Context):
+        if not isinstance(node_tree, T.NodeTree):
+            logger.error(f"NodeLinksProxy.save() called with {node_tree}. Expected a bpy.types.NodeTree")
+            return
 
         node_tree.links.clear()
-        seq = self.data("links").data(MIXER_SEQUENCE)
-        for src_node, src_socket, dst_node, dst_socket in seq:
-            src_socket = node_tree.nodes[src_node].outputs[src_socket]
-            dst_socket = node_tree.nodes[dst_node].inputs[dst_socket]
-            node_tree.links.new(src_socket, dst_socket)
+        for link_proxy in self._data[MIXER_SEQUENCE]:
+            from_node_name = link_proxy["from_node"]
+            from_socket_name = link_proxy["from_socket"]
+            to_node_name = link_proxy["to_node"]
+            to_socket_name = link_proxy["to_socket"]
+
+            from_node = node_tree.nodes.get(from_node_name)
+            if from_node is None:
+                logger.warning(f"save(): from_node {node_tree}.nodes[{from_node_name}] is None")
+                return
+
+            from_socket = from_node.outputs.get(from_socket_name)
+            if from_socket is None:
+                logger.warning(f"save(): from_socket {node_tree}.nodes[{from_socket_name}] is None")
+                return
+
+            to_node = node_tree.nodes.get(to_node_name)
+            if to_node is None:
+                logger.warning(f"save(): to_node {node_tree}.nodes[{to_node_name}] is None")
+                return
+
+            to_socket = to_node.inputs.get(to_socket_name)
+            if to_socket is None:
+                logger.warning(f"save(): to_socket {node_tree}.nodes[{to_socket_name}] is None")
+                return
+
+            node_tree.links.new(from_socket, to_socket)
+
+    def apply(
+        self,
+        parent: Any,
+        key: str,
+        struct_delta: Optional[DeltaUpdate],
+        context: Context,
+        to_blender: bool = True,
+    ) -> Optional[NodeLinksProxy]:
+
+        struct_update = struct_delta.value
+        self._data = struct_update._data
+
+        # update Blender
+        if to_blender:
+            self.save(parent, key, context)
+
+        node_tree = getattr(parent, key)
+        if node_tree is None:
+            return None
+        return self
+
+    def diff(self, links: T.NodeLinks, key, prop, context: Context) -> Optional[DeltaUpdate]:
+        # always complete updates
+        blender_links = self._load(links)
+        if blender_links == self._data[MIXER_SEQUENCE]:
+            return None
+
+        diff = self.__class__()
+        diff.init(None)
+        diff._data[MIXER_SEQUENCE] = blender_links
+        return DeltaUpdate(diff)

@@ -46,7 +46,16 @@ class StructProxy(Proxy):
         self._data = {}
         pass
 
-    def load(self, bl_instance: Any, context: Context):
+    @classmethod
+    def make(cls, attr_property):
+
+        # if isinstance(attr_property, T.NodeLink):
+        #     from mixer.blender_data.node_proxy import NodeLinkProxy
+
+        #     return NodeLinkProxy()
+        return cls()
+
+    def load(self, bl_instance: Any, parent_key: Union[int, str], context: Context):
 
         """
         Load a Blender object into this proxy
@@ -56,12 +65,21 @@ class StructProxy(Proxy):
         # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
         # that we do not want to load anyway
         properties = specifics.conditional_properties(bl_instance, properties)
-        for name, bl_rna_property in properties:
-            attr = getattr(bl_instance, name)
-            attr_value = read_attribute(attr, bl_rna_property, context)
-            # Also write None values. We use them to reset attributes like Camera.dof.focus_object
-            self._data[name] = attr_value
+        try:
+            context.visit_state.path.append(parent_key)
+            for name, bl_rna_property in properties:
+                attr = getattr(bl_instance, name)
+                attr_value = read_attribute(attr, name, bl_rna_property, context)
+
+                # Also write None values. We use them to reset attributes like Camera.dof.focus_object
+                self._data[name] = attr_value
+        finally:
+            context.visit_state.path.pop()
+
         return self
+
+    def _pre_save(self, target: T.bpy_struct, context: Context) -> T.bpy_struct:
+        return specifics.pre_save_struct(self, target, context)
 
     def save(self, bl_instance: Any, key: Union[int, str], context: Context):
         """
@@ -78,13 +96,13 @@ class StructProxy(Proxy):
             if target is None:
                 target = specifics.add_element(self, bl_instance, key, context)
         else:
-            specifics.pre_save_struct(self, bl_instance, key)
             target = getattr(bl_instance, key, None)
+            if target is not None:
+                self._pre_save(target, context)
 
         if target is None:
             if isinstance(bl_instance, T.bpy_prop_collection):
                 logger.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist.")
-                logger.warning("Note: Not implemented write to dict")
             else:
                 # Don't log this because it produces too many log messages when participants have plugins
                 # f"Note: May be due to a plugin used by the sender and not on this Blender"
@@ -94,8 +112,12 @@ class StructProxy(Proxy):
 
             return
 
-        for k, v in self._data.items():
-            write_attribute(target, k, v, context)
+        try:
+            context.visit_state.path.append(key)
+            for k, v in self._data.items():
+                write_attribute(target, k, v, context)
+        finally:
+            context.visit_state.path.pop()
 
     def apply(
         self,
@@ -123,7 +145,7 @@ class StructProxy(Proxy):
 
         assert isinstance(key, (int, str))
 
-        # TODO factorize with save
+        struct_update = struct_delta.value
 
         if isinstance(key, int):
             struct = parent[key]
@@ -131,27 +153,33 @@ class StructProxy(Proxy):
             # TODO append an element :
             # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             struct = parent.get(key)
-            if struct is None:
+            if struct is None and to_blender:
                 struct = specifics.add_element(self, parent, key, context)
         else:
-            specifics.pre_save_struct(self, parent, key)
             struct = getattr(parent, key, None)
+            if to_blender:
+                struct = struct_update._pre_save(struct, context)
 
-        struct_update = struct_delta.value
         assert type(struct_update) == type(self)
-        for k, member_delta in struct_update._data.items():
-            try:
+
+        try:
+            context.visit_state.path.append(key)
+            for k, member_delta in struct_update._data.items():
                 current_value = self._data.get(k)
-                self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
-            except Exception as e:
-                logger.warning(f"Struct.apply(). Processing {member_delta}")
-                logger.warning(f"... for {struct}.{k}")
-                logger.warning(f"... Exception: {e}")
-                logger.warning("... Update ignored")
-                continue
+                try:
+                    self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
+                except Exception as e:
+                    logger.warning(f"Struct.apply(). Processing {member_delta}")
+                    logger.warning(f"... for {struct}.{k}")
+                    logger.warning(f"... Exception: {e!r}")
+                    logger.warning("... Update ignored")
+                    continue
+        finally:
+            context.visit_state.path.pop()
+
         return self
 
-    def diff(self, struct: T.Struct, _: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(self, struct: T.Struct, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
 
@@ -170,28 +198,43 @@ class StructProxy(Proxy):
         # as opposed as the dense self
         diff = self.__class__()
         diff.init(struct)
+        return self._diff(struct, key, prop, context, diff)
 
+    def _diff(
+        self, struct: T.Struct, key: str, prop: T.Property, context: Context, diff: StructProxy
+    ) -> Optional[DeltaUpdate]:
         # PERF accessing the properties from the synchronized_properties is **far** cheaper that iterating over
         # _data and the getting the properties with
         #   member_property = struct.bl_rna.properties[k]
         # line to which py-spy attributes 20% of the total diff !
+        try:
+            if prop is not None:
+                context.visit_state.path.append(key)
+            properties = context.synchronized_properties.properties(struct)
+            properties = specifics.conditional_properties(struct, properties)
+            for k, member_property in properties:
+                # TODO in test_differential.StructDatablockRef.test_remove
+                # target et a scene, k is world and v (current world value) is None
+                # so diff fails. v should be a BpyIDRefNoneProxy
 
-        for k, member_property in context.synchronized_properties.properties(struct):
-            # TODO in test_differential.StructDatablockRef.test_remove
-            # target et a scene, k is world and v (current world value) is None
-            # so diff fails. v should be a BpyIDRefNoneProxy
+                # make a difference between None value and no member
+                try:
+                    member = getattr(struct, k)
+                except AttributeError:
+                    logger.warning(f"diff: unknown attribute {k} in {struct}")
+                    continue
 
-            # make a difference between None value and no member
-            try:
-                member = getattr(struct, k)
-            except AttributeError:
-                logger.warning(f"diff: unknown attribute {k} in {struct}")
-                continue
+                proxy_data = self._data.get(k)
+                delta = diff_attribute(member, k, member_property, proxy_data, context)
 
-            proxy_data = self._data.get(k)
-            delta = diff_attribute(member, member_property, proxy_data, context)
-            if delta is not None:
-                diff._data[k] = delta
+                if delta is not None:
+                    diff._data[k] = delta
+        finally:
+            if prop is not None:
+                context.visit_state.path.pop()
+
+        # TODO detect media updates (reload(), and attach a media descriptor to diff)
+        # difficult ?
 
         # if anything has changed, wrap the hollow proxy in a DeltaUpdate. This may be superfluous but
         # it is homogenous with additions and deletions

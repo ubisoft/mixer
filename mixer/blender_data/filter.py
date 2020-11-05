@@ -246,7 +246,6 @@ _exclude_names = {
 
 default_exclusions = {
     None: [
-        TypeFilterOut(T.MeshVertex),
         # Temporary: parent and child are involved in circular reference
         TypeFilterOut(T.PoseBone),
         NameFilterOut(_exclude_names),
@@ -262,10 +261,21 @@ default_exclusions = {
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foreach_get()
+    T.DecimateModifier: [NameFilterOut(["face_count"])],
+    T.FaceMap: [NameFilterOut(["index"])],
     T.Image: [
-        NameFilterOut("pixels"),
-        # meaningless to sync these, since they are handled by Image.pack() ?
-        NameFilterOut(["packed_file", "packed_files"]),
+        NameFilterOut(
+            [
+                "is_float",  # and others
+                # is packed_files[0]
+                "packed_file",
+                "pixels",
+                "bindcode",
+                "has_data",
+                "depth",
+                "channels",
+            ]
+        ),
     ],
     # TODO see comment in specifics.py:add_element()
     T.KeyingSets: [NameFilterOut("paths")],
@@ -280,17 +290,55 @@ default_exclusions = {
     T.GreasePencil: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
-        NameFilterIn("name")
+    ],
+    T.GPencilLayer: [
+        NameFilterOut(
+            [
+                "active_frame",
+            ]
+        )
+    ],
+    T.GPencilStroke: [
+        NameFilterOut(
+            [
+                # readonly
+                "bound_box_min",
+                "bound_box_max",
+            ]
+        )
     ],
     T.Mesh: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
-        NameFilterIn("name")
+        # NameFilterIn("name")
+        NameFilterOut(
+            [
+                # views into uv_layers controlled by uv_layer_xxx_index
+                "uv_layer_clone",
+                "uv_layer_stencil",
+                # readonly
+                "is_editmode",
+                "total_vert_sel",
+                "total_edge_sel",
+                "total_face_sel",
+                # do not know how to update this, probably by vertices count
+                "vertex_paint_masks",
+            ]
+        )
     ],
-    T.MeshPolygon: [NameFilterOut("area")],
+    T.MeshEdge: [NameFilterOut(["select"])],
+    T.MeshLoopColorLayer: [NameFilterOut(["active"])],
+    T.MeshPolygon: [NameFilterOut(["area", "center", "normal", "select"])],
+    T.MeshUVLoop: [NameFilterOut(["select"])],
+    T.MeshUVLoopLayer: [NameFilterOut(["active", "active_clone"])],
     T.MeshVertex: [
-        # MeshVertex.groups is updated via Object.vertex_groups
-        NameFilterOut("groups")
+        NameFilterOut(
+            [
+                "select",
+                # MeshVertex.groups is updated via Object.vertex_groups
+                "groups",
+            ]
+        )
     ],
     #
     T.Node: [
@@ -304,19 +352,19 @@ default_exclusions = {
     ],
     T.NodeLink: [
         # see NodeLinkProxy
-        NameFilterOut(["from_node", "from_socket", "to_node", "to_socket", "is_hidden"])
+        NameFilterOut(["is_hidden"])
     ],
     T.NodeSocket: [
         # Currently synchronize builtin shading node sockets only, so assume these attributes are
         # managed only at the Node creation
-        NameFilterOut(["bl_idname", "identifier", "is_linked", "is_output", "link_limit", "name", "node", "type"])
+        # NameFilterOut(["identifier", "is_linked", "is_output", "link_limit", "name", "node", "type"])
+        NameFilterOut(["bl_idname", "is_linked", "is_output", "node"])
     ],
     T.NodeTree: [
         NameFilterOut(
             [
                 # read only
                 "view_center",
-                "name",
             ]
         )
     ],
@@ -325,6 +373,8 @@ default_exclusions = {
             [
                 # bounding box, will be computed
                 "dimensions",
+                "bound_box",
+                "mode",
                 # TODO triggers an error on metaballs
                 #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
                 #   looks like a bpy_prop_collection and the key is and empty string
@@ -339,10 +389,18 @@ default_exclusions = {
             ]
         )
     ],
+    T.PackedFile: [
+        # send by a BLENDER_DATA_MEDIA command, not serialized with proxies
+        NameFilterOut("data")
+    ],
     T.RenderSettings: [
         NameFilterOut(
-            # just a view of "right" and "left" from RenderSettings.views
-            "stereo_views"
+            [
+                # just a view of "right" and "left" from RenderSettings.views
+                "stereo_views",
+                # Causes error in pass_filter, maybe not useful
+                "bake",
+            ]
         )
     ],
     T.Scene: [
@@ -357,6 +415,8 @@ default_exclusions = {
                 # Not required and messy: plenty of uninitialized enums, several settings, like "scuplt" are None and
                 # it is unclear how to do it.
                 "tool_settings",
+                # Probably per user setting. Causes a readonly error for StudioLight.spherical_harmonics_coefficients
+                "display",
                 # TODO temporary, not implemented
                 "node_tree",
                 "view_layers",
@@ -396,12 +456,10 @@ safe_depsgraph_updates = (
     T.Collection,
     T.Curve,
     T.Image,
-    # no generic sync of GreasePencil, use VRtist message
-    # T.GreasePencil,
+    T.GreasePencil,
     T.Light,
     T.Material,
-    # no generic sync of Mesh, use VRtist message
-    # T.Mesh
+    T.Mesh,
     T.MetaBall,
     T.NodeTree,
     T.Object,

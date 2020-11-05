@@ -145,6 +145,9 @@ class Client:
     def delete_room(self, room_name: str):
         return self.send_command(common.Command(common.MessageType.DELETE_ROOM, room_name.encode("utf8"), 0))
 
+    def send_error(self, message: str):
+        return self.send_command(common.Command(common.MessageType.SEND_ERROR, common.encode_string(message), 0))
+
     def set_client_attributes(self, attributes: dict):
         diff = update_attributes_and_get_diff(self.current_custom_attributes, attributes)
         if diff == {}:
@@ -205,7 +208,7 @@ class Client:
     def _handle_join_room(self, command: common.Command):
         room_name, _ = common.decode_string(command.data, 0)
 
-        logger.info("Join room %s confirmed by server", room_name)
+        logger.warning("Info: Join room '%s' confirmed by server", room_name)
         self.current_room = room_name
 
     def _handle_send_error(self, command: common.Command):

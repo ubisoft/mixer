@@ -87,7 +87,7 @@ class HandlerManager:
     def _set_handlers(cls, connect: bool):
         try:
             if connect:
-                bpy.app.handlers.frame_change_post.append(handler_send_frame_changed)
+                # bpy.app.handlers.frame_change_post.append(handler_send_frame_changed)
                 bpy.app.handlers.depsgraph_update_post.append(handler_send_scene_data_to_server)
                 bpy.app.handlers.undo_pre.append(handler_on_undo_redo_pre)
                 bpy.app.handlers.redo_pre.append(handler_on_undo_redo_pre)
@@ -96,7 +96,7 @@ class HandlerManager:
                 bpy.app.handlers.load_post.append(handler_on_load)
             else:
                 bpy.app.handlers.load_post.remove(handler_on_load)
-                bpy.app.handlers.frame_change_post.remove(handler_send_frame_changed)
+                # bpy.app.handlers.frame_change_post.remove(handler_send_frame_changed)
                 bpy.app.handlers.depsgraph_update_post.remove(handler_send_scene_data_to_server)
                 bpy.app.handlers.undo_pre.remove(handler_on_undo_redo_pre)
                 bpy.app.handlers.redo_pre.remove(handler_on_undo_redo_pre)

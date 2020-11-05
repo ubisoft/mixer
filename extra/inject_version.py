@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from datetime import datetime, timezone
 import os
 import re
 import subprocess
@@ -44,6 +45,8 @@ def parse(version) -> Tuple[Tuple[int], str]:
     # vMAJOR.MINOR.PATCH-PRERELEASE+BUILD as in https://semver.org/
     re_string = r"^v([0-9]+)\.([0-9]+)\.([0-9]+)((?:\-[0-9A-Za-z-]+)?(?:\+[0-9A-Za-z-]+)?)?$"
     match = re.match(re_string, version)
+    if not match:
+        raise RuntimeError('invalid version string "{version}"')
     groups = match.groups()
 
     # ([0-9]+)\.([0-9]+)\.([0-9]+)
@@ -74,6 +77,9 @@ def main():
                     new_init_file_str += f'__version__ = "v{version_string}"{comment}\n'
                 elif line.startswith("display_version = "):
                     new_init_file_str += f'display_version = "v{version_string}{suffix}"{comment}\n'
+                elif line.startswith("version_date = "):
+                    date = datetime.now(timezone.utc).strftime("%Y-%m-%d:%H:%M:%S %Z")
+                    new_init_file_str += f'version_date = "{date}"{comment}\n'
                 elif line.startswith('    "version": ('):
                     new_init_file_str += f'    "version": {str(tuple(version_numbers))},{comment}\n'
                     done = True
