@@ -6,7 +6,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List, Optional, Tuple
 import unittest
 
 from tests.blender_app import BlenderApp
@@ -47,6 +47,7 @@ class MixerTestCase(unittest.TestCase):
         self._server_process: ServerProcess = ServerProcess()
         self._blenders: List[BlenderApp] = []
         self.ignored_messages = set()
+        self.experimental_sync = True
 
     def set_log_level(self, log_level):
         self._log_level = log_level
@@ -73,7 +74,7 @@ class MixerTestCase(unittest.TestCase):
 
     def setUp(
         self,
-        blenderdescs: Iterable[BlenderDesc] = (BlenderDesc(), BlenderDesc()),
+        blenderdescs: Tuple[BlenderDesc, BlenderDesc] = (BlenderDesc(), BlenderDesc()),
         server_args: Optional[List[str]] = None,
         join=True,
         join_delay: Optional[float] = None,
@@ -243,16 +244,16 @@ class MixerTestCase(unittest.TestCase):
                     raise AssertionError(k, *e.args) from None
 
     def assert_stream_equals(
-        self, streams_a: CommandStream, streams_b: CommandStream, msg: str = None, ignore: List[str] = ()
+        self, streams_a: CommandStream, streams_b: CommandStream, msg: str = None, ignore: Iterable[str] = ()
     ):
         self.assertEqual(streams_a.commands.keys(), streams_b.commands.keys())
 
-        def decode_and_sort_messages(commands: List[mixer.codec.Message]) -> List[mixer.codec.Message]:
+        def decode_and_sort_messages(commands: List[Command]) -> List[mixer.codec.Message]:
             stream = [mixer.codec.decode(c) for c in commands]
             stream.sort()
             return stream
 
-        def sort_buffers(commands: List[Command]) -> List[Command]:
+        def sort_buffers(commands: List[Command]) -> List[bytes]:
             stream = [c.data for c in commands]
             stream.sort()
             return stream
@@ -387,7 +388,7 @@ class MixerTestCase(unittest.TestCase):
         except Exception as e:
             raise self.failureException(f"Exception {e!r} during disconnect_mixer(). Possible Blender crash")
 
-    def send_string(self, s: str, to: Optional[int] = 0, sleep: float = 0.5):
+    def send_string(self, s: str, to: int = 0, sleep: float = 0.5):
         try:
             self._blenders[to].send_string(s, sleep)
         except Exception as e:
@@ -395,5 +396,5 @@ class MixerTestCase(unittest.TestCase):
                 f"Exception {e!r}\n" "during send command :\n" "{s}\n" "to Blender {to}.\n" "Possible Blender crash"
             )
 
-    def send_strings(self, strings: List[str], to: Optional[int] = 0, sleep: float = 0.5):
+    def send_strings(self, strings: List[str], to: int = 0, sleep: float = 0.5):
         self.send_string("\n".join(strings), to, sleep)
