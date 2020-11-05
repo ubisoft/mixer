@@ -295,6 +295,8 @@ default_exclusions = {
         NameFilterOut(
             [
                 "active_frame",
+                # see internal issue #341
+                "parent_type",
             ]
         )
     ],
