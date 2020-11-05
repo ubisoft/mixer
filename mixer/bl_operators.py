@@ -96,7 +96,7 @@ class CreateRoomOperator(bpy.types.Operator):
         prefs = get_mixer_prefs()
         room = prefs.room
         logger.warning(f"CreateRoomOperator.execute({room})")
-        join_room(room)
+        join_room(room, prefs.vrtist_protocol)
 
         return {"FINISHED"}
 
@@ -152,7 +152,9 @@ class JoinRoomOperator(bpy.types.Operator):
         room_index = props.room_index
         room = props.rooms[room_index].name
         logger.warning(f"JoinRoomOperator.execute({room})")
-        join_room(room)
+
+        prefs = get_mixer_prefs()
+        join_room(room, prefs.vrtist_protocol)
 
         return {"FINISHED"}
 

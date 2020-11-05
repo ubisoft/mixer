@@ -177,6 +177,7 @@ def draw_advanced_settings_ui(layout: bpy.types.UILayout):
     layout.prop(mixer_prefs, "data_directory", text="Data Directory")
     layout.prop(mixer_prefs, "log_level")
     layout.prop(mixer_prefs, "show_server_console")
+    layout.prop(mixer_prefs, "vrtist_protocol")
 
 
 def draw_developer_settings_ui(layout: bpy.types.UILayout):
