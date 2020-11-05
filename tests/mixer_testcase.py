@@ -141,7 +141,7 @@ class MixerTestCase(unittest.TestCase):
     def end_test(self):
         self.assert_matches()
 
-    def assert_matches(self):
+    def assert_matches(self, ignore: Iterable[str] = ()):
         # TODO add message count dict as param
         try:
             self._sender.disconnect_mixer()
@@ -203,9 +203,9 @@ class MixerTestCase(unittest.TestCase):
         # TODO_ enhance comparison : check # elements, understandable comparison
         s = sender_grabber.streams
         r = receiver_grabber.streams
-        self.assert_stream_equals(s, r)
+        self.assert_stream_equals(s, r, ignore=ignore)
 
-    def assert_any_almost_equal(self, a: Any, b: Any, msg: str = None):
+    def assert_any_almost_equal(self, a: Any, b: Any, msg: str = None, ignore: Iterable[str] = ()):
 
         # Use Assertion error.
         # The all but last args in the resulting exception is the path into the structure to the faulting element
@@ -223,7 +223,7 @@ class MixerTestCase(unittest.TestCase):
         elif isinstance(a, (list, tuple)):
             for i, (item_a, item_b) in enumerate(zip(a, b)):
                 try:
-                    self.assert_any_almost_equal(item_a, item_b, msg=msg)
+                    self.assert_any_almost_equal(item_a, item_b, msg=msg, ignore=ignore)
                 except AssertionError as e:
                     raise AssertionError(i, *e.args) from None
         else:
@@ -235,12 +235,16 @@ class MixerTestCase(unittest.TestCase):
             keys_a, keys_b = sorted(dict_a.keys()), sorted(dict_b.keys())
             self.assertListEqual(keys_a, keys_b, msg=msg)
             for k in keys_a:
+                if k in ignore:
+                    continue
                 try:
-                    self.assert_any_almost_equal(dict_a[k], dict_b[k], msg=msg)
+                    self.assert_any_almost_equal(dict_a[k], dict_b[k], msg=msg, ignore=ignore)
                 except AssertionError as e:
                     raise AssertionError(k, *e.args) from None
 
-    def assert_stream_equals(self, streams_a: CommandStream, streams_b: CommandStream, msg: str = None):
+    def assert_stream_equals(
+        self, streams_a: CommandStream, streams_b: CommandStream, msg: str = None, ignore: List[str] = ()
+    ):
         self.assertEqual(streams_a.commands.keys(), streams_b.commands.keys())
 
         def decode_and_sort_messages(commands: List[mixer.codec.Message]) -> List[mixer.codec.Message]:
@@ -321,7 +325,7 @@ class MixerTestCase(unittest.TestCase):
 
                 for i, (decoded_a, decoded_b) in enumerate(zip(decoded_stream_a, decoded_stream_b)):
                     self.assert_any_almost_equal(
-                        decoded_a, decoded_b, f"{message_name}: decoded message mismatch at index {i}"
+                        decoded_a, decoded_b, f"{message_name}: decoded message mismatch at index {i}", ignore=ignore
                     )
             else:
                 buffer_stream_a = sort_buffers(commands_a)
@@ -342,7 +346,7 @@ class MixerTestCase(unittest.TestCase):
                 for i, (buffer_a, buffer_b) in enumerate(zip(buffer_stream_a, buffer_stream_b)):
                     self.assertIs(type(buffer_a), type(buffer_b))
                     self.assert_any_almost_equal(
-                        buffer_a, buffer_b, f"{message_name}: encoded buffer mismatch at index {i}"
+                        buffer_a, buffer_b, f"{message_name}: encoded buffer mismatch at index {i}", ignore=ignore
                     )
 
     def assert_user_success(self):
