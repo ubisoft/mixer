@@ -48,6 +48,7 @@ class MixerTestCase(unittest.TestCase):
         self._blenders: List[BlenderApp] = []
         self.ignored_messages = set()
         self.experimental_sync = True
+        self.vrtist_protocol = False
 
     def set_log_level(self, log_level):
         self._log_level = log_level
@@ -200,13 +201,11 @@ class MixerTestCase(unittest.TestCase):
         finally:
             server_process.kill()
 
-        # TODO_ timing error : sometimes succeeds
-        # TODO_ enhance comparison : check # elements, understandable comparison
         s = sender_grabber.streams
         r = receiver_grabber.streams
         self.assert_stream_equals(s, r, ignore=ignore)
 
-    def assert_any_almost_equal(self, a: Any, b: Any, msg: str = None, ignore: Iterable[str] = ()):
+    def assert_any_almost_equal(self, a: Any, b: Any, msg: str = "", ignore: Iterable[str] = ()):
 
         # Use Assertion error.
         # The all but last args in the resulting exception is the path into the structure to the faulting element
@@ -225,6 +224,7 @@ class MixerTestCase(unittest.TestCase):
             self.assertEqual(len(a), len(b), msg=msg)
             for i, (item_a, item_b) in enumerate(zip(a, b)):
                 try:
+                    msg = "Length mismatch. " + msg
                     self.assert_any_almost_equal(item_a, item_b, msg=msg, ignore=ignore)
                 except AssertionError as e:
                     raise AssertionError(i, *e.args) from None
