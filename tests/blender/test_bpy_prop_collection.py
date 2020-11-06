@@ -285,7 +285,7 @@ light.distance = 20
 """
         self.send_string(action)
 
-        self.end_test()
+        self.assert_matches()
 
 
 class TestRenderViews(TestCase):
@@ -300,7 +300,7 @@ views.remove(views[0])
 """
         self.send_string(action)
 
-        self.end_test()
+        self.assert_matches()
 
 
 class TestCurveMapping(TestCase):
@@ -317,4 +317,35 @@ points.new(0.7, 0.3)
 """
         self.send_string(action)
 
-        self.end_test()
+        self.assert_matches()
+
+
+class TestNodes(TestCase):
+    def test_nodes_initial_sync(self):
+        action = """
+import bpy
+mat = bpy.data.materials.new("mat")
+mat.use_nodes = True
+
+bpy.ops.mesh.primitive_cube_add()
+cube = bpy.data.objects["Cube"]
+bpy.ops.object.material_slot_add()
+cube.material_slots[0].material = mat
+
+node_tree = bpy.data.materials["mat"].node_tree
+principled = node_tree.nodes["Principled BSDF"]
+rgb = node_tree.nodes.new("ShaderNodeRGB")
+from_ = rgb.outputs["Color"]
+to_ = principled.inputs["Emission"]
+node_tree.links.new(from_, to_)
+to_ = principled.inputs["Base Color"]
+node_tree.links.new(from_, to_)
+"""
+
+        self.send_string(action)
+
+        self.assert_matches()
+
+
+if __name__ == "main":
+    unittest.main()
