@@ -461,6 +461,10 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, context: Contex
             type_ = proxy.data("type")
             return collection.new(type_)
 
+        if isinstance(bl_rna, type(T.MetaBallElements.bl_rna)):
+            type_ = proxy.data("type")
+            return collection.new(type=type_)
+
         if isinstance(bl_rna, type(T.Nodes.bl_rna)):
             node_type = proxy.data("bl_idname")
             return collection.new(node_type)
@@ -556,14 +560,18 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, context: Contex
     if new_or_add is None:
         logger.warning(f"Not implemented new or add for {collection} ...")
         return None
+
     try:
-        key = proxy.data("name")
-        return new_or_add(key)
-    except Exception:
-        logger.warning(f"Not implemented new or add for type {type(collection)} for {collection}[{key}] ...")
-        for s in traceback.format_exc().splitlines():
-            logger.warning(f"...{s}")
-        return None
+        return new_or_add()
+    except TypeError:
+        try:
+            key = proxy.data("name")
+            return new_or_add(key)
+        except Exception:
+            logger.warning(f"Not implemented new or add for type {type(collection)} for {collection}[{key}] ...")
+            for s in traceback.format_exc().splitlines():
+                logger.warning(f"...{s}")
+    return None
 
 
 def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
@@ -636,13 +644,10 @@ def clear_from(sequence: List[DatablockProxy], collection: T.bpy_prop_collection
         for i, (proxy, item) in enumerate(zip(sequence, collection)):
             if proxy.data("type") != item.type:
                 return i
-        return i + 1
-
-    if isinstance(collection_rna, _cannot_morph_bl_idname):
+    elif isinstance(collection_rna, _cannot_morph_bl_idname):
         for i, (proxy, item) in enumerate(zip(sequence, collection)):
             if proxy.data("bl_idname") != item.bl_idname:
                 return i
-        return i + 1
 
     return default_value
 
