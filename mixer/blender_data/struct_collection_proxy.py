@@ -24,7 +24,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Any, List, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy.types as T  # noqa
 
@@ -54,7 +54,7 @@ class StructCollectionProxy(Proxy):
     def __init__(self):
         # remove this
         self._data = {}
-        self._diff_updates: Dict[int, DeltaUpdate] = {}
+        self._diff_updates: List[Tuple[int, DeltaUpdate]] = []
         self._diff_deletions: int = 0
         self._diff_additions: List[DeltaAddition] = []
         self._sequence: List[DatablockProxy] = []
@@ -82,7 +82,7 @@ class StructCollectionProxy(Proxy):
         # shaky and maybe not useful
         length = self.length
         if key < length:
-            delta_update = self._diff_updates.get(key)
+            delta_update = next((delta for i, delta in self._diff_updates if i == key), None)
             if delta_update is None:
                 return self._sequence[key]
             if resolve_delta:
@@ -155,16 +155,23 @@ class StructCollectionProxy(Proxy):
         try:
             context.visit_state.path.append(key)
             sequence = self._sequence
-            for key, delta_update in update._diff_updates.items():
-                # key are converted to strings by the serialization
-                i = int(key)
-                sequence[i] = apply_attribute(collection, i, sequence[i], delta_update, context, to_blender)
+
+            # Delete before update and proceed updated in reverse order to avoid spurious renames.
+            # Starting with sequence A, B, C, D and delete B causes :
+            # - an update for items 1 and 2 to be renamed into C and D
+            # - one delete
+            # If the update is processed first, item 3 will be spuriously renamed into D.001
+            # If the deletes are processed first but the updates are processed in order, item 1 will be spuriously
+            # renamed into C.001
 
             for _ in range(update._diff_deletions):
                 if to_blender:
                     item = collection[-1]
                     collection.remove(item)
                 del sequence[-1]
+
+            for i, delta_update in reversed(update._diff_updates):
+                sequence[i] = apply_attribute(collection, i, sequence[i], delta_update, context, to_blender)
 
             for i, delta_addition in enumerate(update._diff_additions, len(sequence)):
                 if to_blender:
@@ -175,7 +182,7 @@ class StructCollectionProxy(Proxy):
 
         except Exception as e:
             logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
-            logger.warning(f"... for {collection}[{i}]")
+            logger.warning(f"... for {collection}")
             logger.warning(f"... Exception: {e!r}")
             logger.warning("... Update ignored")
 
@@ -210,7 +217,7 @@ class StructCollectionProxy(Proxy):
             for i in range(clear_from):
                 delta = diff_attribute(collection[i], i, item_property, sequence[i], context)
                 if delta is not None:
-                    diff._diff_updates[i] = delta
+                    diff._diff_updates.append((i, delta))
 
             diff._diff_deletions = len(sequence) - clear_from
 
