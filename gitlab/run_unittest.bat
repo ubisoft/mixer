@@ -58,10 +58,8 @@ if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 %PYTHON% -m xmlrunner discover --verbose tests.broadcaster -o %MIXER_TEST_OUTPUT%
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
-
-REM Skip as not reliable enough on the GitLab runner
-REM %PYTHON% -m unittest discover --verbose tests.blender
-REM if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
+%PYTHON% -m unittest discover --verbose tests.blender
+if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
 
 if %ERROR% GEQ 1 EXIT /B %ERROR%
