@@ -682,7 +682,7 @@ def decode_mesh(client, obj, data, index):
 
 
 def decode_mesh_generic(client, mesh: bpy.types.Mesh, data, index):
-
+    tmp_obj = None
     try:
         tmp_obj = bpy.data.objects.new("_mixer_tmp_", mesh)
         byte_size, index = common.decode_int(data, index)
@@ -695,6 +695,7 @@ def decode_mesh_generic(client, mesh: bpy.types.Mesh, data, index):
             baked_mesh_byte_size, index = common.decode_int(data, index)
             index += baked_mesh_byte_size
     finally:
-        bpy.data.objects.remove(tmp_obj)
+        if tmp_obj:
+            bpy.data.objects.remove(tmp_obj)
 
     return index
