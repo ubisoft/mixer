@@ -465,6 +465,10 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, context: Contex
             type_ = proxy.data("type")
             return collection.new(type=type_)
 
+        if isinstance(bl_rna, type(T.CurveMapPoints.bl_rna)):
+            location = proxy.data("location")
+            return collection.new(location[0], location[1])
+
         if isinstance(bl_rna, type(T.Nodes.bl_rna)):
             node_type = proxy.data("bl_idname")
             return collection.new(node_type)
@@ -682,14 +686,9 @@ def truncate_collection(
                 return
             while incoming_length < len(target):
                 target.remove(target[-1])
-            while incoming_length > len(target):
-                target.new(0.0, 0.0)
         elif srna_bl_rna is bpy.types.MetaBallElements.bl_rna:
             while incoming_length < len(target):
                 target.remove(target[-1])
-            while incoming_length > len(target):
-                # Creates a BALL, but will be changed by write_attribute
-                target.new()
         elif srna_bl_rna is bpy.types.GPencilStrokes.bl_rna:
             while incoming_length < len(target):
                 target.remove(target[-1])
