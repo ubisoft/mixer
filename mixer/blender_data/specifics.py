@@ -654,13 +654,25 @@ def clear_from(sequence: List[DatablockProxy], collection: T.bpy_prop_collection
     return default_value
 
 
+_always_clear = {T.Nodes.bl_rna}
+"""These collections cannot be safely be overwritten in place, either because
+the items cannot be morphed or because some renaming patterns cause spurious renames."""
+
+
 def truncate_collection(collection: T.bpy_prop_collection, size: int):
-    """Truncates collection to size"""
+    """Truncates collection to at most size elements, ensuring that items can safely be saved into
+    the collection. This might clear the collection if its elements cannot be updated"""
 
     if len(collection) == 0:
         return
 
-    if not hasattr(collection, "bl_rna"):
+    try:
+        rna = getattr(collection, "bl_rna", None)
+    except AttributeError:
+        return
+
+    if rna in _always_clear:
+        collection.clear()
         return
 
     try:

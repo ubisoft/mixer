@@ -66,22 +66,22 @@ class NodeLinksProxy(StructCollectionProxy):
 
             from_node = node_tree.nodes.get(from_node_name)
             if from_node is None:
-                logger.warning(f"save(): from_node {node_tree}.nodes[{from_node_name}] is None")
+                logger.error(f"save(): from_node {node_tree}.nodes[{from_node_name}] is None")
                 return
 
             from_socket = from_node.outputs.get(from_socket_name)
             if from_socket is None:
-                logger.warning(f"save(): from_socket {node_tree}.nodes[{from_socket_name}] is None")
+                logger.error(f"save(): from_socket {node_tree}.nodes[{from_socket_name}] is None")
                 return
 
             to_node = node_tree.nodes.get(to_node_name)
             if to_node is None:
-                logger.warning(f"save(): to_node {node_tree}.nodes[{to_node_name}] is None")
+                logger.error(f"save(): to_node {node_tree}.nodes[{to_node_name}] is None")
                 return
 
             to_socket = to_node.inputs.get(to_socket_name)
             if to_socket is None:
-                logger.warning(f"save(): to_socket {node_tree}.nodes[{to_socket_name}] is None")
+                logger.error(f"save(): to_socket {node_tree}.nodes[{to_socket_name}] is None")
                 return
 
             node_tree.links.new(from_socket, to_socket)
@@ -96,7 +96,7 @@ class NodeLinksProxy(StructCollectionProxy):
     ) -> Optional[NodeLinksProxy]:
 
         struct_update = struct_delta.value
-        self._data = struct_update._data
+        self._sequence = struct_update._sequence
 
         # update Blender
         if to_blender:
