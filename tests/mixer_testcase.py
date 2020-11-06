@@ -43,7 +43,7 @@ class MixerTestCase(unittest.TestCase):
         self.latency = 0
         self.expected_counts = {}
         super().__init__(*args, **kwargs)
-        self._log_level = logging.INFO
+        self._log_level = logging.WARNING
         self._server_process: ServerProcess = ServerProcess()
         self._blenders: List[BlenderApp] = []
         self.ignored_messages = set()
