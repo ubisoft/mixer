@@ -45,7 +45,6 @@ if TYPE_CHECKING:
     from mixer.blender_data.mesh_proxy import MeshProxy
     from mixer.blender_data.proxy import Context, Proxy
     from mixer.blender_data.struct_proxy import StructProxy
-    from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 logger = logging.getLogger(__name__)
 
@@ -481,6 +480,13 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, context: Contex
             name = proxy.data("info")
             return collection.new(name)
 
+        if isinstance(bl_rna, type(T.GPencilStrokes.bl_rna)):
+            return collection.new()
+
+        if isinstance(bl_rna, type(T.GPencilFrames.bl_rna)):
+            frame_number = proxy.data("frame_number")
+            return collection.new(frame_number)
+
         if isinstance(bl_rna, type(T.KeyingSets.bl_rna)):
             idname = proxy.data("bl_idname")
             label = proxy.data("bl_label")
@@ -614,14 +620,6 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
     logger.error(f"Not implemented fit_aos for type {target.bl_rna} for {target} ...")
 
 
-_cannot_morph = (
-    type(T.ObjectModifiers.bl_rna),
-    type(T.ObjectGpencilModifiers.bl_rna),
-    type(T.SequenceModifiers.bl_rna),
-    type(T.Nodes.bl_rna),
-)
-"""Items in these collections cannot be morphed in-place"""
-
 _cannot_morph_type = (
     type(T.ObjectModifiers.bl_rna),
     type(T.ObjectGpencilModifiers.bl_rna),
@@ -656,50 +654,18 @@ def clear_from(sequence: List[DatablockProxy], collection: T.bpy_prop_collection
     return default_value
 
 
-def truncate_collection(
-    target: T.bpy_prop_collection, proxy: StructCollectionProxy, attr_property: T.Property, context: Context
-):
-    """"""
+def truncate_collection(collection: T.bpy_prop_collection, size: int):
+    """Truncates collection to size"""
+
+    if len(collection) == 0:
+        return
+
+    if not hasattr(collection, "bl_rna"):
+        return
 
     try:
-        if not hasattr(target, "bl_rna"):
-            return
-
-        target_rna = target.bl_rna
-
-        # TODO now useless ??
-        if any(isinstance(target_rna, t) for t in _cannot_morph):
-            target.clear()
-            return
-
-        srna = attr_property.srna
-        if not srna:
-            return
-
-        incoming_sequence = proxy._sequence
-        incoming_length = len(incoming_sequence)
-
-        srna_bl_rna = srna.bl_rna
-        if srna_bl_rna is bpy.types.CurveMapPoints.bl_rna:
-            if incoming_length < 2:
-                logger.error(f"Invalid length for curvemap: {incoming_length}. Expected at least 2")
-                return
-            while incoming_length < len(target):
-                target.remove(target[-1])
-        elif srna_bl_rna is bpy.types.MetaBallElements.bl_rna:
-            while incoming_length < len(target):
-                target.remove(target[-1])
-        elif srna_bl_rna is bpy.types.GPencilStrokes.bl_rna:
-            while incoming_length < len(target):
-                target.remove(target[-1])
-            while incoming_length > len(target):
-                target.new()
-        elif srna_bl_rna is bpy.types.GPencilFrames.bl_rna:
-            while incoming_length < len(target):
-                target.remove(target[-1])
-            for proxy in incoming_sequence:
-                frame_number = proxy.data("frame_number")
-                target.new(frame_number)
-    except Exception:
-        # for debugging
-        raise
+        while len(collection) > size:
+            collection.remove(collection[-1])
+    except Exception as e:
+        logger.error(f"truncate_collection {collection}: exception ...")
+        logger.error(f"... {e!r}")

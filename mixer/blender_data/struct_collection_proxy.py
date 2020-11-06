@@ -125,7 +125,7 @@ class StructCollectionProxy(Proxy):
             context.visit_state.path.append(attr_name)
             sequence = self._sequence
             prop = bl_instance.bl_rna.properties[attr_name]
-            specifics.truncate_collection(target, self, prop, context)
+            specifics.truncate_collection(target, len(self._sequence))
             for i in range(len(target), len(sequence)):
                 item_proxy = sequence[i]
                 specifics.add_element(item_proxy, target, context)
