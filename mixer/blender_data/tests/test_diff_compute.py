@@ -12,7 +12,6 @@ from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.datablock_collection_proxy import DatablockRefCollectionProxy
 from mixer.blender_data.proxy import DeltaAddition, DeltaDeletion, DeltaUpdate
 from mixer.blender_data.diff import BpyBlendDiff
-from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 from mixer.blender_data.struct_proxy import StructProxy
 
 from mixer.blender_data.filter import test_properties
@@ -237,117 +236,6 @@ class Collection(DifferentialCompute):
         for name in ("Unlinked0", "Unlinked1"):
             self.assertIsInstance(deltas[name], DeltaDeletion)
             self.assertIsInstance(proxies[name], DatablockRefProxy)
-
-    def test_key_str(self):
-        # Scene.render.views
-        # A bpy_prop_collection with string keys
-
-        # test_diff_compute.Collection.test_key_str
-
-        self.proxy = BpyDataProxy()
-        self.proxy.load(test_properties)
-        self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
-        self.scene = bpy.data.scenes["Scene"]
-
-        view = self.scene.render.views["right"]
-        self.scene.render.views.remove(view)
-
-        view = self.scene.render.views.new("New")
-
-        view = self.scene.render.views["left"]
-        view.file_suffix = "new_suffix"
-
-        self.generate_all_uuids()
-
-        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
-
-        self.assertIsInstance(scene_delta, DeltaUpdate)
-        scene_update = scene_delta.value
-        self.assertIsInstance(scene_update, DatablockProxy)
-        self.assertTrue(scene_update.is_standalone_datablock)
-
-        render_delta = scene_update.data("render", resolve_delta=False)
-        self.assertIsInstance(render_delta, DeltaUpdate)
-        render_update = render_delta.value
-        self.assertIsInstance(render_update, StructProxy)
-
-        views_delta = render_update.data("views", resolve_delta=False)
-        self.assertIsInstance(views_delta, DeltaUpdate)
-        views_update = views_delta.value
-        self.assertIsInstance(views_update, StructCollectionProxy)
-
-        # for why "A" and "D" see BpyProStructCollectionProxy.diff()
-        self.assertIn("ANew", views_update)
-        view_delta = views_update.data("ANew", resolve_delta=False)
-        self.assertIsInstance(view_delta, DeltaAddition)
-        view_update = view_delta.value
-        self.assertIsInstance(view_update, StructProxy)
-
-        self.assertIn("Dright", views_update)
-        view_delta = views_update.data("Dright", resolve_delta=False)
-        self.assertIsInstance(view_delta, DeltaDeletion)
-
-        self.assertIn("left", views_update)
-        view_delta = views_update.data("left", resolve_delta=False)
-        self.assertIsInstance(view_delta, DeltaUpdate)
-        view_update = view_delta.value
-        self.assertIsInstance(view_update, StructProxy)
-        property_delta = view_update.data("file_suffix", resolve_delta=False)
-        self.assertIsInstance(view_delta, DeltaUpdate)
-        self.assertEqual(property_delta.value, "new_suffix")
-
-    def test_key_int(self):
-        # Scene.view_settings.curve_mapping.curves
-        # A bpy_prop_collection with string keys
-
-        # test_diff_compute.Collection.test_key_int
-        self.scene.view_settings.use_curve_mapping = True
-        points_remove = self.scene.view_settings.curve_mapping.curves[0].points
-        points_remove.new(0.5, 0.5)
-        points_add = self.scene.view_settings.curve_mapping.curves[1].points
-
-        self.proxy = BpyDataProxy()
-        self.proxy.load(test_properties)
-        self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
-        self.scene = bpy.data.scenes["Scene"]
-
-        points_remove.remove(points_remove[1])
-        points_add.new(2.0, 2.0)
-
-        self.generate_all_uuids()
-
-        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
-
-        points_remove_proxy = (
-            scene_delta.value.data("view_settings").data("curve_mapping").data("curves").data(0).data("points")
-        )
-        self.assertIsInstance(points_remove_proxy, StructCollectionProxy)
-
-        # points are ordered by location. removing the second one produces an update
-        # at index 1 and a delete at index 2
-        point1 = points_remove_proxy.data(1)
-        point1_update = point1.data("location", resolve_delta=False)
-        self.assertIsInstance(point1_update, DeltaUpdate)
-        location1 = point1_update.value
-        self.assertAlmostEqual(location1[0], 1.0)
-        self.assertAlmostEqual(location1[1], 1.0)
-
-        point2 = points_remove_proxy.data(2, resolve_delta=False)
-        self.assertIsInstance(point2, DeltaDeletion)
-
-        points_add_proxy = (
-            scene_delta.value.data("view_settings").data("curve_mapping").data("curves").data(1).data("points")
-        )
-        self.assertIsInstance(points_add_proxy, StructCollectionProxy)
-
-        self.assertIsInstance(points_add_proxy.data(2, resolve_delta=False), DeltaAddition)
-
-        # points are ordered by location. removing the second one produces an update
-        # at index 1 and a delete at index 2
-        point = points_add_proxy.data(2)
-        location = point.data("location")
-        self.assertAlmostEqual(location[0], 2.0)
-        self.assertAlmostEqual(location[1], 2.0)
 
 
 class Aos(DifferentialCompute):
