@@ -28,6 +28,7 @@ class TestMetaballElements(TestCase):
         create = """
 import bpy
 bpy.ops.object.metaball_add(type='BALL')
+bpy.context.active_object.data.elements[0].co.x += 0
 bpy.ops.object.editmode_toggle()
 """
         self.send_string(create, to=0)
@@ -36,6 +37,7 @@ bpy.ops.object.editmode_toggle()
 import bpy
 # add in edit mode adds an element
 bpy.ops.object.metaball_add(type='PLANE')
+bpy.context.active_object.data.elements[1].co.x += 5
 bpy.ops.object.editmode_toggle()
 """
         self.send_string(metaball_add, to=0)
@@ -46,19 +48,24 @@ bpy.ops.object.editmode_toggle()
         create = """
 import bpy
 bpy.ops.object.metaball_add(type='BALL')
+bpy.context.active_object.data.elements[0].co.x += 0
 bpy.ops.object.editmode_toggle()
 bpy.ops.object.metaball_add(type='PLANE')
+bpy.context.active_object.data.elements[1].co.x += 5
 bpy.ops.object.metaball_add(type='CAPSULE')
+bpy.context.active_object.data.elements[2].co.x += 10
+bpy.ops.object.editmode_toggle()
 """
         self.send_string(create, to=0)
 
-        metaball_add = """
+        metaball_remove = """
 import bpy
 # add in edit mode adds an element
-bpy.ops.object.metaball_add(type='PLANE')
+elements = bpy.context.active_object.data.elements
+elements.remove(elements[0])
 bpy.ops.object.editmode_toggle()
 """
-        self.send_string(metaball_add, to=0)
+        self.send_string(metaball_remove, to=0)
 
         self.assert_matches()
 

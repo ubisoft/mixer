@@ -71,6 +71,7 @@ views.remove(views[0])
 
         self.end_test()
 
+    @unittest.skip("see internal issue #298")
     def test_scene_color_management_curve(self):
         action = """
 import bpy
