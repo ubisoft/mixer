@@ -237,6 +237,7 @@ _exclude_names = {
     "use_fake_user",
     "tag",
     "is_library_indirect",
+    "is_editmode",
     "library",
     "override_library",
     "preview",
@@ -319,7 +320,6 @@ default_exclusions = {
                 "uv_layer_clone",
                 "uv_layer_stencil",
                 # readonly
-                "is_editmode",
                 "total_vert_sel",
                 "total_edge_sel",
                 "total_face_sel",
