@@ -197,11 +197,13 @@ class StructCollectionProxy(Proxy):
             collection; the collection that must be diffed agains this proxy
             collection_property; the property os collection as found in its enclosing object
         """
+        sequence = self._sequence
+        if len(sequence) == 0 and len(collection) == 0:
+            return None
 
         item_property = collection_property.fixed_type
         try:
             context.visit_state.path.append(key)
-            sequence = self._sequence
 
             diff = self.__class__()
             clear_from = specifics.clear_from(sequence, collection)
