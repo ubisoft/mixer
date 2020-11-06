@@ -164,6 +164,9 @@ class StructCollectionProxy(Proxy):
             # If the deletes are processed first but the updates are processed in order, item 1 will be spuriously
             # renamed into C.001
 
+            # TODO there is a problem with Grease Pencil layers (internal issue #343) :
+            # when layers are swapped, saving the name change causes a spurious rename
+
             for _ in range(update._diff_deletions):
                 if to_blender:
                     item = collection[-1]

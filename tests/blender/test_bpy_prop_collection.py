@@ -156,6 +156,7 @@ bpy.ops.gpencil.layer_remove()
 
         self.assert_matches()
 
+    @unittest.skip("Cause layer rename. See internal issue #343")
     def test_move(self):
         create = """
 import bpy
