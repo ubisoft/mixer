@@ -279,8 +279,6 @@ default_exclusions = {
             ]
         ),
     ],
-    # TODO see comment in specifics.py:add_element()
-    T.KeyingSets: [NameFilterOut("paths")],
     T.LayerCollection: [
         # TODO temporary
         # Scene.viewlayers[i].layer_collection.collection is Scene.collection,
