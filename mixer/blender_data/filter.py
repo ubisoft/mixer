@@ -231,13 +231,14 @@ _exclude_names = {
     "type_info",  # for Available (?) keyingset
     "depsgraph",  # found in Viewlayer
     "rna_type",
+    "is_editmode",
+    "is_embedded_data",
     "is_evaluated",
+    "is_library_indirect",
     "original",
     "users",
     "use_fake_user",
     "tag",
-    "is_library_indirect",
-    "is_editmode",
     "library",
     "override_library",
     "preview",
