@@ -127,7 +127,7 @@ class StructCollectionProxy(Proxy):
             specifics.truncate_collection(target, len(self._sequence))
             for i in range(len(target), len(sequence)):
                 item_proxy = sequence[i]
-                specifics.add_element(item_proxy, target, context)
+                specifics.add_element(target, item_proxy, context)
             for i, v in enumerate(sequence):
                 write_attribute(target, i, v, context)
         finally:
@@ -178,7 +178,7 @@ class StructCollectionProxy(Proxy):
             for i, delta_addition in enumerate(update._diff_additions, len(sequence)):
                 if to_blender:
                     item_proxy = delta_addition.value
-                    specifics.add_element(item_proxy, collection, context)
+                    specifics.add_element(collection, item_proxy, context)
                     write_attribute(collection, i, item_proxy, context)
                 sequence.append(delta_addition.value)
 
@@ -215,7 +215,7 @@ class StructCollectionProxy(Proxy):
             context.visit_state.path.append(key)
 
             diff = self.__class__()
-            clear_from = specifics.clear_from(sequence, collection)
+            clear_from = specifics.clear_from(collection, sequence)
             for i in range(clear_from):
                 delta = diff_attribute(collection[i], i, item_property, sequence[i], context)
                 if delta is not None:
