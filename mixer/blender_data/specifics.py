@@ -30,7 +30,7 @@ import array
 import logging
 from pathlib import Path
 import traceback
-from typing import Any, Dict, ItemsView, Optional, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, ItemsView, List, Optional, TYPE_CHECKING
 
 from mixer.local_data import get_resolved_file_path
 
@@ -39,14 +39,12 @@ import bpy.types as T  # noqa N812
 import bpy.path
 import mathutils
 
-
 if TYPE_CHECKING:
     from mixer.blender_data.aos_proxy import AosProxy
     from mixer.blender_data.datablock_proxy import DatablockProxy
     from mixer.blender_data.mesh_proxy import MeshProxy
     from mixer.blender_data.proxy import Context, Proxy
     from mixer.blender_data.struct_proxy import StructProxy
-    from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +118,60 @@ soa_initializers: Dict[type, array.array] = {
     mathutils.Color: array.array("f", [0.0]),
     mathutils.Quaternion: array.array("f", [0.0]),
 }
+
+
+def dispatch_rna(no_rna_impl: Callable[..., Any]):
+    """Decorator to select a function implementation according to the rna of its first argument
+
+    See test_rna_dispatch
+    """
+    registry: Dict[type, Callable[..., Any]] = {}
+
+    def register_default():
+        """Registers the decorated function f as the implementaton to use if the rna of the first argument
+        of f was not otherwise registered"""
+
+        def decorator(f: Callable[..., Any]):
+            registry[type(None)] = f
+            return f
+
+        return decorator
+
+    def register(class_):
+        """Registers the decorated function f as the implementaton to use if the first argument
+        has the same rna as class_"""
+
+        def decorator(f: Callable[..., Any]):
+            registry[class_] = f
+            return f
+
+        return decorator
+
+    def dispatch(class_):
+        for cls_ in class_.mro():
+            try:
+                return registry[cls_]
+            except KeyError:
+                pass
+
+        try:
+            return registry[type(None)]
+        except KeyError:
+            return no_rna_impl
+
+    def wrapper(bpy_prop_collection: T.bpy_prop_collection, *args, **kwargs):
+        """Calls the function registered for bpy_prop_collection.bl_rna"""
+        rna = getattr(bpy_prop_collection, "bl_rna", None)
+        if rna is None:
+            func = no_rna_impl
+        else:
+            func = dispatch(type(rna))
+        return func(bpy_prop_collection, *args, **kwargs)
+
+    # wrapper.register = register  genarates mypy error
+    setattr(wrapper, "register", register)  # noqa B010
+    setattr(wrapper, "register_default", register_default)  # noqa B010
+    return wrapper
 
 
 def is_soable_collection(prop):
@@ -435,113 +487,17 @@ def add_datablock_ref_element(collection: T.bpy_prop_collection, datablock: T.ID
     logging.warning(f"add_datablock_ref_element : no implementation for {collection} ")
 
 
-non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}
-effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - non_effect_sequences
-
-_new_name_types = (type(T.UVLoopLayers.bl_rna), type(T.LoopColors.bl_rna), type(T.FaceMaps.bl_rna))
-
-
-def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, context: Context):
+#
+# add_element
+#
+@dispatch_rna
+def add_element(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     """Add an element to a bpy_prop_collection using the collection specific API"""
+    logger.error(f"add_element: no implementation for  {type(collection)}")
 
-    bl_rna = getattr(collection, "bl_rna", None)
-    if bl_rna is not None:
-        if isinstance(bl_rna, (type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl_rna))):
-            name = proxy.data("name")
-            modifier_type = proxy.data("type")
-            return collection.new(name, modifier_type)
 
-        if isinstance(bl_rna, type(T.SequenceModifiers.bl_rna)):
-            name = proxy.data("name")
-            type_ = proxy.data("type")
-            return collection.new(name, type_)
-
-        if isinstance(bl_rna, type(T.ObjectConstraints.bl_rna)):
-            type_ = proxy.data("type")
-            return collection.new(type_)
-
-        if isinstance(bl_rna, type(T.Nodes.bl_rna)):
-            node_type = proxy.data("bl_idname")
-            return collection.new(node_type)
-
-        if isinstance(bl_rna, _new_name_types):
-            name = proxy.data("name")
-            return collection.new(name=name)
-
-        if isinstance(bl_rna, type(T.GreasePencilLayers.bl_rna)):
-            name = proxy.data("info")
-            return collection.new(name)
-
-        if isinstance(bl_rna, type(T.KeyingSets.bl_rna)):
-            idname = proxy.data("bl_idname")
-            return collection.new(name=key, idname=idname)
-
-        if isinstance(bl_rna, type(T.KeyingSetPaths.bl_rna)):
-            # TODO current implementation fails
-            # All keying sets paths have an empty name, and insertion with add() fails
-            # with an empty name
-            target_ref = proxy.data("id")
-            if target_ref is None:
-                target = None
-            else:
-                target = target_ref.target(context)
-            data_path = proxy.data("data_path")
-            index = proxy.data("array_index")
-            group_method = proxy.data("group_method")
-            group_name = proxy.data("group")
-            return collection.add(
-                target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
-            )
-
-        if isinstance(bl_rna, type(T.Nodes.bl_rna)):
-            node_type = proxy.data("bl_idname")
-            return collection.new(node_type)
-
-        if isinstance(
-            bl_rna,
-            (
-                type(T.NodeInputs.bl_rna),
-                type(T.NodeOutputs.bl_rna),
-                type(T.NodeTreeInputs.bl_rna),
-                type(T.NodeTreeOutputs.bl_rna),
-            ),
-        ):
-            socket_type = proxy.data("type")
-            name = proxy.data("name")
-            return collection.new(socket_type, name)
-
-        if isinstance(bl_rna, type(T.Sequences.bl_rna)):
-            type_ = proxy.data("type")
-            name = proxy.data("name")
-            channel = proxy.data("channel")
-            frame_start = proxy.data("frame_start")
-            if type_ in effect_sequences:
-                # overwritten anyway
-                frame_end = frame_start + 1
-                return collection.new_effect(name, type_, channel, frame_start, frame_end=frame_end)
-            if type_ == "SOUND":
-                sound = proxy.data("sound")
-                target = sound.target(context)
-                if not target:
-                    logger.warning(f"missing target ID block for bpy.data.{sound.collection}[{sound.key}] ")
-                    return None
-                filepath = target.filepath
-                return collection.new_sound(name, filepath, channel, frame_start)
-            if type_ == "MOVIE":
-                filepath = proxy.data("filepath")
-                return collection.new_movie(name, filepath, channel, frame_start)
-            if type_ == "IMAGE":
-                directory = proxy.data("directory")
-                filename = proxy.data("elements").data(0).data("filename")
-                filepath = str(Path(directory) / filename)
-                return collection.new_image(name, filepath, channel, frame_start)
-
-            logger.warning(f"Sequence type not implemented: {type_}")
-            # SCENE may be harder than it seems, since we cannot order scene creations.
-            # Currently the creation order is the "deepmost" order as listed in proxy.py:_creation_order
-            # but it does not work for this case
-            return None
-
+@add_element.register_default()
+def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     try:
         return collection.add()
     except Exception:
@@ -552,31 +508,155 @@ def add_element(proxy: Proxy, collection: T.bpy_prop_collection, key: str, conte
     if new_or_add is None:
         new_or_add = getattr(collection, "add", None)
     if new_or_add is None:
-        logger.warning(f"Not implemented new or add for bpy.data.{collection}[{key}] ...")
+        logger.warning(f"Not implemented new or add for {collection} ...")
         return None
+
     try:
-        return new_or_add(key)
-    except Exception:
-        logger.warning(f"Not implemented new or add for type {type(collection)} for {collection}[{key}] ...")
-        for s in traceback.format_exc().splitlines():
-            logger.warning(f"...{s}")
-        return None
+        return new_or_add()
+    except TypeError:
+        try:
+            key = proxy.data("name")
+            return new_or_add(key)
+        except Exception:
+            logger.warning(f"Not implemented new or add for type {type(collection)} for {collection}[{key}] ...")
+            for s in traceback.format_exc().splitlines():
+                logger.warning(f"...{s}")
+    return None
 
 
-always_clear = [type(T.ObjectModifiers.bl_rna), type(T.ObjectGpencilModifiers.bl_rna), type(T.SequenceModifiers.bl_rna)]
-"""Collections in this list are order dependent and should always be cleared"""
+@add_element.register(T.NodeInputs)
+@add_element.register(T.NodeOutputs)
+@add_element.register(T.NodeTreeInputs)
+@add_element.register(T.NodeTreeOutputs)
+def _add_element_type_name(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    socket_type = proxy.data("type")
+    name = proxy.data("name")
+    return collection.new(socket_type, name)
 
 
-def truncate_collection(target: T.bpy_prop_collection, proxy: Union[StructCollectionProxy, AosProxy], context: Context):
-    """"""
+@add_element.register(T.ObjectModifiers)
+@add_element.register(T.ObjectGpencilModifiers)
+@add_element.register(T.SequenceModifiers)
+def _add_element_name_type(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    name = proxy.data("name")
+    type_ = proxy.data("type")
+    return collection.new(name, type_)
+
+
+@add_element.register(T.ObjectConstraints)
+def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    type_ = proxy.data("type")
+    return collection.new(type_)
+
+
+@add_element.register(T.MetaBallElements)
+def _add_element_type_eq(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    type_ = proxy.data("type")
+    return collection.new(type=type_)
+
+
+@add_element.register(T.CurveMapPoints)
+def _add_element_location(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    location = proxy.data("location")
+    return collection.new(location[0], location[1])
+
+
+@add_element.register(T.Nodes)
+def _add_element_idname(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    node_type = proxy.data("bl_idname")
+    return collection.new(node_type)
+
+
+@add_element.register(T.UVLoopLayers)
+@add_element.register(T.LoopColors)
+@add_element.register(T.FaceMaps)
+def _add_element_name_eq(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    name = proxy.data("name")
+    return collection.new(name=name)
+
+
+@add_element.register(T.GreasePencilLayers)
+def _add_element_info(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    name = proxy.data("info")
+    return collection.new(name)
+
+
+@add_element.register(T.GPencilFrames)
+def _add_element_frame_number(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    frame_number = proxy.data("frame_number")
+    return collection.new(frame_number)
+
+
+@add_element.register(T.KeyingSets)
+def _add_element_bl_label(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    label = proxy.data("bl_label")
+    idname = proxy.data("bl_idname")
+    return collection.new(name=label, idname=idname)
+
+
+@add_element.register(T.KeyingSetPaths)
+def _add_element_keyingset(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    # TODO current implementation fails
+    # All keying sets paths have an empty name, and insertion with add() fails
+    # with an empty name
+    target_ref = proxy.data("id")
+    if target_ref is None:
+        target = None
+    else:
+        target = target_ref.target(context)
+    data_path = proxy.data("data_path")
+    index = proxy.data("array_index")
+    group_method = proxy.data("group_method")
+    group_name = proxy.data("group")
+    return collection.add(
+        target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
+    )
+
+
+_non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}
+_effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - _non_effect_sequences
+
+
+@add_element.register(T.Sequences)
+def _add_element_sequence(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    type_name = proxy.data("type")
+    name = proxy.data("name")
+    channel = proxy.data("channel")
+    frame_start = proxy.data("frame_start")
+    if type_name in _effect_sequences:
+        # overwritten anyway
+        frame_end = frame_start + 1
+        return collection.new_effect(name, type_name, channel, frame_start, frame_end=frame_end)
+    if type_name == "SOUND":
+        sound = proxy.data("sound")
+        target = sound.target(context)
+        if not target:
+            logger.warning(f"missing target ID block for bpy.data.{sound.collection}[{sound.key}] ")
+            return None
+        filepath = target.filepath
+        return collection.new_sound(name, filepath, channel, frame_start)
+    if type_name == "MOVIE":
+        filepath = proxy.data("filepath")
+        return collection.new_movie(name, filepath, channel, frame_start)
+    if type_name == "IMAGE":
+        directory = proxy.data("directory")
+        filename = proxy.data("elements").data(0).data("filename")
+        filepath = str(Path(directory) / filename)
+        return collection.new_image(name, filepath, channel, frame_start)
+
+    logger.warning(f"Sequence type not implemented: {type_name}")
+    return None
+
+
+def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
+    """
+    Adjust the size of a bpy_prop_collection proxified as an array of structures (e.g. MeshVertices)
+    """
+
     if not hasattr(target, "bl_rna"):
         return
 
     target_rna = target.bl_rna
-    if any(isinstance(target_rna, t) for t in always_clear):
-        target.clear()
-        return
-
     if isinstance(target_rna, _resize_geometry_types):
         existing_length = len(target)
         incoming_length = proxy.length
@@ -601,20 +681,65 @@ def truncate_collection(target: T.bpy_prop_collection, proxy: Union[StructCollec
                 delta += 1
         return
 
-    incoming_keys = set(proxy._data.keys())
-    existing_keys = set(target.keys())
-    truncate_keys = existing_keys - incoming_keys
-    if not truncate_keys:
-        return
-    if isinstance(target_rna, type(T.KeyingSets.bl_rna)):
-        for k in truncate_keys:
-            target.active_index = target.find(k)
-            bpy.ops.anim.keying_set_remove()
-    else:
-        try:
-            for k in truncate_keys:
-                target.remove(target[k])
-        except Exception:
-            logger.warning(f"Not implemented truncate_collection for type {target.bl_rna} for {target} ...")
-            for s in traceback.format_exc().splitlines():
-                logger.warning(f"...{s}")
+    logger.error(f"Not implemented fit_aos for type {target.bl_rna} for {target} ...")
+
+
+#
+# Clear_from
+#
+@dispatch_rna
+def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+    """
+    Returns the index of the first item in collection that has a type that does not match the
+    coresponding item in sequence
+    """
+    return min(len(sequence), len(collection))
+
+
+@clear_from.register(T.ObjectModifiers)
+@clear_from.register(T.ObjectGpencilModifiers)
+@clear_from.register(T.SequenceModifiers)
+def _clear_from_name(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+    """clear_from() implementation for collections with items types are named "type" """
+    for i, (proxy, item) in enumerate(zip(sequence, collection)):
+        if proxy.data("type") != item.type:
+            return i
+    return min(len(sequence), len(collection))
+
+
+@clear_from.register(T.Nodes)
+def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+    """clear_from() implementation for collections with items types are named "bl_idname" """
+    for i, (proxy, item) in enumerate(zip(sequence, collection)):
+        if proxy.data("bl_idname") != item.bl_idname:
+            return i
+
+    return min(len(sequence), len(collection))
+
+
+#
+# truncate_collection
+#
+@dispatch_rna
+def truncate_collection(collection: T.bpy_prop_collection, size: int):
+    """Truncates collection to at most size elements, ensuring that items can safely be saved into
+    the collection. This might clear the collection if its elements cannot be updated.
+
+    This method is useful for bpy _ppop_collections that cannot be safely be overwritten in place,
+    because the items cannot be morphed."""
+    return
+
+
+@truncate_collection.register_default()
+def _truncate_collection_remove(collection: T.bpy_prop_collection, size: int):
+    try:
+        while len(collection) > size:
+            collection.remove(collection[-1])
+    except Exception as e:
+        logger.error(f"truncate_collection {collection}: exception ...")
+        logger.error(f"... {e!r}")
+
+
+@truncate_collection.register(T.Nodes)
+def _truncate_collection_clear(collection: T.bpy_prop_collection, size: int):
+    collection.clear()

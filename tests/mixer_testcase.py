@@ -6,7 +6,7 @@ import json
 import logging
 import sys
 import time
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List, Optional, Tuple
 import unittest
 
 from tests.blender_app import BlenderApp
@@ -43,10 +43,12 @@ class MixerTestCase(unittest.TestCase):
         self.latency = 0
         self.expected_counts = {}
         super().__init__(*args, **kwargs)
-        self._log_level = logging.INFO
+        self._log_level = logging.WARNING
         self._server_process: ServerProcess = ServerProcess()
         self._blenders: List[BlenderApp] = []
         self.ignored_messages = set()
+        self.experimental_sync = True
+        self.vrtist_protocol = False
 
     def set_log_level(self, log_level):
         self._log_level = log_level
@@ -73,7 +75,7 @@ class MixerTestCase(unittest.TestCase):
 
     def setUp(
         self,
-        blenderdescs: Iterable[BlenderDesc] = (BlenderDesc(), BlenderDesc()),
+        blenderdescs: Tuple[BlenderDesc, BlenderDesc] = (BlenderDesc(), BlenderDesc()),
         server_args: Optional[List[str]] = None,
         join=True,
         join_delay: Optional[float] = None,
@@ -141,7 +143,7 @@ class MixerTestCase(unittest.TestCase):
     def end_test(self):
         self.assert_matches()
 
-    def assert_matches(self):
+    def assert_matches(self, ignore: Iterable[str] = ()):
         # TODO add message count dict as param
         try:
             self._sender.disconnect_mixer()
@@ -199,13 +201,11 @@ class MixerTestCase(unittest.TestCase):
         finally:
             server_process.kill()
 
-        # TODO_ timing error : sometimes succeeds
-        # TODO_ enhance comparison : check # elements, understandable comparison
         s = sender_grabber.streams
         r = receiver_grabber.streams
-        self.assert_stream_equals(s, r)
+        self.assert_stream_equals(s, r, ignore=ignore)
 
-    def assert_any_almost_equal(self, a: Any, b: Any, msg: str = None):
+    def assert_any_almost_equal(self, a: Any, b: Any, msg: str = "", ignore: Iterable[str] = ()):
 
         # Use Assertion error.
         # The all but last args in the resulting exception is the path into the structure to the faulting element
@@ -221,9 +221,11 @@ class MixerTestCase(unittest.TestCase):
         elif isinstance(a, float):
             self.assertAlmostEqual(a, b, places=5, msg=msg)
         elif isinstance(a, (list, tuple)):
+            self.assertEqual(len(a), len(b), msg=msg)
             for i, (item_a, item_b) in enumerate(zip(a, b)):
                 try:
-                    self.assert_any_almost_equal(item_a, item_b, msg=msg)
+                    msg = "Length mismatch. " + msg
+                    self.assert_any_almost_equal(item_a, item_b, msg=msg, ignore=ignore)
                 except AssertionError as e:
                     raise AssertionError(i, *e.args) from None
         else:
@@ -235,20 +237,24 @@ class MixerTestCase(unittest.TestCase):
             keys_a, keys_b = sorted(dict_a.keys()), sorted(dict_b.keys())
             self.assertListEqual(keys_a, keys_b, msg=msg)
             for k in keys_a:
+                if k in ignore:
+                    continue
                 try:
-                    self.assert_any_almost_equal(dict_a[k], dict_a[k], msg=msg)
+                    self.assert_any_almost_equal(dict_a[k], dict_b[k], msg=msg, ignore=ignore)
                 except AssertionError as e:
                     raise AssertionError(k, *e.args) from None
 
-    def assert_stream_equals(self, streams_a: CommandStream, streams_b: CommandStream, msg: str = None):
+    def assert_stream_equals(
+        self, streams_a: CommandStream, streams_b: CommandStream, msg: str = None, ignore: Iterable[str] = ()
+    ):
         self.assertEqual(streams_a.commands.keys(), streams_b.commands.keys())
 
-        def decode_and_sort_messages(commands: List[mixer.codec.Message]) -> List[mixer.codec.Message]:
+        def decode_and_sort_messages(commands: List[Command]) -> List[mixer.codec.Message]:
             stream = [mixer.codec.decode(c) for c in commands]
             stream.sort()
             return stream
 
-        def sort_buffers(commands: List[Command]) -> List[Command]:
+        def sort_buffers(commands: List[Command]) -> List[bytes]:
             stream = [c.data for c in commands]
             stream.sort()
             return stream
@@ -321,7 +327,7 @@ class MixerTestCase(unittest.TestCase):
 
                 for i, (decoded_a, decoded_b) in enumerate(zip(decoded_stream_a, decoded_stream_b)):
                     self.assert_any_almost_equal(
-                        decoded_a, decoded_b, f"{message_name}: decoded message mismatch at index {i}"
+                        decoded_a, decoded_b, f"{message_name}: decoded message mismatch at index {i}", ignore=ignore
                     )
             else:
                 buffer_stream_a = sort_buffers(commands_a)
@@ -342,7 +348,7 @@ class MixerTestCase(unittest.TestCase):
                 for i, (buffer_a, buffer_b) in enumerate(zip(buffer_stream_a, buffer_stream_b)):
                     self.assertIs(type(buffer_a), type(buffer_b))
                     self.assert_any_almost_equal(
-                        buffer_a, buffer_b, f"{message_name}: encoded buffer mismatch at index {i}"
+                        buffer_a, buffer_b, f"{message_name}: encoded buffer mismatch at index {i}", ignore=ignore
                     )
 
     def assert_user_success(self):
@@ -383,7 +389,7 @@ class MixerTestCase(unittest.TestCase):
         except Exception as e:
             raise self.failureException(f"Exception {e!r} during disconnect_mixer(). Possible Blender crash")
 
-    def send_string(self, s: str, to: Optional[int] = 0, sleep: float = 0.5):
+    def send_string(self, s: str, to: int = 0, sleep: float = 0.5):
         try:
             self._blenders[to].send_string(s, sleep)
         except Exception as e:
@@ -391,5 +397,5 @@ class MixerTestCase(unittest.TestCase):
                 f"Exception {e!r}\n" "during send command :\n" "{s}\n" "to Blender {to}.\n" "Possible Blender crash"
             )
 
-    def send_strings(self, strings: List[str], to: Optional[int] = 0, sleep: float = 0.5):
+    def send_strings(self, strings: List[str], to: int = 0, sleep: float = 0.5):
         self.send_string("\n".join(strings), to, sleep)

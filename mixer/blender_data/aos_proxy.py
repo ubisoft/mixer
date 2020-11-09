@@ -102,7 +102,7 @@ class AosProxy(Proxy):
         if target is None:
             return
 
-        specifics.truncate_collection(target, self, context)
+        specifics.fit_aos(target, self, context)
         # nothing to do save here. The buffers that contains vertices and co are serialized apart from the json
         # that contains the Mesh members. The children of this are SoaElement and have no child.
         # They are updated directly bu SoaElement.save_array()
@@ -126,7 +126,7 @@ class AosProxy(Proxy):
         try:
             context.visit_state.path.append(key)
             self._aos_length = struct_update._aos_length
-            specifics.truncate_collection(aos, self, context)
+            specifics.fit_aos(aos, self, context)
             for k, member_delta in struct_update._data.items():
                 current_value = self.data(k)
                 if current_value is not None:

@@ -20,7 +20,7 @@ Helper function fo encode and decode BLENDER_DATA_* messages
 """
 import dataclasses
 import importlib
-from typing import List, Mapping, Optional
+from typing import Dict
 
 from mixer.broadcaster import common
 
@@ -38,7 +38,7 @@ class Color:
     pass
 
 
-MessageTypes = Mapping[common.MessageType, Message]
+MessageTypes = Dict[common.MessageType, type]
 
 # The message types registered by "components" (VRtist, Blender protocol)
 registered_message_types: MessageTypes = {}
@@ -54,7 +54,7 @@ codec_functions = {
 }
 
 
-def decode_as(message_type: common.MessageType, buffer: bytes) -> Optional[Message]:
+def decode_as(message_type: common.MessageType, buffer: bytes) -> Message:
     """
     Decode buffer as message_type. Returns None is mesage_type is not registered
     """
@@ -73,7 +73,7 @@ def decode_as(message_type: common.MessageType, buffer: bytes) -> Optional[Messa
     return message_class(*args)
 
 
-def decode(command: common.Command) -> Optional[Message]:
+def decode(command: common.Command) -> Message:
     return decode_as(command.type, command.data)
 
 
@@ -104,8 +104,8 @@ def register_message_types(types_dict: MessageTypes):
     registered_message_types.update(types_dict)
 
 
-def unregister_message_types(command_types: List[common.Command]):
-    for t in command_types:
+def unregister_message_types(types_dict: MessageTypes):
+    for t in types_dict:
         if t in registered_message_types:
             del registered_message_types[t]
 

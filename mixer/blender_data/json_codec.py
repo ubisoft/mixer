@@ -74,6 +74,10 @@ options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_n
 MIXER_CLASS = "__mixer_class__"
 
 
+class DecodeError(Exception):
+    pass
+
+
 def default_optional(obj, option_name: str) -> Dict[str, Any]:
     option = getattr(obj, option_name, None)
     if option is not None:
@@ -142,4 +146,7 @@ class Codec:
         return json.dumps(obj, default=default)
 
     def decode(self, message: str):
-        return json.loads(message, object_hook=decode_hook)
+        decoded = json.loads(message, object_hook=decode_hook)
+        if isinstance(decoded, dict):
+            raise DecodeError("decode failure", decoded)
+        return decoded

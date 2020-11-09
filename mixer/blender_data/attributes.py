@@ -214,7 +214,7 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, con
 
 def diff_attribute(
     item: Any, key: Union[int, str], item_property: T.Property, value: Any, context: Context
-) -> Optional[Delta]:
+) -> Optional[DeltaUpdate]:
     """
     Computes a difference between a blender item and a proxy value
 
