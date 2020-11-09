@@ -165,7 +165,6 @@ class TestProperties(unittest.TestCase):
         expected_names = {
             "name",
             "name_full",
-            "is_embedded_data",
             "type",
             "sensor_fit",
             "passepartout_alpha",
