@@ -373,8 +373,6 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
     filtered = {k: v for k, v in properties if k not in filter_props}
     return filtered.items()
 
-    return properties
-
 
 def proxy_requires_clear_geometry(incoming_proxy: MeshProxy, mesh: T.Mesh) -> bool:
     for k in _mesh_geometry_properties:
@@ -500,7 +498,7 @@ def add_element(collection: T.bpy_prop_collection, proxy: Proxy, context: Contex
     """Add an element to a bpy_prop_collection using the collection specific API"""
     try:
         collection.add()
-    except:
+    except Exception:
         logger.error(f"add_element: failed for {collection}")
 
 
@@ -560,7 +558,7 @@ def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, context: 
 
 @add_element.register(T.SplinePoints)
 @add_element.register(T.SplineBezierPoints)
-def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_one(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     return collection.add(1)
 
 
@@ -722,7 +720,7 @@ def diff_must_replace(collection: T.bpy_prop_collection, sequence: List[Databloc
 
 
 @diff_must_replace.register(T.CurveSplines)
-def _diff_must_replace_info_mismatch(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+def _diff_must_replace_always(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
     return True
 
 
