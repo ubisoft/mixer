@@ -30,7 +30,7 @@ from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.bl_properties import UserItem
 from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientAttributes
-from mixer.blender_data.debug_addon import DebugDataPanel
+from mixer.blender_data.debug_addon import DebugDataPanel, use_debug_addon
 from mixer import display_version
 
 if TYPE_CHECKING:
@@ -387,11 +387,13 @@ class VRtistSettingsPanel(bpy.types.Panel):
         )
 
 
-panels = (
+panels = [
     MixerSettingsPanel,
     VRtistSettingsPanel,
-    DebugDataPanel,
-)
+]
+
+if use_debug_addon:
+    panels.append(DebugDataPanel)
 
 
 def update_panels_category(self, context):
