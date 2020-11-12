@@ -498,7 +498,10 @@ def add_datablock_ref_element(collection: T.bpy_prop_collection, datablock: T.ID
 @dispatch_rna
 def add_element(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     """Add an element to a bpy_prop_collection using the collection specific API"""
-    logger.error(f"add_element: no implementation for  {type(collection)}")
+    try:
+        collection.add()
+    except:
+        logger.error(f"add_element: failed for {collection}")
 
 
 @add_element.register_default()
