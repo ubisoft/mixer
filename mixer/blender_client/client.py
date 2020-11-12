@@ -60,7 +60,6 @@ from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
 from mixer.blender_data.proxy import ensure_uuid
 import mixer.shot_manager as shot_manager
-from mixer.stats import stats_timer
 from mixer.draw_handlers import set_draw_handlers
 
 from mixer.blender_client.camera import send_camera
@@ -561,7 +560,6 @@ class BlenderClient(Client):
     def get_mesh_name(self, mesh):
         return mesh.name_full
 
-    @stats_timer(share_data)
     def send_mesh(self, obj):
         logger.info("send_mesh %s", obj.name_full)
         mesh = obj.data
@@ -594,7 +592,6 @@ class BlenderClient(Client):
 
         self.add_command(common.Command(MessageType.MESH, binary_buffer, 0))
 
-    @stats_timer(share_data)
     def build_mesh(self, command_data):
         if not share_data.use_vrtist_protocol():
             return self.build_mesh_generic(command_data)
@@ -909,7 +906,6 @@ class BlenderClient(Client):
         # Documentation to update if you change "blender_windows": doc/protocol.md
         return {"blender_windows": windows, common.ClientAttributes.USERSCENES: scene_attributes}
 
-    @stats_timer(share_data)
     def network_consumer(self):
         """
         This method can be considered the entry point of this class. It is meant to be called regularly to send
@@ -1265,7 +1261,6 @@ def clear_scene_content():
             scene.mixer_uuid = "_mixer_to_be_removed_"
 
 
-@stats_timer(share_data)
 def send_scene_content():
     """
     Initial data send to fill a new room.

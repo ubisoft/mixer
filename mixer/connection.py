@@ -30,7 +30,6 @@ import subprocess
 import time
 from pathlib import Path
 
-from mixer.stats import save_statistics, get_stats_filename
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import SendSceneContentFailed, BlenderClient
 from mixer.handlers import HandlerManager
@@ -66,16 +65,6 @@ def join_room(room_name: str, vrtist_protocol: bool = False):
     share_data.client.join_room(room_name)
     share_data.client.send_set_current_scene(bpy.context.scene.name_full)
 
-    share_data.current_statistics = {
-        "session_id": share_data.session_id,
-        "blendfile": bpy.data.filepath,
-        "statsfile": get_stats_filename(share_data.run_id, share_data.session_id),
-        "user": prefs.user,
-        "room": room_name,
-        "children": {},
-    }
-    share_data.auto_save_statistics = prefs.auto_save_statistics
-    share_data.statistics_directory = prefs.statistics_directory
     share_data.set_vrtist_protocol(vrtist_protocol)
     share_data.pending_test_update = False
 
@@ -91,12 +80,6 @@ def leave_current_room():
         HandlerManager.set_handlers(False)
 
     share_data.clear_before_state()
-
-    if share_data.current_statistics is not None and share_data.auto_save_statistics:
-        save_statistics(share_data.current_statistics, share_data.statistics_directory)
-    share_data.current_statistics = None
-    share_data.auto_save_statistics = False
-    share_data.statistics_directory = None
 
 
 def is_joined():

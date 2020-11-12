@@ -30,7 +30,6 @@ from mixer.broadcaster import common
 from mixer.broadcaster.common import ClientAttributes
 from mixer.os_utils import getuser
 from mixer.share_data import share_data
-from mixer.stats import get_stats_directory
 from mixer.local_data import get_data_directory
 
 logger = logging.getLogger(__name__)
@@ -124,11 +123,6 @@ class MixerPreferences(bpy.types.AddonPreferences):
     data_directory: bpy.props.StringProperty(
         name="Data Directory", default=os.environ.get("MIXER_DATA_DIR", get_data_directory()), subtype="FILE_PATH"
     )
-
-    statistics_directory: bpy.props.StringProperty(
-        name="Stats Directory", default=os.environ.get("MIXER_STATS_DIR", get_stats_directory()), subtype="FILE_PATH"
-    )
-    auto_save_statistics: bpy.props.BoolProperty(default=True)
 
     # Developer option to avoid sending scene content to server at the first connexion
     # Allow to quickly iterate debugging/test on large scenes with only one client in room

@@ -82,11 +82,6 @@ class ShareData:
         self.local_server_process = None
         self.selected_objects_names = []
 
-        self.current_statistics = None
-        self.current_stats_timer = None
-        self.auto_save_statistics = False
-        self.statistics_directory = None
-
         self.pending_test_update = False
 
         self.clear_room_data()

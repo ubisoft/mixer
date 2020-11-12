@@ -182,10 +182,6 @@ def draw_advanced_settings_ui(layout: bpy.types.UILayout):
 
 def draw_developer_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "statistics_directory", text="Stats Directory")
-    layout.operator(bl_operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
-    layout.operator(bl_operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
-    layout.prop(mixer_prefs, "auto_save_statistics", text="Auto Save Statistics")
     layout.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
     layout.prop(mixer_prefs, "no_start_server", text="Do not start server on connect")
     layout.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
