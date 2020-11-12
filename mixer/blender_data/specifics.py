@@ -695,6 +695,16 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
                 delta += 1
         return
 
+    if isinstance(target_rna, type(T.SplineBezierPoints.bl_rna)):
+        existing_length = len(target)
+        incoming_length = proxy.length
+        delta = incoming_length - existing_length
+        if delta > 0:
+            target.add(delta)
+        else:
+            logger.error("Remove not implemented for type SplineBezierPoints")
+        return
+
     logger.error(f"Not implemented fit_aos for type {target.bl_rna} for {target} ...")
 
 

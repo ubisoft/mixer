@@ -88,7 +88,7 @@ class AosElement(Proxy):
 
     def save(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str, context: Context):
         for index, item in self._data.items():
-            write_attribute(bl_collection[index], index, item, context)
+            write_attribute(bl_collection[int(index)], attr_name, item, context)
 
 
 class SoaElement(Proxy):
