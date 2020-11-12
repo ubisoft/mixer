@@ -441,6 +441,15 @@ default_exclusions = {
         )
     ],
     T.SequenceEditor: [NameFilterOut(["active_strip", "sequences_all"])],
+    T.BezierSplinePoint: [
+        NameFilterOut(
+            [
+                "select_control_point",
+                "select_left_handle",
+                "select_right_handle",
+            ]
+        )
+    ],
     T.ViewLayer: [
         # Not useful. Requires array insertion (to do shortly)
         NameFilterOut("freestyle_settings"),
@@ -462,6 +471,7 @@ safe_exclusions = {}
 safe_depsgraph_updates = (
     T.Camera,
     T.Collection,
+    T.Curve,
     T.Image,
     T.GreasePencil,
     T.Light,
@@ -485,6 +495,7 @@ safe_filter = FilterStack()
 safe_blenddata_collections = [
     "cameras",
     "collections",
+    "curves",
     "grease_pencils",
     "images",
     "lights",

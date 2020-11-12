@@ -59,6 +59,7 @@ soable_collection_properties = {
     T.Mesh.bl_rna.properties["loop_triangles"],
     T.Mesh.bl_rna.properties["polygons"],
     T.Mesh.bl_rna.properties["vertices"],
+    T.Spline.bl_rna.properties["bezier_points"],
     T.MeshFaceMapLayer.bl_rna.properties["data"],
     T.MeshLoopColorLayer.bl_rna.properties["data"],
     T.MeshUVLoopLayer.bl_rna.properties["data"],
@@ -272,6 +273,10 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
 
         return id_
 
+    if collection_name == "curves":
+        name = proxy.data("name")
+        return bpy.data.curves.new(name, "CURVE")
+
     name = proxy.data("name")
     try:
         id_ = collection.new(name)
@@ -332,7 +337,7 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
 
-    if isinstance(bpy_struct, T.MetaBall):
+    if isinstance(bpy_struct, (T.MetaBall, T.Curve)):
         if not bpy_struct.use_auto_texspace:
             return properties
         filter_props = ["texspace_location", "texspace_size"]
@@ -367,8 +372,6 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         return properties
     filtered = {k: v for k, v in properties if k not in filter_props}
     return filtered.items()
-
-    return properties
 
 
 def proxy_requires_clear_geometry(incoming_proxy: MeshProxy, mesh: T.Mesh) -> bool:
@@ -493,7 +496,10 @@ def add_datablock_ref_element(collection: T.bpy_prop_collection, datablock: T.ID
 @dispatch_rna
 def add_element(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     """Add an element to a bpy_prop_collection using the collection specific API"""
-    logger.error(f"add_element: no implementation for  {type(collection)}")
+    try:
+        collection.add()
+    except Exception:
+        logger.error(f"add_element: failed for {collection}")
 
 
 @add_element.register_default()
@@ -544,9 +550,16 @@ def _add_element_name_type(collection: T.bpy_prop_collection, proxy: Proxy, cont
 
 
 @add_element.register(T.ObjectConstraints)
+@add_element.register(T.CurveSplines)
 def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     type_ = proxy.data("type")
     return collection.new(type_)
+
+
+@add_element.register(T.SplinePoints)
+@add_element.register(T.SplineBezierPoints)
+def _add_element_one(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    return collection.add(1)
 
 
 @add_element.register(T.MetaBallElements)
@@ -681,6 +694,16 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
                 delta += 1
         return
 
+    if isinstance(target_rna, type(T.SplineBezierPoints.bl_rna)):
+        existing_length = len(target)
+        incoming_length = proxy.length
+        delta = incoming_length - existing_length
+        if delta > 0:
+            target.add(delta)
+        else:
+            logger.error("Remove not implemented for type SplineBezierPoints")
+        return
+
     logger.error(f"Not implemented fit_aos for type {target.bl_rna} for {target} ...")
 
 
@@ -694,6 +717,11 @@ def diff_must_replace(collection: T.bpy_prop_collection, sequence: List[Databloc
     full collection replacement
     """
     return False
+
+
+@diff_must_replace.register(T.CurveSplines)
+def _diff_must_replace_always(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+    return True
 
 
 @diff_must_replace.register(T.GreasePencilLayers)

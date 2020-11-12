@@ -7,7 +7,9 @@
     "-s",
     "./tests",
     "-p",
-    "test_*.py"
+    "test_*.py",
+    "--line-length",
+    "120"
   ],
   "python.testing.unittestEnabled": true,
   "python.linting.flake8Enabled": true,

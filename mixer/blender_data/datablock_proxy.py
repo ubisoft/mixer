@@ -370,6 +370,10 @@ class DatablockProxy(StructProxy):
         if isinstance(bl_item, T.Mesh):
             bl_item.update()
 
+        # HACK 2 (force update curves)
+        if isinstance(bl_item, T.Curve):
+            bl_item.twist_mode = bl_item.twist_mode
+
     def diff(self, datablock: T.ID, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
         try:
             diff = self.__class__()
