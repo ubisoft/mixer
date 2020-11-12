@@ -105,8 +105,6 @@ Server attributes (always filled by server):
 
 Standard custom attributes: None for now.
 
-For an example of non standard room attributes, search for `experimental_sync` in the addon, which is only used accross blender clients.
-
 ### Commands / Messages
 
 A command, or message, is some data exchanged between the server and a client. Each command has a byte size (int64), an id (int32), and a message type (int16). For now the id is not used by the protocol. Data of the command is stored after the message type and its size should be the byte size stored as first field of the command.
@@ -157,7 +155,7 @@ Data:
 - room_name (str) (Deprecrated, will be removed)
 
 Protocol:
-- Client send `JOIN_ROOM room_name` to Server
+- Client send `LEAVE_ROOM room_name` to Server
 - If the client is not in a room
   - Server send `SEND_ERROR` to Client
 - Else

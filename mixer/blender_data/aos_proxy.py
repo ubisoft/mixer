@@ -65,8 +65,8 @@ class AosProxy(Proxy):
             self._data.clear()
             return self
 
+        context.visit_state.path.append(key)
         try:
-            context.visit_state.path.append(key)
             # TODO too much work at l   oad time to find soable information. Do it once for all.
 
             # Hybrid array_of_struct/ struct_of_array
@@ -98,13 +98,13 @@ class AosProxy(Proxy):
         if target is None:
             return
 
-        specifics.truncate_collection(target, self, context)
+        specifics.fit_aos(target, self, context)
         # nothing to do save here. The buffers that contains vertices and co are serialized apart from the json
         # that contains the Mesh members. The children of this are SoaElement and have no child.
         # They are updated directly bu SoaElement.save_array()
 
+        context.visit_state.path.append(attr_name)
         try:
-            context.visit_state.path.append(attr_name)
             for k, v in self._data.items():
                 write_attribute(target, k, v, context)
         finally:
@@ -119,10 +119,10 @@ class AosProxy(Proxy):
 
         aos = getattr(parent, key)
 
+        context.visit_state.path.append(key)
         try:
-            context.visit_state.path.append(key)
             self._aos_length = struct_update._aos_length
-            specifics.truncate_collection(aos, self, context)
+            specifics.fit_aos(aos, self, context)
             for k, member_delta in struct_update._data.items():
                 current_value = self.data(k)
                 if current_value is not None:
@@ -140,8 +140,8 @@ class AosProxy(Proxy):
         diff.init(aos)
         diff._aos_length = len(aos)
 
+        context.visit_state.path.append(key)
         try:
-            context.visit_state.path.append(key)
             item_bl_rna = prop.fixed_type.bl_rna
             for attr_name, _ in context.synchronized_properties.properties(item_bl_rna):
                 # co, normals, ...

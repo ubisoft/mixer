@@ -29,7 +29,7 @@ import logging
 import traceback
 from typing import List, Optional, TYPE_CHECKING, Union
 
-from mixer.blender_data.json_codec import Codec
+from mixer.blender_data.json_codec import Codec, DecodeError
 from mixer.broadcaster.common import (
     Command,
     decode_int,
@@ -75,7 +75,7 @@ def build_data_media(buffer: bytes):
 
 
 def send_data_creations(proxies: CreationChangeset):
-    if not share_data.use_experimental_sync():
+    if share_data.use_vrtist_protocol():
         return
 
     codec = Codec()
@@ -131,7 +131,7 @@ def soa_buffers(datablock_proxy: Optional[DatablockProxy]) -> List[bytes]:
 
 
 def send_data_updates(updates: UpdateChangeset):
-    if not share_data.use_experimental_sync():
+    if share_data.use_vrtist_protocol():
         return
 
     codec = Codec()
@@ -154,7 +154,7 @@ def send_data_updates(updates: UpdateChangeset):
 
 
 def build_data_create(buffer):
-    if not share_data.use_experimental_sync():
+    if share_data.use_vrtist_protocol():
         return
 
     proxy_string, index = decode_string(buffer, 0)
@@ -170,6 +170,10 @@ def build_data_create(buffer):
 
         _, rename_changeset = share_data.bpy_data_proxy.create_datablock(datablock_proxy)
         _decode_and_build_soas(datablock_proxy.mixer_uuid(), buffer, index)
+    except DecodeError as e:
+        logger.error(f"Decode error for {str(e.args[1])[:100]} ...")
+        logger.error("... possible version mismatch")
+        return
     except Exception:
         logger.error("Exception during build_data_create")
         for line in traceback.format_exc().splitlines():
@@ -178,6 +182,7 @@ def build_data_create(buffer):
         logger.error("...")
         logger.error(buffer[-200:0])
         logger.error("ignored")
+        return
 
     if rename_changeset:
         send_data_renames(rename_changeset)
@@ -210,7 +215,7 @@ def _decode_and_build_soas(uuid: Uuid, buffer: bytes, index: int):
 
 
 def build_data_update(buffer: bytes):
-    if not share_data.use_experimental_sync():
+    if share_data.use_vrtist_protocol():
         return
 
     proxy_string, index = decode_string(buffer, 0)
@@ -225,6 +230,9 @@ def build_data_update(buffer: bytes):
         datablock_proxy = delta.value
         if datablock_proxy is not None:
             _decode_and_build_soas(datablock_proxy.mixer_uuid(), buffer, index)
+    except DecodeError as e:
+        logger.error(f"Decode error for {str(e.args[1])[:100]} ...")
+        logger.error("... possible version mismatch")
     except Exception:
         logger.error("Exception during build_data_update")
         for line in traceback.format_exc().splitlines():
@@ -237,7 +245,7 @@ def build_data_update(buffer: bytes):
 
 
 def send_data_removals(removals: RemovalChangeset):
-    if not share_data.use_experimental_sync():
+    if share_data.use_vrtist_protocol():
         return
 
     for uuid, _, debug_info in removals:
@@ -248,7 +256,7 @@ def send_data_removals(removals: RemovalChangeset):
 
 
 def build_data_remove(buffer):
-    if not share_data.use_experimental_sync():
+    if share_data.use_vrtist_protocol():
         return
 
     uuid, index = decode_string(buffer, 0)
@@ -263,7 +271,7 @@ def build_data_remove(buffer):
 def send_data_renames(renames: RenameChangeset):
     if not renames:
         return
-    if not share_data.use_experimental_sync():
+    if share_data.use_vrtist_protocol():
         return
 
     items = []
@@ -277,7 +285,7 @@ def send_data_renames(renames: RenameChangeset):
 
 
 def build_data_rename(buffer):
-    if not share_data.use_experimental_sync():
+    if share_data.use_vrtist_protocol():
         return
 
     strings, _ = decode_string_array(buffer, 0)

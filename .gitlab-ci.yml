@@ -74,6 +74,7 @@ release:
     MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
     VRTIST_PORT: 25600 # In case a server is already running on our default port on the test computer
     MIXER_TEST_OUTPUT: logs\tests
+  timeout: 2h
   script:
     - gitlab\run_unittest.bat
   cache:

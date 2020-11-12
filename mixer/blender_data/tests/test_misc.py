@@ -30,6 +30,7 @@ from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.misc_proxies import NonePtrProxy
 from mixer.blender_data.filter import SynchronizedProperties, TypeFilterOut, test_properties, test_filter
 from mixer.blender_data.tests.utils import test_blend_file
+from mixer.blender_data.specifics import dispatch_rna
 
 
 class TestLoadProxy(unittest.TestCase):
@@ -164,7 +165,6 @@ class TestProperties(unittest.TestCase):
         expected_names = {
             "name",
             "name_full",
-            "is_embedded_data",
             "type",
             "sensor_fit",
             "passepartout_alpha",
@@ -261,3 +261,56 @@ class TestAosSoa(unittest.TestCase):
 
         self.assertEqual(len(gp_points["pressure"]._data), len(gp_points["strength"]._data))
         self.assertEqual(3 * len(gp_points["pressure"]._data), len(gp_points["co"]._data))
+
+
+class TestFunctionDispatch(unittest.TestCase):
+    def setUp(self):
+        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
+        self.cube = bpy.data.objects["Cube"]
+
+    def test_rna_dispatch(self):
+        # test_misc.TestFunctionDispatch.test_rna_dispatch
+
+        @dispatch_rna
+        def f(collection: T.bpy_prop_collection, arg):
+            return "f_no_rna", arg
+
+        @f.register_default()
+        def _(collection: T.bpy_prop_collection, arg):
+            return "f_default", arg
+
+        @f.register(T.ObjectModifiers)
+        @f.register(T.ObjectGpencilModifiers)
+        def _(collection: T.bpy_prop_collection, arg):
+            return "f_modifiers", arg
+
+        @f.register(T.ObjectConstraints)
+        def _(collection: T.bpy_prop_collection, arg):
+            return "f_constraints", arg
+
+        @dispatch_rna
+        def g(collection: T.bpy_prop_collection, arg):
+            return "g_no_rna", arg
+
+        @g.register(T.ObjectModifiers)
+        @g.register(T.ObjectGpencilModifiers)
+        def _(collection: T.bpy_prop_collection, arg):
+            return "g_modifiers", arg
+
+        @g.register(T.ObjectConstraints)
+        def _(collection: T.bpy_prop_collection, arg):
+            return "g_constraints", arg
+
+        self.assertEqual(f(self.cube.modifiers, 1), ("f_modifiers", 1))
+        self.assertEqual(f(self.cube.grease_pencil_modifiers, 2), ("f_modifiers", 2))
+        self.assertEqual(f(self.cube.constraints, 3), ("f_constraints", 3))
+        self.assertEqual(f(self.cube.name, 4), ("f_no_rna", 4))
+        self.assertEqual(f(self.cube.material_slots, 5), ("f_no_rna", 5))
+        self.assertEqual(f(self.cube.particle_systems, 6), ("f_default", 6))
+
+        self.assertEqual(g(self.cube.modifiers, 1), ("g_modifiers", 1))
+        self.assertEqual(g(self.cube.grease_pencil_modifiers, 2), ("g_modifiers", 2))
+        self.assertEqual(g(self.cube.constraints, 3), ("g_constraints", 3))
+        self.assertEqual(g(self.cube.name, 4), ("g_no_rna", 4))
+        self.assertEqual(g(self.cube.material_slots, 5), ("g_no_rna", 5))
+        self.assertEqual(g(self.cube.particle_systems, 6), ("g_no_rna", 6))

@@ -21,7 +21,7 @@ class MiscTestCase(VRtistTestCase):
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}],
+    [{"vrtist_protocol": False}, {"vrtist_protocol": True}],
     class_name_func=VRtistTestCase.get_class_name,
 )
 class TestSpontaneousRename(MiscTestCase):
@@ -38,7 +38,7 @@ class TestSpontaneousRename(MiscTestCase):
         self.assert_matches()
 
     def test_light(self):
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             # use exception since the @unittest.skipIf() cannot access self
             raise unittest.SkipTest("FAILS in VRtist mode")
 
@@ -52,7 +52,7 @@ class TestSpontaneousRename(MiscTestCase):
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}],
+    [{"vrtist_protocol": False}, {"vrtist_protocol": True}],
     class_name_func=VRtistTestCase.get_class_name,
 )
 class TestReferencedDatablock(MiscTestCase):
@@ -62,7 +62,7 @@ class TestReferencedDatablock(MiscTestCase):
 
     def test_light(self):
         # Rename the light datablock
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             raise unittest.SkipTest("Broken in VRtist-only")
 
         self.send_strings([bl.ops_objects_light_add("POINT")], to=0)
@@ -72,7 +72,7 @@ class TestReferencedDatablock(MiscTestCase):
         self.assert_matches()
 
     def test_material(self):
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             raise unittest.SkipTest("Broken in VRtist-only")
 
         # only care about Blender_DATA_CREATE
@@ -124,7 +124,7 @@ b.children.link(c)
 
 
 @parameterized_class(
-    [{"experimental_sync": True}],
+    [{"vrtist_protocol": False}],
     class_name_func=VRtistTestCase.get_class_name,
 )
 class TestRenameDatablock(MiscTestCase):
@@ -134,7 +134,7 @@ class TestRenameDatablock(MiscTestCase):
 
     def test_light(self):
         # Rename the light datablock
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             raise unittest.SkipTest("Broken in VRtist-only")
 
         self.send_strings([bl.ops_objects_light_add("POINT")], to=0)
@@ -145,7 +145,7 @@ class TestRenameDatablock(MiscTestCase):
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}],
+    [{"vrtist_protocol": False}, {"vrtist_protocol": True}],
     class_name_func=VRtistTestCase.get_class_name,
 )
 class TestSetDatablockRef(MiscTestCase):
@@ -210,7 +210,7 @@ obj0.parent = obj1
 
     def test_set_datablock_ref_to_none(self):
 
-        if not self.experimental_sync:
+        if self.vrtist_protocol:
             raise unittest.SkipTest("Broken in VRtist-only")
 
         create = """

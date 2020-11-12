@@ -401,22 +401,22 @@ class ShareData:
         }
 
     def init_proxy(self):
-        if self.use_experimental_sync():
+        if not self.use_vrtist_protocol():
             # default, not safe
             # the initialisation must initialize reference target for all useful collections (except screens, ...)
             self.bpy_data_proxy.initialize_ref_targets(test_properties)
 
-    def set_experimental_sync(self, experimental_sync: bool):
-        if experimental_sync:
-            logger.warning("Experimental sync in ON")
+    def set_vrtist_protocol(self, vrtist_protocol: bool):
+        if not vrtist_protocol:
+            logger.warning("Generic protocol sync in ON")
             self.bpy_data_proxy = BpyDataProxy()
         else:
-            logger.warning("Experimental sync in OFF")
+            logger.warning("VRtist protocol sync in ON")
             if self.bpy_data_proxy:
                 self.bpy_data_proxy = None
 
-    def use_experimental_sync(self):
-        return self.bpy_data_proxy is not None
+    def use_vrtist_protocol(self):
+        return self.bpy_data_proxy is None
 
 
 share_data = ShareData()  # Instance storing addon state, is used by most of the sub-modules.

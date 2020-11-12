@@ -12,8 +12,6 @@ The network communication uses TCP sockets to exchange messages that are generat
 
 The synchronization mechanism was originally developed for our VRtist software that include a Unity VR client. As a consequence, the data that are synchronized for VRtist are selected for their relevance to VRtist and the the synchronization "cooks" Blender data into VRtist related messages.
 
-When it became important to have a full Blender synchronization independently of VRtist, a synchronization mechanism at the Blender datablock level was developed. This mechanism is named _Experimental synchronization_ in the UI and _Blender Full Protocol_ in the source code. As the Blender Full Protocol does not yet support all IDs, it currently coexists with the VRtist protocol.
-
 A probable evolution is to move the VRtist protocol into a plugin, and this would make it possible to connect other DCCs by implementing other plugins.
 
 ## Blender datablock synchronization

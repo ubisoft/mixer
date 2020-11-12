@@ -11,7 +11,7 @@ from tests.vrtist.vrtist_testcase import VRtistTestCase
 
 
 @parameterized_class(
-    [{"experimental_sync": True}, {"experimental_sync": False}],
+    [{"vrtist_protocol": False}, {"vrtist_protocol": True}],
     class_name_func=VRtistTestCase.get_class_name,
 )
 class TestSceneEmptyDoc(VRtistTestCase):
@@ -192,8 +192,8 @@ class TestSceneEmptyDoc(VRtistTestCase):
         self.new_collection_instance("src", "instance_1")
         self.link_object_to_scene("Scene", "instance_1")
 
-        self._sender.connect_and_join_mixer(experimental=self.experimental_sync)
-        self._receiver.connect_and_join_mixer(experimental=self.experimental_sync)
+        self._sender.connect_and_join_mixer(vrtist_protocol=self.vrtist_protocol)
+        self._receiver.connect_and_join_mixer(vrtist_protocol=self.vrtist_protocol)
         self.end_test()
 
 

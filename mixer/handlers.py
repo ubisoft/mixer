@@ -150,10 +150,10 @@ def handler_send_scene_data_to_server(scene, dummy):
             logger.debug("handler_send_scene_data_to_server canceled (block_signals = True)")
             return
 
-        if share_data.use_experimental_sync():
-            generic.send_scene_data_to_server(scene, dummy)
-        else:
+        if share_data.use_vrtist_protocol():
             send_scene_data_to_server(scene, dummy)
+        else:
+            generic.send_scene_data_to_server(scene, dummy)
     finally:
         processing_depsgraph_handler = False
 

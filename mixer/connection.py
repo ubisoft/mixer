@@ -49,7 +49,7 @@ def set_client_attributes():
     )
 
 
-def join_room(room_name: str, experimental_sync: bool):
+def join_room(room_name: str, vrtist_protocol: bool = False):
     prefs = get_mixer_prefs()
     logger.warning(f"join: room: {room_name}, user: {prefs.user}")
 
@@ -76,7 +76,7 @@ def join_room(room_name: str, experimental_sync: bool):
     }
     share_data.auto_save_statistics = prefs.auto_save_statistics
     share_data.statistics_directory = prefs.statistics_directory
-    share_data.set_experimental_sync(experimental_sync)
+    share_data.set_vrtist_protocol(vrtist_protocol)
     share_data.pending_test_update = False
 
     # join a room <==> want to track local changes

@@ -24,6 +24,7 @@ import os
 import sys
 import socket
 import subprocess
+import time
 
 import bpy
 
@@ -31,7 +32,14 @@ from mixer.share_data import share_data
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.stats import save_statistics
 from mixer.broadcaster.common import RoomAttributes, ClientAttributes
-from mixer.connection import is_client_connected, connect, join_room, leave_current_room, disconnect
+from mixer.connection import (
+    is_client_connected,
+    connect,
+    join_room,
+    leave_current_room,
+    disconnect,
+    network_consumer_timer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +96,7 @@ class CreateRoomOperator(bpy.types.Operator):
         prefs = get_mixer_prefs()
         room = prefs.room
         logger.warning(f"CreateRoomOperator.execute({room})")
-        join_room(room, prefs.experimental_sync)
+        join_room(room, prefs.vrtist_protocol)
 
         return {"FINISHED"}
 
@@ -114,13 +122,13 @@ class JoinRoomOperator(bpy.types.Operator):
             (lambda: get_mixer_props().room_index < len(get_mixer_props().rooms), "Invalid room selection"),
             (
                 lambda: (
-                    ("experimental_sync" not in get_selected_room_dict() and not get_mixer_prefs().experimental_sync)
+                    ("vrtist_protocol" not in get_selected_room_dict() and not get_mixer_prefs().vrtist_protocol)
                     or (
-                        "experimental_sync" in get_selected_room_dict()
-                        and get_mixer_prefs().experimental_sync == get_selected_room_dict()["experimental_sync"]
+                        "vrtist_protocol" in get_selected_room_dict()
+                        and get_mixer_prefs().vrtist_protocol == get_selected_room_dict()["vrtist_protocol"]
                     )
                 ),
-                "Experimental flag does not match selected room",
+                "vrtist_protocol flag does not match selected room",
             ),
             (
                 lambda: get_selected_room_dict().get(RoomAttributes.JOINABLE, False),
@@ -143,9 +151,10 @@ class JoinRoomOperator(bpy.types.Operator):
         props = get_mixer_props()
         room_index = props.room_index
         room = props.rooms[room_index].name
-        experimental_sync = get_mixer_prefs().experimental_sync
         logger.warning(f"JoinRoomOperator.execute({room})")
-        join_room(room, experimental_sync)
+
+        prefs = get_mixer_prefs()
+        join_room(room, prefs.vrtist_protocol)
 
         return {"FINISHED"}
 
@@ -314,27 +323,61 @@ class LaunchVRtistOperator(bpy.types.Operator):
     bl_label = "Launch VRtist"
     bl_options = {"REGISTER"}
 
+    vrtist_process = None
+
     @classmethod
     def poll(cls, context):
-        return (
-            os.path.isfile(get_mixer_prefs().VRtist)
-            and is_client_connected()
-            and share_data.client.current_room is not None
-            and share_data.client.client_id is not None
-        )
+        # Check VRtist process to auto disconnect
+        if cls.vrtist_process is not None and cls.vrtist_process.poll() is not None:
+            cls.vrtist_process = None
+            leave_current_room()
+            disconnect()
+
+        # Manage button state
+        return os.path.isfile(get_mixer_prefs().VRtist)
 
     def execute(self, context):
         bpy.data.window_managers["WinMan"].mixer.send_base_meshes = False
+        bpy.data.window_managers["WinMan"].mixer.send_bake_meshes = True
+
         mixer_prefs = get_mixer_prefs()
         if not share_data.client or not share_data.client.current_room:
+            timeout = 10
             try:
                 connect()
             except Exception as e:
                 self.report({"ERROR"}, f"vrtist.launch connect error : {e!r}")
                 return {"CANCELLED"}
 
+            # Wait for local server creation
+            while timeout > 0 and not is_client_connected():
+                time.sleep(0.5)
+                timeout -= 0.5
+            if timeout <= 0:
+                self.report({"ERROR"}, "vrtist.launch connect error : unable to connect")
+                return {"CANCELLED"}
+
             logger.warning("LaunchVRtistOperator.execute({mixer_prefs.room})")
-            join_room(mixer_prefs.room, mixer_prefs.experimental)
+            join_room(mixer_prefs.room, True)
+
+            # Wait for room creation/join
+            timeout = 10
+            while timeout > 0 and share_data.client.current_room is None:
+                time.sleep(0.5)
+                timeout -= 0.5
+            if timeout <= 0:
+                self.report({"ERROR"}, "vrtist.launch connect error : unable to join room")
+                return {"CANCELLED"}
+
+            # Wait for client id
+            timeout = 10
+            while timeout > 0 and share_data.client.client_id is None:
+                network_consumer_timer()
+                time.sleep(0.1)
+                timeout -= 0.1
+            if timeout <= 0:
+                self.report({"ERROR"}, "vrtist.launch connect error : unable to retrieve client id")
+                return {"CANCELLED"}
 
         color = share_data.client.clients_attributes[share_data.client.client_id].get(
             ClientAttributes.USERCOLOR, (0.0, 0.0, 0.0)
@@ -360,7 +403,9 @@ class LaunchVRtistOperator(bpy.types.Operator):
             "--username",
             name,
         ]
-        subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+        LaunchVRtistOperator.vrtist_process = subprocess.Popen(
+            args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False
+        )
         return {"FINISHED"}
 
 

@@ -51,17 +51,15 @@ REM These tests run within blender
 %MIXER_BLENDER_EXE_PATH% --background --python-exit-code 1 --python mixer\blender_data\tests\ci.py
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
-REM run unit tests. Theses tests launch 2 blender that communicate together
+REM These tests launch 2 blender that communicate together
 %PYTHON% -m xmlrunner discover --verbose tests.vrtist -o %MIXER_TEST_OUTPUT%
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
 %PYTHON% -m xmlrunner discover --verbose tests.broadcaster -o %MIXER_TEST_OUTPUT%
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
-
-REM Skip as not reliable enough on the GitLab runner
-REM %PYTHON% -m unittest discover --verbose tests.blender
-REM if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
+%PYTHON% -m xmlrunner discover --verbose tests.blender -o %MIXER_TEST_OUTPUT%
+if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
 
 if %ERROR% GEQ 1 EXIT /B %ERROR%

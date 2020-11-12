@@ -37,8 +37,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-MIXER_SEQUENCE = "__mixer_sequence__"
-
 Uuid = str
 
 
@@ -121,6 +119,10 @@ class DeltaUpdate(Delta):
         return cls(p)
 
 
+class DeltaReplace(Delta):
+    pass
+
+
 class Proxy:
     """
     Base class for all proxies.
@@ -147,7 +149,7 @@ class Proxy:
     def init(self, _):
         pass
 
-    def data(self, key: Union[str, int], resolve_delta=True) -> Any:
+    def data(self, key: str, resolve_delta=True) -> Any:
         """Return the data at key, which may be a struct member, a dict value or an array value,
 
         Args:
@@ -155,22 +157,14 @@ class Proxy:
             resolve_delta: If True, and the data is a Delta, will return the delta value
         """
 
-        def resolve(data):
-            if isinstance(data, Delta) and resolve_delta:
-                return data.value
-            return data
+        try:
+            data = self._data[key]
+        except KeyError:
+            return None
 
-        if isinstance(key, int):
-            if MIXER_SEQUENCE in self._data:
-                try:
-                    return resolve(self._data[MIXER_SEQUENCE][key])
-                except IndexError:
-                    return None
-            else:
-                # used by the diff mode that generates a dict with int keys
-                return resolve(self._data.get(key))
-        else:
-            return resolve(self._data.get(key))
+        if isinstance(data, Delta) and resolve_delta:
+            return data.value
+        return data
 
     def save(self, bl_instance: Any, attr_name: str, context: Context):
         """

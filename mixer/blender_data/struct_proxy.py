@@ -65,8 +65,8 @@ class StructProxy(Proxy):
         # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
         # that we do not want to load anyway
         properties = specifics.conditional_properties(bl_instance, properties)
+        context.visit_state.path.append(parent_key)
         try:
-            context.visit_state.path.append(parent_key)
             for name, bl_rna_property in properties:
                 attr = getattr(bl_instance, name)
                 attr_value = read_attribute(attr, name, bl_rna_property, context)
@@ -90,11 +90,7 @@ class StructProxy(Proxy):
         if isinstance(key, int):
             target = bl_instance[key]
         elif isinstance(bl_instance, T.bpy_prop_collection):
-            # TODO append an element :
-            # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             target = bl_instance.get(key)
-            if target is None:
-                target = specifics.add_element(self, bl_instance, key, context)
         else:
             target = getattr(bl_instance, key, None)
             if target is not None:
@@ -112,8 +108,8 @@ class StructProxy(Proxy):
 
             return
 
+        context.visit_state.path.append(key)
         try:
-            context.visit_state.path.append(key)
             for k, v in self._data.items():
                 write_attribute(target, k, v, context)
         finally:
@@ -150,20 +146,17 @@ class StructProxy(Proxy):
         if isinstance(key, int):
             struct = parent[key]
         elif isinstance(parent, T.bpy_prop_collection):
-            # TODO append an element :
-            # https://blenderartists.org/t/how-delete-a-bpy-prop-collection-element/642185/4
             struct = parent.get(key)
-            if struct is None and to_blender:
-                struct = specifics.add_element(self, parent, key, context)
         else:
             struct = getattr(parent, key, None)
-            if to_blender:
-                struct = struct_update._pre_save(struct, context)
+
+        if to_blender:
+            struct = struct_update._pre_save(struct, context)
 
         assert type(struct_update) == type(self)
 
+        context.visit_state.path.append(key)
         try:
-            context.visit_state.path.append(key)
             for k, member_delta in struct_update._data.items():
                 current_value = self._data.get(k)
                 try:
@@ -207,9 +200,9 @@ class StructProxy(Proxy):
         # _data and the getting the properties with
         #   member_property = struct.bl_rna.properties[k]
         # line to which py-spy attributes 20% of the total diff !
+        if prop is not None:
+            context.visit_state.path.append(key)
         try:
-            if prop is not None:
-                context.visit_state.path.append(key)
             properties = context.synchronized_properties.properties(struct)
             properties = specifics.conditional_properties(struct, properties)
             for k, member_property in properties:

@@ -231,12 +231,14 @@ _exclude_names = {
     "type_info",  # for Available (?) keyingset
     "depsgraph",  # found in Viewlayer
     "rna_type",
+    "is_editmode",
+    "is_embedded_data",
     "is_evaluated",
+    "is_library_indirect",
     "original",
     "users",
     "use_fake_user",
     "tag",
-    "is_library_indirect",
     "library",
     "override_library",
     "preview",
@@ -277,8 +279,6 @@ default_exclusions = {
             ]
         ),
     ],
-    # TODO see comment in specifics.py:add_element()
-    T.KeyingSets: [NameFilterOut("paths")],
     T.LayerCollection: [
         # TODO temporary
         # Scene.viewlayers[i].layer_collection.collection is Scene.collection,
@@ -295,6 +295,15 @@ default_exclusions = {
         NameFilterOut(
             [
                 "active_frame",
+                # see internal issue #341
+                "parent_type",
+            ]
+        )
+    ],
+    T.GreasePencilLayers: [
+        NameFilterOut(
+            [
+                "active_index",
             ]
         )
     ],
@@ -317,7 +326,6 @@ default_exclusions = {
                 "uv_layer_clone",
                 "uv_layer_stencil",
                 # readonly
-                "is_editmode",
                 "total_vert_sel",
                 "total_edge_sel",
                 "total_face_sel",

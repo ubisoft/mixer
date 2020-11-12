@@ -30,7 +30,7 @@ class ThrottledTestCase(BlenderTestCase):
             latency_ms = 1000 * self.latency
             server_args = ["--latency", str(latency_ms)]
             super().setUp(blenderdescs=blenderdescs, server_args=server_args)
-            if self.experimental_sync:
+            if not self.vrtist_protocol:
                 self.ignored_messages |= {
                     # TODO clarify this
                     MessageType.ADD_OBJECT_TO_VRTIST,

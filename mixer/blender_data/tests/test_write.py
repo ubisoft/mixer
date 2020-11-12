@@ -197,6 +197,7 @@ class TestWriteAttribute(unittest.TestCase):
                 self.assertAlmostEqual(dst, expected)
 
     def test_array_curvemap_extend(self):
+        # test_write.TestWriteAttribute.test_array_curvemap_extend
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
 
         light_name = "Light"

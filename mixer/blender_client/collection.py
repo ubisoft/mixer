@@ -47,8 +47,8 @@ def build_collection(data):
 
     # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
     # In generic mode, it conflicts with generic messages, so drop it
-    if share_data.use_experimental_sync():
-        logger.warning("build_collection %s, ignored in experimental mode", name_full)
+    if not share_data.use_vrtist_protocol():
+        logger.warning("build_collection %s, ignored in generic mode", name_full)
         return
 
     # Blender/Blender in VRtist (non generic) mode
@@ -85,8 +85,8 @@ def build_collection_removed(data):
 
     # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
     # In generic mode, it conflicts with generic messages, so drop it
-    if share_data.use_experimental_sync():
-        logger.warning("build_collection_remove %s, ignore in experimental mode", name_full)
+    if not share_data.use_vrtist_protocol():
+        logger.warning("build_collection_remove %s, ignore in generic mode", name_full)
         return
 
     # Blender/Blender in VRtist (non generic) mode
@@ -115,8 +115,8 @@ def build_collection_to_collection(data):
 
     # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
     # In generic mode, it conflicts with generic messages, so drop it
-    if share_data.use_experimental_sync():
-        logger.warning("build_collection_to_collection %s <- %s, ignore in experimental mode", parent_name, child_name)
+    if not share_data.use_vrtist_protocol():
+        logger.warning("build_collection_to_collection %s <- %s, ignore in generic mode", parent_name, child_name)
         return
 
     logger.info("build_collection_to_collection %s <- %s", parent_name, child_name)
@@ -127,11 +127,11 @@ def build_collection_to_collection(data):
     try:
         parent.children.link(child)
     except RuntimeError as e:
-        if share_data.use_experimental_sync():
+        if not share_data.use_vrtist_protocol():
             # Added by the Blender Protocol
             logger.info(f"build_collection_to_collection(): parent {parent_name}, child {child_name}...")
             logger.info("... Exception during parent.children.link() ...")
-            logger.info("... Safe in experimental_sync ...")
+            logger.info("... Safe in generic mode ...")
             logger.info(f"... {e!r}")
         else:
             logger.warning(f"build_collection_to_collection(): parent {parent_name}, child {child_name}...")
@@ -152,9 +152,9 @@ def build_remove_collection_from_collection(data):
 
     # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
     # In generic mode, it conflicts with generic messages, so drop it
-    if share_data.use_experimental_sync():
+    if not share_data.use_vrtist_protocol():
         logger.warning(
-            "build_remove_collection_from_collection %s <- %s, ignore in experimental mode", parent_name, child_name
+            "build_remove_collection_from_collection %s <- %s, ignore in generic mode", parent_name, child_name
         )
         return
 
@@ -177,10 +177,8 @@ def build_add_object_to_collection(data):
 
     # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
     # In generic mode, it conflicts with generic messages, so drop it
-    if share_data.use_experimental_sync():
-        logger.warning(
-            "build_add_object_to_collection %s <- %s, ignore in experimental mode", collection_name, object_name
-        )
+    if not share_data.use_vrtist_protocol():
+        logger.warning("build_add_object_to_collection %s <- %s, ignore in generic mode", collection_name, object_name)
         return
     logger.info("build_add_object_to_collection %s <- %s", collection_name, object_name)
 
@@ -205,9 +203,9 @@ def build_remove_object_from_collection(data):
 
     # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
     # In generic mode, it conflicts with generic messages, so drop it
-    if share_data.use_experimental_sync():
+    if not share_data.use_vrtist_protocol():
         logger.warning(
-            "build_remove_object_from_collection %s <- %s, ignore in experimental mode", collection_name, object_name
+            "build_remove_object_from_collection %s <- %s, ignore in generic mode", collection_name, object_name
         )
         return
 
@@ -239,10 +237,8 @@ def build_collection_instance(data):
 
     # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
     # In generic mode, it conflicts with generic messages, so drop it
-    if share_data.use_experimental_sync():
-        logger.warning(
-            "build_collection_instance %s <- %s, ignore in experimental mode", instantiated_name, instance_name
-        )
+    if not share_data.use_vrtist_protocol():
+        logger.warning("build_collection_instance %s <- %s, ignore in generic mode", instantiated_name, instance_name)
         return
 
     logger.info("build_collection_instance %s from %s", instantiated_name, instance_name)

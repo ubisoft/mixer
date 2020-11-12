@@ -23,11 +23,11 @@ implementation that does the job.
 """
 import json
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 from mixer.blender_data.aos_proxy import AosProxy
 from mixer.blender_data.aos_soa_proxy import SoaElement
-from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaUpdate
+from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaReplace, DeltaUpdate, Proxy
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy, DatablockRefCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
@@ -63,6 +63,7 @@ delta_classes = [
     DeltaAddition,
     DeltaDeletion,
     DeltaUpdate,
+    DeltaReplace,
 ]
 _classes = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
@@ -72,6 +73,10 @@ _classes_tuple = tuple(_classes.values())
 
 options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name"]
 MIXER_CLASS = "__mixer_class__"
+
+
+class DecodeError(Exception):
+    pass
 
 
 def default_optional(obj, option_name: str) -> Dict[str, Any]:
@@ -141,5 +146,8 @@ class Codec:
     def encode(self, obj) -> str:
         return json.dumps(obj, default=default)
 
-    def decode(self, message: str):
-        return json.loads(message, object_hook=decode_hook)
+    def decode(self, message: str) -> Union[Proxy, Delta]:
+        decoded = json.loads(message, object_hook=decode_hook)
+        if isinstance(decoded, dict):
+            raise DecodeError("decode failure", decoded)
+        return decoded

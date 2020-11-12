@@ -34,12 +34,12 @@ class BlenderApp:
             self._blender.send_function(mixer_lib.set_log_level, self._log_level)
         self._blender.send_function(mixer_lib.connect)
 
-    def create_room(self, room_name="mixer_unittest", keep_room_open=False, experimental_sync: bool = False):
-        self._blender.send_function(mixer_lib.create_room, room_name, experimental_sync)
+    def create_room(self, room_name="mixer_unittest", keep_room_open=False, vrtist_protocol: bool = False):
+        self._blender.send_function(mixer_lib.create_room, room_name, vrtist_protocol)
         self._blender.send_function(mixer_lib.keep_room_open, room_name, keep_room_open)
 
-    def join_room(self, room_name="mixer_unittest", experimental_sync: bool = False):
-        self._blender.send_function(mixer_lib.join_room, room_name, experimental_sync)
+    def join_room(self, room_name="mixer_unittest", vrtist_protocol: bool = False):
+        self._blender.send_function(mixer_lib.join_room, room_name, vrtist_protocol)
 
     def disconnect_mixer(self):
         self._blender.send_function(mixer_lib.disconnect)
