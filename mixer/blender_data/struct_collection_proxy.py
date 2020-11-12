@@ -105,8 +105,8 @@ class StructCollectionProxy(Proxy):
         context: Context,
     ):
 
+        context.visit_state.path.append(key)
         try:
-            context.visit_state.path.append(key)
             self._sequence = [StructProxy.make(v).load(v, i, context) for i, v in enumerate(bl_collection.values())]
         finally:
             context.visit_state.path.pop()
@@ -121,8 +121,8 @@ class StructCollectionProxy(Proxy):
             # # Don't log this, too many messages
             # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
             return
+        context.visit_state.path.append(attr_name)
         try:
-            context.visit_state.path.append(attr_name)
             sequence = self._sequence
             specifics.truncate_collection(target, len(self._sequence))
             for i in range(len(target), len(sequence)):
@@ -151,8 +151,8 @@ class StructCollectionProxy(Proxy):
         update = delta.value
         assert type(update) == type(self)
 
+        context.visit_state.path.append(key)
         try:
-            context.visit_state.path.append(key)
             sequence = self._sequence
 
             # Delete before update and proceed updated in reverse order to avoid spurious renames.
@@ -211,9 +211,8 @@ class StructCollectionProxy(Proxy):
             return None
 
         item_property = collection_property.fixed_type
+        context.visit_state.path.append(key)
         try:
-            context.visit_state.path.append(key)
-
             diff = self.__class__()
             clear_from = specifics.clear_from(collection, sequence)
             for i in range(clear_from):
