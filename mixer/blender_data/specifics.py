@@ -558,6 +558,7 @@ def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, context: 
     return collection.new(type_)
 
 
+@add_element.register(T.SplinePoints)
 @add_element.register(T.SplineBezierPoints)
 def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     return collection.add(1)
@@ -718,6 +719,11 @@ def diff_must_replace(collection: T.bpy_prop_collection, sequence: List[Databloc
     full collection replacement
     """
     return False
+
+
+@diff_must_replace.register(T.CurveSplines)
+def _diff_must_replace_info_mismatch(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+    return True
 
 
 @diff_must_replace.register(T.GreasePencilLayers)
