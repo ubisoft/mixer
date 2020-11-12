@@ -156,7 +156,6 @@ bpy.ops.gpencil.layer_remove()
 
         self.assert_matches()
 
-    @unittest.skip("Cause layer rename. See internal issue #343")
     def test_move(self):
         create = """
 import bpy
@@ -167,6 +166,7 @@ bpy.ops.object.gpencil_add(type='MONKEY')
         layer_move = """
 import bpy
 # 1 is top
+bpy.context.scene.objects.active = bpy.data.grease_pencils[0]
 bpy.ops.gpencil.layer_active(layer=1)
 bpy.ops.gpencil.layer_move(type='DOWN')
 """

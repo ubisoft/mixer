@@ -685,6 +685,25 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
 
 
 #
+# must_replace
+#
+@dispatch_rna
+def diff_must_replace(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+    """
+    Returns True if a diff between the proxy sequence state and the Blender collection state must force a
+    full collection replacement
+    """
+    return False
+
+
+@diff_must_replace.register(T.GreasePencilLayers)
+def _diff_must_replace_info_mismatch(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+    # Name mismatch (in info property). This may happen during layer swap and cause unsolicited rename
+    # Easier to solve with full replace
+    return any((bl_item.info != proxy.data("info") for bl_item, proxy in zip(collection, sequence)))
+
+
+#
 # Clear_from
 #
 @dispatch_rna
@@ -722,7 +741,7 @@ def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[Data
 #
 @dispatch_rna
 def truncate_collection(collection: T.bpy_prop_collection, size: int):
-    """Truncates collection to at most size elements, ensuring that items can safely be saved into
+    """Truncates collection to _at most_ size elements, ensuring that items can safely be saved into
     the collection. This might clear the collection if its elements cannot be updated.
 
     This method is useful for bpy _ppop_collections that cannot be safely be overwritten in place,

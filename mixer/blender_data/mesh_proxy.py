@@ -54,21 +54,20 @@ class MeshProxy(DatablockProxy):
     def _diff(
         self, struct: T.Struct, key: str, prop: T.Property, context: Context, diff: MeshProxy
     ) -> Optional[DeltaUpdate]:
+
+        # If any mesh buffer change requires a clear geometry on the receiver, send all buffers
+        # This is the case if a face is separated from a cube. The number of vertices is unchanged
+        # but the number of faces changes, which requires the receiver to call Mesh.clear_geometry(),
+        # hence to reload tall the geometry, including parts that were unchanged.
+        # As an optimized alternative, it should be possible not to send the unchanged arrays
+        # but have MeshProxy.apply() to reload unchanged buffers from in-memory copies.
+        force_send_all = proxy_requires_clear_geometry(self, struct)
+        if force_send_all:
+            logger.debug("requires_clear for %s", struct)
+
+        if prop is not None:
+            context.visit_state.path.append(key)
         try:
-
-            # If any mesh buffer change requires a clear geometry on the receiver, send all buffers
-            # This is the case if a face is separated from a cube. The number of vertices is unchanged
-            # but the number of faces changes, which requires the receiver to call Mesh.clear_geometry(),
-            # hence to reload tall the geometry, including parts that were unchanged.
-            # As an optimized alternative, it should be possible not to send the unchanged arrays
-            # but have MeshProxy.apply() to reload unchanged buffers from in-memory copies.
-            force_send_all = proxy_requires_clear_geometry(self, struct)
-            if force_send_all:
-                logger.debug("requires_clear for %s", struct)
-
-            if prop is not None:
-                context.visit_state.path.append(key)
-
             properties = context.synchronized_properties.properties(struct)
             properties = specifics.conditional_properties(struct, properties)
             for k, member_property in properties:
@@ -122,8 +121,8 @@ class MeshProxy(DatablockProxy):
 
         # collection resizing will be done in AosProxy.apply()
 
+        context.visit_state.path.append(key)
         try:
-            context.visit_state.path.append(key)
             for k, member_delta in struct_update._data.items():
                 current_value = self._data.get(k)
                 try:

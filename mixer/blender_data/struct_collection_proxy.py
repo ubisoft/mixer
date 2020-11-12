@@ -30,7 +30,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
-from mixer.blender_data.proxy import DeltaAddition, DeltaUpdate
+from mixer.blender_data.proxy import DeltaAddition, DeltaReplace, DeltaUpdate
 from mixer.blender_data.proxy import Proxy
 from mixer.blender_data.struct_proxy import StructProxy
 
@@ -52,7 +52,7 @@ class StructCollectionProxy(Proxy):
     _serialize = ("_sequence", "_diff_additions", "_diff_deletions", "_diff_updates")
 
     def __init__(self):
-        # remove this
+        # TODO remove _data, just here to make JsonCodec happy
         self._data = {}
         self._diff_updates: List[Tuple[int, DeltaUpdate]] = []
         self._diff_deletions: int = 0
@@ -105,8 +105,8 @@ class StructCollectionProxy(Proxy):
         context: Context,
     ):
 
+        context.visit_state.path.append(key)
         try:
-            context.visit_state.path.append(key)
             self._sequence = [StructProxy.make(v).load(v, i, context) for i, v in enumerate(bl_collection.values())]
         finally:
             context.visit_state.path.pop()
@@ -121,8 +121,8 @@ class StructCollectionProxy(Proxy):
             # # Don't log this, too many messages
             # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
             return
+        context.visit_state.path.append(attr_name)
         try:
-            context.visit_state.path.append(attr_name)
             sequence = self._sequence
             specifics.truncate_collection(target, len(self._sequence))
             for i in range(len(target), len(sequence)):
@@ -139,7 +139,8 @@ class StructCollectionProxy(Proxy):
 
         assert isinstance(key, (int, str))
 
-        # TODO factorize with save
+        update = delta.value
+        assert type(update) == type(self)
 
         if isinstance(key, int):
             collection = parent[key]
@@ -148,54 +149,56 @@ class StructCollectionProxy(Proxy):
         else:
             collection = getattr(parent, key, None)
 
-        update = delta.value
-        assert type(update) == type(self)
+        if isinstance(delta, DeltaReplace):
+            self._sequence = update._sequence
+            if to_blender:
+                specifics.truncate_collection(collection, 0)
+                self.save(parent, key, context)
+        else:
+            # a sparse update
 
-        try:
             context.visit_state.path.append(key)
-            sequence = self._sequence
+            try:
+                sequence = self._sequence
 
-            # Delete before update and proceed updated in reverse order to avoid spurious renames.
-            # Starting with sequence A, B, C, D and delete B causes :
-            # - an update for items 1 and 2 to be renamed into C and D
-            # - one delete
-            # If the update is processed first, item 3 will be spuriously renamed into D.001
-            # If the deletes are processed first but the updates are processed in order, item 1 will be spuriously
-            # renamed into C.001
+                # Delete before update and process updates in reverse order to avoid spurious renames.
+                # Starting with sequence A, B, C, D and delete B causes :
+                # - an update for items 1 and 2 to be renamed into C and D
+                # - one delete
+                # If the update is processed first, Blender renames item 3 into D.001
+                # If the deletes are processed first but the updates are processed in order, Blender renames item 1
+                # into C.001
 
-            # TODO there is a problem with Grease Pencil layers (internal issue #343) :
-            # when layers are swapped, saving the name change causes a spurious rename
+                for _ in range(update._diff_deletions):
+                    if to_blender:
+                        item = collection[-1]
+                        collection.remove(item)
+                    del sequence[-1]
 
-            for _ in range(update._diff_deletions):
-                if to_blender:
-                    item = collection[-1]
-                    collection.remove(item)
-                del sequence[-1]
+                for i, delta_update in reversed(update._diff_updates):
+                    sequence[i] = apply_attribute(collection, i, sequence[i], delta_update, context, to_blender)
 
-            for i, delta_update in reversed(update._diff_updates):
-                sequence[i] = apply_attribute(collection, i, sequence[i], delta_update, context, to_blender)
+                for i, delta_addition in enumerate(update._diff_additions, len(sequence)):
+                    if to_blender:
+                        item_proxy = delta_addition.value
+                        specifics.add_element(collection, item_proxy, context)
+                        write_attribute(collection, i, item_proxy, context)
+                    sequence.append(delta_addition.value)
 
-            for i, delta_addition in enumerate(update._diff_additions, len(sequence)):
-                if to_blender:
-                    item_proxy = delta_addition.value
-                    specifics.add_element(collection, item_proxy, context)
-                    write_attribute(collection, i, item_proxy, context)
-                sequence.append(delta_addition.value)
+            except Exception as e:
+                logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
+                logger.warning(f"... for {collection}")
+                logger.warning(f"... Exception: {e!r}")
+                logger.warning("... Update ignored")
 
-        except Exception as e:
-            logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
-            logger.warning(f"... for {collection}")
-            logger.warning(f"... Exception: {e!r}")
-            logger.warning("... Update ignored")
-
-        finally:
-            context.visit_state.path.pop()
+            finally:
+                context.visit_state.path.pop()
 
         return self
 
     def diff(
         self, collection: T.bpy_prop_collection, key: Union[int, str], collection_property: T.Property, context: Context
-    ) -> Optional[DeltaUpdate]:
+    ) -> Optional[Union[DeltaUpdate, DeltaReplace]]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
 
@@ -204,33 +207,44 @@ class StructCollectionProxy(Proxy):
 
         Args:
             collection; the collection that must be diffed agains this proxy
+            key: the name of the collection, to record in the visit path
             collection_property; the property os collection as found in its enclosing object
         """
         sequence = self._sequence
         if len(sequence) == 0 and len(collection) == 0:
             return None
 
-        item_property = collection_property.fixed_type
-        try:
+        if specifics.diff_must_replace(collection, sequence):
+            # A collection cannot be updated because either:
+            # - some of its members cannot be updated :
+            #   SplineBezierPoints has no API to remove points, so Curve.splines cannot be update and must be replaced
+            # - updating the name of members will cause unsolicited renames.
+            #   When swapping layers A and B in a GreasePencilLayers, renaming layer 0 into B cause an unsolicited
+            #   rename of layer 0 into B.001
+            # Send a replacement for the whole collection
+            self.load(collection, key, collection_property, context)
+            return DeltaReplace(self)
+        else:
+            item_property = collection_property.fixed_type
             context.visit_state.path.append(key)
+            try:
+                diff = self.__class__()
+                clear_from = specifics.clear_from(collection, sequence)
+                for i in range(clear_from):
+                    delta = diff_attribute(collection[i], i, item_property, sequence[i], context)
+                    if delta is not None:
+                        diff._diff_updates.append((i, delta))
 
-            diff = self.__class__()
-            clear_from = specifics.clear_from(collection, sequence)
-            for i in range(clear_from):
-                delta = diff_attribute(collection[i], i, item_property, sequence[i], context)
-                if delta is not None:
-                    diff._diff_updates.append((i, delta))
+                diff._diff_deletions = len(sequence) - clear_from
 
-            diff._diff_deletions = len(sequence) - clear_from
+                for i, item in enumerate(collection[clear_from:], clear_from):
+                    value = read_attribute(item, i, item_property, context)
+                    diff._diff_additions.append(DeltaAddition(value))
+            finally:
+                context.visit_state.path.pop()
 
-            for i, item in enumerate(collection[clear_from:], clear_from):
-                value = read_attribute(item, i, item_property, context)
-                diff._diff_additions.append(DeltaAddition(value))
-        finally:
-            context.visit_state.path.pop()
-
-        if diff._diff_updates or diff._diff_deletions or diff._diff_additions:
-            return DeltaUpdate(diff)
+            if diff._diff_updates or diff._diff_deletions or diff._diff_additions:
+                return DeltaUpdate(diff)
 
         return None
 

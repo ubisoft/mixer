@@ -119,6 +119,10 @@ class DeltaUpdate(Delta):
         return cls(p)
 
 
+class DeltaReplace(Delta):
+    pass
+
+
 class Proxy:
     """
     Base class for all proxies.

@@ -300,6 +300,13 @@ default_exclusions = {
             ]
         )
     ],
+    T.GreasePencilLayers: [
+        NameFilterOut(
+            [
+                "active_index",
+            ]
+        )
+    ],
     T.GPencilStroke: [
         NameFilterOut(
             [
