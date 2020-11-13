@@ -25,8 +25,6 @@ import bmesh
 from mathutils import Vector
 
 from mixer.broadcaster import common
-from mixer.stats import stats_timer
-from mixer.share_data import share_data
 from mixer.blender_client import material as material_api
 
 logger = logging.getLogger(__name__)
@@ -136,18 +134,13 @@ def loops_iterator(bm):
             yield loop
 
 
-@stats_timer(share_data)
 def encode_baked_mesh(obj):
     """
     Bake an object as a triangle mesh and encode it.
     """
-    stats_timer = share_data.current_stats_timer
-
     # Bake modifiers
     depsgraph = bpy.context.evaluated_depsgraph_get()
     obj = obj.evaluated_get(depsgraph)
-
-    stats_timer.checkpoint("eval_depsgraph")
 
     # Triangulate mesh (before calculating normals)
     mesh = obj.data if obj.type == "MESH" else obj.to_mesh()
@@ -167,14 +160,10 @@ def encode_baked_mesh(obj):
     bm.to_mesh(mesh)
     bm.free()
 
-    stats_timer.checkpoint("triangulate_mesh")
-
     # Calculate normals, necessary if auto-smooth option enabled
     mesh.calc_normals()
     mesh.calc_normals_split()
     # calc_loop_triangles resets normals so... don't use it
-
-    stats_timer.checkpoint("calc_normals")
 
     # get active uv layer
     uvlayer = mesh.uv_layers.active
@@ -206,25 +195,17 @@ def encode_baked_mesh(obj):
         original_bm.to_mesh(mesh)
         original_bm.free()
 
-    stats_timer.checkpoint("make_buffers")
-
     # Vericex count + binary vertices buffer
     size = len(vertices) // 3
     binary_vertices_buffer = common.int_to_bytes(size, 4) + struct.pack(f"{len(vertices)}f", *vertices)
-
-    stats_timer.checkpoint("write_verts")
 
     # Normals count + binary normals buffer
     size = len(normals) // 3
     binary_normals_buffer = common.int_to_bytes(size, 4) + struct.pack(f"{len(normals)}f", *normals)
 
-    stats_timer.checkpoint("write_normals")
-
     # UVs count + binary uvs buffer
     size = len(uvs) // 2
     binary_uvs_buffer = common.int_to_bytes(size, 4) + struct.pack(f"{len(uvs)}f", *uvs)
-
-    stats_timer.checkpoint("write_uvs")
 
     # material indices + binary material indices buffer
     size = len(material_indices)
@@ -232,13 +213,9 @@ def encode_baked_mesh(obj):
         f"{len(material_indices)}I", *material_indices
     )
 
-    stats_timer.checkpoint("write_material_indices")
-
     # triangle indices count + binary triangle indices buffer
     size = len(indices) // 3
     binary_indices_buffer = common.int_to_bytes(size, 4) + struct.pack(f"{len(indices)}I", *indices)
-
-    stats_timer.checkpoint("write_tri_idx_buff")
 
     return (
         binary_vertices_buffer
@@ -249,17 +226,13 @@ def encode_baked_mesh(obj):
     )
 
 
-@stats_timer(share_data)
 def encode_base_mesh_geometry(mesh_data):
-    stats_timer = share_data.current_stats_timer
 
     # We do not synchronize "select" and "hide" state of mesh elements
     # because we consider them user specific.
 
     bm = bmesh.new()
     bm.from_mesh(mesh_data)
-
-    stats_timer.checkpoint("bmesh_from_mesh")
 
     binary_buffer = bytes()
 
@@ -270,11 +243,7 @@ def encode_base_mesh_geometry(mesh_data):
     for vert in bm.verts:
         verts_array.extend((*vert.co,))
 
-    stats_timer.checkpoint("make_verts_buffer")
-
     binary_buffer += struct.pack(f"1I{len(verts_array)}f", len(bm.verts), *verts_array)
-
-    stats_timer.checkpoint("encode_verts_buffer")
 
     # Vertex layers
     # Ignored layers for now:
@@ -286,8 +255,6 @@ def encode_base_mesh_geometry(mesh_data):
     # - float, int, string: don't really know their role
     binary_buffer += encode_bmesh_layer(bm.verts.layers.bevel_weight, bm.verts, extract_layer_float)
 
-    stats_timer.checkpoint("verts_layers")
-
     logger.debug("Writing %d edges", len(bm.edges))
     bm.edges.ensure_lookup_table()
 
@@ -295,11 +262,7 @@ def encode_base_mesh_geometry(mesh_data):
     for edge in bm.edges:
         edges_array.extend((edge.verts[0].index, edge.verts[1].index, edge.smooth, edge.seam))
 
-    stats_timer.checkpoint("make_edges_buffer")
-
     binary_buffer += struct.pack(f"1I{len(edges_array)}I", len(bm.edges), *edges_array)
-
-    stats_timer.checkpoint("encode_edges_buffer")
 
     # Edge layers
     # Ignored layers for now: None
@@ -309,8 +272,6 @@ def encode_base_mesh_geometry(mesh_data):
     binary_buffer += encode_bmesh_layer(bm.edges.layers.bevel_weight, bm.edges, extract_layer_float)
     binary_buffer += encode_bmesh_layer(bm.edges.layers.crease, bm.edges, extract_layer_float)
 
-    stats_timer.checkpoint("edges_layers")
-
     logger.debug("Writing %d faces", len(bm.faces))
     bm.faces.ensure_lookup_table()
 
@@ -319,11 +280,7 @@ def encode_base_mesh_geometry(mesh_data):
         faces_array.extend((face.material_index, face.smooth, len(face.verts)))
         faces_array.extend((vert.index for vert in face.verts))
 
-    stats_timer.checkpoint("make_faces_buffer")
-
     binary_buffer += struct.pack(f"1I{len(faces_array)}I", len(bm.faces), *faces_array)
-
-    stats_timer.checkpoint("encode_faces_buffer")
 
     # Face layers
     # Ignored layers for now: None
@@ -331,8 +288,6 @@ def encode_base_mesh_geometry(mesh_data):
     # - freestyle: of type NotImplementedType, maybe reserved for future dev
     # - float, int, string: don't really know their role
     binary_buffer += encode_bmesh_layer(bm.faces.layers.face_map, bm.faces, extract_layer_int)
-
-    stats_timer.checkpoint("faces_layers")
 
     # Loops layers
     # A loop is an edge attached to a face (so each edge of a manifold can have 2 loops at most).
@@ -342,14 +297,11 @@ def encode_base_mesh_geometry(mesh_data):
     binary_buffer += encode_bmesh_layer(bm.loops.layers.uv, loops_iterator(bm), extract_layer_uv)
     binary_buffer += encode_bmesh_layer(bm.loops.layers.color, loops_iterator(bm), extract_layer_color)
 
-    stats_timer.checkpoint("loops_layers")
-
     bm.free()
 
     return binary_buffer
 
 
-@stats_timer(share_data)
 def encode_base_mesh(obj):
 
     # Temporary for curves and other objects that support to_mesh()
@@ -440,7 +392,6 @@ def encode_base_mesh(obj):
     return binary_buffer
 
 
-@stats_timer(share_data)
 def encode_mesh(obj, do_encode_base_mesh, do_encode_baked_mesh):
     binary_buffer = bytes()
 
@@ -469,7 +420,6 @@ def encode_mesh(obj, do_encode_base_mesh, do_encode_baked_mesh):
     return binary_buffer
 
 
-@stats_timer(share_data)
 def decode_baked_mesh(obj: Optional[bpy.types.Object], data, index):
     # Note: Blender should not load a baked mesh but we have this function to debug the encoding part
     # and as an example for implementations that load baked meshes
@@ -532,7 +482,6 @@ def decode_baked_mesh(obj: Optional[bpy.types.Object], data, index):
     return index
 
 
-@stats_timer(share_data)
 def decode_base_mesh(client, obj: bpy.types.Object, mesh: bpy.types.Mesh, data, index):
     bm = bmesh.new()
 
@@ -655,7 +604,6 @@ def decode_base_mesh(client, obj: bpy.types.Object, mesh: bpy.types.Mesh, data, 
     return index
 
 
-@stats_timer(share_data)
 def decode_mesh(client, obj, data, index):
     assert obj.data
 

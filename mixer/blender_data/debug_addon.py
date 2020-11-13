@@ -19,6 +19,7 @@ An addon for development and test of the generic proxy mechanism
 """
 import bpy
 import logging
+import os
 import time
 
 from mixer.blender_data import blenddata
@@ -31,17 +32,6 @@ class DebugDataProperties(bpy.types.PropertyGroup):
     profile_cumulative: bpy.props.BoolProperty(name="ProfileCumulative", default=False)
     profile_callers: bpy.props.BoolProperty(name="ProfileCallers", default=False)
     test_names: bpy.props.StringProperty(name="TestNames", default=default_test)
-
-
-def timeit(func):
-    def wrapper(*arg, **kw):
-        """source: http://www.daniweb.com/code/snippet368.html"""
-        t1 = time.time()
-        res = func(*arg, **kw)
-        t2 = time.time()
-        return (t2 - t1), res, func.__name__
-
-    return wrapper
 
 
 proxy = None
@@ -195,19 +185,23 @@ classes = (
     DebugDataProperties,
 )
 
+use_debug_addon = os.environ.get("MIXER_DEVELOPMENT", False)
+
 
 def get_props() -> DebugDataProperties:
     return bpy.context.window_manager.debug_data_props
 
 
 def register():
-    for class_ in classes:
-        bpy.utils.register_class(class_)
-    bpy.types.WindowManager.debug_data_props = bpy.props.PointerProperty(type=DebugDataProperties)
+    if use_debug_addon:
+        for class_ in classes:
+            bpy.utils.register_class(class_)
+        bpy.types.WindowManager.debug_data_props = bpy.props.PointerProperty(type=DebugDataProperties)
     blenddata.register()
 
 
 def unregister():
-    for class_ in classes:
-        bpy.utils.unregister_class(class_)
+    if use_debug_addon:
+        for class_ in classes:
+            bpy.utils.unregister_class(class_)
     blenddata.unregister()

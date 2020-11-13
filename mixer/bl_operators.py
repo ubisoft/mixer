@@ -21,7 +21,6 @@ This module define Blender Operators types for the addon.
 
 import logging
 import os
-import sys
 import socket
 import subprocess
 import time
@@ -30,7 +29,6 @@ import bpy
 
 from mixer.share_data import share_data
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
-from mixer.stats import save_statistics
 from mixer.broadcaster.common import RoomAttributes, ClientAttributes
 from mixer.connection import (
     is_client_connected,
@@ -409,35 +407,6 @@ class LaunchVRtistOperator(bpy.types.Operator):
         return {"FINISHED"}
 
 
-class WriteStatisticsOperator(bpy.types.Operator):
-    """Write Mixer statistics in a file"""
-
-    bl_idname = "mixer.write_statistics"
-    bl_label = "Mixer Write Statistics"
-    bl_options = {"REGISTER"}
-
-    def execute(self, context):
-        if share_data.current_statistics is not None:
-            save_statistics(share_data.current_statistics, get_mixer_props().statistics_directory)
-        return {"FINISHED"}
-
-
-class OpenStatsDirOperator(bpy.types.Operator):
-    """Write Mixer stats directory in explorer"""
-
-    bl_idname = "mixer.open_stats_dir"
-    bl_label = "Mixer Open Stats Directory"
-    bl_options = {"REGISTER"}
-
-    def execute(self, context):
-        if sys.platform == "win32":
-            os.startfile(get_mixer_prefs().statistics_directory)
-        else:
-            opener = "open" if sys.platform == "darwin" else "xdg-open"
-            subprocess.call([opener, get_mixer_prefs().statistics_directory])
-        return {"FINISHED"}
-
-
 classes = (
     LaunchVRtistOperator,
     CreateRoomOperator,
@@ -446,8 +415,6 @@ classes = (
     JoinRoomOperator,
     DeleteRoomOperator,
     LeaveRoomOperator,
-    WriteStatisticsOperator,
-    OpenStatsDirOperator,
     DownloadRoomOperator,
     UploadRoomOperator,
 )

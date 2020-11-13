@@ -51,11 +51,8 @@ _disable_fault_handler = False
 
 
 def cleanup():
-    from mixer import stats
     from mixer.share_data import share_data
 
-    if share_data.current_statistics is not None and share_data.auto_save_statistics:
-        stats.save_statistics(share_data.current_statistics, share_data.statistics_directory)
     try:
         if share_data.local_server_process:
             share_data.local_server_process.kill()

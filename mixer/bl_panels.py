@@ -30,7 +30,7 @@ from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.bl_properties import UserItem
 from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientAttributes
-from mixer.blender_data.debug_addon import DebugDataPanel
+from mixer.blender_data.debug_addon import DebugDataPanel, use_debug_addon
 from mixer import display_version
 
 if TYPE_CHECKING:
@@ -182,10 +182,6 @@ def draw_advanced_settings_ui(layout: bpy.types.UILayout):
 
 def draw_developer_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "statistics_directory", text="Stats Directory")
-    layout.operator(bl_operators.OpenStatsDirOperator.bl_idname, text="Open Directory")
-    layout.operator(bl_operators.WriteStatisticsOperator.bl_idname, text="Write Statistics")
-    layout.prop(mixer_prefs, "auto_save_statistics", text="Auto Save Statistics")
     layout.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
     layout.prop(mixer_prefs, "no_start_server", text="Do not start server on connect")
     layout.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
@@ -391,11 +387,13 @@ class VRtistSettingsPanel(bpy.types.Panel):
         )
 
 
-panels = (
+panels = [
     MixerSettingsPanel,
     VRtistSettingsPanel,
-    DebugDataPanel,
-)
+]
+
+if use_debug_addon:
+    panels.append(DebugDataPanel)
 
 
 def update_panels_category(self, context):
