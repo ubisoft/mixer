@@ -243,6 +243,8 @@ _exclude_names = {
     "override_library",
     "preview",
     "mixer_uuid",
+    # Related to the UI
+    "active_index",
 }
 """Names of properties that are always excluded"""
 
@@ -297,13 +299,6 @@ default_exclusions = {
                 "active_frame",
                 # see internal issue #341
                 "parent_type",
-            ]
-        )
-    ],
-    T.GreasePencilLayers: [
-        NameFilterOut(
-            [
-                "active_index",
             ]
         )
     ],
