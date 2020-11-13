@@ -108,5 +108,59 @@ scene.use_gravity = True
         self.end_test()
 
 
+class TestMesh(TestGenericJoinBefore):
+    def test_bpy_ops_mesh_plane_add(self):
+        """Same polygon sizes"""
+        action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add()
+"""
+        self.send_string(action)
+        self.end_test()
+
+    def test_bpy_ops_mesh_cone_add(self):
+        # Different polygon sizes
+        action = """
+import bpy
+bpy.ops.mesh.primitive_cone_add()
+"""
+        self.send_string(action)
+        self.end_test()
+
+    def test_bpy_ops_mesh_subdivide(self):
+        """Different polygon sizes"""
+        action = """
+import bpy
+bpy.ops.mesh.primitive_cone_add()
+"""
+        self.send_string(action)
+
+        action = """
+import bpy
+bpy.ops.object.editmode_toggle()
+bpy.ops.mesh.subdivide()
+bpy.ops.object.editmode_toggle()
+"""
+        self.send_string(action)
+
+        self.end_test()
+
+    def test_bpy_ops_mesh_uv_texture_add(self):
+        """Different polygon sizes"""
+        action = """
+import bpy
+bpy.ops.mesh.primitive_cone_add()
+"""
+        self.send_string(action)
+
+        action = """
+import bpy
+bpy.ops.mesh.uv_texture_add()
+"""
+        self.send_string(action)
+
+        self.end_test()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,7 @@
 """
 Base class for test cases
 """
+import array
 from dataclasses import dataclass
 import json
 import logging
@@ -206,7 +207,7 @@ class MixerTestCase(unittest.TestCase):
         self.assert_stream_equals(s, r, ignore=ignore)
 
     def assert_any_almost_equal(self, a: Any, b: Any, msg: str = "", ignore: Iterable[str] = ()):
-
+        """Recursive comparison with float tolerance"""
         # Use Assertion error.
         # The all but last args in the resulting exception is the path into the structure to the faulting element
         # Not that obvious to do something smarter to have a nicer display :
@@ -219,7 +220,9 @@ class MixerTestCase(unittest.TestCase):
         if isinstance(a, (bool, int, str, bytes, type(None))):
             self.assertEqual(a, b, msg=msg)
         elif isinstance(a, float):
-            self.assertAlmostEqual(a, b, places=5, msg=msg)
+            self.assertAlmostEqual(a, b, places=4, msg=msg)
+        elif isinstance(a, array.array):
+            self.assert_any_almost_equal(a.tolist(), b.tolist(), msg=msg)
         elif isinstance(a, (list, tuple)):
             self.assertEqual(len(a), len(b), msg=msg)
             for i, (item_a, item_b) in enumerate(zip(a, b)):
