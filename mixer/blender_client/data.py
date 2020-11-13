@@ -30,6 +30,7 @@ import traceback
 from typing import List, Optional, TYPE_CHECKING, Union
 
 from mixer.blender_data.json_codec import Codec, DecodeError
+from mixer.blender_data.messages import BlenderCreateMessage
 from mixer.broadcaster.common import (
     Command,
     decode_int,
@@ -48,7 +49,7 @@ from mixer.share_data import share_data
 if TYPE_CHECKING:
     from mixer.blender_data.changeset import CreationChangeset, RemovalChangeset, UpdateChangeset, RenameChangeset
     from mixer.blender_data.datablock_proxy import DatablockProxy
-    from mixer.blender_data.proxy import DeltaUpdate, Uuid
+    from mixer.blender_data.proxy import DeltaUpdate, Soa, Uuid
 
 
 logger = logging.getLogger(__name__)
@@ -78,24 +79,22 @@ def send_data_creations(proxies: CreationChangeset):
     if share_data.use_vrtist_protocol():
         return
 
-    codec = Codec()
     for datablock_proxy in proxies:
         logger.info("%s %s", "send_data_create", datablock_proxy)
 
+        send_media_creations(datablock_proxy)
+
+        codec = Codec()
         try:
             encoded_proxy = codec.encode(datablock_proxy)
         except Exception:
             logger.error(f"send_data_create: encode exception for {datablock_proxy}")
             for line in traceback.format_exc().splitlines():
                 logger.error(line)
-            continue
+            return b""
 
-        send_media_creations(datablock_proxy)
-        # creation so that it is available at bpy_data_ctor() time
-        items: List[bytes] = []
-        items.append(encode_string(encoded_proxy))
-        items.extend(soa_buffers(datablock_proxy))
-        command = Command(MessageType.BLENDER_DATA_CREATE, b"".join(items), 0)
+        buffer = BlenderCreateMessage.encode(datablock_proxy, encoded_proxy)
+        command = Command(MessageType.BLENDER_DATA_CREATE, buffer, 0)
         share_data.client.add_command(command)
 
 
@@ -157,19 +156,15 @@ def build_data_create(buffer):
     if share_data.use_vrtist_protocol():
         return
 
-    proxy_string, index = decode_string(buffer, 0)
-    codec = Codec()
+    share_data.set_dirty()
     rename_changeset = None
-
+    codec = Codec()
     try:
-        datablock_proxy: DatablockProxy = codec.decode(proxy_string)
-        logger.info("%s: %s", "build_data_create", datablock_proxy)
-
-        # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
-        share_data.set_dirty()
-
+        message = BlenderCreateMessage()
+        message.decode(buffer)
+        datablock_proxy = codec.decode(message.proxy_string)
         _, rename_changeset = share_data.bpy_data_proxy.create_datablock(datablock_proxy)
-        _decode_and_build_soas(datablock_proxy.mixer_uuid(), buffer, index)
+        _build_soas(datablock_proxy.mixer_uuid(), message.soas)
     except DecodeError as e:
         logger.error(f"Decode error for {str(e.args[1])[:100]} ...")
         logger.error("... possible version mismatch")
@@ -209,6 +204,17 @@ def _decode_and_build_soas(uuid: Uuid, buffer: bytes, index: int):
             share_data.bpy_data_proxy.update_soa(uuid, path, soas)
     except Exception:
         logger.error(f"Exception during build_soa for {uuid} {path} {name}")
+        for line in traceback.format_exc().splitlines():
+            logger.error(line)
+        logger.error("ignored")
+
+
+def _build_soas(uuid: Uuid, soas: List[Soa]):
+    try:
+        for soa in soas:
+            share_data.bpy_data_proxy.update_soa(uuid, soa.path, soa.members)
+    except Exception:
+        logger.error(f"Exception during update_soa for {uuid} {soa.path}")
         for line in traceback.format_exc().splitlines():
             logger.error(line)
         logger.error("ignored")

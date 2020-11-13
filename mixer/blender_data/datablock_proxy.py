@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import logging
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -32,13 +32,12 @@ from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 
 from mixer.blender_data.attributes import apply_attribute, read_attribute, write_attribute
-from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate
+from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate, Path, SoaMember
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.types import sub_id_type
 from mixer.local_data import get_source_file_path
 
 if TYPE_CHECKING:
-    import array
     from mixer.blender_data.bpy_data_proxy import RenameChangeset, Context, VisitState
     from mixer.blender_data.aos_soa_proxy import SoaElement
 
@@ -370,15 +369,15 @@ class DatablockProxy(StructProxy):
             finally:
                 context.visit_state.datablock_proxy = None
 
-    def update_soa(self, bl_item, path: List[Union[int, str]], soas: List[Tuple[str, array.array]]):
+    def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember]):
 
         r = self.find_by_path(bl_item, path)
         if r is None:
             return
         container, container_proxy = r
-        for element_name, buffer in soas:
-            soa_proxy = container_proxy.data(element_name)
-            soa_proxy.save_array(container, element_name, buffer)
+        for soa_member in soa_members:
+            soa_proxy = container_proxy.data(soa_member[0])
+            soa_proxy.save_array(container, soa_member[0], soa_member[1])
 
         # HACK
         if isinstance(bl_item, T.Mesh):

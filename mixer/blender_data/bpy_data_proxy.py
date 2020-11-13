@@ -22,7 +22,6 @@ See synchronization.md
 """
 from __future__ import annotations
 
-import array
 from dataclasses import dataclass, field
 import logging
 from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
@@ -40,8 +39,10 @@ from mixer.blender_data.proxy import (
     DeltaReplace,
     DeltaUpdate,
     ensure_uuid,
+    Path,
     Proxy,
     MaxDepthExceeded,
+    SoaMember,
     UnresolvedRefs,
     Uuid,
 )
@@ -405,10 +406,10 @@ class BpyDataProxy(Proxy):
             return diff
         return None
 
-    def update_soa(self, uuid: Uuid, path: List[Union[int, str]], soas: List[Tuple[str, array.array]]):
+    def update_soa(self, uuid: Uuid, path: Path, soa_members: List[SoaMember]):
         datablock_proxy = self.state.proxies[uuid]
         datablock = self.state.datablocks[uuid]
-        datablock_proxy.update_soa(datablock, path, soas)
+        datablock_proxy.update_soa(datablock, path, soa_members)
 
     def append_delayed_updates(self, delayed_updates: Set[T.ID]):
         self._delayed_updates |= delayed_updates
