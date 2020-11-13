@@ -331,7 +331,7 @@ default_exclusions = {
     ],
     T.MeshEdge: [NameFilterOut(["select"])],
     T.MeshLoopColorLayer: [NameFilterOut(["active"])],
-    T.MeshPolygon: [NameFilterOut(["area", "center", "normal", "select"])],
+    T.MeshPolygon: [NameFilterOut(["area", "center", "normal", "select", "loop_indices", "edge_keys"])],
     T.MeshUVLoop: [NameFilterOut(["select"])],
     T.MeshUVLoopLayer: [NameFilterOut(["active", "active_clone"])],
     T.MeshVertex: [
