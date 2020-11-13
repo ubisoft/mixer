@@ -15,11 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-This module define Proxy classes and utilities to load array of structures like MeshVertex.vertices
-into structure of array and thus benefit from the performance of foreach_get() and foreach_set()
-and from the buffer compacity.
+Proxy classes and utilities to load array of structures into structures of array
+and thus benefit from the performance of foreach_get() and foreach_set() and from the buffer compacity.
 
-This module is not currently used
+This is used for so called soable types, like MeshVertices (array of MeshVertex), SplineBezierPoints
 
 See synchronization.md
 """
@@ -27,7 +26,7 @@ from __future__ import annotations
 
 import array
 import logging
-from typing import Any, List, Dict, Optional, TYPE_CHECKING
+from typing import Any, List, Dict, Optional, Tuple, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -59,10 +58,8 @@ def soa_initializer(attr_type, length):
 
 class AosElement(Proxy):
     """
-    A structure member inside a bpy_prop_collection loaded as a structure of array element
-
-    For instance, MeshVertex.groups is a bpy_prop_collection of variable size and it cannot
-    be loaded as an Soa in Mesh.vertices. So Mesh.vertices loads a "groups" AosElement
+    Proxy for a member of an soable collection that is not supported by foreach_get()/foreach_set(),
+    like SplineBezierPoints[x].handle_left_type
     """
 
     def __init__(self):
@@ -76,18 +73,24 @@ class AosElement(Proxy):
         context: Context,
     ):
         """
-        - bl_collection: a collection of structure, e.g. T.Mesh.vertices
-        - item_bl_rna: the bl_rna if the structure contained in the collection, e.g. T.MeshVertices.bl_rna
-        - attr_name: a member if the structure to be loaded as a sequence, e.g. "groups"
+        - bl_collection: a collection of structure, e.g. a SplineBezierPoints instance
+        - attr_name: the name of the member to load, such as "handle_left_type"
         """
 
         for index, item in enumerate(bl_collection):
             self._data[index] = read_attribute(getattr(item, attr_name), index, attr_property, context)
 
+        try:
+            if not isinstance(self._data[0], str):
+                logger.error(f"unsupported type for {bl_collection}[{attr_name}]: {type(self._data[0])}")
+        except IndexError:
+            pass
+
         return self
 
     def save(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str, context: Context):
         for index, item in self._data.items():
+            # serialization turns all dict keys to strings
             write_attribute(bl_collection[int(index)], attr_name, item, context)
 
 
@@ -104,7 +107,7 @@ class SoaElement(Proxy):
         self._array: Optional[array.array] = None
         self._member_name: Optional[str] = None
 
-    def array_attr(self, aos: T.bpy_prop_collection, member_name: str, bl_rna: T.bpy_struct):
+    def array_attr(self, aos: T.bpy_prop_collection, member_name: str, bl_rna: T.bpy_struct) -> Tuple[int, type]:
         prototype_item = getattr(aos[0], member_name)
         member_type = type(prototype_item)
 
@@ -129,18 +132,20 @@ class SoaElement(Proxy):
             member_name : The name of this aos member (e.g, "co", "normal", ...)
             prototype_item : an element of parent collection
         """
-        array_size, member_type = self.array_attr(aos, member_name, bl_rna)
-        typecode = soa_initializers[member_type].typecode
-        buffer = self._array
-        if buffer is None or buffer.buffer_info()[1] != array_size or buffer.typecode != typecode:
-            self._array = soa_initializer(member_type, array_size)
-
         self._member_name = member_name
+        if len(aos) == 0:
+            self._array = array.array("b", [])
+        else:
+            array_size, member_type = self.array_attr(aos, member_name, bl_rna)
+            typecode = soa_initializers[member_type].typecode
+            buffer = self._array
+            if buffer is None or buffer.buffer_info()[1] != array_size or buffer.typecode != typecode:
+                self._array = soa_initializer(member_type, array_size)
 
-        # if foreach_get() raises "RuntimeError: internal error setting the array"
-        # it means that the array is ill-formed.
-        # Check rna_access.c:rna_raw_access()
-        aos.foreach_get(member_name, self._array)
+            # if foreach_get() raises "RuntimeError: internal error setting the array"
+            # it means that the array is ill-formed.
+            # Check rna_access.c:rna_raw_access()
+            aos.foreach_get(member_name, self._array)
         self._attach(context)
         return self
 
@@ -198,8 +203,7 @@ class SoaElement(Proxy):
             logger.debug(message)
         aos.foreach_get(self._member_name, tmp_array)
 
-        force_diff = context.visit_state.scratchpad.get("force_soa_diff", False)
-        if self._array == tmp_array and not force_diff:
+        if self._array == tmp_array:
             return None
 
         diff = self.__class__()

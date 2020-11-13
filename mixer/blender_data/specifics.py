@@ -42,7 +42,6 @@ import mathutils
 if TYPE_CHECKING:
     from mixer.blender_data.aos_proxy import AosProxy
     from mixer.blender_data.datablock_proxy import DatablockProxy
-    from mixer.blender_data.mesh_proxy import MeshProxy
     from mixer.blender_data.proxy import Context, Proxy
     from mixer.blender_data.struct_proxy import StructProxy
 
@@ -64,8 +63,6 @@ soable_collection_properties = {
     T.MeshLoopColorLayer.bl_rna.properties["data"],
     T.MeshUVLoopLayer.bl_rna.properties["data"],
 }
-
-
 _resize_geometry_types = tuple(
     type(t.bl_rna)
     for t in [
@@ -77,28 +74,6 @@ _resize_geometry_types = tuple(
     ]
 )
 
-
-_mesh_geometry_properties = {
-    "edges",
-    "loop_triangles",
-    "loops",
-    "polygons",
-    "vertices",
-}
-"""If the size of any of these has changes clear_geomtry() is required. Is is not necessary to check for
-other properties (uv_layers), as they are redundant checks"""
-
-mesh_resend_on_clear = {
-    "edges",
-    "face_maps",
-    "loops",
-    "loop_triangles",
-    "polygons",
-    "vertices",
-    "uv_layers",
-    "vertex_colors",
-}
-"""if geometry needs to be cleared, these arrays must be resend, as they will need to be reloaded by the receiver"""
 
 # in sync with soa_initializers
 soable_properties = (
@@ -374,38 +349,6 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
     return filtered.items()
 
 
-def proxy_requires_clear_geometry(incoming_proxy: MeshProxy, mesh: T.Mesh) -> bool:
-    for k in _mesh_geometry_properties:
-        soa = getattr(mesh, k)
-        existing_length = len(soa)
-        incoming_soa = incoming_proxy.data(k)
-        if incoming_soa:
-            incoming_length = incoming_soa.length
-            if existing_length != incoming_length:
-                logger.debug(
-                    "need_clear_geometry: %s.%s (current/incoming) (%s/%s)",
-                    mesh,
-                    k,
-                    existing_length,
-                    incoming_length,
-                )
-                return True
-    return False
-
-
-def update_requires_clear_geometry(incoming_update: MeshProxy, existing_proxy: MeshProxy) -> bool:
-    geometry_updates = _mesh_geometry_properties & set(incoming_update._data.keys())
-    for k in geometry_updates:
-        existing_length = existing_proxy._data[k].length
-        incoming_soa = incoming_update.data(k)
-        if incoming_soa:
-            incoming_length = incoming_soa.length
-            if existing_length != incoming_length:
-                logger.debug("apply: length mismatch %s.%s ", existing_proxy, k)
-                return True
-    return False
-
-
 def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
     """Process attributes that must be saved first and return a possibly updated reference to the target"""
 
@@ -413,7 +356,7 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
     # When called from save, the proxy has  all the synchronized properties
     # WHen called from apply, the proxy only contains the updated properties
 
-    if isinstance(target, T.Mesh) and proxy_requires_clear_geometry(proxy, target):
+    if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
         target.clear_geometry()
     elif isinstance(target, T.Material):
         use_nodes = proxy.data("use_nodes")

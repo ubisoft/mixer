@@ -36,7 +36,15 @@ from mixer.blender_data.datablock_collection_proxy import DatablockCollectionPro
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import SynchronizedProperties, safe_depsgraph_updates, safe_properties
-from mixer.blender_data.proxy import DeltaUpdate, ensure_uuid, Proxy, MaxDepthExceeded, UnresolvedRefs, Uuid
+from mixer.blender_data.proxy import (
+    DeltaReplace,
+    DeltaUpdate,
+    ensure_uuid,
+    Proxy,
+    MaxDepthExceeded,
+    UnresolvedRefs,
+    Uuid,
+)
 
 if TYPE_CHECKING:
     from mixer.blender_data.changeset import Removal
@@ -298,7 +306,7 @@ class BpyDataProxy(Proxy):
         """
         Process a received datablock update command, updating the datablock and the proxy state
         """
-        assert isinstance(update, DeltaUpdate)
+        assert isinstance(update, (DeltaUpdate, DeltaReplace))
         incoming_proxy: DatablockProxy = update.value
         bpy_data_collection_proxy = self._data.get(incoming_proxy.collection_name)
         if bpy_data_collection_proxy is None:

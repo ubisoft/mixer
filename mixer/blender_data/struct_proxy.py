@@ -46,6 +46,12 @@ class StructProxy(Proxy):
         self._data = {}
         pass
 
+    def copy_data(self, other: StructProxy):
+        self._data = other._data
+
+    def clear_data(self):
+        self._data.clear()
+
     @classmethod
     def make(cls, attr_property):
 
@@ -60,7 +66,7 @@ class StructProxy(Proxy):
         """
         Load a Blender object into this proxy
         """
-        self._data.clear()
+        self.clear_data()
         properties = context.synchronized_properties.properties(bl_instance)
         # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
         # that we do not want to load anyway
