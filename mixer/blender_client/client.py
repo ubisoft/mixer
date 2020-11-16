@@ -265,6 +265,8 @@ class BlenderClient(Client):
         try:
             obj = self.get_or_create_path(src_path)
             new_obj = obj.copy()
+            # reparent to root
+            new_obj.parent = None
             new_obj.name = dst_name
 
             # copy materials
@@ -280,7 +282,7 @@ class BlenderClient(Client):
             for collection in obj.users_collection:
                 collection.objects.link(new_obj)
 
-            self.set_transform(new_obj, obj.matrix_parent_invert, basis_matrix, obj.matrix_parent_invert @ basis_matrix)
+            self.set_transform(new_obj, Matrix(), basis_matrix, basis_matrix)
         except Exception:
             pass
 
