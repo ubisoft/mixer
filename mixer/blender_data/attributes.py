@@ -27,7 +27,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data.blenddata import bl_rna_to_type
 from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
 from mixer.blender_data.specifics import is_soable_collection
-from mixer.blender_data.types import is_builtin, is_vector, is_matrix
+from mixer.blender_data.type_helpers import is_builtin, is_vector, is_matrix
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context

@@ -28,7 +28,7 @@ from typing import Any, Dict, ItemsView, Iterable, List, Union
 
 from bpy import types as T  # noqa
 
-from mixer.blender_data.types import is_pointer_to
+from mixer.blender_data.type_helpers import is_pointer_to
 from mixer.blender_data.blenddata import collection_name_to_type
 
 DEBUG = True

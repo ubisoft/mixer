@@ -34,7 +34,7 @@ from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 from mixer.blender_data.attributes import apply_attribute, read_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate, Path, SoaMember
 from mixer.blender_data.struct_proxy import StructProxy
-from mixer.blender_data.types import sub_id_type
+from mixer.blender_data.type_helpers import sub_id_type
 from mixer.local_data import get_source_file_path
 
 if TYPE_CHECKING:

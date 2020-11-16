@@ -22,7 +22,7 @@ import unittest
 
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from mixer.blender_data.types import is_builtin, is_vector, is_matrix
+from mixer.blender_data.type_helpers import is_builtin, is_vector, is_matrix
 from mixer.blender_data.filter import test_properties
 
 

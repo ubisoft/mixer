@@ -33,7 +33,7 @@ import bpy.types as T  # noqa
 
 
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
-from mixer.blender_data.types import is_vector
+from mixer.blender_data.type_helpers import is_vector
 from mixer.blender_data.specifics import soa_initializers
 from mixer.blender_data.attributes import read_attribute, write_attribute
 
