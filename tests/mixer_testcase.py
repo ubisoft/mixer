@@ -49,7 +49,6 @@ class MixerTestCase(unittest.TestCase):
         self._blenders: List[BlenderApp] = []
         self.ignored_messages = set()
         self.experimental_sync = True
-        self.vrtist_protocol = False
 
     def set_log_level(self, log_level):
         self._log_level = log_level

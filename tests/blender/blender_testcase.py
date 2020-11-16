@@ -18,11 +18,12 @@ class BlenderTestCase(MixerTestCase):
     """
 
     def __init__(self, *args, **kwargs):
+        # in case @parameterized_class is missing
+        if not hasattr(self, "vrtist_protocol"):
+            self.vrtist_protocol = False
         super().__init__(*args, **kwargs)
 
     def setUp(self, *args, **kwargs):
-        if not hasattr(self, "vrtist_protocol"):
-            self.vrtist_protocol = False
         super().setUp(*args, **kwargs)
 
 
