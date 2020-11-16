@@ -76,7 +76,9 @@ class DatablockCollectionProxy(Proxy):
             if skip_bpy_data_item(collection_name, item):
                 continue
             uuid = ensure_uuid(item)
-            self._data[uuid] = DatablockProxy().load(item, name, context, bpy_data_collection_name=collection_name)
+            self._data[uuid] = DatablockProxy.make(item).load(
+                item, name, context, bpy_data_collection_name=collection_name
+            )
 
         return self
 
