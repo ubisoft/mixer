@@ -305,6 +305,8 @@ default_exclusions = {
     T.GPencilStroke: [
         NameFilterOut(
             [
+                # Fails comparison in tests. Result Ok without. Seems computed
+                "triangles",
                 # readonly
                 "bound_box_min",
                 "bound_box_max",
