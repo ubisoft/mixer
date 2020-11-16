@@ -21,7 +21,6 @@ See synchronization.md
 """
 from __future__ import annotations
 
-import array
 from collections import defaultdict
 from dataclasses import dataclass
 import logging
@@ -115,26 +114,6 @@ class DeltaUpdate(Delta):
 
 class DeltaReplace(Delta):
     pass
-
-
-SoaMember = Tuple[str, array.array]
-"""Member of a structure of array from a Blender array of structure like MeshVertices
-- Name of the structure member, e.g, "co" or "normal"
-- Data to be loaded with foreach_set()
-"""
-
-Path = List[Union[str, int]]
-"""a data path starting from the datablock e.g. ["curves", 0, "bezier_points"]"""
-
-
-@dataclass
-class Soa:
-    """A structure of array, loaded from a Blender array of structure like MeshVertices"""
-
-    path: Path
-    """a data path to the array"""
-
-    members: List[SoaMember]
 
 
 class Proxy:

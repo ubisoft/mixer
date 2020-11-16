@@ -49,7 +49,8 @@ from mixer.share_data import share_data
 if TYPE_CHECKING:
     from mixer.blender_data.changeset import CreationChangeset, RemovalChangeset, UpdateChangeset, RenameChangeset
     from mixer.blender_data.datablock_proxy import DatablockProxy
-    from mixer.blender_data.proxy import DeltaUpdate, Soa, Uuid
+    from mixer.blender_data.proxy import DeltaUpdate, Uuid
+    from mixer.blender_data.types import Soa
 
 
 logger = logging.getLogger(__name__)

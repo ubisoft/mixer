@@ -39,16 +39,15 @@ from mixer.blender_data.proxy import (
     DeltaReplace,
     DeltaUpdate,
     ensure_uuid,
-    Path,
     Proxy,
     MaxDepthExceeded,
-    SoaMember,
     UnresolvedRefs,
     Uuid,
 )
 
 if TYPE_CHECKING:
     from mixer.blender_data.changeset import Removal
+    from mixer.blender_data.types import Path, SoaMember
 
 logger = logging.getLogger(__name__)
 

@@ -29,7 +29,7 @@ import traceback
 from typing import List, Optional, TYPE_CHECKING, Union
 
 from mixer.codec import Message
-from mixer.blender_data.proxy import Soa
+from mixer.blender_data.types import Soa
 
 from mixer.broadcaster.common import (
     decode_int,
