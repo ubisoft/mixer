@@ -88,7 +88,7 @@ def _decode_soas(buffer: bytes) -> List[Soa]:
             path_string, index = decode_string(buffer, index)
             path = json.loads(path_string)
 
-            logger.info("%s: %s %s", "build_soa", path)
+            logger.info("%s: %s ", "build_soa", path)
 
             element_count, index = decode_int(buffer, index)
             members = []

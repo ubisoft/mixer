@@ -22,7 +22,7 @@ from bpy import data as D  # noqa
 from bpy import types as T  # noqa
 
 
-from mixer.blender_data import types
+from mixer.blender_data.type_helpers import is_pointer_to
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.filter import test_properties
 from mixer.blender_data.struct_proxy import StructProxy
@@ -104,19 +104,19 @@ class TestCore(unittest.TestCase):
 
     def test_pointer_class(self):
         eevee = T.Scene.bl_rna.properties["eevee"]
-        self.assertTrue(types.is_pointer_to(eevee, T.SceneEEVEE))
+        self.assertTrue(is_pointer_to(eevee, T.SceneEEVEE))
 
         collection = T.Scene.bl_rna.properties["collection"]
-        self.assertTrue(types.is_pointer_to(collection, T.Collection))
+        self.assertTrue(is_pointer_to(collection, T.Collection))
         node_tree = T.World.bl_rna.properties["node_tree"]
-        self.assertTrue(types.is_pointer_to(node_tree, T.NodeTree))
-        self.assertFalse(types.is_pointer_to(node_tree, T.ShaderNodeTree))
+        self.assertTrue(is_pointer_to(node_tree, T.NodeTree))
+        self.assertFalse(is_pointer_to(node_tree, T.ShaderNodeTree))
 
         camera = T.Scene.bl_rna.properties["camera"]
-        self.assertTrue(types.is_pointer_to(camera, T.Object))
+        self.assertTrue(is_pointer_to(camera, T.Object))
 
         data = T.Object.bl_rna.properties["data"]
-        self.assertTrue(types.is_pointer_to(data, T.ID))
+        self.assertTrue(is_pointer_to(data, T.ID))
 
     def test_scene_viewlayer_layercollection_is_master(self):
         s = D.scenes["Scene_0"]
