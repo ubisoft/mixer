@@ -108,5 +108,92 @@ scene.use_gravity = True
         self.end_test()
 
 
+class TestMesh(TestGenericJoinBefore):
+    def test_bpy_ops_mesh_plane_add(self):
+        # Same polygon sizes
+        action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add()
+"""
+        self.send_string(action)
+        self.end_test()
+
+    def test_edit_a_vertex_co(self):
+        # Same polygon sizes
+        action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add()
+"""
+        self.send_string(action)
+
+        action = """
+import bpy
+bpy.data.meshes[0].vertices[0].co *= 2
+"""
+        self.send_string(action)
+        self.end_test()
+
+    def test_bpy_ops_mesh_cone_add(self):
+        # Different polygon sizes
+        action = """
+import bpy
+bpy.ops.mesh.primitive_cone_add()
+"""
+        self.send_string(action)
+
+        self.end_test()
+
+    def test_bpy_ops_mesh_subdivide(self):
+        # change topology and resend all
+        action = """
+import bpy
+bpy.ops.mesh.primitive_cone_add()
+"""
+        self.send_string(action)
+
+        action = """
+import bpy
+bpy.ops.object.editmode_toggle()
+bpy.ops.mesh.subdivide()
+bpy.ops.object.editmode_toggle()
+"""
+        self.send_string(action)
+
+        self.end_test()
+
+    def test_bpy_ops_mesh_delete_all(self):
+        action = """
+import bpy
+bpy.ops.mesh.primitive_cube_add()
+"""
+        self.send_string(action)
+
+        action = """
+import bpy
+bpy.ops.object.editmode_toggle()
+bpy.ops.mesh.select_all(action='SELECT')
+bpy.ops.mesh.delete()
+bpy.ops.object.editmode_toggle()
+"""
+        self.send_string(action)
+
+        self.end_test()
+
+    def test_bpy_ops_mesh_uv_texture_add(self):
+        action = """
+import bpy
+bpy.ops.mesh.primitive_cone_add()
+"""
+        self.send_string(action)
+
+        action = """
+import bpy
+bpy.ops.mesh.uv_texture_add()
+"""
+        self.send_string(action)
+
+        self.end_test()
+
+
 if __name__ == "__main__":
     unittest.main()

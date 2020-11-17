@@ -16,19 +16,18 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Define the mapping between message types nad message classes.
+Define the mapping between message types and message classes.
 
-Mostly used by tests to ease message decoding
+Mostly used by tests to ease message decoding.
 """
 from mixer import codec
 from mixer.broadcaster.common import MessageType
 from mixer.blender_data import messages
 
 message_types = {
-    MessageType.BLENDER_DATA_CREATE: messages.BlenderCreateMessage,
-    MessageType.BLENDER_DATA_UPDATE: messages.BlenderUpdateMessage,
+    MessageType.BLENDER_DATA_CREATE: messages.BlenderDataMessage,
     MessageType.BLENDER_DATA_REMOVE: messages.BlenderRemoveMessage,
-    MessageType.BLENDER_DATA_RENAME: messages.BlenderRenameMessage,
+    MessageType.BLENDER_DATA_RENAME: messages.BlenderRenamesMessage,
 }
 
 

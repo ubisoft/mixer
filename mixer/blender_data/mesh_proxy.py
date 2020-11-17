@@ -26,15 +26,11 @@ from typing import Optional, TYPE_CHECKING
 
 import bpy.types as T  # noqa
 
-from mixer.blender_data.attributes import apply_attribute, diff_attribute
-from mixer.blender_data.proxy import DeltaUpdate
-from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data import specifics
-from mixer.blender_data.specifics import (
-    mesh_resend_on_clear,
-    proxy_requires_clear_geometry,
-    update_requires_clear_geometry,
-)
+from mixer.blender_data.attributes import apply_attribute, diff_attribute
+from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate
+
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
@@ -45,25 +41,79 @@ DEBUG = True
 logger = logging.getLogger(__name__)
 
 
+_mesh_geometry_properties = {
+    "edges",
+    "loop_triangles",
+    "loops",
+    "polygons",
+    "vertices",
+}
+"""If the size of any of these has changes clear_geomtry() is required. Is is not necessary to check for
+other properties (uv_layers), as they are redundant checks"""
+
+mesh_resend_on_clear = {
+    "edges",
+    "face_maps",
+    "loops",
+    "loop_triangles",
+    "polygons",
+    "vertices",
+    "uv_layers",
+    "vertex_colors",
+}
+"""if geometry needs to be cleared, these arrays must be resend, as they will need to be reloaded by the receiver"""
+
+
+def update_requires_clear_geometry(incoming_update: MeshProxy, existing_proxy: MeshProxy) -> bool:
+    """Determine if applying incoming_update requires to clear the geometry of existing_proxy"""
+    geometry_updates = _mesh_geometry_properties & set(incoming_update._data.keys())
+    for k in geometry_updates:
+        existing_length = existing_proxy._data[k].length
+        incoming_soa = incoming_update.data(k)
+        if incoming_soa:
+            incoming_length = incoming_soa.length
+            if existing_length != incoming_length:
+                logger.debug("apply: length mismatch %s.%s ", existing_proxy, k)
+                return True
+    return False
+
+
 class MeshProxy(DatablockProxy):
     """
     Proxy for a Mesh datablock. This specialization is required to handle geometry resize processing, that
     spans across Mesh (for clear_geometry()) and geometry arrays of structures (Mesh.vertices.add() and others)
     """
 
+    def requires_clear_geometry(self, mesh: T.Mesh) -> bool:
+        """Determines if the difference between mesh and self will require a clear_geometry() on the receiver side"""
+        for k in _mesh_geometry_properties:
+            soa = getattr(mesh, k)
+            existing_length = len(soa)
+            incoming_soa = self.data(k)
+            if incoming_soa:
+                incoming_length = incoming_soa.length
+                if existing_length != incoming_length:
+                    logger.debug(
+                        "need_clear_geometry: %s.%s (current/incoming) (%s/%s)",
+                        mesh,
+                        k,
+                        existing_length,
+                        incoming_length,
+                    )
+                    return True
+        return False
+
     def _diff(
         self, struct: T.Struct, key: str, prop: T.Property, context: Context, diff: MeshProxy
     ) -> Optional[DeltaUpdate]:
 
-        # If any mesh buffer change requires a clear geometry on the receiver, send all buffers
-        # This is the case if a face is separated from a cube. The number of vertices is unchanged
-        # but the number of faces changes, which requires the receiver to call Mesh.clear_geometry(),
-        # hence to reload tall the geometry, including parts that were unchanged.
-        # As an optimized alternative, it should be possible not to send the unchanged arrays
-        # but have MeshProxy.apply() to reload unchanged buffers from in-memory copies.
-        force_send_all = proxy_requires_clear_geometry(self, struct)
-        if force_send_all:
-            logger.debug("requires_clear for %s", struct)
+        if self.requires_clear_geometry(struct):
+            # If any mesh buffer changes requires a clear geometry on the receiver, the receiver will clear all
+            # buffers, including uv_layers and vertex_colors.
+            # Resend everything
+
+            diff.load(struct, key, context)
+            return DeltaReplace(diff)
 
         if prop is not None:
             context.visit_state.path.append(key)
@@ -78,19 +128,10 @@ class MeshProxy(DatablockProxy):
                     continue
 
                 proxy_data = self._data.get(k)
-                force_diff = force_send_all and k in mesh_resend_on_clear
-                try:
-                    if force_diff:
-                        context.visit_state.scratchpad["force_soa_diff"] = True
-                    delta = diff_attribute(member, k, member_property, proxy_data, context)
+                delta = diff_attribute(member, k, member_property, proxy_data, context)
 
-                    if delta is not None:
-                        diff._data[k] = delta
-                    elif force_send_all and k in mesh_resend_on_clear:
-                        diff._data[k] = DeltaUpdate.deep_wrap(proxy_data)
-                finally:
-                    if force_diff:
-                        del context.visit_state.scratchpad["force_soa_diff"]
+                if delta is not None:
+                    diff._data[k] = delta
 
         finally:
             if prop is not None:
@@ -109,35 +150,30 @@ class MeshProxy(DatablockProxy):
         context: Context,
         to_blender: bool = True,
     ) -> MeshProxy:
-        """"""
 
         struct = parent.get(key)
         struct_update = struct_delta.value
-
-        if to_blender:
-            if update_requires_clear_geometry(struct_update, self):
-                logger.debug(f"clear_geometry for {struct}")
+        if isinstance(struct_delta, DeltaReplace):
+            self.copy_data(struct_update)
+            if to_blender:
                 struct.clear_geometry()
-
-        # collection resizing will be done in AosProxy.apply()
-
-        context.visit_state.path.append(key)
-        try:
-            for k, member_delta in struct_update._data.items():
-                current_value = self._data.get(k)
-                try:
-                    self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
-                except Exception as e:
-                    logger.warning(f"Struct.apply(). Processing {member_delta}")
-                    logger.warning(f"... for {struct}.{k}")
-                    logger.warning(f"... Exception: {e!r}")
-                    logger.warning("... Update ignored")
-                    continue
-        finally:
-            context.visit_state.path.pop()
-
-        # If a face is removed from a cube, the vertices array is unchanged but the polygon array is changed.
-        # We expect to receive soa updates for arrays that have been modified, but not for unmodified arrays.
-        # however unmodified arrays must be reloaded if clear_geometry was called
+                self.save(parent, key, context)
+        else:
+            # a sparse update (buffer contents requiring no clear_geometry)
+            # collection resizing will be done in AosProxy.apply()
+            context.visit_state.path.append(key)
+            try:
+                for k, member_delta in struct_update._data.items():
+                    current_value = self._data.get(k)
+                    try:
+                        self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
+                    except Exception as e:
+                        logger.warning(f"Struct.apply(). Processing {member_delta}")
+                        logger.warning(f"... for {struct}.{k}")
+                        logger.warning(f"... Exception: {e!r}")
+                        logger.warning("... Update ignored")
+                        continue
+            finally:
+                context.visit_state.path.pop()
 
         return self

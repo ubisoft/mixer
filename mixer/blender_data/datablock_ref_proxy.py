@@ -30,7 +30,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data.attributes import read_attribute
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
-from mixer.blender_data.types import bases_of
+from mixer.blender_data.type_helpers import bases_of
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Uuid, Context

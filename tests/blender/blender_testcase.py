@@ -18,46 +18,13 @@ class BlenderTestCase(MixerTestCase):
     """
 
     def __init__(self, *args, **kwargs):
+        # in case @parameterized_class is missing
+        if not hasattr(self, "vrtist_protocol"):
+            self.vrtist_protocol = False
         super().__init__(*args, **kwargs)
 
     def setUp(self, *args, **kwargs):
-        if not hasattr(self, "vrtist_protocol"):
-            self.vrtist_protocol = False
         super().setUp(*args, **kwargs)
-
-    def assertDictAlmostEqual(self, a, b, msg=None):  # noqa N802
-        def sort(d):
-            return {k: d[k] for k in sorted(d.keys())}
-
-        self.assertIs(type(a), type(b), msg=msg)
-        self.assertIsInstance(a, dict, msg=msg)
-
-        ignore = ["mixer_uuid"]
-        for k in ignore:
-            if k in a.keys() and k in b.keys():
-                del a[k]
-                del b[k]
-
-        a_sorted = sort(a)
-        b_sorted = sort(b)
-        self.assertSequenceEqual(a.keys(), b.keys(), msg=msg)
-        try:
-            for (_k, ia), ib in zip(a_sorted.items(), b_sorted.values()):
-                self.assertIs(type(ia), type(ib), msg=msg)
-                if isinstance(ia, dict):
-                    self.assertDictAlmostEqual(ia, ib, msg=msg)
-                elif type(ia) is float:
-                    self.assertAlmostEqual(ia, ib, places=3, msg=msg)
-                else:
-                    self.assertEqual(ia, ib, msg=msg)
-        except AssertionError as e:
-            exc_class = type(e)
-            if _k == "_data":
-                item = a.get("_class_name")
-            else:
-                item = _k
-            message = f"{e.args[0]} '{item}'"
-            raise exc_class(message) from None
 
 
 class TestGeneric(BlenderTestCase):

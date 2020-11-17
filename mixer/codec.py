@@ -63,14 +63,20 @@ def decode_as(message_type: common.MessageType, buffer: bytes) -> Message:
     message_class = registered_message_types.get(message_type)
     if message_class is None:
         raise NotImplementedError(f"No encode/decode function for {message_type}")
-    fields = (f.type for f in dataclasses.fields(message_class))
-    for type_ in fields:
-        if type_ not in codec_functions:
-            raise NotImplementedError(f"No codec_func for {type_}")
-        decode = codec_functions[type_][1]
-        decoded, index = decode(buffer, index)
-        args.append(decoded)
-    return message_class(*args)
+
+    if hasattr(message_class, "decode"):
+        message = message_class()
+        message.decode(buffer)
+        return message
+    else:
+        fields = (f.type for f in dataclasses.fields(message_class))
+        for type_ in fields:
+            if type_ not in codec_functions:
+                raise NotImplementedError(f"No codec_func for {type_}")
+            decode = codec_functions[type_][1]
+            decoded, index = decode(buffer, index)
+            args.append(decoded)
+        return message_class(*args)
 
 
 def decode(command: common.Command) -> Message:

@@ -16,14 +16,14 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Proxy of a collection
+Proxy for array of structures proxified as structure of arrays
 
 See synchronization.md
 """
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import Dict, Optional, Union, TYPE_CHECKING
 
 import bpy.types as T  # noqa
 
@@ -34,23 +34,21 @@ from mixer.blender_data.attributes import diff_attribute, write_attribute
 from mixer.blender_data.proxy import DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import Context
+    from mixer.blender_data.proxy import Context, Delta
 
 logger = logging.getLogger(__name__)
 
 
 class AosProxy(Proxy):
     """
-    Proxy to a bpy_prop_collection of non-datablock Struct.
-
-    It can track an array (int keys) or a dictionnary(string keys). Both implementation are
-    in the same class as it is not possible to know at creation time the type of an empty collection
+    Proxy to a bpy_prop_collection of structure with at least a member that can be handled
+    by foreach_get()/foreach_set(), such as MeshVertices
     """
 
     _serialize = ("_aos_length",)
 
     def __init__(self):
-        self._data: Dict[str, SoaElement] = {}
+        self._data: Dict[str, Union[AosElement, SoaElement, Delta]] = {}
         self._aos_length = 0
 
     @property
@@ -60,50 +58,47 @@ class AosProxy(Proxy):
     def load(
         self, bl_collection: T.bpy_prop_collection, key: str, bl_collection_property: T.Property, context: Context
     ):
+
+        # Must process the Soa elements, even if empty, because we may we called when a diff detects that
+        # a replace is required (e.g. geometry vertext count change) and we must ensure that the soas are updated.
+        # This will unfortunately register and transfer empty arrays.
+        # TODO optimize and do not send empty arrays
         self._aos_length = len(bl_collection)
-        if self._aos_length == 0:
-            self._data.clear()
-            return self
 
         context.visit_state.path.append(key)
         try:
-            # TODO too much work at l   oad time to find soable information. Do it once for all.
-
-            # Hybrid array_of_struct/ struct_of_array
-            # Hybrid because MeshVertex.groups does not have a fixed size and is not soa-able, but we want
-            # to treat other MeshVertex members as SOAs.
-            # Could be made more efficient later on. Keep the code simple until save() is implemented
-            # and we need better
             item_bl_rna = bl_collection_property.fixed_type.bl_rna
             for attr_name, bl_rna_property in context.synchronized_properties.properties(item_bl_rna):
                 if is_soable_property(bl_rna_property):
-                    # element type supported by foreach_get
+                    # element supported by foreach_get()/foreach_set(), e.g. MeshVertices.co
+                    # The collection is loaded as an array.array and encoded as a binary buffer
                     self._data[attr_name] = SoaElement().load(bl_collection, attr_name, item_bl_rna, context)
                 else:
+                    # element not supported by foreach_get()/foreach_set(), e.g. BezierSplinePoint.handle_left_type,
+                    # which is an enum, loaded as string
+                    # The collection is loaded as a dict, encoded as such
                     self._data[attr_name] = AosElement().load(bl_collection, attr_name, item_bl_rna, context)
         finally:
             context.visit_state.path.pop()
         return self
 
-    def save(self, bl_instance: T.bpy_struct, attr_name: str, context: Context):
+    def save(self, parent: T.bpy_struct, key: str, context: Context):
         """
         Save this proxy the Blender property
         """
 
-        if self.length == 0 and len(self._data) != 0:
-            logger.error(f"save(): length is {self.length} but _data is {self._data.keys()}")
-            # return
-
-        target = getattr(bl_instance, attr_name, None)
+        target = getattr(parent, key, None)
         if target is None:
+            logger.error("save: {parent}[{key}] is None")
             return
 
         specifics.fit_aos(target, self, context)
+
         # nothing to do save here. The buffers that contains vertices and co are serialized apart from the json
         # that contains the Mesh members. The children of this are SoaElement and have no child.
         # They are updated directly bu SoaElement.save_array()
 
-        context.visit_state.path.append(attr_name)
+        context.visit_state.path.append(key)
         try:
             for k, v in self._data.items():
                 write_attribute(target, k, v, context)
@@ -114,7 +109,8 @@ class AosProxy(Proxy):
         self, parent: T.bpy_struct, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True
     ) -> Optional[AosProxy]:
         if delta is None:
-            return
+            return None
+
         struct_update = delta.value
 
         aos = getattr(parent, key)

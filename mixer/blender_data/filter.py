@@ -28,7 +28,7 @@ from typing import Any, Dict, ItemsView, Iterable, List, Union
 
 from bpy import types as T  # noqa
 
-from mixer.blender_data.types import is_pointer_to
+from mixer.blender_data.type_helpers import is_pointer_to
 from mixer.blender_data.blenddata import collection_name_to_type
 
 DEBUG = True
@@ -243,6 +243,8 @@ _exclude_names = {
     "override_library",
     "preview",
     "mixer_uuid",
+    # Related to the UI
+    "active_index",
 }
 """Names of properties that are always excluded"""
 
@@ -300,16 +302,11 @@ default_exclusions = {
             ]
         )
     ],
-    T.GreasePencilLayers: [
-        NameFilterOut(
-            [
-                "active_index",
-            ]
-        )
-    ],
     T.GPencilStroke: [
         NameFilterOut(
             [
+                # Fails comparison in tests. Result Ok without. Seems computed
+                "triangles",
                 # readonly
                 "bound_box_min",
                 "bound_box_max",
