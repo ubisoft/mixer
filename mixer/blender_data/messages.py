@@ -16,28 +16,30 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-Definition of messages used by the full Blender protocol
+Encoding end decoding of BLENDER_DATA messages used by the full Blender protocol.
 
-Currently used only in tests. Could be used also in all send_xxx() and build_xxx() functions
+This module addresses the lower level encoding/decoding (from/to the wire), using encode_*() and decode_*()
+shared with the VRtist protocol.
+
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import logging
 import traceback
 from typing import List, Optional, TYPE_CHECKING, Union
 
-from mixer.codec import Message
 from mixer.blender_data.types import Soa
 
 from mixer.broadcaster.common import (
     decode_int,
     decode_py_array,
     decode_string,
+    decode_string_array,
     encode_int,
     encode_py_array,
     encode_string,
+    encode_string_array,
 )
 
 if TYPE_CHECKING:
@@ -111,15 +113,14 @@ def _decode_soas(buffer: bytes) -> List[Soa]:
     return soas
 
 
-class BlenderCreateMessage:
+class BlenderDataMessage:
     def __init__(self):
         self.proxy_string: str = ""
         self.soas: List[Soa] = []
 
     def __lt__(self, other):
-        if self.proxy_string < other.proxy_string:
-            # guaranteed to contain a uuid and be unique
-            return True
+        # for sorting by the tests
+        return self.proxy_string < other.proxy_string
 
     def decode(self, buffer: bytes):
         self.proxy_string, index = decode_string(buffer, 0)
@@ -133,19 +134,31 @@ class BlenderCreateMessage:
         return b"".join(items)
 
 
-@dataclass(order=True)
-class BlenderUpdateMessage(Message):
-    proxy_string: str
+class BlenderRemoveMessage:
+    def __init__(self):
+        self.uuid: str = ""
+        self.debug_info: str = ""
+
+    def __lt__(self, other):
+        # for sorting by the tests
+        return self.uuid < other.uuid
+
+    def decode(self, buffer: bytes):
+        self.uuid, index = decode_string(buffer, 0)
+        self.debug_info, index = decode_string(buffer, index)
+
+    @staticmethod
+    def encode(uuid: str, debug_info: str) -> bytes:
+        return encode_string(uuid) + encode_string(debug_info)
 
 
-@dataclass(order=True)
-class BlenderRemoveMessage(Message):
-    uuid: str
-    debug_info: str
+class BlenderRenamesMessage:
+    def __init__(self):
+        self.renames: List[str] = []
 
+    def decode(self, buffer: bytes):
+        self.renames, _ = decode_string_array(buffer, 0)
 
-@dataclass(order=True)
-class BlenderRenameMessage(Message):
-    uuid: str
-    new_name: str
-    debug_info: str
+    @staticmethod
+    def encode(renames: List[str]) -> bytes:
+        return encode_string_array(renames)

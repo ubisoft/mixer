@@ -16,31 +16,21 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-This module handles generic updates using the blender_data package.
-
-The goal for Mixer is to replace all code specific to entities (camera, light, material, ...) by this generic update
-mechanism.
+Send BLENDER_DATA messages, receive and process them
 """
 from __future__ import annotations
 
 import itertools
-import json
 import logging
 import traceback
-from typing import List, Optional, TYPE_CHECKING, Union
+from typing import List, TYPE_CHECKING
 
 from mixer.blender_data.json_codec import Codec, DecodeError
-from mixer.blender_data.messages import BlenderCreateMessage
+from mixer.blender_data.messages import BlenderDataMessage, BlenderRemoveMessage, BlenderRenamesMessage
 from mixer.broadcaster.common import (
     Command,
-    decode_int,
-    decode_py_array,
     decode_string,
-    decode_string_array,
-    encode_int,
-    encode_py_array,
     encode_string,
-    encode_string_array,
     MessageType,
 )
 from mixer.local_data import get_local_or_create_cache_file
@@ -49,7 +39,7 @@ from mixer.share_data import share_data
 if TYPE_CHECKING:
     from mixer.blender_data.changeset import CreationChangeset, RemovalChangeset, UpdateChangeset, RenameChangeset
     from mixer.blender_data.datablock_proxy import DatablockProxy
-    from mixer.blender_data.proxy import DeltaUpdate, Uuid
+    from mixer.blender_data.proxy import Delta, Uuid
     from mixer.blender_data.types import Soa
 
 
@@ -80,12 +70,11 @@ def send_data_creations(proxies: CreationChangeset):
     if share_data.use_vrtist_protocol():
         return
 
+    codec = Codec()
+
     for datablock_proxy in proxies:
         logger.info("%s %s", "send_data_create", datablock_proxy)
-
         send_media_creations(datablock_proxy)
-
-        codec = Codec()
         try:
             encoded_proxy = codec.encode(datablock_proxy)
         except Exception:
@@ -94,40 +83,9 @@ def send_data_creations(proxies: CreationChangeset):
                 logger.error(line)
             return b""
 
-        buffer = BlenderCreateMessage.encode(datablock_proxy, encoded_proxy)
+        buffer = BlenderDataMessage.encode(datablock_proxy, encoded_proxy)
         command = Command(MessageType.BLENDER_DATA_CREATE, buffer, 0)
         share_data.client.add_command(command)
-
-
-def soa_buffers(datablock_proxy: Optional[DatablockProxy]) -> List[bytes]:
-    if datablock_proxy is None:
-        # empty update, should not happen
-        return [encode_int(0)]
-
-    # Layout is
-    #   number of AosProxy: 2
-    #       soa path in datablock : ("vertices")
-    #       number of SoaElement : 2
-    #           element name: "co"
-    #           array
-    #           element name: "normals"
-    #           array
-    #       soa path in datablock : ("edges")
-    #       number of SoaElement : 1
-    #           element name: "vertices"
-    #           array
-
-    items: List[bytes] = []
-    items.append(encode_int(len(datablock_proxy._soas)))
-    for path, soa_proxies in datablock_proxy._soas.items():
-        path_string = json.dumps(path)
-        items.append(encode_string(path_string))
-        items.append(encode_int(len(soa_proxies)))
-        for element_name, soa_element in soa_proxies:
-            if soa_element._array is not None:
-                items.append(encode_string(element_name))
-                items.append(encode_py_array(soa_element._array))
-    return items
 
 
 def send_data_updates(updates: UpdateChangeset):
@@ -146,10 +104,8 @@ def send_data_updates(updates: UpdateChangeset):
                 logger.error(line)
             continue
 
-        items: List[bytes] = []
-        items.append(encode_string(encoded_update))
-        items.extend(soa_buffers(update.value))
-        command = Command(MessageType.BLENDER_DATA_UPDATE, b"".join(items), 0)
+        buffer = BlenderDataMessage.encode(update.value, encoded_update)
+        command = Command(MessageType.BLENDER_DATA_UPDATE, buffer, 0)
         share_data.client.add_command(command)
 
 
@@ -161,7 +117,7 @@ def build_data_create(buffer):
     rename_changeset = None
     codec = Codec()
     try:
-        message = BlenderCreateMessage()
+        message = BlenderDataMessage()
         message.decode(buffer)
         datablock_proxy = codec.decode(message.proxy_string)
         _, rename_changeset = share_data.bpy_data_proxy.create_datablock(datablock_proxy)
@@ -184,32 +140,6 @@ def build_data_create(buffer):
         send_data_renames(rename_changeset)
 
 
-def _decode_and_build_soas(uuid: Uuid, buffer: bytes, index: int):
-    path: List[Union[int, str]] = ["unknown"]
-    name = "unknown"
-    try:
-        # see soa_buffers()
-        aos_count, index = decode_int(buffer, index)
-        for _ in range(aos_count):
-            path_string, index = decode_string(buffer, index)
-            path = json.loads(path_string)
-
-            logger.info("%s: %s %s", "build_soa", uuid, path)
-
-            element_count, index = decode_int(buffer, index)
-            soas = []
-            for _ in range(element_count):
-                name, index = decode_string(buffer, index)
-                array, index = decode_py_array(buffer, index)
-                soas.append((name, array))
-            share_data.bpy_data_proxy.update_soa(uuid, path, soas)
-    except Exception:
-        logger.error(f"Exception during build_soa for {uuid} {path} {name}")
-        for line in traceback.format_exc().splitlines():
-            logger.error(line)
-        logger.error("ignored")
-
-
 def _build_soas(uuid: Uuid, soas: List[Soa]):
     try:
         for soa in soas:
@@ -225,18 +155,19 @@ def build_data_update(buffer: bytes):
     if share_data.use_vrtist_protocol():
         return
 
-    proxy_string, index = decode_string(buffer, 0)
+    share_data.set_dirty()
     codec = Codec()
-
     try:
-        delta: DeltaUpdate = codec.decode(proxy_string)
+        message = BlenderDataMessage()
+        message.decode(buffer)
+        delta: Delta = codec.decode(message.proxy_string)
         logger.info("%s: %s", "build_data_update", delta)
-        # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
-        share_data.set_dirty()
         share_data.bpy_data_proxy.update_datablock(delta)
+
         datablock_proxy = delta.value
         if datablock_proxy is not None:
-            _decode_and_build_soas(datablock_proxy.mixer_uuid(), buffer, index)
+            _build_soas(datablock_proxy.mixer_uuid(), message.soas)
+
     except DecodeError as e:
         logger.error(f"Decode error for {str(e.args[1])[:100]} ...")
         logger.error("... possible version mismatch")
@@ -257,7 +188,7 @@ def send_data_removals(removals: RemovalChangeset):
 
     for uuid, _, debug_info in removals:
         logger.info("send_removal: %s (%s)", uuid, debug_info)
-        buffer = encode_string(uuid) + encode_string(debug_info)
+        buffer = BlenderRemoveMessage.encode(uuid, debug_info)
         command = Command(MessageType.BLENDER_DATA_REMOVE, buffer, 0)
         share_data.client.add_command(command)
 
@@ -266,10 +197,10 @@ def build_data_remove(buffer):
     if share_data.use_vrtist_protocol():
         return
 
-    uuid, index = decode_string(buffer, 0)
-    debug_info, index = decode_string(buffer, index)
-    logger.info("build_data_remove: %s (%s)", uuid, debug_info)
-    share_data.bpy_data_proxy.remove_datablock(uuid)
+    message = BlenderRemoveMessage()
+    message.decode(buffer)
+    logger.info("build_data_remove: %s (%s)", message.uuid, message.debug_info)
+    share_data.bpy_data_proxy.remove_datablock(message.uuid)
 
     # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
     share_data.set_dirty()
@@ -286,7 +217,7 @@ def send_data_renames(renames: RenameChangeset):
         logger.info("send_rename: %s (%s) into %s", uuid, debug_info, new_name)
         items.extend([uuid, old_name, new_name])
 
-    buffer = encode_string_array(items)
+    buffer = BlenderRenamesMessage.encode(items)
     command = Command(MessageType.BLENDER_DATA_RENAME, buffer, 0)
     share_data.client.add_command(command)
 
@@ -295,10 +226,12 @@ def build_data_rename(buffer):
     if share_data.use_vrtist_protocol():
         return
 
-    strings, _ = decode_string_array(buffer, 0)
+    message = BlenderRenamesMessage()
+    message.decode(buffer)
+    renames = message.renames
 
     # (uuid1, old1, new1, uuid2, old2, new2, ...) to ((uuid1, old1, new1), (uuid2, old2, new2), ...)
-    args = [iter(strings)] * 3
+    args = [iter(renames)] * 3
     # do not consume the iterator on the log loop !
     items = list(itertools.zip_longest(*args))
 
