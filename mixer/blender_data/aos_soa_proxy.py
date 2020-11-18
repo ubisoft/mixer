@@ -201,7 +201,13 @@ class SoaElement(Proxy):
                 f"diff {aos}.{self._member_name} proxy({len(self._array)} {typecode}) blender'{len(aos)} {member_type}'"
             )
             logger.debug(message)
-        aos.foreach_get(self._member_name, tmp_array)
+
+        try:
+            aos.foreach_get(self._member_name, tmp_array)
+        except RuntimeError as e:
+            logger.error(f"diff soa {aos}.{self._member_name} failed")
+            logger.error(f"... member size: {len(aos)}, tmp_array: ('{tmp_array.typecode}', {len(tmp_array)})")
+            logger.error(f"... exception {e!r}")
 
         if self._array == tmp_array:
             return None

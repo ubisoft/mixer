@@ -142,7 +142,7 @@ class AosProxy(Proxy):
             for attr_name, _ in context.synchronized_properties.properties(item_bl_rna):
                 # co, normals, ...
                 proxy_data = self._data.get(attr_name, SoaElement())
-                delta = diff_attribute(aos, attr_name, prop, proxy_data, context)
+                delta = diff_attribute(aos, attr_name, item_bl_rna, proxy_data, context)
                 if delta is not None:
                     diff._data[attr_name] = delta
         finally:

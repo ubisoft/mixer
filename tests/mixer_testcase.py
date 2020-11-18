@@ -226,7 +226,6 @@ class MixerTestCase(unittest.TestCase):
             self.assertEqual(len(a), len(b), msg=msg)
             for i, (item_a, item_b) in enumerate(zip(a, b)):
                 try:
-                    msg = "Length mismatch. " + msg
                     self.assert_any_almost_equal(item_a, item_b, msg=msg, ignore=ignore)
                 except AssertionError as e:
                     raise AssertionError(i, *e.args) from None
