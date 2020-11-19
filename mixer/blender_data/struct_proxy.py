@@ -29,7 +29,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
-from mixer.blender_data.proxy import DeltaUpdate, Proxy
+from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
@@ -148,7 +148,7 @@ class StructProxy(Proxy):
         assert isinstance(key, (int, str))
 
         struct_update = struct_delta.value
-
+        # TODO duplicate code in StructCollectionProxy.apply()
         if isinstance(key, int):
             struct = parent[key]
         elif isinstance(parent, T.bpy_prop_collection):
@@ -156,25 +156,31 @@ class StructProxy(Proxy):
         else:
             struct = getattr(parent, key, None)
 
-        if to_blender:
-            struct = struct_update._pre_save(struct, context)
+        if isinstance(struct_delta, DeltaReplace):
+            self.copy_data(struct_update)
+            if to_blender:
+                self.save(parent, key, context)
+        else:
 
-        assert type(struct_update) == type(self)
+            if to_blender:
+                struct = struct_update._pre_save(struct, context)
 
-        context.visit_state.path.append(key)
-        try:
-            for k, member_delta in struct_update._data.items():
-                current_value = self._data.get(k)
-                try:
-                    self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
-                except Exception as e:
-                    logger.warning(f"Struct.apply(). Processing {member_delta}")
-                    logger.warning(f"... for {struct}.{k}")
-                    logger.warning(f"... Exception: {e!r}")
-                    logger.warning("... Update ignored")
-                    continue
-        finally:
-            context.visit_state.path.pop()
+            assert type(struct_update) == type(self)
+
+            context.visit_state.path.append(key)
+            try:
+                for k, member_delta in struct_update._data.items():
+                    current_value = self._data.get(k)
+                    try:
+                        self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
+                    except Exception as e:
+                        logger.warning(f"Struct.apply(). Processing {member_delta}")
+                        logger.warning(f"... for {struct}.{k}")
+                        logger.warning(f"... Exception: {e!r}")
+                        logger.warning("... Update ignored")
+                        continue
+            finally:
+                context.visit_state.path.pop()
 
         return self
 

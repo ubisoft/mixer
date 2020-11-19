@@ -141,7 +141,7 @@ class StructCollectionProxy(Proxy):
 
         update = delta.value
         assert type(update) == type(self)
-
+        # TODO duplicate code in StructProxy.apply()
         if isinstance(key, int):
             collection = parent[key]
         elif isinstance(parent, T.bpy_prop_collection):
