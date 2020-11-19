@@ -129,12 +129,13 @@ def decode_hook(x):
         return x
 
     del x[MIXER_CLASS]
-    obj = class_()
+
     if class_ in delta_classes:
-        obj.value = x["value"]
+        obj = class_(x["value"])
     elif class_ in (SoaElement, NonePtrProxy):
-        pass
+        obj = class_()
     else:
+        obj = class_()
         obj._data.update(x["_data"])
 
     for option in options:
