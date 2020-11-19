@@ -363,28 +363,9 @@ class DatablockProxy(StructProxy):
         """
         Apply delta to this proxy, but do not update Blender state
         """
-        if delta is None:
-            return
 
-        update = delta.value
-        assert type(update) == type(self)
-        if isinstance(delta, DeltaReplace):
-            self.copy_data(update)
-        else:
-            try:
-                context.visit_state.datablock_proxy = self
-                for k, delta in update._data.items():
-                    try:
-                        current_value = self._data.get(k)
-                        self._data[k] = apply_attribute(datablock, k, current_value, delta, context, to_blender=False)
-                    except Exception as e:
-                        logger.warning(f"apply_to_proxy(). Processing {delta}")
-                        logger.warning(f"... for {datablock}.{k}")
-                        logger.warning(f"... Exception: {e!r}")
-                        logger.warning("... Update ignored")
-                        continue
-            finally:
-                context.visit_state.datablock_proxy = None
+        collection = getattr(bpy.data, self.collection_name)
+        self.apply(collection, datablock.name, delta, context, to_blender=False)
 
     def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember]):
 
