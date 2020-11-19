@@ -101,7 +101,7 @@ class ObjectProxy(DatablockProxy):
         vertex_groups.clear()
         groups_data = [
             (item._data["index"], item._data["lock_weight"], item._data["name"])
-            for item in vertex_groups_proxy._data.values()
+            for item in vertex_groups_proxy._sequence
         ]
         groups_data.sort(key=lambda x: x[0])
 
