@@ -4,6 +4,8 @@
 
 Note that development is on Windows 10. Please report issues and submit PRs for other OSs.
 
+Look for the details about the latest version in its announcement issue.
+
 ## Introduction
 
 Mixer is a Blender addon developed at Ubisoft Animation Studio for Real Time Collaboration in 3D edition. It allows multiple Blender users to work on the same scene at the same time. Thanks to a broadcasting server that is independent from Blender, it is also possible to implement a connection for other 3D editing softwares.
@@ -20,7 +22,7 @@ Then you can test locally between two Blender instances, or you can open the por
 
 If all participants are in the same network everything should work directly. If participants are not on the same LAN, see [hosting a Mixer server](doc/hosting.md)
 
-A Mixer server hosts rooms that are created by users. By default there is no room and someone connected to the server needs to create one from the panel. The creator of the room will upload its current blender data to the server, and this data will be transfered to people that connect to the room.
+A Mixer server hosts rooms that are created by users. By default there is no room and someone connected to the server needs to create one from the panel. The creator of the room will upload its current blender data to the server, and this data will be transferred to people that connect to the room.
 
 When all users leave a room, its content is destroyed, so someone needs to save the file before everyone leave, if you want to keep it. Optionally you can check the "keep open" checkbox so the room will remain open even if it has no users.
 
@@ -29,7 +31,7 @@ As a Developer, you may want to read the [Developer environment](doc/development
 ### Known limitations
 
 - Avoid using Undo as it may cause problems like disappearing objects or crashes.
-- Synchronization is currently limited to cameras, collections, grease pencils (partially) lights, materials (partially), meshed, objects and scenes.
+- Synchronization is currently limited to cameras, collections, grease pencils, lights, materials, metaballs, meshes, objects and scenes (without view layers).
 
 You will find more detailed information in the changelogs and in the announcement issue that comes with the new version.
 

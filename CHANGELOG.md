@@ -1,19 +1,38 @@
-# 0.18.0 wip
+# 0.18.0 (2020-11-18)
 
 ## Features
 
-- Shading trees for objects, worlds and lights (except grouped nodes)
-- Log OS, Blender, Mixer version and enabled addons list when joining room
-- VRtist: sky
+- UI: remove "experimental synchronization" checkbox. Blender generic synchronization mode is now the default mode.
+- UI: move VRtist UI into its own panel.
+- UI: simplify Mixer panel.
+- Bezier curves: synchronization.
+- Node trees: synchronization for objects, world and lights (except nodes groups).
+- VRtist: sky synchronization.
+
+## Improvements
+
+- Performance: transfer less mesh data with linked meshes and when modifiers are updated.
 
 ## Fixes
 
-- Transfer less mesh data when modifiers are modified
-- Transfer less mesh data with linked meshes
-- Fix new mesh part not linked to its collection after mesh separate
-- Remove logging of meaningless ReferenceError messages
-- Fix error when setting datablock reference after initial synchronization (e.g. TextureNodeImage.image, ArrayModifier.object_offset, Scene.camera)
-- Add exception type when logging an exception
+- Image: image data is synchronized when source folder does not exist on receiver machine.
+- Mesh: new part not linked to collection after separate.
+- Mesh: misc synchronization errors (UV map, existing faces).
+- Grease pencil: duplicate layers during session.
+- Metaball: update fixes
+- Synchronization: update datablock reference (e.g. TextureNodeImage.image, ArrayModifier.object_offset, Scene.camera).
+- Synchronization: some updates performed in non-object mode were ignored.
+- Server: dangling connections
+
+## Other
+
+- Tests: add tests for Mesh synchronization
+- Refactoring: bpy_prop_collection synchronization.
+- Refactoring: mesh synchronization.
+- Logging: remove meaningless ReferenceError messages.
+- Logging: add exception type when logging an exception.
+- Logging: add information about Blender version, Mixer version and loaded addons.
+- Code health: remove stats module
 
 
 # 0.17.0 (2020-10-15)
