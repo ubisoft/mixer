@@ -79,6 +79,26 @@ def update_requires_clear_geometry(incoming_update: MeshProxy, existing_proxy: M
     return False
 
 
+def _compute_vertex_groups(datablock: T.Mesh):
+    indices: Dict[int, List[int]] = defaultdict(list)
+    weights: Dict[int, List[float]] = defaultdict(list)
+    for i, vertex in enumerate(datablock.vertices):
+        for element in vertex.groups:
+            group = element.group
+            indices[group].append(i)
+            weights[group].append(element.weight)
+
+    groups = indices.keys()
+    # used in ObjectProxy._save()
+
+    # with arrays: cannot serialize as-is
+    # self._meta["vertex_groups"] = {
+    #     group: (array("I", indices[group]), array("f", weights[group])) for group in groups
+    # }
+
+    return {str(group): [indices[group], weights[group]] for group in groups}
+
+
 class MeshProxy(DatablockProxy):
     """
     Proxy for a Mesh datablock. This specialization is required to handle geometry resize processing, that
@@ -121,28 +141,8 @@ class MeshProxy(DatablockProxy):
         bpy_data_collection_name: str = None,
     ) -> MeshProxy:
         super().load(datablock, key, context, bpy_data_collection_name)
-        self._meta["vertex_groups"] = self.compute_vertex_groups(datablock)
+        self._meta["vertex_groups"] = _compute_vertex_groups(datablock)
         return self
-
-    @classmethod
-    def compute_vertex_groups(cls, datablock: T.Mesh):
-        indices: Dict[int, List[int]] = defaultdict(list)
-        weights: Dict[int, List[float]] = defaultdict(list)
-        for i, vertex in enumerate(datablock.vertices):
-            for element in vertex.groups:
-                group = element.group
-                indices[group].append(i)
-                weights[group].append(element.weight)
-
-        groups = indices.keys()
-        # used in ObjectProxy._save()
-
-        # with arrays: cannot serialize as-is
-        # self._meta["vertex_groups"] = {
-        #     group: (array("I", indices[group]), array("f", weights[group])) for group in groups
-        # }
-
-        return {str(group): [indices[group], weights[group]] for group in groups}
 
     def _diff(
         self, struct: T.Mesh, key: str, prop: T.Property, context: Context, diff: MeshProxy
@@ -162,7 +162,7 @@ class MeshProxy(DatablockProxy):
             if prop is not None:
                 context.visit_state.path.append(key)
             try:
-                vertex_groups = self.compute_vertex_groups(struct)
+                vertex_groups = _compute_vertex_groups(struct)
                 if vertex_groups != self._meta["vertex_groups"]:
                     logger.debug(f"_diff: {struct} dirty vertex groups")
                     # force Object update. This requires that Object updates are processed later, which seems to be
