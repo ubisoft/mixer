@@ -47,11 +47,13 @@ def send_scene_data_to_server(scene, dummy):
     # make sure to process them anyway. It is also possible to edit multiple objects at once
 
     # TODO when a mesh is selected the object is not
-    selected_objects = getattr(bpy.context, "selected_objects", {})
+    selected_objects = getattr(bpy.context, "selected_objects", [])
+    active_objects = getattr(bpy.context, "active_objects", [])
+    current_objects = set(selected_objects) | set(active_objects)
     updates = {update.id.original for update in depsgraph.updates}
     delayed_updates = set()
     for datablock in updates:
-        if datablock in selected_objects and datablock.mode != "OBJECT" and datablock.data is not None:
+        if datablock in current_objects and datablock.mode != "OBJECT" and datablock.data is not None:
             delayed_updates.add(datablock)
             delayed_updates.add(datablock.data)
     updates -= delayed_updates
