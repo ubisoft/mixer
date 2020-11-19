@@ -205,34 +205,37 @@ class MeshProxy(DatablockProxy):
 
         struct = parent.get(key)
         struct_update = struct_delta.value
-        if isinstance(struct_delta, DeltaReplace):
-            self.copy_data(struct_update)
-            if to_blender:
-                struct.clear_geometry()
 
         try:
             self._meta["vertex_groups"] = struct_update._meta["vertex_groups"]
         except KeyError:
             pass
-        # collection resizing will be done in AosProxy.apply()
 
-        context.visit_state.path.append(key)
-        try:
-            for k, member_delta in struct_update._data.items():
-                current_value = self._data.get(k)
-                try:
-                    self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
-                except Exception as e:
-                    logger.warning(f"Struct.apply(). Processing {member_delta}")
-                    logger.warning(f"... for {struct}.{k}")
-                    logger.warning(f"... Exception: {e!r}")
-                    logger.warning("... Update ignored")
-                    continue
-        finally:
-            context.visit_state.path.pop()
+        if isinstance(struct_delta, DeltaReplace):
+            self.copy_data(struct_update)
+            if to_blender:
+                struct.clear_geometry()
+                self.save(parent, key, context)
+        else:
+            # collection resizing will be done in AosProxy.apply()
 
-        # If a face is removed from a cube, the vertices array is unchanged but the polygon array is changed.
-        # We expect to receive soa updates for arrays that have been modified, but not for unmodified arrays.
-        # however unmodified arrays must be reloaded if clear_geometry was called
+            context.visit_state.path.append(key)
+            try:
+                for k, member_delta in struct_update._data.items():
+                    current_value = self._data.get(k)
+                    try:
+                        self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
+                    except Exception as e:
+                        logger.warning(f"Struct.apply(). Processing {member_delta}")
+                        logger.warning(f"... for {struct}.{k}")
+                        logger.warning(f"... Exception: {e!r}")
+                        logger.warning("... Update ignored")
+                        continue
+            finally:
+                context.visit_state.path.pop()
+
+            # If a face is removed from a cube, the vertices array is unchanged but the polygon array is changed.
+            # We expect to receive soa updates for arrays that have been modified, but not for unmodified arrays.
+            # however unmodified arrays must be reloaded if clear_geometry was called
 
         return self
