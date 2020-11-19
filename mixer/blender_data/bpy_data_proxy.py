@@ -102,7 +102,8 @@ class ProxyState:
 @dataclass
 class VisitState:
     """
-    Gathers proxy system state (mainly known datablocks) and properties to synchronize
+    Visit state updated during the proxy structure hierarchy with local (per datablock)
+    or global (inter datablock) state
     """
 
     Path = List[Union[str, int]]
@@ -110,20 +111,28 @@ class VisitState:
     ("layers", "MyLayer", "frames", 0, "strokes", 0, "points").
     Used to identify SoaElement buffer updates.
     Equivalent to a RNA path, parsed with indexed instead of names.
+    Local state
     """
 
     datablock_proxy: Optional[DatablockProxy] = None
-    """The datablock proxy being visited"""
+    """The datablock proxy being visited
+    Local state
+    """
 
     path: Path = field(default_factory=list)
-    """The path to the current property from the datablock, for instance in GreasePencil
-    ["layers", "fills", "frames", 0, "strokes", 1, "points", 0]"""
+    """The path to the current property from the current datablock, for instance in GreasePencil
+    ["layers", "fills", "frames", 0, "strokes", 1, "points", 0]
+    Local state"""
 
     recursion_guard: RecursionGuard = RecursionGuard()
+    """Keeps track of the data depth and guards agains excessive depth that may be caused
+    by circular references
+    Local state"""
 
     scratchpad: Dict[str, Any] = field(default_factory=dict)
     """Custom data attached to the load/save/diff/apply visits that some data nodes may attach
     in order to modify the processing at other data nodes
+    Mainly to communicate global state between datablocks
     """
 
 
@@ -135,7 +144,7 @@ class Context:
     synchronized_properties: SynchronizedProperties
     """Controls what properties are synchronized"""
 
-    visit_state: VisitState = VisitState()
+    visit_state: VisitState = field(default_factory=VisitState)
     """Current datablock operation state"""
 
 
@@ -255,6 +264,8 @@ class BpyDataProxy(Proxy):
         if process_delayed_updates:
             all_updates |= self._delayed_updates
             self._delayed_updates.clear()
+
+        # It is required that Object are processed after Mesh (search for "dirty_vertex_groups")
         for datablock in all_updates:
             if not isinstance(datablock, safe_depsgraph_updates):
                 logger.info("depsgraph update: ignoring untracked type %s", datablock)

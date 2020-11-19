@@ -45,6 +45,8 @@ def send_scene_data_to_server(scene, dummy):
     # Mesh separate delivers Collection as well as created Object and Mesh updates while the edited
     # object is in edit mode, and these updates are not delivered when leaving edit mode, so
     # make sure to process them anyway. It is also possible to edit multiple objects at once
+
+    # TODO when a mesh is selected the object is not
     selected_objects = getattr(bpy.context, "selected_objects", {})
     updates = {update.id.original for update in depsgraph.updates}
     delayed_updates = set()

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import logging
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 import bpy.types as T  # noqa
 
@@ -121,21 +121,31 @@ class MeshProxy(DatablockProxy):
         bpy_data_collection_name: str = None,
     ) -> MeshProxy:
         super().load(datablock, key, context, bpy_data_collection_name)
-
-        #
-        # Vertex groups
-        #
-        groups: Dict[int, List[Tuple[int, float]]] = defaultdict(list)
-        for i, vertex in enumerate(datablock.vertices):
-            for element in vertex.groups:
-                groups[element.group].append((i, element.weight))
-
-        self._meta["vertex_groups"] = groups
-
+        self._meta["vertex_groups"] = self.compute_vertex_groups(datablock)
         return self
 
+    @classmethod
+    def compute_vertex_groups(cls, datablock: T.Mesh):
+        indices: Dict[int, List[int]] = defaultdict(list)
+        weights: Dict[int, List[float]] = defaultdict(list)
+        for i, vertex in enumerate(datablock.vertices):
+            for element in vertex.groups:
+                group = element.group
+                indices[group].append(i)
+                weights[group].append(element.weight)
+
+        groups = indices.keys()
+        # used in ObjectProxy._save()
+
+        # with arrays: cannot serialize as-is
+        # self._meta["vertex_groups"] = {
+        #     group: (array("I", indices[group]), array("f", weights[group])) for group in groups
+        # }
+
+        return {str(group): [indices[group], weights[group]] for group in groups}
+
     def _diff(
-        self, struct: T.Struct, key: str, prop: T.Property, context: Context, diff: MeshProxy
+        self, struct: T.Mesh, key: str, prop: T.Property, context: Context, diff: MeshProxy
     ) -> Optional[DeltaUpdate]:
 
         if self.requires_clear_geometry(struct):
@@ -149,6 +159,17 @@ class MeshProxy(DatablockProxy):
         if prop is not None:
             context.visit_state.path.append(key)
         try:
+            vertex_groups = self.compute_vertex_groups(struct)
+            if vertex_groups != self._meta["vertex_groups"]:
+                # force Object update. This requires that Object updates are processed later, which seems to be
+                # the order  they are listed in Depsgraph.updates
+                try:
+                    dirty_vertex_groups = context.visit_state.scratchpad["dirty_vertex_groups"]
+                except KeyError:
+                    dirty_vertex_groups = context.visit_state.scratchpad["dirty_vertex_groups"] = set()
+                dirty_vertex_groups.add(struct.mixer_uuid)
+                diff._meta["vertex_groups"] = vertex_groups
+
             properties = context.synchronized_properties.properties(struct)
             properties = specifics.conditional_properties(struct, properties)
             for k, member_property in properties:
@@ -168,7 +189,7 @@ class MeshProxy(DatablockProxy):
             if prop is not None:
                 context.visit_state.path.pop()
 
-        if len(diff._data):
+        if len(diff._data) or len(diff._meta):
             return DeltaUpdate(diff)
 
         return None
@@ -188,23 +209,30 @@ class MeshProxy(DatablockProxy):
             self.copy_data(struct_update)
             if to_blender:
                 struct.clear_geometry()
-                self.save(parent, key, context)
-        else:
-            # a sparse update (buffer contents requiring no clear_geometry)
-            # collection resizing will be done in AosProxy.apply()
-            context.visit_state.path.append(key)
-            try:
-                for k, member_delta in struct_update._data.items():
-                    current_value = self._data.get(k)
-                    try:
-                        self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
-                    except Exception as e:
-                        logger.warning(f"Struct.apply(). Processing {member_delta}")
-                        logger.warning(f"... for {struct}.{k}")
-                        logger.warning(f"... Exception: {e!r}")
-                        logger.warning("... Update ignored")
-                        continue
-            finally:
-                context.visit_state.path.pop()
+
+        try:
+            self._meta["vertex_groups"] = struct_update._meta["vertex_groups"]
+        except KeyError:
+            pass
+        # collection resizing will be done in AosProxy.apply()
+
+        context.visit_state.path.append(key)
+        try:
+            for k, member_delta in struct_update._data.items():
+                current_value = self._data.get(k)
+                try:
+                    self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
+                except Exception as e:
+                    logger.warning(f"Struct.apply(). Processing {member_delta}")
+                    logger.warning(f"... for {struct}.{k}")
+                    logger.warning(f"... Exception: {e!r}")
+                    logger.warning("... Update ignored")
+                    continue
+        finally:
+            context.visit_state.path.pop()
+
+        # If a face is removed from a cube, the vertices array is unchanged but the polygon array is changed.
+        # We expect to receive soa updates for arrays that have been modified, but not for unmodified arrays.
+        # however unmodified arrays must be reloaded if clear_geometry was called
 
         return self
