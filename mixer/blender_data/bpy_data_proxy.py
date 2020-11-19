@@ -129,11 +129,9 @@ class VisitState:
     by circular references
     Local state"""
 
-    scratchpad: Dict[str, Any] = field(default_factory=dict)
-    """Custom data attached to the load/save/diff/apply visits that some data nodes may attach
-    in order to modify the processing at other data nodes
-    Mainly to communicate global state between datablocks
-    """
+    dirty_vertex_groups: Set[Uuid] = field(default_factory=set)
+    """Uuids of the Mesh datablocks that whose vertex_groups data has been updated since last loaded
+    into their MeshProxy"""
 
 
 @dataclass

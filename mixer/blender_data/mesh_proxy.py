@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import logging
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING, Union
 
 import bpy.types as T  # noqa
 
@@ -146,53 +146,53 @@ class MeshProxy(DatablockProxy):
 
     def _diff(
         self, struct: T.Mesh, key: str, prop: T.Property, context: Context, diff: MeshProxy
-    ) -> Optional[DeltaUpdate]:
+    ) -> Optional[Union[DeltaUpdate, DeltaReplace]]:
 
         if self.requires_clear_geometry(struct):
             # If any mesh buffer changes requires a clear geometry on the receiver, the receiver will clear all
             # buffers, including uv_layers and vertex_colors.
             # Resend everything
-
             diff.load(struct, key, context)
+
+            # force ObjectProxy._diff to resend the Vertex groups
+            logger.debug(f"_diff: {struct} requires clear_geometry: replace")
+            context.visit_state.dirty_vertex_groups.add(struct.mixer_uuid)
             return DeltaReplace(diff)
-
-        if prop is not None:
-            context.visit_state.path.append(key)
-        try:
-            vertex_groups = self.compute_vertex_groups(struct)
-            if vertex_groups != self._meta["vertex_groups"]:
-                # force Object update. This requires that Object updates are processed later, which seems to be
-                # the order  they are listed in Depsgraph.updates
-                try:
-                    dirty_vertex_groups = context.visit_state.scratchpad["dirty_vertex_groups"]
-                except KeyError:
-                    dirty_vertex_groups = context.visit_state.scratchpad["dirty_vertex_groups"] = set()
-                dirty_vertex_groups.add(struct.mixer_uuid)
-                diff._meta["vertex_groups"] = vertex_groups
-
-            properties = context.synchronized_properties.properties(struct)
-            properties = specifics.conditional_properties(struct, properties)
-            for k, member_property in properties:
-                try:
-                    member = getattr(struct, k)
-                except AttributeError:
-                    logger.warning(f"diff: unknown attribute {k} in {struct}")
-                    continue
-
-                proxy_data = self._data.get(k)
-                delta = diff_attribute(member, k, member_property, proxy_data, context)
-
-                if delta is not None:
-                    diff._data[k] = delta
-
-        finally:
+        else:
             if prop is not None:
-                context.visit_state.path.pop()
+                context.visit_state.path.append(key)
+            try:
+                vertex_groups = self.compute_vertex_groups(struct)
+                if vertex_groups != self._meta["vertex_groups"]:
+                    logger.debug(f"_diff: {struct} dirty vertex groups")
+                    # force Object update. This requires that Object updates are processed later, which seems to be
+                    # the order  they are listed in Depsgraph.updates
+                    context.visit_state.dirty_vertex_groups.add(struct.mixer_uuid)
+                    diff._meta["vertex_groups"] = vertex_groups
 
-        if len(diff._data) or len(diff._meta):
-            return DeltaUpdate(diff)
+                properties = context.synchronized_properties.properties(struct)
+                properties = specifics.conditional_properties(struct, properties)
+                for k, member_property in properties:
+                    try:
+                        member = getattr(struct, k)
+                    except AttributeError:
+                        logger.warning(f"diff: unknown attribute {k} in {struct}")
+                        continue
 
-        return None
+                    proxy_data = self._data.get(k)
+                    delta = diff_attribute(member, k, member_property, proxy_data, context)
+
+                    if delta is not None:
+                        diff._data[k] = delta
+
+            finally:
+                if prop is not None:
+                    context.visit_state.path.pop()
+
+            if len(diff._data) or len(diff._meta):
+                return DeltaUpdate(diff)
+
+            return None
 
     def apply(
         self,

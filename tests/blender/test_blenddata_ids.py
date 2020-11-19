@@ -195,5 +195,64 @@ bpy.ops.mesh.uv_texture_add()
         self.end_test()
 
 
+class TestMeshVertexGroups(TestGenericJoinBefore):
+    def test_create_mesh_with_vg(self):
+        action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+vgs = obj.vertex_groups
+
+bpy.ops.object.editmode_toggle()
+bpy.ops.object.vertex_group_assign_new()
+vgs[-1].name = "group_0"
+
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 1))
+bpy.ops.object.vertex_group_assign_new()
+vgs[-1].name = "group_1"
+
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 2))
+bpy.ops.object.vertex_group_assign_new()
+vgs[-1].name = "group_2"
+
+bpy.ops.object.editmode_toggle()
+"""
+        self.send_string(action)
+
+        self.end_test()
+
+    def test_vg_add(self):
+        action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+vgs = obj.vertex_groups
+
+bpy.ops.object.editmode_toggle()
+bpy.ops.object.vertex_group_assign_new()
+vgs[-1].name = "group_0"
+bpy.ops.object.editmode_toggle()
+
+"""
+        self.send_string(action)
+
+        action = """
+import bpy
+
+obj = bpy.data.objects[0]
+vgs = obj.vertex_groups
+
+bpy.ops.object.editmode_toggle()
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 1))
+bpy.ops.object.vertex_group_assign_new()
+vgs[-1].name = "group_1"
+bpy.ops.object.editmode_toggle()
+"""
+
+        self.send_string(action)
+
+        self.end_test()
+
+
 if __name__ == "__main__":
     unittest.main()

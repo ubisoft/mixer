@@ -668,6 +668,16 @@ def _diff_must_replace_always(collection: T.bpy_prop_collection, sequence: List[
     return True
 
 
+@diff_must_replace.register(T.VertexGroups)
+def _diff_must_replace_vertex_groups(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+    # Full replace if anything has changed is easier to cope with in ObjectProxy.update_vertex_groups()
+    return (
+        any((bl_item.name != proxy.data("name") for bl_item, proxy in zip(collection, sequence)))
+        or any((bl_item.index != proxy.data("index") for bl_item, proxy in zip(collection, sequence)))
+        or any((bl_item.lock_weight != proxy.data("lock_weight") for bl_item, proxy in zip(collection, sequence)))
+    )
+
+
 @diff_must_replace.register(T.GreasePencilLayers)
 def _diff_must_replace_info_mismatch(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
     # Name mismatch (in info property). This may happen during layer swap and cause unsolicited rename
@@ -706,17 +716,6 @@ def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[Data
             return i
 
     return min(len(sequence), len(collection))
-
-
-@clear_from.register(T.VertexGroups)
-def _clear_from_0(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
-    """clear_from() implementation for collections that always require to be cleared because
-    a name update may cause an spurious rename.
-
-    TODO find a softer way to do this. The sender could generate smart renames like for bpy.data
-    collections items
-    """
-    return 0
 
 
 #

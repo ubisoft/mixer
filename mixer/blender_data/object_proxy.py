@@ -26,10 +26,9 @@ from typing import Optional, TYPE_CHECKING
 
 import bpy.types as T  # noqa
 
-from mixer.blender_data.attributes import read_attribute
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.misc_proxies import NonePtrProxy
-from mixer.blender_data.proxy import DeltaAddition, DeltaUpdate
+from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 if TYPE_CHECKING:
@@ -58,7 +57,10 @@ class ObjectProxy(DatablockProxy):
     def update_vertex_groups(
         self, object_datablock: T.Object, vertex_groups_proxy: StructCollectionProxy, context: Context
     ):
+        """Update vertex groups of object_datablock with information from vertex_groups_proxy"""
+
         # Vertex groups are read in MeshProxy and written here
+        # Correct operation relies on vertex_groups_proxy being a full update (see _diff_must_replace_vertex_groups())
         if vertex_groups_proxy is None or vertex_groups_proxy.length == 0:
             return
 
@@ -102,16 +104,12 @@ class ObjectProxy(DatablockProxy):
 
         datablock_ref = self._data["data"]
         if datablock_ref and not isinstance(datablock_ref, NonePtrProxy):
-            if datablock_ref.mixer_uuid in context.visit_state.scratchpad.get("dirty_vertex_groups", {}):
-                # force a full vertex_groups update
-                update = StructCollectionProxy()
-                vertex_groups_proxy = self._data["vertex_groups"]
-                update._diff_deletions = vertex_groups_proxy.length
-                update._diff_additions = [
-                    DeltaAddition(read_attribute(vg, "vertex_groups", _vertex_group_prop, context))
-                    for vg in struct.vertex_groups
-                ]
-                diff._data["vertex_groups"] = DeltaUpdate(update)
+            if datablock_ref.mixer_uuid in context.visit_state.dirty_vertex_groups:
+                logger.debug(f"_diff: {struct} dirty vertex group: replace")
+                # Lazy and heavy : replace the whole Object. Otherwise we would have to merge a DeltaReplace
+                # for vertex_groups and a DeltaUpdate for the remaining items
+                diff.load(struct, key, context)
+                return DeltaReplace(diff)
 
         return super()._diff(struct, key, prop, context, diff)
 
@@ -127,6 +125,7 @@ class ObjectProxy(DatablockProxy):
         if to_blender:
             update = struct_delta.value
             incoming_vertex_groups = update.data("vertex_groups")
+            logger.debug(f"apply: incoming vg: {incoming_vertex_groups}")
             object_datablock = parent[key]
             updated_proxy.update_vertex_groups(object_datablock, incoming_vertex_groups, context)
         return updated_proxy
