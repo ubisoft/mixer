@@ -40,7 +40,7 @@ from mixer.local_data import get_source_file_path
 if TYPE_CHECKING:
     from mixer.blender_data.aos_soa_proxy import SoaElement
     from mixer.blender_data.bpy_data_proxy import RenameChangeset, Context, VisitState
-    from mixer.blender_data.types import Path, SoaMember
+    from mixer.blender_data.types import ArrayGroups, Path, SoaMember
 
 
 DEBUG = True
@@ -68,16 +68,22 @@ class DatablockProxy(StructProxy):
             ("edges"): ...
         }"""
 
+        # TODO move into _arrays
         self._media: Optional[Tuple[str, bytes]] = None
+
+        self._arrays: ArrayGroups = {}
+        """ArrayGroups that are not stored as soas."""
 
     def copy_data(self, other: DatablockProxy):
         super().copy_data(other)
         self._soas = other._soas
         self._media = other._media
+        self._arrays = other._arrays
 
     def clear_data(self):
         super().clear_data()
         self._soas.clear()
+        self._arrays.clear()
         if self._media:
             self._media.clear()
 
@@ -88,6 +94,9 @@ class DatablockProxy(StructProxy):
                 self._bpy_data_collection = rna_identifier_to_collection_name[type_name]
                 self._datablock_uuid = datablock.mixer_uuid
             self._class_name = datablock.__class__.__name__
+
+    def set_arrays(self, arrays: ArrayGroups):
+        self._arrays = arrays
 
     @classmethod
     def make(cls, datablock: T.ID):

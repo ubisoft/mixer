@@ -21,9 +21,10 @@ See synchronization.md
 """
 from __future__ import annotations
 
+import array
 from collections import defaultdict
 import logging
-from typing import Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Dict, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy.types as T  # noqa
 
@@ -35,6 +36,7 @@ from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
+    from mixer.blender_data.types import ArrayGroup
 
 
 DEBUG = True
@@ -79,24 +81,57 @@ def update_requires_clear_geometry(incoming_update: MeshProxy, existing_proxy: M
     return False
 
 
-def _compute_vertex_groups(datablock: T.Mesh):
-    indices: Dict[int, List[int]] = defaultdict(list)
-    weights: Dict[int, List[float]] = defaultdict(list)
-    for i, vertex in enumerate(datablock.vertices):
-        for element in vertex.groups:
-            group = element.group
-            indices[group].append(i)
-            weights[group].append(element.weight)
+class VertexGroups:
+    """Utility class to hold vertex groups data in a handy way for MeshProxy, ObjectProxy and serialization """
 
-    groups = indices.keys()
-    # used in ObjectProxy._save()
+    def __init__(self, indices: Dict[int, array.array] = None, weights: Dict[int, array.array] = None) -> None:
+        self.indices = indices if indices is not None else {}
+        self.weights = weights if weights is not None else {}
 
-    # with arrays: cannot serialize as-is
-    # self._meta["vertex_groups"] = {
-    #     group: (array("I", indices[group]), array("f", weights[group])) for group in groups
-    # }
+    def __bool__(self):
+        return bool(self.indices)
 
-    return {str(group): [indices[group], weights[group]] for group in groups}
+    def __eq__(self, other):
+        return self.indices == other.indices and self.weights == other.weights
+
+    def group(self, group_index: int) -> Tuple[array.array, array.array]:
+        return self.indices[group_index], self.weights[group_index]
+
+    @staticmethod
+    def from_mesh(datablock: T.Mesh) -> VertexGroups:
+        indices = defaultdict(list)
+        weights = defaultdict(list)
+        for i, vertex in enumerate(datablock.vertices):
+            for element in vertex.groups:
+                group_index = element.group
+                indices[group_index].append(i)
+                weights[group_index].append(element.weight)
+
+        return VertexGroups(
+            {g: array.array("i", list_) for g, list_ in indices.items()},
+            {g: array.array("f", list_) for g, list_ in weights.items()},
+        )
+
+    @staticmethod
+    def from_array_sequence(array_sequence: ArrayGroup) -> VertexGroups:
+        """
+        Args:
+            seq: a list of tuples ((vertex_group number, "i" or "w" ), array)
+        """
+        vertex_groups = VertexGroups()
+        for identifier, array_ in array_sequence:
+            group, item_name = identifier
+            if item_name == "i":
+                vertex_groups.indices[group] = array_
+            elif item_name == "w":
+                vertex_groups.weights[group] = array_
+        return vertex_groups
+
+    def to_array_sequence(self) -> ArrayGroup:
+        array_sequence = []
+        array_sequence.extend([((group, "i"), array_) for group, array_ in self.indices.items()])
+        array_sequence.extend([((group, "w"), array_) for group, array_ in self.weights.items()])
+        return array_sequence
 
 
 class MeshProxy(DatablockProxy):
@@ -104,15 +139,6 @@ class MeshProxy(DatablockProxy):
     Proxy for a Mesh datablock. This specialization is required to handle geometry resize processing, that
     spans across Mesh (for clear_geometry()) and geometry arrays of structures (Mesh.vertices.add() and others)
     """
-
-    # TODO find another name than meta
-    # TODO send as buffers
-    # TODO weighs representation (sort by weights to speed up load, compress weights is applicable)
-    _serialize = ("_meta",)
-
-    def __init__(self):
-        super().__init__()
-        self._meta = {}
 
     def requires_clear_geometry(self, mesh: T.Mesh) -> bool:
         """Determines if the difference between mesh and self will require a clear_geometry() on the receiver side"""
@@ -141,7 +167,7 @@ class MeshProxy(DatablockProxy):
         bpy_data_collection_name: str = None,
     ) -> MeshProxy:
         super().load(datablock, key, context, bpy_data_collection_name)
-        self._meta["vertex_groups"] = _compute_vertex_groups(datablock)
+        self._arrays["vertex_groups"] = VertexGroups.from_mesh(datablock).to_array_sequence()
         return self
 
     def _diff(
@@ -162,13 +188,16 @@ class MeshProxy(DatablockProxy):
             if prop is not None:
                 context.visit_state.path.append(key)
             try:
-                vertex_groups = _compute_vertex_groups(struct)
-                if vertex_groups != self._meta["vertex_groups"]:
+                # vertex groups are always replaced as a whole
+                mesh_vertex_groups = VertexGroups.from_mesh(struct).to_array_sequence()
+                proxy_vertex_groups: ArrayGroup = self._arrays.get("vertex_groups", [])
+                if mesh_vertex_groups != proxy_vertex_groups:
                     logger.debug(f"_diff: {struct} dirty vertex groups")
+                    diff._arrays["vertex_groups"] = mesh_vertex_groups
+
                     # force Object update. This requires that Object updates are processed later, which seems to be
                     # the order  they are listed in Depsgraph.updates
                     context.visit_state.dirty_vertex_groups.add(struct.mixer_uuid)
-                    diff._meta["vertex_groups"] = vertex_groups
 
                 properties = context.synchronized_properties.properties(struct)
                 properties = specifics.conditional_properties(struct, properties)
@@ -189,7 +218,7 @@ class MeshProxy(DatablockProxy):
                 if prop is not None:
                     context.visit_state.path.pop()
 
-            if len(diff._data) or len(diff._meta):
+            if len(diff._data) or len(diff._arrays):
                 return DeltaUpdate(diff)
 
             return None
@@ -206,17 +235,17 @@ class MeshProxy(DatablockProxy):
         struct = parent.get(key)
         struct_update = struct_delta.value
 
-        try:
-            self._meta["vertex_groups"] = struct_update._meta["vertex_groups"]
-        except KeyError:
-            pass
-
         if isinstance(struct_delta, DeltaReplace):
             self.copy_data(struct_update)
             if to_blender:
                 struct.clear_geometry()
                 self.save(parent, key, context)
         else:
+            # vertex groups are always replaced as a whole
+            vertex_groups_arrays = struct_update._arrays.get("vertex_groups", None)
+            if vertex_groups_arrays is not None:
+                self._arrays["vertex_groups"] = vertex_groups_arrays
+
             # collection resizing will be done in AosProxy.apply()
 
             context.visit_state.path.append(key)

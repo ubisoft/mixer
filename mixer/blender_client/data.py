@@ -120,6 +120,7 @@ def build_data_create(buffer):
         message = BlenderDataMessage()
         message.decode(buffer)
         datablock_proxy = codec.decode(message.proxy_string)
+        datablock_proxy.set_arrays(message.arrays)
         _, rename_changeset = share_data.bpy_data_proxy.create_datablock(datablock_proxy)
         _build_soas(datablock_proxy.mixer_uuid(), message.soas)
     except DecodeError as e:

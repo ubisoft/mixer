@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import array
 from dataclasses import dataclass
-from typing import List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 
 SoaMember = Tuple[str, array.array]
@@ -44,3 +44,11 @@ class Soa:
     """a data path to the array"""
 
     members: List[SoaMember]
+
+
+ArrayGroup = List[Tuple[Any, array.array]]
+"""A logical group of related arrays, like vertex groups.
+
+The first item is an identifier for the DatablockProxy that uses the ArrayGroup. see MeshProxy.py:VertexGroups"""
+
+ArrayGroups = Dict[str, ArrayGroup]

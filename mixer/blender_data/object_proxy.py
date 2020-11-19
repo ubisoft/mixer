@@ -27,6 +27,7 @@ from typing import Optional, TYPE_CHECKING
 import bpy.types as T  # noqa
 
 from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.mesh_proxy import VertexGroups
 from mixer.blender_data.misc_proxies import NonePtrProxy
 from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
@@ -67,14 +68,23 @@ class ObjectProxy(DatablockProxy):
         try:
             datablock_ref_proxy = self._data["data"]
         except KeyError:
-            return None
-
-        data_proxy = context.proxy_state.proxies.get(datablock_ref_proxy.mixer_uuid)
+            # an empty
+            return
 
         try:
-            data_vertex_groups = data_proxy._meta["vertex_groups"]
+            mesh_proxy = context.proxy_state.proxies.get(datablock_ref_proxy.mixer_uuid)
         except KeyError:
-            logger.error(f"_save(): {object_datablock} has vertex groups, but its data datablock has None")
+            logger.error(
+                f"_save(): internal error: {object_datablock} has vertex groups, but its data datablock has None"
+            )
+            return
+
+        try:
+            mesh_vertex_groups_array = mesh_proxy._arrays["vertex_groups"]
+        except KeyError:
+            return
+
+        mesh_vertex_groups = VertexGroups.from_array_sequence(mesh_vertex_groups_array)
 
         vertex_groups = object_datablock.vertex_groups
         vertex_groups.clear()
@@ -90,7 +100,7 @@ class ObjectProxy(DatablockProxy):
             vertex_group = vertex_groups.new(name=name)
             vertex_group.lock_weight = lock_weight
             try:
-                indices, weights = data_vertex_groups[str(index)]
+                indices, weights = mesh_vertex_groups.group(index)
             except KeyError:
                 # empty vertex group
                 continue

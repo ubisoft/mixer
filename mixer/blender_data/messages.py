@@ -24,12 +24,13 @@ shared with the VRtist protocol.
 """
 from __future__ import annotations
 
+import array
 import json
 import logging
 import traceback
-from typing import List, Optional, TYPE_CHECKING, Union
+from typing import List, Optional, Tuple, TYPE_CHECKING, Union
 
-from mixer.blender_data.types import Soa
+from mixer.blender_data.types import ArrayGroup, ArrayGroups, Soa
 
 from mixer.broadcaster.common import (
     decode_int,
@@ -79,13 +80,60 @@ def soa_buffers(datablock_proxy: Optional[DatablockProxy]) -> List[bytes]:
     return items
 
 
-def _decode_soas(buffer: bytes) -> List[Soa]:
+_typecodes = {int: "i", float: "f"}
+
+
+def encode_arrays(datablock_proxy: DatablockProxy) -> List[bytes]:
+    if not hasattr(datablock_proxy, "_arrays"):
+        return [encode_int(0)]
+
+    items = []
+    items.append(encode_int(len(datablock_proxy._arrays)))
+    for array_group_name, arrays in datablock_proxy._arrays.items():
+        # for vertex groups, _arrays layout is
+        # { "vertex_groups: [
+        #       ((0, "i"), indices_array_of_vertex_group_0),
+        #       ((0, "w"), weights_array_of_vertex_group_0),
+        #       ...
+        # ]}
+        items.append(encode_string(array_group_name))
+        items.append(encode_int(len(arrays)))
+        for key, array_ in arrays:
+            key_string = json.dumps(key)
+            items.append(encode_string(key_string))
+            items.append(encode_py_array(array_))
+    return items
+
+
+def decode_arrays(buffer: bytes, index) -> Tuple[ArrayGroups, int]:
+    array_group_count, index = decode_int(buffer, index)
+    if array_group_count == 0:
+        return {}, index
+
+    array_groups: ArrayGroups = {}
+    for _groups_index in range(array_group_count):
+        array_group_name, index = decode_string(buffer, index)
+        array_group_length, index = decode_int(buffer, index)
+        array_group: ArrayGroup = []
+        for _array_index in range(array_group_length):
+            key_string, index = decode_string(buffer, index)
+            key = json.loads(key_string)
+            array_, index = decode_py_array(buffer, index)
+            array_group.append(
+                (key, array_),
+            )
+        array_groups[array_group_name] = array_group
+
+    return array_groups, index
+
+
+def _decode_soas(buffer: bytes, index: int) -> Tuple[List[Soa], int]:
     path: List[Union[int, str]] = ["unknown"]
     name = "unknown"
     soas: List[Soa] = []
     try:
         # see soa_buffers()
-        aos_count, index = decode_int(buffer, 0)
+        aos_count, index = decode_int(buffer, index)
         for _ in range(aos_count):
             path_string, index = decode_string(buffer, index)
             path = json.loads(path_string)
@@ -110,27 +158,31 @@ def _decode_soas(buffer: bytes) -> List[Soa]:
         logger.error("ignored")
         return []
 
-    return soas
+    return soas, index
 
 
 class BlenderDataMessage:
     def __init__(self):
         self.proxy_string: str = ""
         self.soas: List[Soa] = []
+        self.arrays: List[str, array.array] = {}
 
     def __lt__(self, other):
         # for sorting by the tests
         return self.proxy_string < other.proxy_string
 
-    def decode(self, buffer: bytes):
+    def decode(self, buffer: bytes) -> int:
         self.proxy_string, index = decode_string(buffer, 0)
-        self.soas = _decode_soas(buffer[index:])
+        self.soas, index = _decode_soas(buffer, index)
+        self.arrays, index = decode_arrays(buffer, index)
+        return index
 
     @staticmethod
     def encode(datablock_proxy: DatablockProxy, encoded_proxy: str) -> bytes:
         items = []
         items.append(encode_string(encoded_proxy))
         items.extend(soa_buffers(datablock_proxy))
+        items.extend(encode_arrays(datablock_proxy))
         return b"".join(items)
 
 
