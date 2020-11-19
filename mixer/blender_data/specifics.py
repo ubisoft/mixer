@@ -708,6 +708,17 @@ def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[Data
     return min(len(sequence), len(collection))
 
 
+@clear_from.register(T.VertexGroups)
+def _clear_from_0(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+    """clear_from() implementation for collections that always require to be cleared because
+    a name update may cause an spurious rename.
+
+    TODO find a softer way to do this. The sender could generate smart renames like for bpy.data
+    collections items
+    """
+    return 0
+
+
 #
 # truncate_collection
 #
