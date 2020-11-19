@@ -90,9 +90,13 @@ class DatablockProxy(StructProxy):
             self._class_name = datablock.__class__.__name__
 
     @classmethod
-    def make(cls, attr_property):
+    def make(cls, datablock: T.ID):
 
-        if isinstance(attr_property, T.Mesh):
+        if isinstance(datablock, T.Object):
+            from mixer.blender_data.object_proxy import ObjectProxy
+
+            return ObjectProxy()
+        if isinstance(datablock, T.Mesh):
             from mixer.blender_data.mesh_proxy import MeshProxy
 
             return MeshProxy()
@@ -263,6 +267,9 @@ class DatablockProxy(StructProxy):
 
         datablock.mixer_uuid = self.mixer_uuid()
 
+        return self._save(datablock, context), renames
+
+    def _save(self, datablock: T.ID, context: Context) -> T.ID:
         datablock = self._pre_save(datablock, context)
         if datablock is None:
             logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
@@ -274,7 +281,7 @@ class DatablockProxy(StructProxy):
         finally:
             context.visit_state.datablock_proxy = None
 
-        return datablock, renames
+        return datablock
 
     def update_standalone_datablock(self, datablock: T.ID, delta: DeltaUpdate, context: Context) -> T.ID:
         """

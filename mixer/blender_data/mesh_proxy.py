@@ -21,8 +21,9 @@ See synchronization.md
 """
 from __future__ import annotations
 
+from collections import defaultdict
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import bpy.types as T  # noqa
 
@@ -84,6 +85,15 @@ class MeshProxy(DatablockProxy):
     spans across Mesh (for clear_geometry()) and geometry arrays of structures (Mesh.vertices.add() and others)
     """
 
+    # TODO find another name than meta
+    # TODO send as buffers
+    # TODO weighs representation (sort by weights to speed up load, compress weights is applicable)
+    _serialize = ("_meta",)
+
+    def __init__(self):
+        super().__init__()
+        self._meta = {}
+
     def requires_clear_geometry(self, mesh: T.Mesh) -> bool:
         """Determines if the difference between mesh and self will require a clear_geometry() on the receiver side"""
         for k in _mesh_geometry_properties:
@@ -102,6 +112,27 @@ class MeshProxy(DatablockProxy):
                     )
                     return True
         return False
+
+    def load(
+        self,
+        datablock: T.ID,
+        key: str,
+        context: Context,
+        bpy_data_collection_name: str = None,
+    ) -> MeshProxy:
+        super().load(datablock, key, context, bpy_data_collection_name)
+
+        #
+        # Vertex groups
+        #
+        groups: Dict[int, List[Tuple[int, float]]] = defaultdict(list)
+        for i, vertex in enumerate(datablock.vertices):
+            for element in vertex.groups:
+                groups[element.group].append((i, element.weight))
+
+        self._meta["vertex_groups"] = groups
+
+        return self
 
     def _diff(
         self, struct: T.Struct, key: str, prop: T.Property, context: Context, diff: MeshProxy

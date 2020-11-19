@@ -108,7 +108,9 @@ class VisitState:
     Path = List[Union[str, int]]
     """The current visit path relative to the datablock, for instance in a GreasePencil datablock
     ("layers", "MyLayer", "frames", 0, "strokes", 0, "points").
-    Used to identify SoaElement buffer updates"""
+    Used to identify SoaElement buffer updates.
+    Equivalent to a RNA path, parsed with indexed instead of names.
+    """
 
     datablock_proxy: Optional[DatablockProxy] = None
     """The datablock proxy being visited"""

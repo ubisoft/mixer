@@ -47,6 +47,9 @@ class NonePtrProxy(Proxy):
     TODO Check it it is meaningfull for anything else ?
     """
 
+    def target(self, context: Context) -> None:
+        return None
+
     def save(self, bl_instance: Any, attr_name: str, context: Context):
         try:
             setattr(bl_instance, attr_name, None)
