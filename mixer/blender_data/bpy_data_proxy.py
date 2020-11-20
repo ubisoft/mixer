@@ -264,7 +264,9 @@ class BpyDataProxy(Proxy):
             self._delayed_updates.clear()
 
         # It is required that Object are processed after Mesh (search for "dirty_vertex_groups")
-        for datablock in all_updates:
+        sorted_updates = sorted(all_updates, key=lambda datablock: 0 if isinstance(datablock, T.Mesh) else 1)
+
+        for datablock in sorted_updates:
             if not isinstance(datablock, safe_depsgraph_updates):
                 logger.info("depsgraph update: ignoring untracked type %s", datablock)
                 continue
