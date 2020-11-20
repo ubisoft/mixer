@@ -84,6 +84,11 @@ class ObjectProxy(DatablockProxy):
         except KeyError:
             return
 
+        if object_datablock.mode == "EDIT":
+            logger.warning(f"Cannot update vertex groups while in edit mode for {object_datablock}...")
+            logger.warning(f"... vertex group contents not updated")
+            return
+
         mesh_vertex_groups = VertexGroups.from_array_sequence(mesh_vertex_groups_array)
 
         vertex_groups = object_datablock.vertex_groups
@@ -94,7 +99,7 @@ class ObjectProxy(DatablockProxy):
             item = vertex_groups_proxy.data(i)
             groups_data.append((item.data("index"), item.data("lock_weight"), item.data("name")))
 
-        groups_data.sort(key=lambda x: x[0])
+        # groups_data.sort(key=lambda x: x[0])
 
         for index, lock_weight, name in groups_data:
             vertex_group = vertex_groups.new(name=name)
