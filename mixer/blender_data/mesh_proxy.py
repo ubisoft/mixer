@@ -129,8 +129,8 @@ class VertexGroups:
 
     def to_array_sequence(self) -> ArrayGroup:
         array_sequence = []
-        array_sequence.extend([((group, "i"), array_) for group, array_ in self.indices.items()])
-        array_sequence.extend([((group, "w"), array_) for group, array_ in self.weights.items()])
+        array_sequence.extend([([group, "i"], array_) for group, array_ in self.indices.items()])
+        array_sequence.extend([([group, "w"], array_) for group, array_ in self.weights.items()])
         return array_sequence
 
 
