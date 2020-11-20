@@ -95,7 +95,12 @@ class DatablockProxy(StructProxy):
                 self._datablock_uuid = datablock.mixer_uuid
             self._class_name = datablock.__class__.__name__
 
-    def set_arrays(self, arrays: ArrayGroups):
+    @property
+    def arrays(self):
+        return self._arrays
+
+    @arrays.setter
+    def arrays(self, arrays: ArrayGroups):
         self._arrays = arrays
 
     @classmethod
