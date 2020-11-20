@@ -1,4 +1,3 @@
-import logging
 import unittest
 
 from tests import files_folder
