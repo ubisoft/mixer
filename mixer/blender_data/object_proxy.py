@@ -58,7 +58,7 @@ class ObjectProxy(DatablockProxy):
     def update_vertex_groups(
         self, object_datablock: T.Object, vertex_groups_proxy: StructCollectionProxy, context: Context
     ):
-        """Update vertex groups of object_datablock with information from vertex_groups_proxy"""
+        """Update vertex groups of object_datablock with information from vertex_groups_proxy (from MeshProxy)"""
 
         # Vertex groups are read in MeshProxy and written here
         # Correct operation relies on vertex_groups_proxy being a full update (see _diff_must_replace_vertex_groups())
@@ -85,6 +85,8 @@ class ObjectProxy(DatablockProxy):
             return
 
         if object_datablock.mode == "EDIT":
+            # TODO This displays a false error when the receive is in edit mode, but the update is limited
+            # to Object.vertex_groups, the Mesh vertex group data being unchanged. Do a smarter test.
             logger.warning(f"Cannot update vertex groups while in edit mode for {object_datablock}...")
             logger.warning("... vertex group contents not updated")
             return

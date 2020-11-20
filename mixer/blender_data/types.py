@@ -49,6 +49,12 @@ class Soa:
 ArrayGroup = List[Tuple[Any, array.array]]
 """A logical group of related arrays, like vertex groups.
 
-The first item is an identifier for the DatablockProxy that uses the ArrayGroup. see MeshProxy.py:VertexGroups"""
+The first item is an identifier for the DatablockProxy that uses the ArrayGroup. see MeshProxy.py:VertexGroups.
+Json serialization converts tuples into lists"""
 
 ArrayGroups = Dict[str, ArrayGroup]
+"""ArrayGroups contain arrays that must be serialized in binary format, mainly because of their size, but could
+otherwise be stored in Proxy._data
+
+TODO use ArrayGroups for Proxy._media and Proxy._soas
+"""

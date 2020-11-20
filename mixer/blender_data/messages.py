@@ -92,8 +92,8 @@ def encode_arrays(datablock_proxy: DatablockProxy) -> List[bytes]:
     for array_group_name, arrays in datablock_proxy._arrays.items():
         # for vertex groups, _arrays layout is
         # { "vertex_groups: [
-        #       ((0, "i"), indices_array_of_vertex_group_0),
-        #       ((0, "w"), weights_array_of_vertex_group_0),
+        #       ([0, "i"], indices_array_of_vertex_group_0),
+        #       ([0, "w"], weights_array_of_vertex_group_0),
         #       ...
         # ]}
         items.append(encode_string(array_group_name))

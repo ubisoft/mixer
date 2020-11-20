@@ -72,7 +72,7 @@ class DatablockProxy(StructProxy):
         self._media: Optional[Tuple[str, bytes]] = None
 
         self._arrays: ArrayGroups = {}
-        """ArrayGroups that are not stored as soas."""
+        """arrays that must not be serialized as json because of their size"""
 
     def copy_data(self, other: DatablockProxy):
         super().copy_data(other)

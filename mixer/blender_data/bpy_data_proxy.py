@@ -130,7 +130,7 @@ class VisitState:
     Local state"""
 
     dirty_vertex_groups: Set[Uuid] = field(default_factory=set)
-    """Uuids of the Mesh datablocks that whose vertex_groups data has been updated since last loaded
+    """Uuids of the Mesh datablocks whose vertex_groups data has been updated since last loaded
     into their MeshProxy"""
 
 
