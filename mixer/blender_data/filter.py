@@ -389,8 +389,6 @@ default_exclusions = {
                 # TODO temporary, waiting for shape_key support
                 # there is a loop in active_shape_key/relative_key
                 "active_shape_key",
-                # temporary
-                "vertex_groups",
             ]
         )
     ],

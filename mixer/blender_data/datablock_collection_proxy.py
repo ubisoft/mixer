@@ -71,13 +71,13 @@ class DatablockCollectionProxy(Proxy):
         """
         Load bl_collection elements as standalone datablocks.
         """
-        for name, item in bl_collection.items():
-            collection_name = BlendData.instance().bl_collection_name_from_ID(item)
-            if skip_bpy_data_item(collection_name, item):
+        for name, datablock in bl_collection.items():
+            collection_name = BlendData.instance().bl_collection_name_from_ID(datablock)
+            if skip_bpy_data_item(collection_name, datablock):
                 continue
-            uuid = ensure_uuid(item)
-            self._data[uuid] = DatablockProxy.make(item).load(
-                item, name, context, bpy_data_collection_name=collection_name
+            uuid = ensure_uuid(datablock)
+            self._data[uuid] = DatablockProxy.make(datablock).load(
+                datablock, name, context, bpy_data_collection_name=collection_name
             )
 
         return self

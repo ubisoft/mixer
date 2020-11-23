@@ -31,8 +31,8 @@ import bpy.types as T  # noqa
 from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 
-from mixer.blender_data.attributes import apply_attribute, read_attribute, write_attribute
-from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate
+from mixer.blender_data.attributes import read_attribute, write_attribute
+from mixer.blender_data.proxy import DeltaUpdate
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.type_helpers import sub_id_type
 from mixer.local_data import get_source_file_path
@@ -40,7 +40,7 @@ from mixer.local_data import get_source_file_path
 if TYPE_CHECKING:
     from mixer.blender_data.aos_soa_proxy import SoaElement
     from mixer.blender_data.bpy_data_proxy import RenameChangeset, Context, VisitState
-    from mixer.blender_data.types import Path, SoaMember
+    from mixer.blender_data.types import ArrayGroups, Path, SoaMember
 
 
 DEBUG = True
@@ -68,16 +68,22 @@ class DatablockProxy(StructProxy):
             ("edges"): ...
         }"""
 
+        # TODO move into _arrays
         self._media: Optional[Tuple[str, bytes]] = None
+
+        self._arrays: ArrayGroups = {}
+        """arrays that must not be serialized as json because of their size"""
 
     def copy_data(self, other: DatablockProxy):
         super().copy_data(other)
         self._soas = other._soas
         self._media = other._media
+        self._arrays = other._arrays
 
     def clear_data(self):
         super().clear_data()
         self._soas.clear()
+        self._arrays.clear()
         if self._media:
             self._media.clear()
 
@@ -89,10 +95,22 @@ class DatablockProxy(StructProxy):
                 self._datablock_uuid = datablock.mixer_uuid
             self._class_name = datablock.__class__.__name__
 
-    @classmethod
-    def make(cls, attr_property):
+    @property
+    def arrays(self):
+        return self._arrays
 
-        if isinstance(attr_property, T.Mesh):
+    @arrays.setter
+    def arrays(self, arrays: ArrayGroups):
+        self._arrays = arrays
+
+    @classmethod
+    def make(cls, datablock: T.ID):
+
+        if isinstance(datablock, T.Object):
+            from mixer.blender_data.object_proxy import ObjectProxy
+
+            return ObjectProxy()
+        if isinstance(datablock, T.Mesh):
             from mixer.blender_data.mesh_proxy import MeshProxy
 
             return MeshProxy()
@@ -263,6 +281,9 @@ class DatablockProxy(StructProxy):
 
         datablock.mixer_uuid = self.mixer_uuid()
 
+        return self._save(datablock, context), renames
+
+    def _save(self, datablock: T.ID, context: Context) -> T.ID:
         datablock = self._pre_save(datablock, context)
         if datablock is None:
             logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
@@ -274,7 +295,7 @@ class DatablockProxy(StructProxy):
         finally:
             context.visit_state.datablock_proxy = None
 
-        return datablock, renames
+        return datablock
 
     def update_standalone_datablock(self, datablock: T.ID, delta: DeltaUpdate, context: Context) -> T.ID:
         """
@@ -347,28 +368,9 @@ class DatablockProxy(StructProxy):
         """
         Apply delta to this proxy, but do not update Blender state
         """
-        if delta is None:
-            return
 
-        update = delta.value
-        assert type(update) == type(self)
-        if isinstance(delta, DeltaReplace):
-            self.copy_data(update)
-        else:
-            try:
-                context.visit_state.datablock_proxy = self
-                for k, delta in update._data.items():
-                    try:
-                        current_value = self._data.get(k)
-                        self._data[k] = apply_attribute(datablock, k, current_value, delta, context, to_blender=False)
-                    except Exception as e:
-                        logger.warning(f"apply_to_proxy(). Processing {delta}")
-                        logger.warning(f"... for {datablock}.{k}")
-                        logger.warning(f"... Exception: {e!r}")
-                        logger.warning("... Update ignored")
-                        continue
-            finally:
-                context.visit_state.datablock_proxy = None
+        collection = getattr(bpy.data, self.collection_name)
+        self.apply(collection, datablock.name, delta, context, to_blender=False)
 
     def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember]):
 

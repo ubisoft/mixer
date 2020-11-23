@@ -526,6 +526,7 @@ def _add_element_idname(collection: T.bpy_prop_collection, proxy: Proxy, context
 @add_element.register(T.UVLoopLayers)
 @add_element.register(T.LoopColors)
 @add_element.register(T.FaceMaps)
+@add_element.register(T.VertexGroups)
 def _add_element_name_eq(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     name = proxy.data("name")
     return collection.new(name=name)
@@ -665,6 +666,16 @@ def diff_must_replace(collection: T.bpy_prop_collection, sequence: List[Databloc
 @diff_must_replace.register(T.CurveSplines)
 def _diff_must_replace_always(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
     return True
+
+
+@diff_must_replace.register(T.VertexGroups)
+def _diff_must_replace_vertex_groups(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+    # Full replace if anything has changed is easier to cope with in ObjectProxy.update_vertex_groups()
+    return (
+        any((bl_item.name != proxy.data("name") for bl_item, proxy in zip(collection, sequence)))
+        or any((bl_item.index != proxy.data("index") for bl_item, proxy in zip(collection, sequence)))
+        or any((bl_item.lock_weight != proxy.data("lock_weight") for bl_item, proxy in zip(collection, sequence)))
+    )
 
 
 @diff_must_replace.register(T.GreasePencilLayers)

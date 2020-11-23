@@ -21,8 +21,10 @@ See synchronization.md
 """
 from __future__ import annotations
 
+import array
+from collections import defaultdict
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import Dict, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy.types as T  # noqa
 
@@ -34,6 +36,7 @@ from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
+    from mixer.blender_data.types import ArrayGroup
 
 
 DEBUG = True
@@ -78,6 +81,59 @@ def update_requires_clear_geometry(incoming_update: MeshProxy, existing_proxy: M
     return False
 
 
+class VertexGroups:
+    """Utility class to hold vertex groups data in a handy way for MeshProxy, ObjectProxy and serialization """
+
+    def __init__(self, indices: Dict[int, array.array] = None, weights: Dict[int, array.array] = None) -> None:
+        self.indices = indices if indices is not None else {}
+        self.weights = weights if weights is not None else {}
+
+    def __bool__(self):
+        return bool(self.indices)
+
+    def __eq__(self, other):
+        return self.indices == other.indices and self.weights == other.weights
+
+    def group(self, group_index: int) -> Tuple[array.array, array.array]:
+        return self.indices[group_index], self.weights[group_index]
+
+    @staticmethod
+    def from_mesh(datablock: T.Mesh) -> VertexGroups:
+        indices = defaultdict(list)
+        weights = defaultdict(list)
+        for i, vertex in enumerate(datablock.vertices):
+            for element in vertex.groups:
+                group_index = element.group
+                indices[group_index].append(i)
+                weights[group_index].append(element.weight)
+
+        return VertexGroups(
+            {g: array.array("i", list_) for g, list_ in indices.items()},
+            {g: array.array("f", list_) for g, list_ in weights.items()},
+        )
+
+    @staticmethod
+    def from_array_sequence(array_sequence: ArrayGroup) -> VertexGroups:
+        """
+        Args:
+            seq: a list of tuples ((vertex_group number, "i" or "w" ), array)
+        """
+        vertex_groups = VertexGroups()
+        for identifier, array_ in array_sequence:
+            group, item_name = identifier
+            if item_name == "i":
+                vertex_groups.indices[group] = array_
+            elif item_name == "w":
+                vertex_groups.weights[group] = array_
+        return vertex_groups
+
+    def to_array_sequence(self) -> ArrayGroup:
+        array_sequence = []
+        array_sequence.extend([([group, "i"], array_) for group, array_ in self.indices.items()])
+        array_sequence.extend([([group, "w"], array_) for group, array_ in self.weights.items()])
+        return array_sequence
+
+
 class MeshProxy(DatablockProxy):
     """
     Proxy for a Mesh datablock. This specialization is required to handle geometry resize processing, that
@@ -103,44 +159,69 @@ class MeshProxy(DatablockProxy):
                     return True
         return False
 
+    def load(
+        self,
+        datablock: T.ID,
+        key: str,
+        context: Context,
+        bpy_data_collection_name: str = None,
+    ) -> MeshProxy:
+        super().load(datablock, key, context, bpy_data_collection_name)
+        self._arrays["vertex_groups"] = VertexGroups.from_mesh(datablock).to_array_sequence()
+        return self
+
     def _diff(
-        self, struct: T.Struct, key: str, prop: T.Property, context: Context, diff: MeshProxy
-    ) -> Optional[DeltaUpdate]:
+        self, struct: T.Mesh, key: str, prop: T.Property, context: Context, diff: MeshProxy
+    ) -> Optional[Union[DeltaUpdate, DeltaReplace]]:
 
         if self.requires_clear_geometry(struct):
             # If any mesh buffer changes requires a clear geometry on the receiver, the receiver will clear all
             # buffers, including uv_layers and vertex_colors.
             # Resend everything
-
             diff.load(struct, key, context)
+
+            # force ObjectProxy._diff to resend the Vertex groups
+            logger.debug(f"_diff: {struct} requires clear_geometry: replace")
+            context.visit_state.dirty_vertex_groups.add(struct.mixer_uuid)
             return DeltaReplace(diff)
-
-        if prop is not None:
-            context.visit_state.path.append(key)
-        try:
-            properties = context.synchronized_properties.properties(struct)
-            properties = specifics.conditional_properties(struct, properties)
-            for k, member_property in properties:
-                try:
-                    member = getattr(struct, k)
-                except AttributeError:
-                    logger.warning(f"diff: unknown attribute {k} in {struct}")
-                    continue
-
-                proxy_data = self._data.get(k)
-                delta = diff_attribute(member, k, member_property, proxy_data, context)
-
-                if delta is not None:
-                    diff._data[k] = delta
-
-        finally:
+        else:
             if prop is not None:
-                context.visit_state.path.pop()
+                context.visit_state.path.append(key)
+            try:
+                # vertex groups are always replaced as a whole
+                mesh_vertex_groups = VertexGroups.from_mesh(struct).to_array_sequence()
+                proxy_vertex_groups: ArrayGroup = self._arrays.get("vertex_groups", [])
+                if mesh_vertex_groups != proxy_vertex_groups:
+                    logger.debug(f"_diff: {struct} dirty vertex groups")
+                    diff._arrays["vertex_groups"] = mesh_vertex_groups
 
-        if len(diff._data):
-            return DeltaUpdate(diff)
+                    # force Object update. This requires that Object updates are processed later, which seems to be
+                    # the order  they are listed in Depsgraph.updates
+                    context.visit_state.dirty_vertex_groups.add(struct.mixer_uuid)
 
-        return None
+                properties = context.synchronized_properties.properties(struct)
+                properties = specifics.conditional_properties(struct, properties)
+                for k, member_property in properties:
+                    try:
+                        member = getattr(struct, k)
+                    except AttributeError:
+                        logger.warning(f"diff: unknown attribute {k} in {struct}")
+                        continue
+
+                    proxy_data = self._data.get(k)
+                    delta = diff_attribute(member, k, member_property, proxy_data, context)
+
+                    if delta is not None:
+                        diff._data[k] = delta
+
+            finally:
+                if prop is not None:
+                    context.visit_state.path.pop()
+
+            if len(diff._data) or len(diff._arrays):
+                return DeltaUpdate(diff)
+
+            return None
 
     def apply(
         self,
@@ -153,14 +234,20 @@ class MeshProxy(DatablockProxy):
 
         struct = parent.get(key)
         struct_update = struct_delta.value
+
         if isinstance(struct_delta, DeltaReplace):
             self.copy_data(struct_update)
             if to_blender:
                 struct.clear_geometry()
                 self.save(parent, key, context)
         else:
-            # a sparse update (buffer contents requiring no clear_geometry)
+            # vertex groups are always replaced as a whole
+            vertex_groups_arrays = struct_update._arrays.get("vertex_groups", None)
+            if vertex_groups_arrays is not None:
+                self._arrays["vertex_groups"] = vertex_groups_arrays
+
             # collection resizing will be done in AosProxy.apply()
+
             context.visit_state.path.append(key)
             try:
                 for k, member_delta in struct_update._data.items():
@@ -175,5 +262,9 @@ class MeshProxy(DatablockProxy):
                         continue
             finally:
                 context.visit_state.path.pop()
+
+            # If a face is removed from a cube, the vertices array is unchanged but the polygon array is changed.
+            # We expect to receive soa updates for arrays that have been modified, but not for unmodified arrays.
+            # however unmodified arrays must be reloaded if clear_geometry was called
 
         return self

@@ -93,7 +93,7 @@ class Delta:
     add, remove or update operation
     """
 
-    def __init__(self, value: Optional[Any] = None):
+    def __init__(self, value: Any):
         self.value = value
 
     def __str__(self):

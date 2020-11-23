@@ -41,15 +41,21 @@ def send_scene_data_to_server(scene, dummy):
     bpy_data_proxy = share_data.bpy_data_proxy
     depsgraph = bpy.context.evaluated_depsgraph_get()
 
-    # Delay the update of Object data to avoid Mesh updates in edit mode, but keep other updates.
+    # Delay the update of Object data to avoid Mesh updates in edit or paint mode, but keep other updates.
     # Mesh separate delivers Collection as well as created Object and Mesh updates while the edited
     # object is in edit mode, and these updates are not delivered when leaving edit mode, so
     # make sure to process them anyway. It is also possible to edit multiple objects at once
-    selected_objects = getattr(bpy.context, "selected_objects", {})
+
+    # When no Object is selected and a Mesh is selected the Object with the selected Mesh is the
+    # active_object, but not in selected_objects
+    current_objects = set(getattr(bpy.context, "selected_objects", []))
+    active_object = getattr(bpy.context, "active_object", None)
+    if active_object:
+        current_objects.add(active_object)
     updates = {update.id.original for update in depsgraph.updates}
     delayed_updates = set()
     for datablock in updates:
-        if datablock in selected_objects and datablock.mode != "OBJECT" and datablock.data is not None:
+        if datablock in current_objects and datablock.mode != "OBJECT" and datablock.data is not None:
             delayed_updates.add(datablock)
             delayed_updates.add(datablock.data)
     updates -= delayed_updates

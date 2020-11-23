@@ -1,5 +1,18 @@
 import unittest
-from tests.blender.blender_testcase import TestGenericJoinBefore
+
+from tests import files_folder
+from tests.blender.blender_testcase import BlenderTestCase, TestGenericJoinBefore
+from tests.mixer_testcase import BlenderDesc
+
+
+class TestCase(BlenderTestCase):
+    def setUp(self):
+        sender_blendfile = files_folder() / "empty.blend"
+        receiver_blendfile = files_folder() / "empty.blend"
+        sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
+        receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
+        blenderdescs = [sender, receiver]
+        super().setUp(blenderdescs=blenderdescs)
 
 
 class TestMetaBall(TestGenericJoinBefore):
@@ -192,6 +205,94 @@ bpy.ops.mesh.uv_texture_add()
 """
         self.send_string(action)
 
+        self.end_test()
+
+
+class TestMeshVertexGroups(TestCase):
+    def test_update_add_vg(self):
+        # Although we send a single command, Blender triggers several DG updates and parts of the vg modifications
+        # are processed as updates, not creations
+        action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+vgs = obj.vertex_groups
+
+bpy.ops.object.editmode_toggle()
+bpy.ops.object.vertex_group_assign_new()
+obj.vertex_groups[-1].name = "group_0"
+
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 1))
+bpy.ops.object.vertex_group_assign_new()
+obj.vertex_groups[-1].name = "group_1"
+
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 2))
+bpy.ops.object.vertex_group_assign_new()
+obj.vertex_groups[-1].name = "group_2"
+
+bpy.ops.object.editmode_toggle()
+"""
+        self.send_string(action)
+
+        self.end_test()
+
+    def test_vg_add(self):
+        action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+vgs = obj.vertex_groups
+
+bpy.ops.object.editmode_toggle()
+bpy.ops.object.vertex_group_assign_new()
+vgs[-1].name = "group_0"
+bpy.ops.object.editmode_toggle()
+
+"""
+        self.send_string(action)
+
+        action = """
+import bpy
+
+obj = bpy.data.objects[0]
+vgs = obj.vertex_groups
+
+bpy.ops.object.editmode_toggle()
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 1))
+bpy.ops.object.vertex_group_assign_new()
+vgs[-1].name = "group_1"
+bpy.ops.object.editmode_toggle()
+"""
+
+        self.send_string(action)
+
+        self.end_test()
+
+    def test_move_vg(self):
+        action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+vgs = obj.vertex_groups
+
+bpy.ops.object.editmode_toggle()
+bpy.ops.object.vertex_group_assign_new()
+obj.vertex_groups[-1].name = "group_0"
+
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 1))
+bpy.ops.object.vertex_group_assign_new()
+obj.vertex_groups[-1].name = "group_1"
+
+bpy.ops.object.editmode_toggle()
+"""
+        self.send_string(action)
+
+        action = """
+import bpy
+bpy.ops.object.vertex_group_move(direction="UP")
+"""
+
+        self.send_string(action)
         self.end_test()
 
 

@@ -34,6 +34,7 @@ from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.misc_proxies import NonePtrProxy
 from mixer.blender_data.mesh_proxy import MeshProxy
 from mixer.blender_data.node_proxy import NodeLinksProxy
+from mixer.blender_data.object_proxy import ObjectProxy
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
@@ -47,6 +48,7 @@ struct_like_classes = [
     DatablockRefProxy,
     MeshProxy,
     NonePtrProxy,
+    ObjectProxy,
     StructProxy,
     SoaElement,
     AosElement,
@@ -127,12 +129,13 @@ def decode_hook(x):
         return x
 
     del x[MIXER_CLASS]
-    obj = class_()
+
     if class_ in delta_classes:
-        obj.value = x["value"]
+        obj = class_(x["value"])
     elif class_ in (SoaElement, NonePtrProxy):
-        pass
+        obj = class_()
     else:
+        obj = class_()
         obj._data.update(x["_data"])
 
     for option in options:

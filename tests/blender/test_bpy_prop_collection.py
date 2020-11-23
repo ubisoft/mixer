@@ -228,6 +228,7 @@ bpy.ops.object.modifier_move_down(modifier='Array')
 
 
 class TestObjectVertexGroup(TestCase):
+    # Test only Object.vertex_groups, without Mesh data
     def test_add(self):
         create = """
 import bpy

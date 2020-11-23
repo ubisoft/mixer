@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import array
 from dataclasses import dataclass
-from typing import List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 
 SoaMember = Tuple[str, array.array]
@@ -44,3 +44,17 @@ class Soa:
     """a data path to the array"""
 
     members: List[SoaMember]
+
+
+ArrayGroup = List[Tuple[Any, array.array]]
+"""A logical group of related arrays, like vertex groups.
+
+The first item is an identifier for the DatablockProxy that uses the ArrayGroup. see MeshProxy.py:VertexGroups.
+Json serialization converts tuples into lists"""
+
+ArrayGroups = Dict[str, ArrayGroup]
+"""ArrayGroups contain arrays that must be serialized in binary format, mainly because of their size, but could
+otherwise be stored in Proxy._data
+
+TODO use ArrayGroups for Proxy._media and Proxy._soas
+"""
