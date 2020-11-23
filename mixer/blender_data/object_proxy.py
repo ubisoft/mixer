@@ -51,6 +51,8 @@ class ObjectProxy(DatablockProxy):
     """
 
     def _save(self, datablock: T.Object, context: Context) -> T.Object:
+        # TODO remove extra work done here. The vertex groups array is created in super()._save(), then cleared in
+        # update_vertex_groups(), because diff() requires clear().
         super()._save(datablock, context)
         self.update_vertex_groups(datablock, self._data["vertex_groups"], context)
         return datablock
@@ -84,16 +86,25 @@ class ObjectProxy(DatablockProxy):
         except KeyError:
             return
 
-        if object_datablock.mode == "EDIT":
-            # TODO This displays a false error when the receive is in edit mode, but the update is limited
-            # to Object.vertex_groups, the Mesh vertex group data being unchanged. Do a smarter test.
-            logger.warning(f"Cannot update vertex groups while in edit mode for {object_datablock}...")
-            logger.warning("... vertex group contents not updated")
+        vertex_groups = object_datablock.vertex_groups
+
+        # check if the vertex groups can be edited. Checking this Object for OBJECT mode is not enough
+        # as another Object using the same Mesh might not be in OBJECT mode
+        dummy = vertex_groups.new(name="dummy")
+        try:
+            dummy.add([0], 1, "ADD")
+        except RuntimeError as e:
+            # TODO a smarter test. This displays a false error when the update is limited to Object.vertex_groups,
+            # the Mesh vertex group data being unchanged.
+            logger.error(f"Cannot update vertex groups while in edit mode for {object_datablock}...")
+            logger.error(f"... update raises {e!r}")
+            logger.error("... vertex group contents not updated")
             return
+        finally:
+            vertex_groups.remove(dummy)
 
         mesh_vertex_groups = VertexGroups.from_array_sequence(mesh_vertex_groups_array)
 
-        vertex_groups = object_datablock.vertex_groups
         vertex_groups.clear()
         groups_data = []
         for i in range(vertex_groups_proxy.length):
