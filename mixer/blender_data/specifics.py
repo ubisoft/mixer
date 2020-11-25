@@ -417,24 +417,6 @@ def post_save_id(proxy: Proxy, bpy_id: T.ID):
     pass
 
 
-_link_collections = tuple(type(t.bl_rna) for t in [T.CollectionObjects, T.CollectionChildren, T.SceneObjects])
-
-
-def add_datablock_ref_element(collection: T.bpy_prop_collection, datablock: T.ID):
-    """Add an element to a bpy_prop_collection using the collection specific API"""
-    bl_rna = getattr(collection, "bl_rna", None)
-    if bl_rna is not None:
-        if isinstance(bl_rna, _link_collections):
-            collection.link(datablock)
-            return
-
-        if isinstance(bl_rna, type(T.IDMaterials.bl_rna)):
-            collection.append(datablock)
-            return
-
-    logging.warning(f"add_datablock_ref_element : no implementation for {collection} ")
-
-
 #
 # add_element
 #

@@ -68,7 +68,9 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
     context.visit_state.recursion_guard.push(attr_property.identifier)
     try:
         if attr_type == T.bpy_prop_collection:
-            if isinstance(attr_property.fixed_type, bpy.types.ID):
+            if hasattr(attr, "bl_rna") and isinstance(
+                attr.bl_rna, (type(T.CollectionObjects.bl_rna), type(T.CollectionChildren.bl_rna))
+            ):
                 from mixer.blender_data.datablock_collection_proxy import DatablockRefCollectionProxy
 
                 return DatablockRefCollectionProxy().load(attr, key, context)

@@ -296,16 +296,12 @@ class DatablockCollectionProxy(Proxy):
 
 class DatablockRefCollectionProxy(Proxy):
     """
-    Proxy to a bpy_prop_collection of datablock references like Scene.collection.objects or Object.materials
-
-
-    TODO
-    SceneObjects behave like dictionaries and IDMaterials bahave like sequence. Only the dictionary case
-    is is correctly implemented.handles and having multiple items in IDMaterials is not supported
+    Proxy to a bpy_prop_collection of datablock references (CollectionObjects and CollectionChildren only,
+    with link/unlink API
     """
 
     def __init__(self):
-        # On item per datablock. The key is the uuid, which eases rename management
+        # One item per datablock. The key is the uuid, which eases rename management
         self._data: Dict[str, DatablockRefProxy] = {}
 
     def __len__(self):
@@ -316,12 +312,6 @@ class DatablockRefCollectionProxy(Proxy):
         Load bl_collection elements as references to bpy.data collections
         """
 
-        # Warning:
-        # - for Scene.object, can use uuids as no references are None
-        # - for Mesh.matrials, more than one reference may be none, so cannot use a map, it is a sequence
-        # Also, if Mesh.materials has a None item, len(bl_collection) == 2 (includes the None),
-        # but len(bl_collection.items()) == 1 (excludes the None)
-        # so iterate on bl_collection
         for item in bl_collection:
             if item is not None:
                 proxy = DatablockRefProxy()
@@ -349,10 +339,10 @@ class DatablockRefCollectionProxy(Proxy):
         for _, ref_proxy in self._data.items():
             datablock = ref_proxy.target(context)
             if datablock:
-                specifics.add_datablock_ref_element(collection, datablock)
+                collection.link(datablock)
             else:
                 logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy.display_string()}")
-                add_element = functools.partial(specifics.add_datablock_ref_element, collection)
+                add_element = collection.link
                 context.proxy_state.unresolved_refs.append(ref_proxy.mixer_uuid, add_element)
 
     def apply(
