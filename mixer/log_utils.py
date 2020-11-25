@@ -41,8 +41,13 @@ class Formatter(logging.Formatter):
         - to append "./" at the begining to permit going to the line quickly with VS Code CTRL+click from terminal
         """
         s = super().format(record)
-        pathname = Path(record.pathname).relative_to(MODULE_PATH)
-        s += f" [{os.curdir}{os.sep}{pathname}:{record.lineno}]"
+        path = Path(record.pathname)
+        try:
+            path = path.relative_to(MODULE_PATH)
+        except ValueError:
+            pass
+
+        s += f" [{os.curdir}{os.sep}{path}:{record.lineno}]"
         return s
 
 
