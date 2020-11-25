@@ -313,6 +313,14 @@ default_exclusions = {
             ]
         )
     ],
+    T.MaterialSlot: [
+        NameFilterOut(
+            [
+                # read only
+                "name"
+            ]
+        )
+    ],
     T.Mesh: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
