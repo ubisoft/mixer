@@ -30,7 +30,7 @@ import array
 import logging
 from pathlib import Path
 import traceback
-from typing import Any, Callable, Dict, ItemsView, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, ItemsView, List, Optional, TYPE_CHECKING, Union
 
 from mixer.local_data import get_resolved_file_path
 
@@ -42,6 +42,7 @@ import mathutils
 if TYPE_CHECKING:
     from mixer.blender_data.aos_proxy import AosProxy
     from mixer.blender_data.datablock_proxy import DatablockProxy
+    from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
     from mixer.blender_data.proxy import Context, Proxy
     from mixer.blender_data.struct_proxy import StructProxy
 
@@ -668,16 +669,23 @@ def diff_must_replace(
 
         if len(collection) != len(sequence):
             return True
+
         # The struct_collection update encoding is complex. It is way easier to handle a full replace in
         # ObjectProxy._update_material_slots, so replace all if anything has changed
-        for item, proxy in zip(collection, sequence):
-            item_material = item.material
-            if (item_material is None) != isinstance(proxy, NonePtrProxy):
+
+        # As diff yields a complete DiffReplace or nothing, all the attributes are present in the proxy
+        for bl_item, proxy in zip(collection, sequence):
+            bl_material = bl_item.material
+            material_proxy: Union[DatablockRefProxy, NonePtrProxy] = proxy.data("material")
+            if (bl_material is None) != isinstance(material_proxy, NonePtrProxy):
                 return True
-            item_uuid = item_material.mixer_uuid
-            proxy_uuid = proxy.data("material").mixer_uuid
-            if item_material is not None and not isinstance(proxy, NonePtrProxy) and item_uuid != proxy_uuid:
+            if bl_material is not None and bl_material.mixer_uuid != material_proxy.mixer_uuid:
                 return True
+            if bl_item.link != proxy.data("LINK"):
+                return True
+
+        return False
+
     return False
 
 

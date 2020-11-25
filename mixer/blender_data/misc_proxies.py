@@ -50,6 +50,10 @@ class NonePtrProxy(Proxy):
     def target(self, context: Context) -> None:
         return None
 
+    @property
+    def mixer_uuid(self) -> str:
+        return "00000000-0000-0000-0000-000000000000"
+
     def load(self, *_):
         return self
 
