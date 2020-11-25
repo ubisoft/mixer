@@ -177,12 +177,17 @@ class DatablockRefProxy(Proxy):
             from mixer.blender_data.misc_proxies import NonePtrProxy
 
             if isinstance(update, NonePtrProxy):
-                setattr(parent, key, None)
+                value = None
             else:
                 assert type(update) == type(self), "type(update) == type(self)"
 
-                datablock = context.proxy_state.datablocks.get(update._datablock_uuid)
-                setattr(parent, key, datablock)
+                value = context.proxy_state.datablocks.get(update._datablock_uuid)
+
+            if isinstance(key, int):
+                parent[key] = value
+            else:
+                setattr(parent, key, value)
+
         return update
 
     def diff(
