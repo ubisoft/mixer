@@ -296,5 +296,78 @@ bpy.ops.object.vertex_group_move(direction="UP")
         self.end_test()
 
 
+class TestObject(TestCase):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._create_action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+
+mat0 = bpy.data.materials.new("mat0")
+mat1 = bpy.data.materials.new("mat1")
+
+bpy.ops.object.material_slot_add()
+obj.material_slots[0].material = mat0
+
+bpy.ops.object.material_slot_add()
+# None
+
+bpy.ops.object.material_slot_add()
+obj.material_slots[2].link = "OBJECT"
+obj.material_slots[2].material = mat1
+
+"""
+
+    def test_material_slots_create(self):
+        # Although we send a single command, Blender triggers several DG updates and parts of the vg modifications
+        # are processed as updates, not creations
+        self.send_string(self._create_action)
+
+        self.end_test()
+
+    def test_material_slots_remove(self):
+        # Although we send a single command, Blender triggers several DG updates and parts of the vg modifications
+        # are processed as updates, not creations
+
+        self.send_string(self._create_action)
+        action = """
+import bpy
+obj = bpy.data.objects[0]
+obj.active_material_index = 0
+bpy.ops.object.material_slot_remove()
+"""
+
+        self.send_string(action)
+        self.end_test()
+
+    def test_material_slots_update(self):
+        self.send_string(self._create_action)
+        action = """
+import bpy
+obj = bpy.data.objects[0]
+mat0 = bpy.data.materials.new("mat0")
+mat1 = bpy.data.materials.new("mat1")
+
+obj.material_slots[0].material = None
+obj.material_slots[1].material = mat1
+"""
+
+        self.send_string(action)
+        self.end_test()
+
+    def test_material_slots_move(self):
+        self.send_string(self._create_action)
+        action = """
+import bpy
+obj = bpy.data.objects[0]
+obj.active_material_index = 0
+bpy.ops.object.material_slot_move(direction='DOWN')
+"""
+
+        self.send_string(action)
+        self.end_test()
+
+
 if __name__ == "__main__":
     unittest.main()
