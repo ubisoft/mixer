@@ -124,16 +124,18 @@ def dispatch_rna(no_rna_impl: Callable[..., Any]):
         return decorator
 
     def dispatch(class_):
-        for cls_ in class_.mro():
-            try:
-                return registry[cls_]
-            except KeyError:
-                pass
+        # ignore "object" parent
+        for cls_ in class_.mro()[:-1]:
+            # KeyError exceptions are a pain when debugging in VScode, avoid them
+            func = registry.get(cls_)
+            if func:
+                return func
 
-        try:
-            return registry[type(None)]
-        except KeyError:
-            return no_rna_impl
+        func = registry.get(type(None))
+        if func is not None:
+            return func
+
+        return no_rna_impl
 
     def wrapper(bpy_prop_collection: T.bpy_prop_collection, *args, **kwargs):
         """Calls the function registered for bpy_prop_collection.bl_rna"""
