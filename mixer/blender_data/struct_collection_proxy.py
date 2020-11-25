@@ -189,7 +189,7 @@ class StructCollectionProxy(Proxy):
                 if delete_count > 0:
                     if to_blender:
                         specifics.truncate_collection(collection, len(collection) - delete_count)
-                    del sequence[:delete_count]
+                    del sequence[-delete_count:]
 
                 for i, delta_update in reversed(update._diff_updates):
                     sequence[i] = apply_attribute(collection, i, sequence[i], delta_update, context, to_blender)
