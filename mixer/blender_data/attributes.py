@@ -203,7 +203,10 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, con
         if to_blender:
             try:
                 # try is less costly than fetching the property to find if the attribute is readonly
-                setattr(parent, key, value)
+                if isinstance(key, int):
+                    parent[key] = value
+                else:
+                    setattr(parent, key, value)
             except Exception as e:
                 logger.warning(f"apply_attribute: setattr({parent}, {key}, {value})")
                 logger.warning(f"... exception {e!r})")

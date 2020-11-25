@@ -388,8 +388,9 @@ default_exclusions = {
                 "dimensions",
                 "bound_box",
                 "mode",
-                # set by active_material_index
+                # UI only, define the target of operators
                 "active_material",
+                "active_material_index",
                 # TODO temporary, has a seed member that makes some tests fail
                 "field",
                 # TODO temporary, waiting for shape_key support

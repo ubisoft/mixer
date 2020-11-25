@@ -649,22 +649,49 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
 #
 # must_replace
 #
+_object_material_slots_property = T.Object.bl_rna.properties["material_slots"]
+
+
 @dispatch_rna
-def diff_must_replace(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+def diff_must_replace(
+    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
+) -> bool:
     """
     Returns True if a diff between the proxy sequence state and the Blender collection state must force a
     full collection replacement
     """
+
+    if collection_property == _object_material_slots_property:
+        # Object.material_slots has no bl_rna, so rely on the property to identify it
+        # TODO should we change to a dispatch on the property value ?
+        from mixer.blender_data.misc_proxies import NonePtrProxy
+
+        if len(collection) != len(sequence):
+            return True
+        # The struct_collection update encoding is complex. It is way easier to handle a full replace in
+        # ObjectProxy._update_material_slots, so replace all if anything has changed
+        for item, proxy in zip(collection, sequence):
+            item_material = item.material
+            if (item_material is None) != isinstance(proxy, NonePtrProxy):
+                return True
+            item_uuid = item_material.mixer_uuid
+            proxy_uuid = proxy.data("material").mixer_uuid
+            if item_material is not None and not isinstance(proxy, NonePtrProxy) and item_uuid != proxy_uuid:
+                return True
     return False
 
 
 @diff_must_replace.register(T.CurveSplines)
-def _diff_must_replace_always(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+def _diff_must_replace_always(
+    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
+) -> bool:
     return True
 
 
 @diff_must_replace.register(T.VertexGroups)
-def _diff_must_replace_vertex_groups(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+def _diff_must_replace_vertex_groups(
+    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
+) -> bool:
     # Full replace if anything has changed is easier to cope with in ObjectProxy.update_vertex_groups()
     return (
         any((bl_item.name != proxy.data("name") for bl_item, proxy in zip(collection, sequence)))
@@ -674,7 +701,9 @@ def _diff_must_replace_vertex_groups(collection: T.bpy_prop_collection, sequence
 
 
 @diff_must_replace.register(T.GreasePencilLayers)
-def _diff_must_replace_info_mismatch(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+def _diff_must_replace_info_mismatch(
+    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
+) -> bool:
     # Name mismatch (in info property). This may happen during layer swap and cause unsolicited rename
     # Easier to solve with full replace
     return any((bl_item.info != proxy.data("info") for bl_item, proxy in zip(collection, sequence)))
@@ -729,7 +758,7 @@ def truncate_collection(collection: T.bpy_prop_collection, size: int):
 @truncate_collection.register_default()
 def _truncate_collection_remove(collection: T.bpy_prop_collection, size: int):
     try:
-        while len(collection) > size:
+        while len(collection) > max(size, 0):
             collection.remove(collection[-1])
     except Exception as e:
         logger.error(f"truncate_collection {collection}: exception ...")
@@ -739,3 +768,9 @@ def _truncate_collection_remove(collection: T.bpy_prop_collection, size: int):
 @truncate_collection.register(T.Nodes)
 def _truncate_collection_clear(collection: T.bpy_prop_collection, size: int):
     collection.clear()
+
+
+@truncate_collection.register(T.IDMaterials)
+def _truncate_collection_pop(collection: T.bpy_prop_collection, size: int):
+    while len(collection) > max(size, 0):
+        collection.pop()
