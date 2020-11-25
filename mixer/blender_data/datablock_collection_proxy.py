@@ -113,7 +113,7 @@ class DatablockCollectionProxy(Proxy):
         datablock, renames = incoming_proxy.create_standalone_datablock(context)
 
         if incoming_proxy.collection_name == "scenes":
-            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid()}'")
+            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}'")
 
             # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
             # Remove it now
@@ -123,7 +123,7 @@ class DatablockCollectionProxy(Proxy):
 
                 scene_to_remove = scenes["_mixer_to_be_removed_"]
                 logger.warning(
-                    f"After create scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid()}''"
+                    f"After create scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}''"
                 )
                 logger.warning(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
                 delete_scene(scene_to_remove)
@@ -131,7 +131,7 @@ class DatablockCollectionProxy(Proxy):
         if not datablock:
             return None, None
 
-        uuid = incoming_proxy.mixer_uuid()
+        uuid = incoming_proxy.mixer_uuid
         self._data[uuid] = incoming_proxy
         context.proxy_state.datablocks[uuid] = datablock
         context.proxy_state.proxies[uuid] = incoming_proxy
@@ -142,7 +142,7 @@ class DatablockCollectionProxy(Proxy):
     def update_datablock(self, delta: DeltaUpdate, context: Context):
         """Update a bpy.data item from a received DatablockProxy and update the proxy state"""
         incoming_proxy = delta.value
-        uuid = incoming_proxy.mixer_uuid()
+        uuid = incoming_proxy.mixer_uuid
 
         proxy: DatablockProxy = context.proxy_state.proxies.get(uuid)
         if proxy is None:
@@ -151,9 +151,9 @@ class DatablockCollectionProxy(Proxy):
             )
             return
 
-        if proxy.mixer_uuid() != incoming_proxy.mixer_uuid():
+        if proxy.mixer_uuid != incoming_proxy.mixer_uuid:
             logger.error(
-                f"update_datablock : uuid mismatch between incoming {incoming_proxy.mixer_uuid()} ({incoming_proxy}) and existing {proxy.mixer_uuid} ({proxy})"
+                f"update_datablock : uuid mismatch between incoming {incoming_proxy.mixer_uuid} ({incoming_proxy}) and existing {proxy.mixer_uuid} ({proxy})"
             )
             return
 
@@ -188,7 +188,7 @@ class DatablockCollectionProxy(Proxy):
             # Alternatively we could try to sort messages on the sender side
             logger.warning(f"Exception during remove_datablock for {proxy}")
             logger.warning(f"... {e!r}")
-        uuid = proxy.mixer_uuid()
+        uuid = proxy.mixer_uuid
         del self._data[uuid]
 
     def rename_datablock(self, proxy: DatablockProxy, new_name: str, datablock: T.ID):
@@ -234,7 +234,7 @@ class DatablockCollectionProxy(Proxy):
         for proxy in diff.items_removed:
             try:
                 logger.info("Perform removal for %s", proxy)
-                uuid = proxy.mixer_uuid()
+                uuid = proxy.mixer_uuid
                 changeset.removals.append((uuid, proxy.collection_name, str(proxy)))
                 del self._data[uuid]
                 id_ = context.proxy_state.datablocks[uuid]
@@ -264,14 +264,14 @@ class DatablockCollectionProxy(Proxy):
         #   Master collection and also a FC/B unlinked
         #
         for proxy, new_name in diff.items_renamed:
-            uuid = proxy.mixer_uuid()
+            uuid = proxy.mixer_uuid
             if proxy.collection[new_name] is not context.proxy_state.datablocks[uuid]:
                 logger.error(
                     f"update rename : {proxy.collection}[{new_name}] is not {context.proxy_state.datablocks[uuid]} for {proxy}, {uuid}"
                 )
 
             old_name = proxy.data("name")
-            changeset.renames.append((proxy.mixer_uuid(), old_name, new_name, str(proxy)))
+            changeset.renames.append((proxy.mixer_uuid, old_name, new_name, str(proxy)))
             proxy.rename(new_name)
 
         return changeset

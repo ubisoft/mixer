@@ -96,7 +96,7 @@ class BpyPropCollectionDiff(BpyDiff):
         self.items_added.clear()
         self.items_removed.clear()
         self.items_renamed.clear()
-        proxy_items = {id_proxy.mixer_uuid(): id_proxy for id_proxy in proxy._data.values()}
+        proxy_items = {id_proxy.mixer_uuid: id_proxy for id_proxy in proxy._data.values()}
         bl_collection = getattr(bpy.data, collection_name)
         blender_items = {}
         for name, item in bl_collection.items():
