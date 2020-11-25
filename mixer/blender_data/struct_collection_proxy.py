@@ -41,6 +41,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _proxy_factory(attr):
+    if isinstance(attr, T.ID) and not attr.is_embedded_data:
+        from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+
+        return DatablockRefProxy()
+    elif attr is None:
+        from mixer.blender_data.misc_proxies import NonePtrProxy
+
+        return NonePtrProxy()
+    else:
+        return StructProxy()
+
+
 class StructCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of non-datablock Struct.
@@ -107,7 +120,7 @@ class StructCollectionProxy(Proxy):
 
         context.visit_state.path.append(key)
         try:
-            self._sequence = [StructProxy.make(v).load(v, i, context) for i, v in enumerate(bl_collection.values())]
+            self._sequence = [_proxy_factory(v).load(v, i, context) for i, v in enumerate(bl_collection.values())]
         finally:
             context.visit_state.path.pop()
         return self

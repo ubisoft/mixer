@@ -424,6 +424,11 @@ def post_save_id(proxy: Proxy, bpy_id: T.ID):
 def add_element(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     """Add an element to a bpy_prop_collection using the collection specific API"""
     try:
+        collection.bl_rna
+    except AttributeError:
+        return
+
+    try:
         collection.add()
     except Exception:
         logger.error(f"add_element: failed for {collection}")
@@ -441,7 +446,7 @@ def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, contex
     if new_or_add is None:
         new_or_add = getattr(collection, "add", None)
     if new_or_add is None:
-        logger.warning(f"Not implemented new or add for {collection} ...")
+        logger.warning(f"Not implemented: add_element for {collection} ...")
         return None
 
     try:
@@ -451,7 +456,7 @@ def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, contex
             key = proxy.data("name")
             return new_or_add(key)
         except Exception:
-            logger.warning(f"Not implemented new or add for type {type(collection)} for {collection}[{key}] ...")
+            logger.warning(f"Not implemented: add_element for type {type(collection)} for {collection}[{key}] ...")
             for s in traceback.format_exc().splitlines():
                 logger.warning(f"...{s}")
     return None
@@ -587,6 +592,12 @@ def _add_element_sequence(collection: T.bpy_prop_collection, proxy: Proxy, conte
 
     logger.warning(f"Sequence type not implemented: {type_name}")
     return None
+
+
+@add_element.register(T.IDMaterials)
+def _add_element_material_ref(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    material_datablock = proxy.target(context)
+    return collection.append(material_datablock)
 
 
 def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):

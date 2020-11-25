@@ -50,16 +50,22 @@ class NonePtrProxy(Proxy):
     def target(self, context: Context) -> None:
         return None
 
-    def save(self, bl_instance: Any, attr_name: str, context: Context):
-        try:
-            setattr(bl_instance, attr_name, None)
-        except AttributeError as e:
-            # Motsly errors like
-            #   AttributeError: bpy_struct: attribute "node_tree" from "Material" is read-only
-            # Avoiding them would require filtering attrivutes on save in order not to set
-            # Material.node_tree if Material.use_nodes is False
-            logger.debug("NonePtrProxy.save() exception ...")
-            logger.debug(f"... {repr(e)}")
+    def load(self, *_):
+        return self
+
+    def save(self, parent: T.bpy_struct, key: Union[int, str], context: Context):
+        if isinstance(key, int):
+            parent[key] = None
+        else:
+            try:
+                setattr(parent, key, None)
+            except AttributeError as e:
+                # Motsly errors like
+                #   AttributeError: bpy_struct: attribute "node_tree" from "Material" is read-only
+                # Avoiding them would require filtering attrivutes on save in order not to set
+                # Material.node_tree if Material.use_nodes is False
+                logger.debug("NonePtrProxy.save() exception for {parent}[{key}]...")
+                logger.debug(f"... {repr(e)}")
 
     def apply(
         self,

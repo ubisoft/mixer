@@ -114,13 +114,13 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
 
             return StructProxy().load(attr, key, context)
 
-        if attr is None and isinstance(attr_property, T.PointerProperty):
+        if attr is None:
             from mixer.blender_data.misc_proxies import NonePtrProxy
 
             return NonePtrProxy()
 
         logger.error(
-            f"Unsupported attribute {attr_type} {attr_property} {attr_property.fixed_type} at {context.visit_state.datablock_proxy._class_name}.{context.visit_state.path}.{attr_property.identifier}"
+            f"Unsupported attribute {attr_type} {attr_property} at {context.visit_state.datablock_proxy._class_name}.{context.visit_state.path}.{attr_property.identifier}"
         )
     finally:
         context.visit_state.recursion_guard.pop()

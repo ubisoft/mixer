@@ -21,7 +21,6 @@ See synchronization.md
 """
 from __future__ import annotations
 
-import functools
 import logging
 import traceback
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
@@ -38,7 +37,6 @@ from mixer.blender_data.diff import BpyPropCollectionDiff
 from mixer.blender_data.filter import skip_bpy_data_item
 from mixer.blender_data.proxy import DeltaUpdate, DeltaAddition, DeltaDeletion, MaxDepthExceeded
 from mixer.blender_data.proxy import ensure_uuid, Proxy
-from mixer.blender_data import specifics
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
