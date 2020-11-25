@@ -122,7 +122,7 @@ def build_data_create(buffer):
         datablock_proxy = codec.decode(message.proxy_string)
         datablock_proxy.arrays = message.arrays
         _, rename_changeset = share_data.bpy_data_proxy.create_datablock(datablock_proxy)
-        _build_soas(datablock_proxy.mixer_uuid(), message.soas)
+        _build_soas(datablock_proxy.mixer_uuid, message.soas)
     except DecodeError as e:
         logger.error(f"Decode error for {str(e.args[1])[:100]} ...")
         logger.error("... possible version mismatch")
@@ -168,7 +168,7 @@ def build_data_update(buffer: bytes):
 
         datablock_proxy = delta.value
         if datablock_proxy is not None:
-            _build_soas(datablock_proxy.mixer_uuid(), message.soas)
+            _build_soas(datablock_proxy.mixer_uuid, message.soas)
 
     except DecodeError as e:
         logger.error(f"Decode error for {str(e.args[1])[:100]} ...")

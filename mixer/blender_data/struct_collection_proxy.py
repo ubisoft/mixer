@@ -41,6 +41,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _proxy_factory(attr):
+    if isinstance(attr, T.ID) and not attr.is_embedded_data:
+        from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+
+        return DatablockRefProxy()
+    elif attr is None:
+        from mixer.blender_data.misc_proxies import NonePtrProxy
+
+        return NonePtrProxy()
+    else:
+        return StructProxy()
+
+
 class StructCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of non-datablock Struct.
@@ -66,6 +79,9 @@ class StructCollectionProxy(Proxy):
 
             return NodeLinksProxy()
         return StructCollectionProxy()
+
+    def __len__(self):
+        return len(self._sequence)
 
     @property
     def length(self) -> int:
@@ -107,7 +123,7 @@ class StructCollectionProxy(Proxy):
 
         context.visit_state.path.append(key)
         try:
-            self._sequence = [StructProxy.make(v).load(v, i, context) for i, v in enumerate(bl_collection.values())]
+            self._sequence = [_proxy_factory(v).load(v, i, context) for i, v in enumerate(bl_collection.values())]
         finally:
             context.visit_state.path.pop()
         return self
@@ -169,11 +185,11 @@ class StructCollectionProxy(Proxy):
                 # If the deletes are processed first but the updates are processed in order, Blender renames item 1
                 # into C.001
 
-                for _ in range(update._diff_deletions):
+                delete_count = update._diff_deletions
+                if delete_count > 0:
                     if to_blender:
-                        item = collection[-1]
-                        collection.remove(item)
-                    del sequence[-1]
+                        specifics.truncate_collection(collection, len(collection) - delete_count)
+                    del sequence[-delete_count:]
 
                 for i, delta_update in reversed(update._diff_updates):
                     sequence[i] = apply_attribute(collection, i, sequence[i], delta_update, context, to_blender)
@@ -214,7 +230,7 @@ class StructCollectionProxy(Proxy):
         if len(sequence) == 0 and len(collection) == 0:
             return None
 
-        if specifics.diff_must_replace(collection, sequence):
+        if specifics.diff_must_replace(collection, sequence, collection_property):
             # A collection cannot be updated because either:
             # - some of its members cannot be updated :
             #   SplineBezierPoints has no API to remove points, so Curve.splines cannot be update and must be replaced

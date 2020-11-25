@@ -313,6 +313,14 @@ default_exclusions = {
             ]
         )
     ],
+    T.MaterialSlot: [
+        NameFilterOut(
+            [
+                # read only
+                "name"
+            ]
+        )
+    ],
     T.Mesh: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
@@ -380,10 +388,9 @@ default_exclusions = {
                 "dimensions",
                 "bound_box",
                 "mode",
-                # TODO triggers an error on metaballs
-                #   Cannot write to '<bpy_collection[0], Object.material_slots>', attribute '' because it does not exist
-                #   looks like a bpy_prop_collection and the key is and empty string
-                "material_slots",
+                # UI only, define the target of operators
+                "active_material",
+                "active_material_index",
                 # TODO temporary, has a seed member that makes some tests fail
                 "field",
                 # TODO temporary, waiting for shape_key support

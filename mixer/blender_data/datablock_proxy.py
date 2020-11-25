@@ -60,7 +60,7 @@ class DatablockProxy(StructProxy):
         """name of the bpy.data collection this datablock belongs to, None if embedded in another datablock"""
 
         self._class_name: str = ""
-        self._datablock_uuid: Optional[str] = None
+        self._datablock_uuid: Optional[str] = ""
 
         self._soas: Dict[VisitState.Path, List[Tuple[str, SoaElement]]] = defaultdict(list)
         """e.g. {
@@ -124,7 +124,8 @@ class DatablockProxy(StructProxy):
     def is_embedded_data(self):
         return self._bpy_data_collection is None
 
-    def mixer_uuid(self) -> Optional[str]:
+    @property
+    def mixer_uuid(self) -> str:
         return self._datablock_uuid
 
     def rename(self, new_name: str):
@@ -132,7 +133,7 @@ class DatablockProxy(StructProxy):
         self._data["name_full"] = new_name
 
     def __str__(self) -> str:
-        return f"DatablockProxy {self.mixer_uuid()} for bpy.data.{self.collection_name}[{self.data('name')}]"
+        return f"DatablockProxy {self.mixer_uuid} for bpy.data.{self.collection_name}[{self.data('name')}]"
 
     def load(
         self,
@@ -221,7 +222,7 @@ class DatablockProxy(StructProxy):
         return getattr(bpy.data, self.collection_name)
 
     def target(self, context: Context) -> T.ID:
-        return context.proxy_state.datablocks.get(self.mixer_uuid())
+        return context.proxy_state.datablocks.get(self.mixer_uuid)
 
     def create_standalone_datablock(self, context: Context) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """
@@ -241,7 +242,7 @@ class DatablockProxy(StructProxy):
                 logger.info(f"create_standalone_datablock for {self} found existing datablock from VRtist")
                 datablock = existing_datablock
             else:
-                if existing_datablock.mixer_uuid != self.mixer_uuid():
+                if existing_datablock.mixer_uuid != self.mixer_uuid:
                     # local has a datablock with the same name as remote wants to create, but a different uuid.
                     # It is a simultaneous creation : rename local's datablock. Remote will do the same thing on its side
                     # and we will end up will all renamed datablocks
@@ -279,7 +280,7 @@ class DatablockProxy(StructProxy):
             if self.collection.get(name).name != datablock.name:
                 logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
-        datablock.mixer_uuid = self.mixer_uuid()
+        datablock.mixer_uuid = self.mixer_uuid
 
         return self._save(datablock, context), renames
 
@@ -338,7 +339,7 @@ class DatablockProxy(StructProxy):
                 if DEBUG:
                     if bl_instance.get(attr_name) != id_:
                         logger.error(f"Name mismatch after creation of bpy.data.{collection_name}[{attr_name}] ")
-                id_.mixer_uuid = self.mixer_uuid()
+                id_.mixer_uuid = self.mixer_uuid
         else:
             logger.info(f"IDproxy save embedded {self}")
             # an is_embedded_data datablock. pre_save will retrieve it by calling target

@@ -30,7 +30,7 @@ import array
 import logging
 from pathlib import Path
 import traceback
-from typing import Any, Callable, Dict, ItemsView, List, Optional, TYPE_CHECKING
+from typing import Any, Callable, Dict, ItemsView, List, Optional, TYPE_CHECKING, Union
 
 from mixer.local_data import get_resolved_file_path
 
@@ -42,6 +42,7 @@ import mathutils
 if TYPE_CHECKING:
     from mixer.blender_data.aos_proxy import AosProxy
     from mixer.blender_data.datablock_proxy import DatablockProxy
+    from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
     from mixer.blender_data.proxy import Context, Proxy
     from mixer.blender_data.struct_proxy import StructProxy
 
@@ -124,16 +125,18 @@ def dispatch_rna(no_rna_impl: Callable[..., Any]):
         return decorator
 
     def dispatch(class_):
-        for cls_ in class_.mro():
-            try:
-                return registry[cls_]
-            except KeyError:
-                pass
+        # ignore "object" parent
+        for cls_ in class_.mro()[:-1]:
+            # KeyError exceptions are a pain when debugging in VScode, avoid them
+            func = registry.get(cls_)
+            if func:
+                return func
 
-        try:
-            return registry[type(None)]
-        except KeyError:
-            return no_rna_impl
+        func = registry.get(type(None))
+        if func is not None:
+            return func
+
+        return no_rna_impl
 
     def wrapper(bpy_prop_collection: T.bpy_prop_collection, *args, **kwargs):
         """Calls the function registered for bpy_prop_collection.bl_rna"""
@@ -415,30 +418,17 @@ def post_save_id(proxy: Proxy, bpy_id: T.ID):
     pass
 
 
-_link_collections = tuple(type(t.bl_rna) for t in [T.CollectionObjects, T.CollectionChildren, T.SceneObjects])
-
-
-def add_datablock_ref_element(collection: T.bpy_prop_collection, datablock: T.ID):
-    """Add an element to a bpy_prop_collection using the collection specific API"""
-    bl_rna = getattr(collection, "bl_rna", None)
-    if bl_rna is not None:
-        if isinstance(bl_rna, _link_collections):
-            collection.link(datablock)
-            return
-
-        if isinstance(bl_rna, type(T.IDMaterials.bl_rna)):
-            collection.append(datablock)
-            return
-
-    logging.warning(f"add_datablock_ref_element : no implementation for {collection} ")
-
-
 #
 # add_element
 #
 @dispatch_rna
 def add_element(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     """Add an element to a bpy_prop_collection using the collection specific API"""
+    try:
+        collection.bl_rna
+    except AttributeError:
+        return
+
     try:
         collection.add()
     except Exception:
@@ -457,7 +447,7 @@ def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, contex
     if new_or_add is None:
         new_or_add = getattr(collection, "add", None)
     if new_or_add is None:
-        logger.warning(f"Not implemented new or add for {collection} ...")
+        logger.warning(f"Not implemented: add_element for {collection} ...")
         return None
 
     try:
@@ -467,7 +457,7 @@ def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, contex
             key = proxy.data("name")
             return new_or_add(key)
         except Exception:
-            logger.warning(f"Not implemented new or add for type {type(collection)} for {collection}[{key}] ...")
+            logger.warning(f"Not implemented: add_element for type {type(collection)} for {collection}[{key}] ...")
             for s in traceback.format_exc().splitlines():
                 logger.warning(f"...{s}")
     return None
@@ -605,6 +595,12 @@ def _add_element_sequence(collection: T.bpy_prop_collection, proxy: Proxy, conte
     return None
 
 
+@add_element.register(T.IDMaterials)
+def _add_element_material_ref(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    material_datablock = proxy.target(context)
+    return collection.append(material_datablock)
+
+
 def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
     """
     Adjust the size of a bpy_prop_collection proxified as an array of structures (e.g. MeshVertices)
@@ -654,22 +650,56 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
 #
 # must_replace
 #
+_object_material_slots_property = T.Object.bl_rna.properties["material_slots"]
+
+
 @dispatch_rna
-def diff_must_replace(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+def diff_must_replace(
+    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
+) -> bool:
     """
     Returns True if a diff between the proxy sequence state and the Blender collection state must force a
     full collection replacement
     """
+
+    if collection_property == _object_material_slots_property:
+        # Object.material_slots has no bl_rna, so rely on the property to identify it
+        # TODO should we change to a dispatch on the property value ?
+        from mixer.blender_data.misc_proxies import NonePtrProxy
+
+        if len(collection) != len(sequence):
+            return True
+
+        # The struct_collection update encoding is complex. It is way easier to handle a full replace in
+        # ObjectProxy._update_material_slots, so replace all if anything has changed
+
+        # As diff yields a complete DiffReplace or nothing, all the attributes are present in the proxy
+        for bl_item, proxy in zip(collection, sequence):
+            bl_material = bl_item.material
+            material_proxy: Union[DatablockRefProxy, NonePtrProxy] = proxy.data("material")
+            if (bl_material is None) != isinstance(material_proxy, NonePtrProxy):
+                return True
+            if bl_material is not None and bl_material.mixer_uuid != material_proxy.mixer_uuid:
+                return True
+            if bl_item.link != proxy.data("LINK"):
+                return True
+
+        return False
+
     return False
 
 
 @diff_must_replace.register(T.CurveSplines)
-def _diff_must_replace_always(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+def _diff_must_replace_always(
+    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
+) -> bool:
     return True
 
 
 @diff_must_replace.register(T.VertexGroups)
-def _diff_must_replace_vertex_groups(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+def _diff_must_replace_vertex_groups(
+    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
+) -> bool:
     # Full replace if anything has changed is easier to cope with in ObjectProxy.update_vertex_groups()
     return (
         any((bl_item.name != proxy.data("name") for bl_item, proxy in zip(collection, sequence)))
@@ -679,7 +709,9 @@ def _diff_must_replace_vertex_groups(collection: T.bpy_prop_collection, sequence
 
 
 @diff_must_replace.register(T.GreasePencilLayers)
-def _diff_must_replace_info_mismatch(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> bool:
+def _diff_must_replace_info_mismatch(
+    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
+) -> bool:
     # Name mismatch (in info property). This may happen during layer swap and cause unsolicited rename
     # Easier to solve with full replace
     return any((bl_item.info != proxy.data("info") for bl_item, proxy in zip(collection, sequence)))
@@ -734,7 +766,7 @@ def truncate_collection(collection: T.bpy_prop_collection, size: int):
 @truncate_collection.register_default()
 def _truncate_collection_remove(collection: T.bpy_prop_collection, size: int):
     try:
-        while len(collection) > size:
+        while len(collection) > max(size, 0):
             collection.remove(collection[-1])
     except Exception as e:
         logger.error(f"truncate_collection {collection}: exception ...")
@@ -744,3 +776,9 @@ def _truncate_collection_remove(collection: T.bpy_prop_collection, size: int):
 @truncate_collection.register(T.Nodes)
 def _truncate_collection_clear(collection: T.bpy_prop_collection, size: int):
     collection.clear()
+
+
+@truncate_collection.register(T.IDMaterials)
+def _truncate_collection_pop(collection: T.bpy_prop_collection, size: int):
+    while len(collection) > max(size, 0):
+        collection.pop()

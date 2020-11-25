@@ -21,7 +21,6 @@ See synchronization.md
 """
 from __future__ import annotations
 
-import functools
 import logging
 import traceback
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
@@ -38,7 +37,6 @@ from mixer.blender_data.diff import BpyPropCollectionDiff
 from mixer.blender_data.filter import skip_bpy_data_item
 from mixer.blender_data.proxy import DeltaUpdate, DeltaAddition, DeltaDeletion, MaxDepthExceeded
 from mixer.blender_data.proxy import ensure_uuid, Proxy
-from mixer.blender_data import specifics
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
@@ -115,7 +113,7 @@ class DatablockCollectionProxy(Proxy):
         datablock, renames = incoming_proxy.create_standalone_datablock(context)
 
         if incoming_proxy.collection_name == "scenes":
-            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid()}'")
+            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}'")
 
             # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
             # Remove it now
@@ -125,7 +123,7 @@ class DatablockCollectionProxy(Proxy):
 
                 scene_to_remove = scenes["_mixer_to_be_removed_"]
                 logger.warning(
-                    f"After create scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid()}''"
+                    f"After create scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}''"
                 )
                 logger.warning(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
                 delete_scene(scene_to_remove)
@@ -133,7 +131,7 @@ class DatablockCollectionProxy(Proxy):
         if not datablock:
             return None, None
 
-        uuid = incoming_proxy.mixer_uuid()
+        uuid = incoming_proxy.mixer_uuid
         self._data[uuid] = incoming_proxy
         context.proxy_state.datablocks[uuid] = datablock
         context.proxy_state.proxies[uuid] = incoming_proxy
@@ -144,7 +142,7 @@ class DatablockCollectionProxy(Proxy):
     def update_datablock(self, delta: DeltaUpdate, context: Context):
         """Update a bpy.data item from a received DatablockProxy and update the proxy state"""
         incoming_proxy = delta.value
-        uuid = incoming_proxy.mixer_uuid()
+        uuid = incoming_proxy.mixer_uuid
 
         proxy: DatablockProxy = context.proxy_state.proxies.get(uuid)
         if proxy is None:
@@ -153,9 +151,9 @@ class DatablockCollectionProxy(Proxy):
             )
             return
 
-        if proxy.mixer_uuid() != incoming_proxy.mixer_uuid():
+        if proxy.mixer_uuid != incoming_proxy.mixer_uuid:
             logger.error(
-                f"update_datablock : uuid mismatch between incoming {incoming_proxy.mixer_uuid()} ({incoming_proxy}) and existing {proxy.mixer_uuid} ({proxy})"
+                f"update_datablock : uuid mismatch between incoming {incoming_proxy.mixer_uuid} ({incoming_proxy}) and existing {proxy.mixer_uuid} ({proxy})"
             )
             return
 
@@ -190,7 +188,7 @@ class DatablockCollectionProxy(Proxy):
             # Alternatively we could try to sort messages on the sender side
             logger.warning(f"Exception during remove_datablock for {proxy}")
             logger.warning(f"... {e!r}")
-        uuid = proxy.mixer_uuid()
+        uuid = proxy.mixer_uuid
         del self._data[uuid]
 
     def rename_datablock(self, proxy: DatablockProxy, new_name: str, datablock: T.ID):
@@ -236,7 +234,7 @@ class DatablockCollectionProxy(Proxy):
         for proxy in diff.items_removed:
             try:
                 logger.info("Perform removal for %s", proxy)
-                uuid = proxy.mixer_uuid()
+                uuid = proxy.mixer_uuid
                 changeset.removals.append((uuid, proxy.collection_name, str(proxy)))
                 del self._data[uuid]
                 id_ = context.proxy_state.datablocks[uuid]
@@ -266,14 +264,14 @@ class DatablockCollectionProxy(Proxy):
         #   Master collection and also a FC/B unlinked
         #
         for proxy, new_name in diff.items_renamed:
-            uuid = proxy.mixer_uuid()
+            uuid = proxy.mixer_uuid
             if proxy.collection[new_name] is not context.proxy_state.datablocks[uuid]:
                 logger.error(
                     f"update rename : {proxy.collection}[{new_name}] is not {context.proxy_state.datablocks[uuid]} for {proxy}, {uuid}"
                 )
 
             old_name = proxy.data("name")
-            changeset.renames.append((proxy.mixer_uuid(), old_name, new_name, str(proxy)))
+            changeset.renames.append((proxy.mixer_uuid, old_name, new_name, str(proxy)))
             proxy.rename(new_name)
 
         return changeset
@@ -296,16 +294,12 @@ class DatablockCollectionProxy(Proxy):
 
 class DatablockRefCollectionProxy(Proxy):
     """
-    Proxy to a bpy_prop_collection of datablock references like Scene.collection.objects or Object.materials
-
-
-    TODO
-    SceneObjects behave like dictionaries and IDMaterials bahave like sequence. Only the dictionary case
-    is is correctly implemented.handles and having multiple items in IDMaterials is not supported
+    Proxy to a bpy_prop_collection of datablock references (CollectionObjects and CollectionChildren only,
+    with link/unlink API
     """
 
     def __init__(self):
-        # On item per datablock. The key is the uuid, which eases rename management
+        # One item per datablock. The key is the uuid, which eases rename management
         self._data: Dict[str, DatablockRefProxy] = {}
 
     def __len__(self):
@@ -316,12 +310,6 @@ class DatablockRefCollectionProxy(Proxy):
         Load bl_collection elements as references to bpy.data collections
         """
 
-        # Warning:
-        # - for Scene.object, can use uuids as no references are None
-        # - for Mesh.matrials, more than one reference may be none, so cannot use a map, it is a sequence
-        # Also, if Mesh.materials has a None item, len(bl_collection) == 2 (includes the None),
-        # but len(bl_collection.items()) == 1 (excludes the None)
-        # so iterate on bl_collection
         for item in bl_collection:
             if item is not None:
                 proxy = DatablockRefProxy()
@@ -349,10 +337,10 @@ class DatablockRefCollectionProxy(Proxy):
         for _, ref_proxy in self._data.items():
             datablock = ref_proxy.target(context)
             if datablock:
-                specifics.add_datablock_ref_element(collection, datablock)
+                collection.link(datablock)
             else:
                 logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy.display_string()}")
-                add_element = functools.partial(specifics.add_datablock_ref_element, collection)
+                add_element = collection.link
                 context.proxy_state.unresolved_refs.append(ref_proxy.mixer_uuid, add_element)
 
     def apply(
