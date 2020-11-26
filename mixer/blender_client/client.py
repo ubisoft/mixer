@@ -64,6 +64,7 @@ from mixer.draw_handlers import set_draw_handlers
 
 from mixer.blender_client.camera import send_camera
 from mixer.blender_client.light import send_light
+from mixer.blender_client.empty import send_empty
 from mixer.local_data import get_local_or_create_cache_file, get_source_file_path
 
 logger = logging.getLogger(__name__)
@@ -1175,12 +1176,16 @@ def update_params(obj):
         collection_api.send_collection_instance(share_data.client, obj)
         return
 
-    if not hasattr(obj, "data"):
-        return
+    # if not hasattr(obj, "data"):
+    #    return
 
     typename = obj.bl_rna.name
     if obj.data:
         typename = obj.data.bl_rna.name
+    else:
+        if typename == "Object":
+            send_empty(share_data.client, obj)
+        return
 
     supported_lights = ["Sun Light", "Point Light", "Spot Light", "Area Light"]
     if (
