@@ -388,6 +388,10 @@ default_exclusions = {
                 "dimensions",
                 "bound_box",
                 "mode",
+                # read_only
+                "is_instancer",
+                "is_from_instancer",
+                "is_from_set",
                 # UI only, define the target of operators
                 "active_material",
                 "active_material_index",
