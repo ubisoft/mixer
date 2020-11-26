@@ -113,7 +113,7 @@ class DatablockCollectionProxy(Proxy):
         datablock, renames = incoming_proxy.create_standalone_datablock(context)
 
         if incoming_proxy.collection_name == "scenes":
-            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}'")
+            logger.warning(f"Creating scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}'")
 
             # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
             # Remove it now
@@ -123,7 +123,7 @@ class DatablockCollectionProxy(Proxy):
 
                 scene_to_remove = scenes["_mixer_to_be_removed_"]
                 logger.warning(
-                    f"After create scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}''"
+                    f"After create scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}''"
                 )
                 logger.warning(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
                 delete_scene(scene_to_remove)
@@ -144,7 +144,7 @@ class DatablockCollectionProxy(Proxy):
         incoming_proxy = delta.value
         uuid = incoming_proxy.mixer_uuid
 
-        proxy: DatablockProxy = context.proxy_state.proxies.get(uuid)
+        proxy = context.proxy_state.proxies.get(uuid)
         if proxy is None:
             logger.error(
                 f"update_datablock(): Missing proxy for bpy.data.{incoming_proxy.collection_name}[{incoming_proxy.data('name')}] uuid {uuid}"
@@ -196,6 +196,7 @@ class DatablockCollectionProxy(Proxy):
         Rename a bpy.data collection item and update the proxy state (receiver side)
         """
         logger.warning("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
+        # TODO LIB edit the short name and let Blender update name_full
         proxy.rename(new_name)
         datablock.name = new_name
 
@@ -284,7 +285,7 @@ class DatablockCollectionProxy(Proxy):
                 results.append(proxy)
         return results
 
-    def search_one(self, name: str) -> DatablockProxy:
+    def search_one(self, name: str) -> Optional[DatablockProxy]:
         """Convenience method to find a proxy by name instead of uuid (for tests only)"""
         results = self.search(name)
         return None if not results else results[0]
@@ -298,7 +299,7 @@ class DatablockRefCollectionProxy(Proxy):
 
     def __init__(self):
         # One item per datablock. The key is the uuid, which eases rename management
-        self._data: Dict[str, DatablockRefProxy] = {}
+        self._data: Dict[str, Union[DeltaAddition, DeltaDeletion, DeltaUpdate, DatablockRefProxy]] = {}
 
     def __len__(self):
         return len(self._data)
@@ -333,6 +334,7 @@ class DatablockRefCollectionProxy(Proxy):
             return
 
         for _, ref_proxy in self._data.items():
+            assert isinstance(ref_proxy, DatablockRefProxy)
             datablock = ref_proxy.target(context)
             if datablock:
                 collection.link(datablock)
@@ -343,9 +345,9 @@ class DatablockRefCollectionProxy(Proxy):
 
     def apply(
         self,
-        parent: Any,
-        key: Union[int, str],
-        collection_delta: Optional[DeltaUpdate],
+        parent: T.Collection,
+        key: str,
+        delta: DeltaUpdate,
         context: Context,
         to_blender: bool = True,
     ) -> DatablockRefCollectionProxy:
@@ -354,19 +356,25 @@ class DatablockRefCollectionProxy(Proxy):
 
         This method is only applicable if this is a proxy to a collection of datablock references
         like Scene.collection.objects, because changes to bpy.data are processed by xxx_datablock() methods.
+
+        Args:
+            parent: the Collection to update
+            key: the name of the attribute in parent
         """
 
-        collection_update: DatablockCollectionProxy = collection_delta.value
-        assert type(collection_update) == type(self)
+        update: DatablockRefCollectionProxy = delta.value
+        assert type(update) == type(self)
+
+        # objects or children
         collection = getattr(parent, key)
-        for k, ref_delta in collection_update._data.items():
+        for k, ref_delta in update._data.items():
             try:
                 if not isinstance(ref_delta, (DeltaAddition, DeltaDeletion)):
-                    logger.warning(f"unexpected type for delta at {collection}[{k}]: {ref_delta}. Ignored")
+                    logger.error(f"unexpected type for delta at {collection}[{k}]: {ref_delta}. Ignored")
                     continue
                 ref_update: DatablockRefProxy = ref_delta.value
                 if not isinstance(ref_update, DatablockRefProxy):
-                    logger.warning(f"unexpected type for delta_value at {collection}[{k}]: {ref_update}. Ignored")
+                    logger.error(f"unexpected type for delta_value at {collection}[{k}]: {ref_update}. Ignored")
                     continue
 
                 assert isinstance(ref_update, DatablockRefProxy)

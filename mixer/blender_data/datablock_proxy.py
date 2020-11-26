@@ -239,15 +239,21 @@ class DatablockProxy(StructProxy):
             return None, None
         renames: RenameChangeset = []
         incoming_name = self.data("name")
+
+        # Detect a conflicting creation
         existing_datablock = self.collection.get(incoming_name)
         if existing_datablock:
             if not existing_datablock.mixer_uuid:
                 # A datablock created by VRtist command in the same command batch
                 # Not an error, we will make it ours by adding the uuid and registering it
+
+                # TODO this branch should be obsolete as VRtist commands are no more processed in generic mode
                 logger.info(f"create_standalone_datablock for {self} found existing datablock from VRtist")
                 datablock = existing_datablock
             else:
                 if existing_datablock.mixer_uuid != self.mixer_uuid:
+                    # TODO LIB
+
                     # local has a datablock with the same name as remote wants to create, but a different uuid.
                     # It is a simultaneous creation : rename local's datablock. Remote will do the same thing on its side
                     # and we will end up will all renamed datablocks
@@ -281,6 +287,8 @@ class DatablockProxy(StructProxy):
             return None, None
 
         if DEBUG:
+            # TODO LIB
+            # Detect a failure to avoid spontaneous renames ??
             name = self.data("name")
             if self.collection.get(name).name != datablock.name:
                 logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
@@ -320,7 +328,7 @@ class DatablockProxy(StructProxy):
 
         return datablock
 
-    def save(self, bl_instance: Any = None, attr_name: str = None, context: Context = None) -> T.ID:
+    def save(self, bl_instance: Any, attr_name: str, context: Context) -> T.ID:
         """
         Save this proxy into an existing datablock that may be a bpy.data member item or an embedded datablock
         """
