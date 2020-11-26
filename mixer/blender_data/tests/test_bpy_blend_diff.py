@@ -44,16 +44,16 @@ class TestDiff(unittest.TestCase):
             D.worlds.new(w)
         diff = BpyBlendDiff()
         diff.diff(self.proxy, test_properties)
-        for name, delta in diff.collection_deltas:
-            self.assertEqual(0, len(delta.items_removed), f"removed count mismatch for {name}")
-            self.assertEqual(0, len(delta.items_renamed), f"renamed count mismatch for {name}")
-            if name == "worlds":
-                self.assertEqual(len(new_worlds), len(delta.items_added), f"added count mismatch for {name}")
+        for collection_name, delta in diff.collection_deltas:
+            self.assertEqual(0, len(delta.items_removed), f"removed count mismatch for {collection_name}")
+            self.assertEqual(0, len(delta.items_renamed), f"renamed count mismatch for {collection_name}")
+            if collection_name == "worlds":
+                self.assertEqual(len(new_worlds), len(delta.items_added), f"added count mismatch for {collection_name}")
                 found = list(delta.items_added.keys())
                 found.sort()
-                self.assertEqual(new_worlds, found, f"added count mismatch for {name}")
+                self.assertEqual(new_worlds, found, f"added count mismatch for {collection_name}")
             else:
-                self.assertEqual(0, len(delta.items_added), f"added count mismatch for {name}")
+                self.assertEqual(0, len(delta.items_added), f"added count mismatch for {collection_name}")
 
     def test_remove(self):
         # test_diff.TestDiff.test_create

@@ -31,74 +31,57 @@ from typing import List, Dict, Tuple, TYPE_CHECKING
 import bpy
 import bpy.types as T  # noqa
 
+from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.filter import SynchronizedProperties, skip_bpy_data_item
 from mixer.blender_data.proxy import ensure_uuid
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import BpyDataProxy
-    from mixer.blender_data.datablock_proxy import DatablockProxy
     from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 
-    ItemsRemoved = List[DatablockProxy]
-    ItemsRenamed = List[Tuple[DatablockProxy, str]]
+ItemsRemoved = List[DatablockProxy]
+ItemsRenamed = List[Tuple[DatablockProxy, str]]
+"""(proxy, old_name)"""
+
+ItemsAdded = Dict[str, str]
+"""Item_name : collection_name"""
 
 logger = logging.getLogger(__name__)
 Uuid = str
-BlendDataCollectionName = str
-ItemsAdded = Dict[str, str]
-# Item_name : collection_name
-
-# (proxy, old_name)
+BpyDataCollectionName = str
 
 
-def find_renamed(
-    proxy_items: Dict[Uuid, DatablockProxy], blender_items: Dict[Uuid, Tuple[str, str]]
-) -> Tuple[ItemsAdded, ItemsRemoved, ItemsRenamed]:
+class BpyDataCollectionDiff:
     """
-    Split before/after mappings into added/removed/renamed
-
-    Rename detection is based on the mapping keys (e.g. uuids)
-    """
-    proxy_uuids = set(proxy_items.keys())
-    blender_uuids = set(blender_items.keys())
-
-    renamed_uuids = {
-        uuid for uuid in blender_uuids & proxy_uuids if proxy_items[uuid].data("name") != blender_items[uuid][0]
-    }
-    added_uuids = blender_uuids - proxy_uuids - renamed_uuids
-    removed_uuids = proxy_uuids - blender_uuids - renamed_uuids
-
-    added_items = {blender_items[uuid][0]: blender_items[uuid][1] for uuid in added_uuids}
-    removed_items = [proxy_items[uuid] for uuid in removed_uuids]
-
-    # (proxy, old_name)
-    renamed_items = [(proxy_items[uuid], blender_items[uuid][0]) for uuid in renamed_uuids]
-
-    return added_items, removed_items, renamed_items
-
-
-class BpyDiff:
-    pass
-
-
-class BpyPropCollectionDiff(BpyDiff):
-    """
-    Diff for a bpy_prop_collection. May not work as is for bpy_prop_collection not in bpy.data
+    Diff between Blender state and proxy state for a bpy.data collection.
     """
 
-    items_added: ItemsAdded = {}
-    items_removed: ItemsRemoved = []
-    items_renamed: ItemsRenamed = []
+    def __init__(self):
+        self._items_added: ItemsAdded = {}
+        self._items_removed: ItemsRemoved = []
+        self._items_renamed: ItemsRenamed = []
+
+    @property
+    def items_added(self):
+        return self._items_added
+
+    @property
+    def items_removed(self):
+        return self._items_removed
+
+    @property
+    def items_renamed(self):
+        return self._items_renamed
 
     def diff(
         self, proxy: DatablockCollectionProxy, collection_name: str, synchronized_properties: SynchronizedProperties
     ):
-        self.items_added.clear()
-        self.items_removed.clear()
-        self.items_renamed.clear()
+        self._items_added.clear()
+        self._items_removed.clear()
+        self._items_renamed.clear()
         proxy_items = {id_proxy.mixer_uuid: id_proxy for id_proxy in proxy._data.values()}
         bl_collection = getattr(bpy.data, collection_name)
-        blender_items = {}
+        blender_items: Dict[Uuid, Tuple[str, str]] = {}
         for name, item in bl_collection.items():
             if skip_bpy_data_item(collection_name, item):
                 continue
@@ -120,35 +103,47 @@ class BpyPropCollectionDiff(BpyDiff):
                 continue
 
             blender_items[item.mixer_uuid] = (name, collection_name)
-        self.items_added, self.items_removed, self.items_renamed = find_renamed(proxy_items, blender_items)
+
+        proxy_uuids = set(proxy_items.keys())
+        blender_uuids = set(blender_items.keys())
+
+        renamed_uuids = {
+            uuid for uuid in blender_uuids & proxy_uuids if proxy_items[uuid].data("name") != blender_items[uuid][0]
+        }
+        added_uuids = blender_uuids - proxy_uuids - renamed_uuids
+        removed_uuids = proxy_uuids - blender_uuids - renamed_uuids
+
+        self._items_added = {blender_items[uuid][0]: blender_items[uuid][1] for uuid in added_uuids}
+        self._items_removed = [proxy_items[uuid] for uuid in removed_uuids]
+        self._items_renamed = [(proxy_items[uuid], blender_items[uuid][0]) for uuid in renamed_uuids]
 
     def empty(self):
-        return not (self.items_added or self.items_removed or self.items_renamed)
+        return not (self._items_added or self._items_removed or self._items_renamed)
 
 
-class BpyBlendDiff(BpyDiff):
+class BpyBlendDiff:
     """
     Diff for the whole bpy.data
     """
 
-    # A list of deltas per bpy.data collection. Use a list because if will be sorted later
-    collection_deltas: List[Tuple[BlendDataCollectionName, BpyPropCollectionDiff]] = []
+    def __init__(self):
+        self._collection_deltas: List[Tuple[BpyDataCollectionName, BpyDataCollectionDiff]] = []
+        """A list of deltas per bpy.data collection. Use a list because if will be sorted later"""
 
-    # TODO cleanup: not used.
-    # Will not be used as the per_DI deltas will be limited to the depsgraph updates
-    id_deltas: List[Tuple[DatablockProxy, T.ID]] = []
+    @property
+    def collection_deltas(self):
+        return self._collection_deltas
 
     def diff(self, blend_proxy: BpyDataProxy, synchronized_properties: SynchronizedProperties):
-        self.collection_deltas.clear()
-        self.id_deltas.clear()
+        self._collection_deltas.clear()
 
         for collection_name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
             if collection_name not in blend_proxy._data:
                 continue
-            delta = BpyPropCollectionDiff()
+            delta = BpyDataCollectionDiff()
             delta.diff(blend_proxy._data[collection_name], collection_name, synchronized_properties)
             if not delta.empty():
-                self.collection_deltas.append((collection_name, delta))
+                self._collection_deltas.append((collection_name, delta))
 
         # Before this change:
         # Only datablocks handled by the generic synchronization system get a uuid, either from
