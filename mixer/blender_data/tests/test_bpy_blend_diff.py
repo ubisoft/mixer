@@ -49,7 +49,7 @@ class TestDiff(unittest.TestCase):
             self.assertEqual(0, len(delta.items_renamed), f"renamed count mismatch for {collection_name}")
             if collection_name == "worlds":
                 self.assertEqual(len(new_worlds), len(delta.items_added), f"added count mismatch for {collection_name}")
-                found = list(delta.items_added.keys())
+                found = [datablock.name for datablock, _ in delta.items_added]
                 found.sort()
                 self.assertEqual(new_worlds, found, f"added count mismatch for {collection_name}")
             else:
@@ -138,7 +138,7 @@ class TestDiff(unittest.TestCase):
         diff.diff(self.proxy, test_properties)
         for name, delta in diff.collection_deltas:
             if name == "worlds":
-                items_added = list(delta.items_added.keys())
+                items_added = [datablock.name for datablock, _ in delta.items_added]
                 items_added.sort()
                 self.assertEqual(items_added, ["W0", "W5"], f"added count mismatch for {name}")
 

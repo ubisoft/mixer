@@ -69,7 +69,7 @@ class DatablockCollectionProxy(Proxy):
         """
         Load bl_collection elements as standalone datablocks.
         """
-        for name, datablock in bl_collection.items():
+        for datablock in bl_collection.values():
             collection_name = BlendData.instance().bl_collection_name_from_ID(datablock)
             if skip_bpy_data_item(collection_name, datablock):
                 continue
@@ -204,21 +204,17 @@ class DatablockCollectionProxy(Proxy):
         Update the proxy according to local datablock creations, removals or renames (sender side)
         """
         changeset = Changeset()
+
         # Sort so that the tests receive the messages in deterministic order. Sad but not very harmfull
-        added_names = sorted(diff.items_added.keys())
-        for name in added_names:
-            collection_name = diff.items_added[name]
-            logger.info("Perform update/creation for %s[%s]", collection_name, name)
+        added_names = sorted(diff.items_added, key=lambda x: id(x[0].name_full))
+        for datablock, collection_name in added_names:
+            name_full = datablock.name_full
+            logger.info("Perform update/creation for %s[%s]", collection_name, name_full)
             try:
-                # TODO could have a datablock directly
-                collection = getattr(bpy.data, collection_name)
-                datablock = collection.get(name)
-                if datablock is None:
-                    logger.error("update/ request addition for %s[%s] : not found", collection_name, name)
-                    continue
                 uuid = ensure_uuid(datablock)
                 context.proxy_state.datablocks[uuid] = datablock
-                # name is not used in DatablockProxy.load()
+
+                # TODO LIB update DatablockProxy.make() to create standalone, link or override datablock
                 proxy = DatablockProxy.make(datablock).load(
                     datablock, context, bpy_data_collection_name=collection_name
                 )
@@ -226,11 +222,11 @@ class DatablockCollectionProxy(Proxy):
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
             except MaxDepthExceeded as e:
-                logger.error(f"MaxDepthExceeded while loading {collection_name}[{name}]:")
+                logger.error(f"MaxDepthExceeded while loading {collection_name}[{name_full}]:")
                 logger.error("... Nested attribute depth is too large: ")
                 logger.error(f"... {e!r}")
             except Exception:
-                logger.error(f"Exception while loading {collection_name}[{name}]:")
+                logger.error(f"Exception while loading {collection_name}[{name_full}]:")
                 for line in traceback.format_exc().splitlines():
                     logger.error(line)
 

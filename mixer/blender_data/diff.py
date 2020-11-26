@@ -43,8 +43,8 @@ ItemsRemoved = List[DatablockProxy]
 ItemsRenamed = List[Tuple[DatablockProxy, str]]
 """(proxy, old_name)"""
 
-ItemsAdded = Dict[str, str]
-"""Item_name : collection_name"""
+ItemsAdded = List[Tuple[T.ID, str]]
+"""datablock : collection_name"""
 
 logger = logging.getLogger(__name__)
 Uuid = str
@@ -79,46 +79,50 @@ class BpyDataCollectionDiff:
         self._items_added.clear()
         self._items_removed.clear()
         self._items_renamed.clear()
-        proxy_items = {id_proxy.mixer_uuid: id_proxy for id_proxy in proxy._data.values()}
+        proxies = {datablock_proxy.mixer_uuid: datablock_proxy for datablock_proxy in proxy._data.values()}
         bl_collection = getattr(bpy.data, collection_name)
 
         # (item name, collection name)
-        blender_items: Dict[Uuid, Tuple[str, str]] = {}
+        blender_items: Dict[Uuid, Tuple[T.ID, str]] = {}
 
-        for name, item in bl_collection.items():
-            if skip_bpy_data_item(collection_name, item):
+        for datablock in bl_collection.values():
+            if skip_bpy_data_item(collection_name, datablock):
                 continue
 
-            uuid = item.mixer_uuid
+            uuid = datablock.mixer_uuid
             if uuid in blender_items.keys():
                 # duplicate uuid, from an object duplication
                 duplicate_name, duplicate_collection_name = blender_items[uuid]
                 logger.info(
-                    f"Duplicate uuid {uuid} in bpy.data.{duplicate_collection_name} for {duplicate_name} and bpy.data.{collection_name} for {name}..."
+                    f"Duplicate uuid {uuid} in bpy.data.{duplicate_collection_name} for {duplicate_name} and bpy.data.{collection_name} for {datablock.name_full}..."
                 )
                 logger.info("... assuming object was duplicated. Resetting (not an error)")
                 # reset the uuid, ensure will regenerate
-                item.mixer_uuid = ""
+                datablock.mixer_uuid = ""
 
-            ensure_uuid(item)
-            if item.mixer_uuid in blender_items.keys():
-                logger.error(f"Duplicate uuid found for {item}")
+            ensure_uuid(datablock)
+            if datablock.mixer_uuid in blender_items.keys():
+                logger.error(f"Duplicate uuid found for {datablock}")
                 continue
 
-            blender_items[item.mixer_uuid] = (name, collection_name)
+            blender_items[datablock.mixer_uuid] = (datablock, collection_name)
 
-        proxy_uuids = set(proxy_items.keys())
+        proxy_uuids = set(proxies.keys())
         blender_uuids = set(blender_items.keys())
 
+        # TODO LIB
         renamed_uuids = {
-            uuid for uuid in blender_uuids & proxy_uuids if proxy_items[uuid].data("name") != blender_items[uuid][0]
+            uuid for uuid in blender_uuids & proxy_uuids if proxies[uuid].data("name") != blender_items[uuid][0].name
         }
         added_uuids = blender_uuids - proxy_uuids - renamed_uuids
         removed_uuids = proxy_uuids - blender_uuids - renamed_uuids
 
-        self._items_added = {blender_items[uuid][0]: blender_items[uuid][1] for uuid in added_uuids}
-        self._items_removed = [proxy_items[uuid] for uuid in removed_uuids]
-        self._items_renamed = [(proxy_items[uuid], blender_items[uuid][0]) for uuid in renamed_uuids]
+        # this finds standalone datablock, link datablocks and override datablocks
+        self._items_added = [(blender_items[uuid][0], blender_items[uuid][1]) for uuid in added_uuids]
+        self._items_removed = [proxies[uuid] for uuid in removed_uuids]
+
+        # TODO LIB
+        self._items_renamed = [(proxies[uuid], blender_items[uuid][0].name) for uuid in renamed_uuids]
 
     def empty(self):
         return not (self._items_added or self._items_removed or self._items_renamed)

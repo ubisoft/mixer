@@ -338,6 +338,7 @@ class BpyDataProxy(Proxy):
         proxy = self.state.proxies.get(uuid)
         if proxy is None:
             logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
+            return
 
         bpy_data_collection_proxy = self._data.get(proxy.collection_name)
         if bpy_data_collection_proxy is None:
