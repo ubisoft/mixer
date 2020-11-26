@@ -56,11 +56,11 @@ class DatablockProxy(StructProxy):
     def __init__(self):
         super().__init__()
 
-        self._bpy_data_collection: str = None
+        self._bpy_data_collection: str = ""
         """name of the bpy.data collection this datablock belongs to, None if embedded in another datablock"""
 
         self._class_name: str = ""
-        self._datablock_uuid: Optional[str] = ""
+        self._datablock_uuid: str = ""
 
         self._soas: Dict[VisitState.Path, List[Tuple[str, SoaElement]]] = defaultdict(list)
         """e.g. {
@@ -118,11 +118,11 @@ class DatablockProxy(StructProxy):
 
     @property
     def is_standalone_datablock(self):
-        return self._bpy_data_collection is not None
+        return bool(self._bpy_data_collection)
 
     @property
     def is_embedded_data(self):
-        return self._bpy_data_collection is None
+        return not self.is_standalone_datablock
 
     @property
     def mixer_uuid(self) -> str:
@@ -152,7 +152,7 @@ class DatablockProxy(StructProxy):
             return
 
         if bl_instance.is_embedded_data:
-            self._bpy_data_collection = None
+            self._bpy_data_collection = ""
 
         if bpy_data_collection_name is not None:
             self._bpy_data_collection = bpy_data_collection_name
@@ -211,9 +211,9 @@ class DatablockProxy(StructProxy):
             self._media = (path, data)
 
     @property
-    def collection_name(self) -> Optional[str]:
+    def collection_name(self) -> str:
         """
-        The name of the bpy.data collection this object is a proxy, None if an embedded ID
+        The name of the bpy.data collection this object is a proxy, empty string if an embedded datablock
         """
         return self._bpy_data_collection
 
@@ -320,7 +320,7 @@ class DatablockProxy(StructProxy):
         Save this proxy into an existing datablock that may be a bpy.data member item or an embedded datablock
         """
         collection_name = self.collection_name
-        if collection_name is not None:
+        if collection_name:
             logger.info(f"IDproxy save standalone {self}")
             # a standalone datablock in a bpy.data collection
 

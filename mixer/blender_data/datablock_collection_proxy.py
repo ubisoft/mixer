@@ -193,7 +193,7 @@ class DatablockCollectionProxy(Proxy):
 
     def rename_datablock(self, proxy: DatablockProxy, new_name: str, datablock: T.ID):
         """
-        Rename a bpy.data collection item and update the proxy state
+        Rename a bpy.data collection item and update the proxy state (receiver side)
         """
         logger.warning("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
         proxy.rename(new_name)
@@ -201,7 +201,7 @@ class DatablockCollectionProxy(Proxy):
 
     def update(self, diff: BpyDataCollectionDiff, context: Context) -> Changeset:
         """
-        Update the proxy according to local datablock creations, removals or renames
+        Update the proxy according to local datablock creations, removals or renames (sender side)
         """
         changeset = Changeset()
         # Sort so that the tests receive the messages in deterministic order. Sad but not very harmfull
@@ -212,13 +212,15 @@ class DatablockCollectionProxy(Proxy):
             try:
                 # TODO could have a datablock directly
                 collection = getattr(bpy.data, collection_name)
-                id_ = collection.get(name)
-                if id_ is None:
+                datablock = collection.get(name)
+                if datablock is None:
                     logger.error("update/ request addition for %s[%s] : not found", collection_name, name)
                     continue
-                uuid = ensure_uuid(id_)
-                context.proxy_state.datablocks[uuid] = id_
-                proxy = DatablockProxy.make(id_).load(id_, name, context, bpy_data_collection_name=collection_name)
+                uuid = ensure_uuid(datablock)
+                context.proxy_state.datablocks[uuid] = datablock
+                proxy = DatablockProxy.make(datablock).load(
+                    datablock, name, context, bpy_data_collection_name=collection_name
+                )
                 context.proxy_state.proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
@@ -237,7 +239,6 @@ class DatablockCollectionProxy(Proxy):
                 uuid = proxy.mixer_uuid
                 changeset.removals.append((uuid, proxy.collection_name, str(proxy)))
                 del self._data[uuid]
-                id_ = context.proxy_state.datablocks[uuid]
                 del context.proxy_state.proxies[uuid]
                 del context.proxy_state.datablocks[uuid]
             except Exception:

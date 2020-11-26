@@ -216,7 +216,7 @@ class BpyDataProxy(Proxy):
             self._data[name] = DatablockCollectionProxy(name).load(collection, name, context)
         return self
 
-    def find(self, collection_name: str, key: str) -> DatablockProxy:
+    def find(self, collection_name: str, key: str) -> Optional[DatablockProxy]:
         # TODO not used ?
         if not self._data:
             return None
@@ -308,7 +308,7 @@ class BpyDataProxy(Proxy):
             logger.warning(
                 f"create_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} "
             )
-            return None
+            return None, None
 
         context = self.context(synchronized_properties)
         return bpy_data_collection_proxy.create_datablock(incoming_proxy, context)
@@ -349,9 +349,10 @@ class BpyDataProxy(Proxy):
         del self.state.proxies[uuid]
         del self.state.datablocks[uuid]
 
-    def rename_datablocks(self, items: List[str, str, str]) -> RenameChangeset:
+    def rename_datablocks(self, items: List[Tuple[str, str, str]]) -> RenameChangeset:
         """
         Process a received datablock rename command, renaming the datablocks and updating the proxy state.
+        (receiver side)
         """
         rename_changeset_to_send: RenameChangeset = []
         renames = []
@@ -359,7 +360,7 @@ class BpyDataProxy(Proxy):
             proxy = self.state.proxies.get(uuid)
             if proxy is None:
                 logger.error(f"rename_datablocks(): no proxy for {uuid} (debug info)")
-                return
+                return []
 
             bpy_data_collection_proxy = self._data.get(proxy.collection_name)
             if bpy_data_collection_proxy is None:

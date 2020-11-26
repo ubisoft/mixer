@@ -52,7 +52,7 @@ class DatablockRefProxy(Proxy):
         self._datablock_uuid: str = None
         # Not used but "required" by the json codec
         self._data: Dict[str, Any] = {}
-        self._bpy_data_collection: str = None
+        self._bpy_data_collection: str = ""
         self._initial_name: str = None
 
         self._debug_name = None

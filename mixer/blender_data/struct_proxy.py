@@ -52,15 +52,6 @@ class StructProxy(Proxy):
     def clear_data(self):
         self._data.clear()
 
-    @classmethod
-    def make(cls, attr_property):
-
-        # if isinstance(attr_property, T.NodeLink):
-        #     from mixer.blender_data.node_proxy import NodeLinkProxy
-
-        #     return NodeLinkProxy()
-        return cls()
-
     def load(self, bl_instance: Any, parent_key: Union[int, str], context: Context):
 
         """
@@ -76,8 +67,6 @@ class StructProxy(Proxy):
             for name, bl_rna_property in properties:
                 attr = getattr(bl_instance, name)
                 attr_value = read_attribute(attr, name, bl_rna_property, context)
-
-                # Also write None values. We use them to reset attributes like Camera.dof.focus_object
                 self._data[name] = attr_value
         finally:
             context.visit_state.path.pop()

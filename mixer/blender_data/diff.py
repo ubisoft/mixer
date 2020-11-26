@@ -81,7 +81,10 @@ class BpyDataCollectionDiff:
         self._items_renamed.clear()
         proxy_items = {id_proxy.mixer_uuid: id_proxy for id_proxy in proxy._data.values()}
         bl_collection = getattr(bpy.data, collection_name)
+
+        # (item name, collection name)
         blender_items: Dict[Uuid, Tuple[str, str]] = {}
+
         for name, item in bl_collection.items():
             if skip_bpy_data_item(collection_name, item):
                 continue
