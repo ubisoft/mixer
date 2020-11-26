@@ -407,6 +407,18 @@ default_exclusions = {
         # send by a BLENDER_DATA_MEDIA command, not serialized with proxies
         NameFilterOut("data")
     ],
+    T.PointCache: [
+        NameFilterOut(
+            [
+                # read_only
+                "info",
+                "is_backed",
+                "is_baking",
+                "is_frame_skip",
+                "is_outdated",
+            ]
+        )
+    ],
     T.RenderSettings: [
         NameFilterOut(
             [
