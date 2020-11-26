@@ -199,22 +199,26 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, con
     try:
         if isinstance(proxy_value, Proxy):
             return proxy_value.apply(parent, key, delta, context, to_blender)
-
-        if to_blender:
-            try:
+        else:
+            if to_blender:
                 # try is less costly than fetching the property to find if the attribute is readonly
                 if isinstance(key, int):
                     parent[key] = value
                 else:
-                    setattr(parent, key, value)
-            except Exception as e:
-                logger.warning(f"apply_attribute: setattr({parent}, {key}, {value})")
-                logger.warning(f"... exception {e!r})")
-        return value
+                    try:
+                        setattr(parent, key, value)
+                    except AttributeError as e:
+                        # most likely an addon (runtime) attribute that exists on the sender but no on this
+                        # receiver or a readonbly attribute that should be filtered out
+                        # Do not be too verbose
+                        logger.info(f"apply_attribute: exception for {parent} {key}")
+                        logger.info(f"... exception {e!r})")
+
+            return value
 
     except Exception as e:
-        logger.warning(f"apply exception for attr: {e!r}")
-        raise
+        logger.warning(f"apply_attribute: exception for {parent} {key}")
+        logger.warning(f"... exception {e!r})")
 
 
 def diff_attribute(
