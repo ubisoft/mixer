@@ -75,7 +75,7 @@ class DatablockCollectionProxy(Proxy):
                 continue
             uuid = ensure_uuid(datablock)
             self._data[uuid] = DatablockProxy.make(datablock).load(
-                datablock, name, context, bpy_data_collection_name=collection_name
+                datablock, context, bpy_data_collection_name=collection_name
             )
 
         return self
@@ -218,8 +218,9 @@ class DatablockCollectionProxy(Proxy):
                     continue
                 uuid = ensure_uuid(datablock)
                 context.proxy_state.datablocks[uuid] = datablock
+                # name is not used in DatablockProxy.load()
                 proxy = DatablockProxy.make(datablock).load(
-                    datablock, name, context, bpy_data_collection_name=collection_name
+                    datablock, context, bpy_data_collection_name=collection_name
                 )
                 context.proxy_state.proxies[uuid] = proxy
                 self._data[uuid] = proxy

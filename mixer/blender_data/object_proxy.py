@@ -181,7 +181,7 @@ class ObjectProxy(DatablockProxy):
                 logger.debug(f"_diff: {struct} dirty vertex group: replace")
                 # Lazy and heavy : replace the whole Object. Otherwise we would have to merge a DeltaReplace
                 # for vertex_groups and a DeltaUpdate for the remaining items
-                diff.load(struct, key, context)
+                diff.load(struct, context)
                 return DeltaReplace(diff)
 
         return super()._diff(struct, key, prop, context, diff)

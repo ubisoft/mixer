@@ -138,12 +138,17 @@ class DatablockProxy(StructProxy):
     def load(
         self,
         bl_instance: T.ID,
-        key: str,
         context: Context,
         bpy_data_collection_name: str = None,
-    ):
+    ) -> DatablockProxy:
         """
-        Load a datablock into this proxy
+        Load a datablock into this DatablockProxy
+
+        Args:
+            bl_instance: the datablock to load into this DatablockProxy
+            context: visit and proxy state
+            bpy_data_collection_name: if datablock is standalone, name of the bpy.data collection that owns datablock,
+            otherwise None
         """
         if bl_instance.is_embedded_data and bpy_data_collection_name is not None:
             logger.error(

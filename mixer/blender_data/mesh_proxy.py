@@ -162,11 +162,10 @@ class MeshProxy(DatablockProxy):
     def load(
         self,
         datablock: T.ID,
-        key: str,
         context: Context,
         bpy_data_collection_name: str = None,
     ) -> MeshProxy:
-        super().load(datablock, key, context, bpy_data_collection_name)
+        super().load(datablock, context, bpy_data_collection_name)
         self._arrays["vertex_groups"] = VertexGroups.from_mesh(datablock).to_array_sequence()
         return self
 
@@ -178,7 +177,7 @@ class MeshProxy(DatablockProxy):
             # If any mesh buffer changes requires a clear geometry on the receiver, the receiver will clear all
             # buffers, including uv_layers and vertex_colors.
             # Resend everything
-            diff.load(struct, key, context)
+            diff.load(struct, context)
 
             # force ObjectProxy._diff to resend the Vertex groups
             logger.debug(f"_diff: {struct} requires clear_geometry: replace")
