@@ -288,7 +288,7 @@ def users_selection_draw_iteration(per_user_callback, per_object_callback):
 
             for object_full_name in selected_objects:
                 if object_full_name not in bpy.data.objects:
-                    logger.warning(f"{object_full_name} not in bpy.data")
+                    logger.info(f"{object_full_name} not in bpy.data")
                     continue
 
                 obj = bpy.data.objects[object_full_name]
