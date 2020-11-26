@@ -173,7 +173,7 @@ class DatablockCollectionProxy(Proxy):
 
     def remove_datablock(self, proxy: DatablockProxy, datablock: T.ID):
         """Remove a bpy.data collection item and update the proxy state"""
-        logger.info("Perform removal for %s", proxy)
+        logger.warning("Perform removal for %s", proxy)
         try:
             if isinstance(datablock, T.Scene):
                 from mixer.blender_client.scene import delete_scene
@@ -195,7 +195,7 @@ class DatablockCollectionProxy(Proxy):
         """
         Rename a bpy.data collection item and update the proxy state
         """
-        logger.info("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
+        logger.warning("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
         proxy.rename(new_name)
         datablock.name = new_name
 
@@ -233,7 +233,7 @@ class DatablockCollectionProxy(Proxy):
 
         for proxy in diff.items_removed:
             try:
-                logger.info("Perform removal for %s", proxy)
+                logger.warning("Perform removal for %s", proxy)
                 uuid = proxy.mixer_uuid
                 changeset.removals.append((uuid, proxy.collection_name, str(proxy)))
                 del self._data[uuid]

@@ -226,7 +226,7 @@ class StructProxy(Proxy):
                 try:
                     member = getattr(struct, k)
                 except AttributeError:
-                    logger.warning(f"diff: unknown attribute {k} in {struct}")
+                    logger.info(f"diff: unknown attribute {k} in {struct}")
                     continue
 
                 proxy_data = self._data.get(k)

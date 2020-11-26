@@ -189,7 +189,7 @@ def send_data_removals(removals: RemovalChangeset):
         return
 
     for uuid, _, debug_info in removals:
-        logger.info("send_removal: %s (%s)", uuid, debug_info)
+        logger.warning("send_removal: %s (%s)", uuid, debug_info)
         buffer = BlenderRemoveMessage.encode(uuid, debug_info)
         command = Command(MessageType.BLENDER_DATA_REMOVE, buffer, 0)
         share_data.client.add_command(command)
@@ -201,7 +201,7 @@ def build_data_remove(buffer):
 
     message = BlenderRemoveMessage()
     message.decode(buffer)
-    logger.info("build_data_remove: %s (%s)", message.uuid, message.debug_info)
+    logger.warning("build_data_remove: %s (%s)", message.uuid, message.debug_info)
     share_data.bpy_data_proxy.remove_datablock(message.uuid)
 
     # TODO temporary until VRtist protocol uses Blenddata instead of blender_objects & co
@@ -216,7 +216,7 @@ def send_data_renames(renames: RenameChangeset):
 
     items = []
     for uuid, old_name, new_name, debug_info in renames:
-        logger.info("send_rename: %s (%s) into %s", uuid, debug_info, new_name)
+        logger.warning("send_rename: %s (%s) into %s", uuid, debug_info, new_name)
         items.extend([uuid, old_name, new_name])
 
     buffer = BlenderRenamesMessage.encode(items)
@@ -238,7 +238,7 @@ def build_data_rename(buffer):
     items = list(itertools.zip_longest(*args))
 
     for uuid, old_name, new_name in items:
-        logger.info("build_data_rename: %s (%s) into %s", uuid, old_name, new_name)
+        logger.warning("build_data_rename: %s (%s) into %s", uuid, old_name, new_name)
 
     rename_changeset = share_data.bpy_data_proxy.rename_datablocks(items)
 
