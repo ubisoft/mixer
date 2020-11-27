@@ -48,9 +48,12 @@ def get_resolved_file_path(path: str):
     return str(get_cache_file_hash(Path(path)))
 
 
+def get_cache_file_path(path: str):
+    return str(get_cache_file_hash(Path(path)))
+
+
 def get_source_file_path(cache_path: str):
-    abspath = bpy.path.abspath(cache_path)
-    metadata_path = Path(abspath).with_suffix(".metadata")
+    metadata_path = Path(cache_path).with_suffix(".metadata")
     if not metadata_path.exists():
         return cache_path
 
@@ -63,6 +66,15 @@ def get_local_or_create_cache_file(str_path: str, data: bytes):
         return str_path
 
     cache_path = get_cache_file_hash(path)
+    if not cache_path.with_suffix(".metadata").exists():
+        create_cache_file(path, cache_path, data)
+    return str(cache_path)
+
+
+def get_or_create_cache_file(str_path: str, data: bytes):
+    path = Path(str_path)
+    cache_path = get_cache_file_hash(path)
+
     if not cache_path.with_suffix(".metadata").exists():
         create_cache_file(path, cache_path, data)
     return str(cache_path)

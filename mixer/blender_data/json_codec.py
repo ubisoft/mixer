@@ -74,7 +74,14 @@ _classes.update({c.__name__: c for c in delta_classes})
 
 _classes_tuple = tuple(_classes.values())
 
-options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name"]
+options = [
+    "_bpy_data_collection",
+    "_class_name",
+    "_datablock_uuid",
+    "_initial_name",
+    "_is_in_workspace",
+    "_filepath_raw",
+]
 MIXER_CLASS = "__mixer_class__"
 
 

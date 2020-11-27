@@ -47,6 +47,10 @@ def set_log_level(self, value):
     logger.log(value, "Logging level changed")
 
 
+class WorkspaceItem(bpy.types.PropertyGroup):
+    workspace: bpy.props.StringProperty(default="", subtype="DIR_PATH", name="Workspace Directory")
+
+
 class MixerPreferences(bpy.types.AddonPreferences):
     """
     Preferences class, store persistent properties and options.
@@ -124,6 +128,11 @@ class MixerPreferences(bpy.types.AddonPreferences):
         name="Data Directory", default=os.environ.get("MIXER_DATA_DIR", get_data_directory()), subtype="FILE_PATH"
     )
 
+    workspace_directories: bpy.props.CollectionProperty(
+        name="Workspace Directories",
+        type=WorkspaceItem,
+    )
+
     # Developer option to avoid sending scene content to server at the first connexion
     # Allow to quickly iterate debugging/test on large scenes with only one client in room
     # Main usage: optimization of client timers to check if updates are required
@@ -150,7 +159,10 @@ class MixerPreferences(bpy.types.AddonPreferences):
         draw_preferences_ui(self, context)
 
 
-classes = (MixerPreferences,)
+classes = (
+    WorkspaceItem,
+    MixerPreferences,
+)
 
 register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)
 

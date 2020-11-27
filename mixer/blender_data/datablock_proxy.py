@@ -24,6 +24,7 @@ from __future__ import annotations
 from collections import defaultdict
 import logging
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from pathlib import Path
 
 import bpy
 import bpy.types as T  # noqa
@@ -36,6 +37,7 @@ from mixer.blender_data.proxy import DeltaUpdate
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.type_helpers import sub_id_type
 from mixer.local_data import get_source_file_path
+from mixer.bl_utils import get_mixer_prefs
 
 if TYPE_CHECKING:
     from mixer.blender_data.aos_soa_proxy import SoaElement
@@ -70,6 +72,8 @@ class DatablockProxy(StructProxy):
 
         # TODO move into _arrays
         self._media: Optional[Tuple[str, bytes]] = None
+        self._is_in_workspace: Optional[bool] = None
+        self._filepath_raw: Optional[str] = None
 
         self._arrays: ArrayGroups = {}
         """arrays that must not be serialized as json because of their size"""
@@ -189,8 +193,22 @@ class DatablockProxy(StructProxy):
             self._datablock_uuid = bl_instance.mixer_uuid
             context.proxy_state.proxies[uuid] = self
 
+        self.attach_filepath_raw(bl_instance)
         self.attach_media_descriptor(bl_instance)
         return self
+
+    def attach_filepath_raw(self, datablock: T.ID):
+        if isinstance(datablock, T.Image):
+            path = get_source_file_path(bpy.path.abspath(datablock.filepath))
+            self._filepath_raw = str(Path(path).resolve(strict=False))
+
+    def is_file_in_workspace(self, filepath):
+        filepath = str(Path(filepath))
+        for item in get_mixer_prefs().workspace_directories:
+            workspace = item.workspace
+            if filepath.startswith(str(Path(workspace))):
+                return True
+        return False
 
     def attach_media_descriptor(self, datablock: T.ID):
         # if Image, Sound, Library, MovieClip, Text, VectorFont, Volume
@@ -200,7 +218,13 @@ class DatablockProxy(StructProxy):
         #
         #
         if isinstance(datablock, T.Image):
-            path = get_source_file_path(datablock.filepath)
+            if self.is_file_in_workspace(self._filepath_raw):
+                self._is_in_workspace = True
+                self._media = None
+                return
+
+            self._is_in_workspace = False
+            path = get_source_file_path(self._filepath_raw)
             packed_file = datablock.packed_file
             data = None
             if packed_file is not None:

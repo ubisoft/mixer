@@ -24,8 +24,11 @@ import os
 import socket
 import subprocess
 import time
+from pathlib import Path
 
 import bpy
+from bpy_extras.io_utils import ImportHelper
+from bpy.types import Operator
 
 from mixer.share_data import share_data
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
@@ -44,6 +47,37 @@ logger = logging.getLogger(__name__)
 
 poll_is_client_connected = (lambda: is_client_connected(), "Client not connected")
 poll_already_in_a_room = (lambda: not share_data.client.current_room, "Already in a room")
+
+
+class WorkspaceAddDirectoryOperator(bpy.types.Operator, ImportHelper):
+    bl_idname = "mixer.add_workspace"
+    bl_label = "Add Workspace"
+    filepath: bpy.props.StringProperty(subtype="DIR_PATH")
+
+    def execute(self, context):
+        from mixer.bl_preferences import WorkspaceItem
+
+        path = self.filepath
+        if not Path(path).is_dir():
+            path = str(Path(path).parent)
+
+        for item in get_mixer_prefs().workspace_directories:
+            if item.workspace == path:
+                return {"FINISHED"}
+
+        item = get_mixer_prefs().workspace_directories.add()
+        item.workspace = path
+        return {"FINISHED"}
+
+
+class WorkspaceRemoveDirectoryOperator(bpy.types.Operator):
+    bl_idname = "mixer.remove_workspace"
+    bl_label = "Remove Workspace"
+
+    def execute(self, context):
+        props = get_mixer_props()
+        item = get_mixer_prefs().workspace_directories.remove(props.workspace_index)
+        return {"FINISHED"}
 
 
 def generic_poll(cls, context):
@@ -417,6 +451,8 @@ classes = (
     LeaveRoomOperator,
     DownloadRoomOperator,
     UploadRoomOperator,
+    WorkspaceAddDirectoryOperator,
+    WorkspaceRemoveDirectoryOperator,
 )
 
 register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)

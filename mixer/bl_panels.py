@@ -160,6 +160,11 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
             split.prop(item, "joinable", text="")
 
 
+class WORKSPACE_UL_ItemRenderer(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
+        layout.prop(item, "workspace", text="", emboss=False, icon_value=icon)
+
+
 def draw_user_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
     layout.prop(mixer_prefs, "user")
@@ -178,6 +183,17 @@ def draw_advanced_settings_ui(layout: bpy.types.UILayout):
     layout.prop(mixer_prefs, "log_level")
     layout.prop(mixer_prefs, "show_server_console")
     layout.prop(mixer_prefs, "vrtist_protocol")
+
+    mixer_props = get_mixer_props()
+    box = layout.box()
+    box.label(text="Shared Workspaces")
+    row = box.row()
+    row.template_list(
+        "WORKSPACE_UL_ItemRenderer", "", mixer_prefs, "workspace_directories", mixer_props, "workspace_index", rows=4
+    )
+    col = row.column(align=True)
+    col.operator(bl_operators.WorkspaceAddDirectoryOperator.bl_idname, text="", icon="ADD")
+    col.operator(bl_operators.WorkspaceRemoveDirectoryOperator.bl_idname, text="", icon="REMOVE")
 
 
 def draw_developer_settings_ui(layout: bpy.types.UILayout):
@@ -414,7 +430,7 @@ def update_panels_category(self, context):
         logger.error(f"Updating Panel category has failed {e!r}")
 
 
-classes = (ROOM_UL_ItemRenderer, MixerSettingsPanel, VRtistSettingsPanel)
+classes = (ROOM_UL_ItemRenderer, WORKSPACE_UL_ItemRenderer, MixerSettingsPanel, VRtistSettingsPanel)
 register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)
 
 

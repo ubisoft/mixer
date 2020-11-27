@@ -33,7 +33,7 @@ from mixer.broadcaster.common import (
     encode_string,
     MessageType,
 )
-from mixer.local_data import get_local_or_create_cache_file
+from mixer.local_data import get_or_create_cache_file
 from mixer.share_data import share_data
 
 if TYPE_CHECKING:
@@ -63,7 +63,7 @@ def build_data_media(buffer: bytes):
     path, index = decode_string(buffer, 0)
     bytes_ = buffer[index:]
     # TODO this does not overwrite outdated local files
-    get_local_or_create_cache_file(path, bytes_)
+    get_or_create_cache_file(path, bytes_)
 
 
 def send_data_creations(proxies: CreationChangeset):

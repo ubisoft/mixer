@@ -32,7 +32,7 @@ from pathlib import Path
 import traceback
 from typing import Any, Callable, Dict, ItemsView, List, Optional, TYPE_CHECKING, Union
 
-from mixer.local_data import get_resolved_file_path
+from mixer.local_data import get_cache_file_path
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -179,7 +179,15 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
         image = None
         image_name = proxy.data("name")
         filepath = proxy.data("filepath")
-        resolved_filepath = get_resolved_file_path(filepath)
+
+        resolved_filepath = proxy._filepath_raw
+        if not proxy._is_in_workspace:
+            resolved_filepath = get_cache_file_path(proxy._filepath_raw)
+        else:
+            if not proxy.is_file_in_workspace(proxy._filepath_raw):
+                logger.warning(f'"{proxy._filepath_raw}" not is workspace')
+                return None
+
         packed_files = proxy.data("packed_files")
         if packed_files is not None and packed_files.length:
             name = proxy.data("name")
