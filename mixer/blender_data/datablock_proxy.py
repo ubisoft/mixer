@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import logging
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -137,40 +137,43 @@ class DatablockProxy(StructProxy):
 
     def load(
         self,
-        bl_instance: T.ID,
+        datablock: T.ID,
         context: Context,
         bpy_data_collection_name: str = None,
     ) -> DatablockProxy:
         """
-        Load a datablock into this DatablockProxy
+        Load a datablock into this proxy?
 
         Args:
-            bl_instance: the datablock to load into this DatablockProxy
+            datablock: the datablock to load into this proxy, may be standalone or embedded
             context: visit and proxy state
             bpy_data_collection_name: if datablock is standalone, name of the bpy.data collection that owns datablock,
             otherwise None
+
+        Returns:
+            this DatablockProxy
         """
-        if bl_instance.is_embedded_data and bpy_data_collection_name is not None:
-            logger.error(
-                f"DatablockProxy.load() for {bl_instance} : is_embedded_data is True and bpy_prop_collection is {bpy_data_collection_name}. Item ignored"
-            )
-            return
 
-        if bl_instance.is_embedded_data:
+        if bpy_data_collection_name is None:
+            # TODO would be better to load embedded datablocks into StructProxy and use DatablockProxy
+            # only for standalone datablocks
+            assert datablock.is_embedded_data, f"load: {datablock} is not embedded and collection_name is None"
             self._bpy_data_collection = ""
-
-        if bpy_data_collection_name is not None:
+        else:
+            assert (
+                not datablock.is_embedded_data
+            ), f"load: {datablock} is embedded and collection_name is {bpy_data_collection_name}"
             self._bpy_data_collection = bpy_data_collection_name
 
-        self._class_name = bl_instance.__class__.__name__
+        self._class_name = datablock.__class__.__name__
         self._data.clear()
-        properties = context.synchronized_properties.properties(bl_instance)
+        properties = context.synchronized_properties.properties(datablock)
         # this assumes that specifics.py apply only to ID, not Struct
-        properties = specifics.conditional_properties(bl_instance, properties)
+        properties = specifics.conditional_properties(datablock, properties)
         try:
             context.visit_state.datablock_proxy = self
             for name, bl_rna_property in properties:
-                attr = getattr(bl_instance, name)
+                attr = getattr(datablock, name)
                 attr_value = read_attribute(attr, name, bl_rna_property, context)
                 # Also write None values to reset attributes like Camera.dof.focus_object
                 # TODO for scene, test difference, only send update if dirty as continuous updates to scene
@@ -179,22 +182,22 @@ class DatablockProxy(StructProxy):
         finally:
             context.visit_state.datablock_proxy = None
 
-        specifics.post_save_id(self, bl_instance)
+        specifics.post_save_id(self, datablock)
 
-        uuid = bl_instance.get("mixer_uuid")
+        uuid = datablock.get("mixer_uuid")
         if uuid:
             # It is a bpy.data ID, not an ID "embedded" inside another ID, like scene.collection
             id_ = context.proxy_state.datablocks.get(uuid)
-            if id_ is not bl_instance:
+            if id_ is not datablock:
                 # this occurs when
                 # - when we find a reference to a BlendData ID that was not loaded
                 # - the ID are not properly ordred at creation time, for instance (objects, meshes)
                 # instead of (meshes, objects) : a bug
-                logger.debug("DatablockProxy.load(): %s not in context.proxy_state.datablocks[uuid]", bl_instance)
-            self._datablock_uuid = bl_instance.mixer_uuid
+                logger.debug("DatablockProxy.load(): %s not in context.proxy_state.datablocks[uuid]", datablock)
+            self._datablock_uuid = datablock.mixer_uuid
             context.proxy_state.proxies[uuid] = self
 
-        self.attach_media_descriptor(bl_instance)
+        self.attach_media_descriptor(datablock)
         return self
 
     def attach_media_descriptor(self, datablock: T.ID):
@@ -218,7 +221,8 @@ class DatablockProxy(StructProxy):
     @property
     def collection_name(self) -> str:
         """
-        The name of the bpy.data collection this object is a proxy, empty string if an embedded datablock
+        The name of the bpy.data collection that contains the proxified datablock, empty string if the
+        proxified datablock is embedded
         """
         return self._bpy_data_collection
 
@@ -227,6 +231,7 @@ class DatablockProxy(StructProxy):
         return getattr(bpy.data, self.collection_name)
 
     def target(self, context: Context) -> T.ID:
+        """Returns the datablock proxified by this proxy"""
         return context.proxy_state.datablocks.get(self.mixer_uuid)
 
     def create_standalone_datablock(self, context: Context) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
@@ -328,40 +333,27 @@ class DatablockProxy(StructProxy):
 
         return datablock
 
-    def save(self, bl_instance: Any, attr_name: str, context: Context) -> T.ID:
+    def save(self, parent: T.bpy_struct, key: str, context: Context) -> T.ID:
         """
-        Save this proxy into an existing datablock that may be a bpy.data member item or an embedded datablock
+        Save this proxy into an embedded datablock
+
+        Args:
+            parent: the struct that contains the embedded datablock (e.g. a Scene)
+            key: the member name of the datablock in parent (e.g. node_tree)
+            context: proxy and visit state
+
+        Returns:
+            The saved datablock
         """
-        collection_name = self.collection_name
-        if collection_name:
-            logger.info(f"IDproxy save standalone {self}")
-            # a standalone datablock in a bpy.data collection
 
-            if bl_instance is None:
-                bl_instance = self.collection
-            if attr_name is None:
-                attr_name = self.data("name")
-            id_ = bl_instance.get(attr_name)
+        # TODO it might be better to load embedded datablocks as StructProxy and remove this method
+        # assert self.is_embedded_data, f"save: called {parent}[{key}], which is not standalone"
+        assert isinstance(key, str), f"save: {parent} unexpected type for key : {type(key)}"
 
-            if id_ is None:
-                logger.warning(f"IDproxy save standalone {self}, not found. Creating")
-                id_ = specifics.bpy_data_ctor(collection_name, self, context)
-                if id_ is None:
-                    logger.warning(f"Cannot create bpy.data.{collection_name}[{attr_name}]")
-                    return None
-                if DEBUG:
-                    if bl_instance.get(attr_name) != id_:
-                        logger.error(f"Name mismatch after creation of bpy.data.{collection_name}[{attr_name}] ")
-                id_.mixer_uuid = self.mixer_uuid
-        else:
-            logger.info(f"IDproxy save embedded {self}")
-            # an is_embedded_data datablock. pre_save will retrieve it by calling target
-            id_ = getattr(bl_instance, attr_name)
-            pass
-
-        target = self._pre_save(id_, context)
+        datablock = getattr(parent, key)
+        target = self._pre_save(datablock, context)
         if target is None:
-            logger.warning(f"DatablockProxy.save() {bl_instance}.{attr_name} is None")
+            logger.warning(f"DatablockProxy.save() {parent}.{key} is None")
             return None
 
         try:
@@ -396,12 +388,10 @@ class DatablockProxy(StructProxy):
             soa_proxy = container_proxy.data(soa_member[0])
             soa_proxy.save_array(container, soa_member[0], soa_member[1])
 
-        # HACK
+        # HACK force updates :
         if isinstance(bl_item, T.Mesh):
             bl_item.update()
-
-        # HACK 2 (force update curves)
-        if isinstance(bl_item, T.Curve):
+        elif isinstance(bl_item, T.Curve):
             bl_item.twist_mode = bl_item.twist_mode
 
     def diff(self, datablock: T.ID, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
