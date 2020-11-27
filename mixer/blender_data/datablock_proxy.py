@@ -218,20 +218,22 @@ class DatablockProxy(StructProxy):
         #
         #
         if isinstance(datablock, T.Image):
+            self._is_in_workspace = False
+            packed_file = datablock.packed_file
+            data = None
+            if packed_file is not None:
+                data = packed_file.data
+                self._media = (get_source_file_path(self._filepath_raw), data)
+                return
+
             if self.is_file_in_workspace(self._filepath_raw):
                 self._is_in_workspace = True
                 self._media = None
                 return
 
-            self._is_in_workspace = False
             path = get_source_file_path(self._filepath_raw)
-            packed_file = datablock.packed_file
-            data = None
-            if packed_file is not None:
-                data = packed_file.data
-            else:
-                with open(bpy.path.abspath(path), "rb") as data_file:
-                    data = data_file.read()
+            with open(bpy.path.abspath(path), "rb") as data_file:
+                data = data_file.read()
             self._media = (path, data)
 
     @property
