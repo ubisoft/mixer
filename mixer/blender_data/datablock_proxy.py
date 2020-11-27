@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections import defaultdict
 import logging
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
-from pathlib import Path
+import pathlib
 
 import bpy
 import bpy.types as T  # noqa
@@ -200,13 +200,13 @@ class DatablockProxy(StructProxy):
     def attach_filepath_raw(self, datablock: T.ID):
         if isinstance(datablock, T.Image):
             path = get_source_file_path(bpy.path.abspath(datablock.filepath))
-            self._filepath_raw = str(Path(path).resolve(strict=False))
+            self._filepath_raw = str(pathlib.Path(path).resolve(strict=False))
 
     def is_file_in_workspace(self, filepath):
-        filepath = str(Path(filepath))
+        filepath = str(pathlib.Path(filepath))
         for item in get_mixer_prefs().workspace_directories:
             workspace = item.workspace
-            if filepath.startswith(str(Path(workspace))):
+            if filepath.startswith(str(pathlib.Path(workspace))):
                 return True
         return False
 

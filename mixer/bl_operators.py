@@ -28,7 +28,6 @@ from pathlib import Path
 
 import bpy
 from bpy_extras.io_utils import ImportHelper
-from bpy.types import Operator
 
 from mixer.share_data import share_data
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
@@ -55,7 +54,6 @@ class WorkspaceAddDirectoryOperator(bpy.types.Operator, ImportHelper):
     filepath: bpy.props.StringProperty(subtype="DIR_PATH")
 
     def execute(self, context):
-        from mixer.bl_preferences import WorkspaceItem
 
         path = self.filepath
         if not Path(path).is_dir():
@@ -76,7 +74,7 @@ class WorkspaceRemoveDirectoryOperator(bpy.types.Operator):
 
     def execute(self, context):
         props = get_mixer_props()
-        item = get_mixer_prefs().workspace_directories.remove(props.workspace_index)
+        get_mixer_prefs().workspace_directories.remove(props.workspace_index)
         return {"FINISHED"}
 
 

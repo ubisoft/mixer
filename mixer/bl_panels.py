@@ -160,7 +160,7 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
             split.prop(item, "joinable", text="")
 
 
-class WORKSPACE_UL_ItemRenderer(bpy.types.UIList):
+class WORKSPACE_UL_ItemRenderer(bpy.types.UIList):  # noqa
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         layout.prop(item, "workspace", text="", emboss=False, icon_value=icon)
 
