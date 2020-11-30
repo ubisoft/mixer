@@ -151,7 +151,7 @@ class StructCollectionProxy(Proxy):
             context.visit_state.path.pop()
 
     def apply(
-        self, parent: Any, key: Union[int, str], delta: Optional[DeltaUpdate], context: Context, to_blender=True
+        self, parent: Any, key: Union[int, str], delta: DeltaUpdate, context: Context, to_blender=True
     ) -> StructCollectionProxy:
 
         assert isinstance(key, (int, str))

@@ -91,7 +91,7 @@ class NodeLinksProxy(StructCollectionProxy):
         self,
         parent: Any,
         key: str,
-        struct_delta: Optional[DeltaUpdate],
+        struct_delta: DeltaUpdate,
         context: Context,
         to_blender: bool = True,
     ) -> Optional[NodeLinksProxy]:

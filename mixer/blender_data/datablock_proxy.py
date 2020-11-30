@@ -372,7 +372,7 @@ class DatablockProxy(StructProxy):
     def apply_to_proxy(
         self,
         datablock: T.ID,
-        delta: Optional[DeltaUpdate],
+        delta: DeltaUpdate,
         context: Context,
     ):
         """

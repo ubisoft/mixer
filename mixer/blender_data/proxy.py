@@ -178,7 +178,7 @@ class Proxy:
         self,
         parent: Any,
         key: Union[int, str],
-        delta: Optional[DeltaUpdate],
+        delta: DeltaUpdate,
         context: Context,
         to_blender: bool = True,
     ) -> Proxy:

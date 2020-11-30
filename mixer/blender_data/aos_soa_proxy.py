@@ -190,7 +190,7 @@ class SoaElement(Proxy):
             logger.error(f"... exception {e!r}")
 
     def apply(
-        self, parent: T.bpy_prop_collection, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True
+        self, parent: T.bpy_prop_collection, key: str, delta: DeltaUpdate, context: Context, to_blender=True
     ) -> SoaElement:
         update = delta.value
         if update is None:

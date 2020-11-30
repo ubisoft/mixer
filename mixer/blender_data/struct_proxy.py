@@ -117,7 +117,7 @@ class StructProxy(Proxy):
         self,
         parent: Any,
         key: Union[int, str],
-        struct_delta: Optional[DeltaUpdate],
+        struct_delta: DeltaUpdate,
         context: Context,
         to_blender: bool = True,
     ) -> StructProxy:

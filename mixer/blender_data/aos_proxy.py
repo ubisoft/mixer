@@ -107,11 +107,8 @@ class AosProxy(Proxy):
             context.visit_state.path.pop()
 
     def apply(
-        self, parent: T.bpy_struct, key: str, delta: Optional[DeltaUpdate], context: Context, to_blender=True
+        self, parent: T.bpy_struct, key: str, delta: DeltaUpdate, context: Context, to_blender=True
     ) -> Optional[AosProxy]:
-        if delta is None:
-            return None
-
         struct_update = delta.value
 
         aos = getattr(parent, key)
