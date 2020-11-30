@@ -255,6 +255,15 @@ default_exclusions = {
         NameFilterOut(_exclude_names),
     ],
     T.ActionGroup: [NameFilterOut("channels")],
+    T.BezierSplinePoint: [
+        NameFilterOut(
+            [
+                "select_control_point",
+                "select_left_handle",
+                "select_right_handle",
+            ]
+        )
+    ],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
     # makes a loop
     T.Bone: [NameFilterOut("parent")],
@@ -462,15 +471,6 @@ default_exclusions = {
         )
     ],
     T.SequenceEditor: [NameFilterOut(["active_strip", "sequences_all"])],
-    T.BezierSplinePoint: [
-        NameFilterOut(
-            [
-                "select_control_point",
-                "select_left_handle",
-                "select_right_handle",
-            ]
-        )
-    ],
     T.ViewLayer: [
         # Not useful. Requires array insertion (to do shortly)
         NameFilterOut("freestyle_settings"),

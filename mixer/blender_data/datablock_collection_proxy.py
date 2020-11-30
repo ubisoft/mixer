@@ -55,8 +55,10 @@ class DatablockCollectionProxy(Proxy):
 
     def __init__(self, name: str):
         self._name: str = name
-        # On item per datablock. The key is the uuid, which eases rename management
+        """Name of the collection in bpy.data"""
+
         self._data: Dict[str, DatablockProxy] = {}
+        """One item per datablock. The key is the uuid, which eases rename management"""
 
     def __len__(self):
         return len(self._data)
@@ -67,7 +69,7 @@ class DatablockCollectionProxy(Proxy):
 
     def load(self, bl_collection: bpy.types.bpy_prop_collection, key: str, context: Context):  # noqa N802
         """
-        Load bl_collection elements as standalone datablocks.
+        FOR TESTS ONLY Load bl_collection elements as standalone datablocks.
         """
         for datablock in bl_collection.values():
             collection_name = BlendData.instance().bl_collection_name_from_ID(datablock)
@@ -82,14 +84,8 @@ class DatablockCollectionProxy(Proxy):
 
     def save(self, attribute: bpy.type.Collection, parent: Any, key: str, context: Context):
         """
-        UNUSED Save this proxy into the a Blender collection referenced by attribute.
-
-        Args:
-            attribute: a collection of standalone datablocks in bpy.data or a collection of referenced datablocks
-                like bpy.type.Collection.children
-            parent: the attribute that contains attribute (e.g. a Mesh instance)
-            key: the name of the bpy_collection in parent (e.g "vertices")
-            context: proxy and visit state
+        OBSOLETE Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data
+        or a collection of referenced datablocks like bpy.type.Collection.children
         """
         if not self._data:
             return

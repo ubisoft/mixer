@@ -204,7 +204,7 @@ class BpyDataProxy(Proxy):
                     self.state.datablocks[uuid] = item
 
     def load(self, synchronized_properties: SynchronizedProperties):
-        """Load the current scene into this proxy
+        """FOR TESTS ONLY Load the current scene into this proxy
 
         Only used for test. The initial load is performed by update()
         """
