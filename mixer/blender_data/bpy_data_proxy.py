@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.blenddata import BlendData, collection_name_to_type
+from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -38,7 +38,6 @@ from mixer.blender_data.filter import SynchronizedProperties, safe_depsgraph_upd
 from mixer.blender_data.proxy import (
     DeltaReplace,
     DeltaUpdate,
-    ensure_uuid,
     Proxy,
     MaxDepthExceeded,
     UnresolvedRefs,
@@ -180,43 +179,17 @@ class BpyDataProxy(Proxy):
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}
 
-    def initialize_ref_targets(self, synchronized_properties: SynchronizedProperties):
-        """Keep track of all bpy.data items so that loading recognizes references to them
-
-        Call this before updating the proxy from send_scene_content. It is not needed on the
-        receiver side.
-
-        TODO check is this is actually required or if we can rely upon is_embedded_data being False
-        """
-        # Normal operation no more involve BpyDataProxy.load() ad initial synchronization behaves
-        # like a creation. The current load_as_what() implementation relies on root_ids to determine if
-        # a T.ID must ne loaded as an IDRef (pointer to bpy.data) or an IDDef (pointer to an "owned" ID).
-        # so we need to load all the root_ids before loading anything into the proxy.
-        # However, root_ids may no more be required if we can load all the proxies inside out (deepmost first, i.e
-        # (Mesh, Metaball, ..), then Object, the Scene). This should be possible as as we sort
-        # the updates inside out in update() to the receiver gets them in order
-        for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
-            if name in collection_name_to_type:
-                # TODO use BlendData
-                bl_collection = getattr(bpy.data, name)
-                for _id_name, item in bl_collection.items():
-                    uuid = ensure_uuid(item)
-                    self.state.datablocks[uuid] = item
-
     def load(self, synchronized_properties: SynchronizedProperties):
-        """Load the current scene into this proxy
+        """FOR TESTS ONLY Load the current scene into this proxy
 
         Only used for test. The initial load is performed by update()
         """
-        self.initialize_ref_targets(synchronized_properties)
-        context = self.context(synchronized_properties)
-
-        for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
-            collection = getattr(bpy.data, name)
-            self._data[name] = DatablockCollectionProxy(name).load(collection, name, context)
+        diff = BpyBlendDiff()
+        diff.diff(self, synchronized_properties)
+        self.update(diff, {}, False, synchronized_properties)
         return self
 
-    def find(self, collection_name: str, key: str) -> DatablockProxy:
+    def find(self, collection_name: str, key: str) -> Optional[DatablockProxy]:
         # TODO not used ?
         if not self._data:
             return None
@@ -308,7 +281,7 @@ class BpyDataProxy(Proxy):
             logger.warning(
                 f"create_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} "
             )
-            return None
+            return None, None
 
         context = self.context(synchronized_properties)
         return bpy_data_collection_proxy.create_datablock(incoming_proxy, context)
@@ -338,6 +311,7 @@ class BpyDataProxy(Proxy):
         proxy = self.state.proxies.get(uuid)
         if proxy is None:
             logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
+            return
 
         bpy_data_collection_proxy = self._data.get(proxy.collection_name)
         if bpy_data_collection_proxy is None:
@@ -349,9 +323,10 @@ class BpyDataProxy(Proxy):
         del self.state.proxies[uuid]
         del self.state.datablocks[uuid]
 
-    def rename_datablocks(self, items: List[str, str, str]) -> RenameChangeset:
+    def rename_datablocks(self, items: List[Tuple[str, str, str]]) -> RenameChangeset:
         """
         Process a received datablock rename command, renaming the datablocks and updating the proxy state.
+        (receiver side)
         """
         rename_changeset_to_send: RenameChangeset = []
         renames = []
@@ -359,7 +334,7 @@ class BpyDataProxy(Proxy):
             proxy = self.state.proxies.get(uuid)
             if proxy is None:
                 logger.error(f"rename_datablocks(): no proxy for {uuid} (debug info)")
-                return
+                return []
 
             bpy_data_collection_proxy = self._data.get(proxy.collection_name)
             if bpy_data_collection_proxy is None:

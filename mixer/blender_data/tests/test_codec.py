@@ -60,9 +60,6 @@ class TestCodec(unittest.TestCase):
         # transmit
         #
 
-        # create
-        cam_received = D.cameras.new(transmit_name)
-
         # decode into proxy
         cam_proxy_received = codec.decode(message)
 
@@ -71,7 +68,9 @@ class TestCodec(unittest.TestCase):
         self.assertEqual(focus_object_proxy._datablock_uuid, cam_sent.dof.focus_object.mixer_uuid)
 
         # save into blender
-        cam_proxy_received.save(D.cameras, transmit_name, self.proxy.context())
+        cam_proxy_received._datablock_uuid = "__" + cam_proxy_received._datablock_uuid
+        cam_received, _ = cam_proxy_received.create_standalone_datablock(self.proxy.context())
+
         self.assertEqual(cam_sent, cam_received)
         pass
 

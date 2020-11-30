@@ -22,12 +22,12 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union
 
 import bpy.types as T  # noqa
 
 from mixer.blender_data.attributes import read_attribute
-from mixer.blender_data.proxy import DeltaUpdate, Proxy
+from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
 if TYPE_CHECKING:
@@ -57,7 +57,9 @@ class NonePtrProxy(Proxy):
     def load(self, *_):
         return self
 
-    def save(self, parent: T.bpy_struct, key: Union[int, str], context: Context):
+    def save(self, unused_attribute, parent: T.bpy_struct, key: Union[int, str], context: Context):
+        """Save None into parent.key or parent[key]"""
+
         if isinstance(key, int):
             parent[key] = None
         else:
@@ -73,14 +75,25 @@ class NonePtrProxy(Proxy):
 
     def apply(
         self,
-        parent: Any,
-        key: str,
-        delta: DeltaUpdate,
+        attribute: Union[T.bpy_struct, T.bpy_prop_collection],
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        delta: Delta,
         context: Context,
         to_blender: bool = True,
-    ) -> Optional[NonePtrProxy]:
+    ) -> Union[DatablockRefProxy, NonePtrProxy]:
         """
-        Apply a delta to this proxy, which occurs when Scene.camera is set from None to a valid reference
+        Apply delta to an attribute with None value.
+
+        This is used for instance Scene.camera is None and updatde to hold a valid Camera reference
+
+        Args:
+            attribute: the Blender attribute to update (e.g a_scene.camera)
+            parent: the attribute that contains attribute (e.g. a Scene instance)
+            key: the key that identifies attribute in parent (e.g; "camera").
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update attribute in addition to this Proxy
         """
         update = delta.value
 
@@ -96,7 +109,7 @@ class NonePtrProxy(Proxy):
         # A none PointerProperty that can point to something that is not a datablock.
         # Can this happen ?
         logger.error(f"apply({parent}, {key}) called with a {type(update)} at {context.visit_state.path}")
-        return None
+        return self
 
     def diff(
         self,

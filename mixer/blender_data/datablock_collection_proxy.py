@@ -29,13 +29,11 @@ import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data.attributes import diff_attribute, read_attribute, write_attribute
-from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
-from mixer.blender_data.diff import BpyPropCollectionDiff
-from mixer.blender_data.filter import skip_bpy_data_item
-from mixer.blender_data.proxy import DeltaUpdate, DeltaAddition, DeltaDeletion, MaxDepthExceeded
+from mixer.blender_data.diff import BpyDataCollectionDiff
+from mixer.blender_data.proxy import Delta, DeltaUpdate, DeltaAddition, DeltaDeletion, MaxDepthExceeded
 from mixer.blender_data.proxy import ensure_uuid, Proxy
 
 if TYPE_CHECKING:
@@ -55,8 +53,10 @@ class DatablockCollectionProxy(Proxy):
 
     def __init__(self, name: str):
         self._name: str = name
-        # On item per datablock. The key is the uuid, which eases rename management
+        """Name of the collection in bpy.data"""
+
         self._data: Dict[str, DatablockProxy] = {}
+        """One item per datablock. The key is the uuid, which eases rename management"""
 
     def __len__(self):
         return len(self._data)
@@ -65,38 +65,17 @@ class DatablockCollectionProxy(Proxy):
         collection = getattr(bpy.data, self._name)
         datablocks.update({datablock.mixer_uuid: datablock for datablock in collection})
 
-    def load(self, bl_collection: bpy.types.bpy_prop_collection, key: str, context: Context):  # noqa N802
+    def save(self, attribute: bpy.type.Collection, parent: Any, key: str, context: Context):
         """
-        Load bl_collection elements as standalone datablocks.
-        """
-        for name, datablock in bl_collection.items():
-            collection_name = BlendData.instance().bl_collection_name_from_ID(datablock)
-            if skip_bpy_data_item(collection_name, datablock):
-                continue
-            uuid = ensure_uuid(datablock)
-            self._data[uuid] = DatablockProxy.make(datablock).load(
-                datablock, name, context, bpy_data_collection_name=collection_name
-            )
-
-        return self
-
-    def save(self, parent: Any, key: str, context: Context):
-        """
-        Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data
+        OBSOLETE Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data
         or a collection of referenced datablocks like bpy.type.Collection.children
         """
         if not self._data:
             return
 
-        target = getattr(parent, key, None)
-        if target is None:
-            # Don't log this, too many messages
-            # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
-            return
-
         # collection of standalone datablocks
         for k, v in self._data.items():
-            write_attribute(target, k, v, context)
+            write_attribute(attribute, k, v, context)
 
     def find(self, key: str):
         return self._data.get(key)
@@ -113,7 +92,7 @@ class DatablockCollectionProxy(Proxy):
         datablock, renames = incoming_proxy.create_standalone_datablock(context)
 
         if incoming_proxy.collection_name == "scenes":
-            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}'")
+            logger.warning(f"Creating scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}'")
 
             # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
             # Remove it now
@@ -123,7 +102,7 @@ class DatablockCollectionProxy(Proxy):
 
                 scene_to_remove = scenes["_mixer_to_be_removed_"]
                 logger.warning(
-                    f"After create scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}''"
+                    f"After create scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}''"
                 )
                 logger.warning(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
                 delete_scene(scene_to_remove)
@@ -144,7 +123,7 @@ class DatablockCollectionProxy(Proxy):
         incoming_proxy = delta.value
         uuid = incoming_proxy.mixer_uuid
 
-        proxy: DatablockProxy = context.proxy_state.proxies.get(uuid)
+        proxy = context.proxy_state.proxies.get(uuid)
         if proxy is None:
             logger.error(
                 f"update_datablock(): Missing proxy for bpy.data.{incoming_proxy.collection_name}[{incoming_proxy.data('name')}] uuid {uuid}"
@@ -193,41 +172,40 @@ class DatablockCollectionProxy(Proxy):
 
     def rename_datablock(self, proxy: DatablockProxy, new_name: str, datablock: T.ID):
         """
-        Rename a bpy.data collection item and update the proxy state
+        Rename a bpy.data collection item and update the proxy state (receiver side)
         """
         logger.warning("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
-        proxy.rename(new_name)
         datablock.name = new_name
+        proxy._data["name"] = new_name
 
-    def update(self, diff: BpyPropCollectionDiff, context: Context) -> Changeset:
+    def update(self, diff: BpyDataCollectionDiff, context: Context) -> Changeset:
         """
-        Update the proxy according to local datablock creations, removals or renames
+        Update the proxy according to local datablock creations, removals or renames (sender side)
         """
         changeset = Changeset()
+
         # Sort so that the tests receive the messages in deterministic order. Sad but not very harmfull
-        added_names = sorted(diff.items_added.keys())
-        for name in added_names:
-            collection_name = diff.items_added[name]
-            logger.info("Perform update/creation for %s[%s]", collection_name, name)
+        added_names = sorted(diff.items_added, key=lambda x: id(x[0].name_full))
+        for datablock, collection_name in added_names:
+            name_full = datablock.name_full
+            logger.info("Perform update/creation for %s[%s]", collection_name, name_full)
             try:
-                # TODO could have a datablock directly
-                collection = getattr(bpy.data, collection_name)
-                id_ = collection.get(name)
-                if id_ is None:
-                    logger.error("update/ request addition for %s[%s] : not found", collection_name, name)
-                    continue
-                uuid = ensure_uuid(id_)
-                context.proxy_state.datablocks[uuid] = id_
-                proxy = DatablockProxy.make(id_).load(id_, name, context, bpy_data_collection_name=collection_name)
+                uuid = ensure_uuid(datablock)
+                context.proxy_state.datablocks[uuid] = datablock
+
+                # TODO LIB update DatablockProxy.make() to create standalone, link or override datablock
+                proxy = DatablockProxy.make(datablock).load(
+                    datablock, context, bpy_data_collection_name=collection_name
+                )
                 context.proxy_state.proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
             except MaxDepthExceeded as e:
-                logger.error(f"MaxDepthExceeded while loading {collection_name}[{name}]:")
+                logger.error(f"MaxDepthExceeded while loading {collection_name}[{name_full}]:")
                 logger.error("... Nested attribute depth is too large: ")
                 logger.error(f"... {e!r}")
             except Exception:
-                logger.error(f"Exception while loading {collection_name}[{name}]:")
+                logger.error(f"Exception while loading {collection_name}[{name_full}]:")
                 for line in traceback.format_exc().splitlines():
                     logger.error(line)
 
@@ -237,7 +215,6 @@ class DatablockCollectionProxy(Proxy):
                 uuid = proxy.mixer_uuid
                 changeset.removals.append((uuid, proxy.collection_name, str(proxy)))
                 del self._data[uuid]
-                id_ = context.proxy_state.datablocks[uuid]
                 del context.proxy_state.proxies[uuid]
                 del context.proxy_state.datablocks[uuid]
             except Exception:
@@ -264,15 +241,9 @@ class DatablockCollectionProxy(Proxy):
         #   Master collection and also a FC/B unlinked
         #
         for proxy, new_name in diff.items_renamed:
-            uuid = proxy.mixer_uuid
-            if proxy.collection[new_name] is not context.proxy_state.datablocks[uuid]:
-                logger.error(
-                    f"update rename : {proxy.collection}[{new_name}] is not {context.proxy_state.datablocks[uuid]} for {proxy}, {uuid}"
-                )
-
             old_name = proxy.data("name")
             changeset.renames.append((proxy.mixer_uuid, old_name, new_name, str(proxy)))
-            proxy.rename(new_name)
+            proxy._data["name"] = new_name
 
         return changeset
 
@@ -286,7 +257,7 @@ class DatablockCollectionProxy(Proxy):
                 results.append(proxy)
         return results
 
-    def search_one(self, name: str) -> DatablockProxy:
+    def search_one(self, name: str) -> Optional[DatablockProxy]:
         """Convenience method to find a proxy by name instead of uuid (for tests only)"""
         results = self.search(name)
         return None if not results else results[0]
@@ -300,7 +271,7 @@ class DatablockRefCollectionProxy(Proxy):
 
     def __init__(self):
         # One item per datablock. The key is the uuid, which eases rename management
-        self._data: Dict[str, DatablockRefProxy] = {}
+        self._data: Dict[str, Union[DeltaAddition, DeltaDeletion, DeltaUpdate, DatablockRefProxy]] = {}
 
     def __len__(self):
         return len(self._data)
@@ -320,21 +291,19 @@ class DatablockRefCollectionProxy(Proxy):
                 logger.error(f"unexpected None in {bl_collection}.{key}")
         return self
 
-    def save(self, parent: Any, key: str, context: Context):
+    def save(self, collection: T.bpy_prop_collection, parent: T.bpy_struct, key: str, context: Context):
         """
-        Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data
-        or a collection of referenced datablocks like bpy.type.Collection.children
+        Saves this proxy into collection
+
+        Args:
+            collection: a collection of datablock references with link/unlink interface
+                (e.g a_Collection_instance.objects)
+            parent: the structure that contains collection to be loaded (e.g. a Collection instance)
+            key: the name of the bpy_collection (e.g "objects")
+            context:
         """
-        if not self._data:
-            return
-
-        collection = getattr(parent, key, None)
-        if collection is None:
-            # Don't log this, too many messages
-            # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
-            return
-
         for _, ref_proxy in self._data.items():
+            assert isinstance(ref_proxy, DatablockRefProxy)
             datablock = ref_proxy.target(context)
             if datablock:
                 collection.link(datablock)
@@ -345,30 +314,36 @@ class DatablockRefCollectionProxy(Proxy):
 
     def apply(
         self,
-        parent: Any,
+        collection: T.bpy_prop_collection,
+        parent: T.Collection,
         key: Union[int, str],
-        collection_delta: Optional[DeltaUpdate],
+        delta: Delta,
         context: Context,
         to_blender: bool = True,
     ) -> DatablockRefCollectionProxy:
         """
-        Apply a received Delta to this proxy.
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
 
-        This method is only applicable if this is a proxy to a collection of datablock references
-        like Scene.collection.objects, because changes to bpy.data are processed by xxx_datablock() methods.
+        Args:
+            attribute: a bpy_prop_collection of datablock references with link/unlink API (e.g. a_collection.objects)
+            parent: the attribute that contains attribute (e.g. a Collection instance)
+            key: the name of the bpy_collection in parent (e.g "objects")
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
         """
+        update: DatablockRefCollectionProxy = delta.value
+        assert type(update) == type(self)
 
-        collection_update: DatablockCollectionProxy = collection_delta.value
-        assert type(collection_update) == type(self)
-        collection = getattr(parent, key)
-        for k, ref_delta in collection_update._data.items():
+        # objects or children
+        for k, ref_delta in update._data.items():
             try:
                 if not isinstance(ref_delta, (DeltaAddition, DeltaDeletion)):
-                    logger.warning(f"unexpected type for delta at {collection}[{k}]: {ref_delta}. Ignored")
+                    logger.error(f"unexpected type for delta at {collection}[{k}]: {ref_delta}. Ignored")
                     continue
                 ref_update: DatablockRefProxy = ref_delta.value
                 if not isinstance(ref_update, DatablockRefProxy):
-                    logger.warning(f"unexpected type for delta_value at {collection}[{k}]: {ref_update}. Ignored")
+                    logger.error(f"unexpected type for delta_value at {collection}[{k}]: {ref_update}. Ignored")
                     continue
 
                 assert isinstance(ref_update, DatablockRefProxy)

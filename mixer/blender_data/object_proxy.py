@@ -22,7 +22,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -30,7 +30,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.mesh_proxy import VertexGroups
 from mixer.blender_data.misc_proxies import NonePtrProxy
-from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate
+from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 if TYPE_CHECKING:
@@ -61,10 +61,10 @@ class ObjectProxy(DatablockProxy):
 
     def _save(self, datablock: T.Object, context: Context) -> T.Object:
         # TODO remove extra work done here. The vertex groups array is created in super()._save(), then cleared in
-        # update_vertex_groups(), because diff() requires clear().
+        # _update_vertex_groups(), because diff() requires clear().
         self._fit_material_slots(datablock, self._data["material_slots"], context)
         super()._save(datablock, context)
-        self.update_vertex_groups(datablock, self._data["vertex_groups"], context)
+        self._update_vertex_groups(datablock, self._data["vertex_groups"], context)
         return datablock
 
     def _fit_material_slots(
@@ -105,7 +105,7 @@ class ObjectProxy(DatablockProxy):
                 if "FINISHED" not in r:
                     raise RuntimeError(f"update_material_slots on {object_datablock}: material_slot_add returned {r}")
 
-    def update_vertex_groups(
+    def _update_vertex_groups(
         self, object_datablock: T.Object, vertex_groups_proxy: StructCollectionProxy, context: Context
     ):
         """Update vertex groups of object_datablock with information from vertex_groups_proxy (from MeshProxy)"""
@@ -181,30 +181,41 @@ class ObjectProxy(DatablockProxy):
                 logger.debug(f"_diff: {struct} dirty vertex group: replace")
                 # Lazy and heavy : replace the whole Object. Otherwise we would have to merge a DeltaReplace
                 # for vertex_groups and a DeltaUpdate for the remaining items
-                diff.load(struct, key, context)
+                diff.load(struct, context)
                 return DeltaReplace(diff)
 
         return super()._diff(struct, key, prop, context, diff)
 
     def apply(
         self,
+        attribute: T.Object,
         parent: T.BlendDataObjects,
-        key: str,
-        struct_delta: DeltaUpdate,
+        key: Union[int, str],
+        delta: Delta,
         context: Context,
         to_blender: bool = True,
     ) -> StructProxy:
+        """
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
 
-        update = struct_delta.value
-        object_datablock = parent[key]
+        Args:
+            attribute: the Object datablock to update
+            parent: the attribute that contains attribute (e.g. a bpy.data.objects)
+            key: the key that identifies attribute in parent.
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
+        """
+        assert isinstance(key, str)
+        update = delta.value
 
         if to_blender:
             incoming_material_slots = update.data("material_slots")
-            self._fit_material_slots(object_datablock, incoming_material_slots, context)
+            self._fit_material_slots(attribute, incoming_material_slots, context)
 
-        updated_proxy = super().apply(parent, key, struct_delta, context, to_blender)
+        updated_proxy = super().apply(attribute, parent, key, delta, context, to_blender)
 
         if to_blender:
             incoming_vertex_groups = update.data("vertex_groups")
-            updated_proxy.update_vertex_groups(object_datablock, incoming_vertex_groups, context)
+            updated_proxy._update_vertex_groups(attribute, incoming_vertex_groups, context)
         return updated_proxy

@@ -70,7 +70,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene = D.scenes[0]
         eevee_proxy = self.proxy._data["scenes"].search_one("Scene_0")._data["eevee"]
         eevee_proxy._data["gi_cubemap_resolution"] = "64"
-        eevee_proxy.save(scene, "eevee", self.proxy.context())
+        eevee_proxy.save(scene.eevee, scene, "eevee", self.proxy.context())
         self.assertEqual("64", scene.eevee.gi_cubemap_resolution)
 
     def test_write_bpy_property_group_scene_cycles(self):
@@ -78,7 +78,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene = D.scenes[0]
         cycles_proxy = self.proxy._data["scenes"].search_one("Scene_0")._data["cycles"]
         cycles_proxy._data["shading_system"] = True
-        cycles_proxy.save(scene, "cycles", self.proxy.context())
+        cycles_proxy.save(scene.cycles, scene, "cycles", self.proxy.context())
         self.assertEqual(True, scene.cycles.shading_system)
 
     @unittest.skip("Mesh currently restricted to Mesh.name")
@@ -95,7 +95,7 @@ class TestWriteAttribute(unittest.TestCase):
         co_proxy[1] *= 2
         co_proxy[2] *= 2
 
-        vertices_proxy.save(cube, "vertices", self.proxy.context())
+        vertices_proxy.save(cube.vertices, cube, "vertices", self.proxy.context())
         self.assertListEqual(list(cube.vertices[0].co[0:3]), co_proxy[0:3].tolist())
 
     # explicit test per data type , including addition in collections
@@ -104,15 +104,14 @@ class TestWriteAttribute(unittest.TestCase):
         # Write a whole scene datablock
         light_name = "Light"
         light = D.lights[light_name]
-        light_type = light.type
         light_proxy = self.proxy.data("lights").search_one(light_name)
 
         light.name = "light_bak"
         light_bak = D.lights["light_bak"]
 
-        light = D.lights.new(light_name, light_type)
-        light_proxy.save(D.lights, light_name, self.proxy.context())
-        self.assertEqual(D.lights[light_name], light_bak)
+        light_proxy._datablock_uuid = "__" + light_proxy._datablock_uuid
+        datablock, _ = light_proxy.create_standalone_datablock(self.proxy.context())
+        self.assertEqual(datablock, light_bak)
 
     def test_write_datablock_world(self):
         # Write a whole scene datablock
@@ -124,8 +123,11 @@ class TestWriteAttribute(unittest.TestCase):
         world_bak = D.worlds["world_bak"]
 
         world = D.worlds.new(world_name)
-        world_proxy.save(D.worlds, world_name, self.proxy.context())
-        self.assertEqual(D.worlds[world_name], world_bak)
+
+        world_proxy._datablock_uuid = "__" + world_proxy._datablock_uuid
+        datablock, _ = world_proxy.create_standalone_datablock(self.proxy.context())
+
+        self.assertEqual(datablock, world_bak)
 
     def test_write_array_curvemap(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
@@ -145,8 +147,8 @@ class TestWriteAttribute(unittest.TestCase):
         light = None
 
         light_proxy = self.proxy.data("lights").search_one(light_name)
-        light_proxy.save(D.lights, light_name, self.proxy.context())
-        light = D.lights[light_name]
+        light_proxy._datablock_uuid = "__" + light_proxy._datablock_uuid
+        light, _ = light_proxy.create_standalone_datablock(self.proxy.context())
         curve = light.falloff_curve.curves[0]
         for i, point in enumerate(points):
             for clone, expected in zip(curve.points[i].location, point):
@@ -171,9 +173,8 @@ class TestWriteAttribute(unittest.TestCase):
         light = None
 
         light_proxy = self.proxy.data("lights").search_one(light_name)
-
-        light_proxy.save(D.lights, light_name, self.proxy.context())
-        light = D.lights[light_name]
+        light_proxy._datablock_uuid = "__" + light_proxy._datablock_uuid
+        light, _ = light_proxy.create_standalone_datablock(self.proxy.context())
 
         dst_curve = light.falloff_curve.curves[0]
         self.assertEqual(len(src_points), len(dst_curve.points))
@@ -187,8 +188,8 @@ class TestWriteAttribute(unittest.TestCase):
         self.assertEqual(len(dst_points), len(dst_curve.points))
 
         # restore again, save needs to shrink
-        light_proxy.save(D.lights, light_name, self.proxy.context())
-        light = D.lights[light_name]
+        light_proxy._datablock_uuid = "__" + light_proxy._datablock_uuid
+        light, _ = light_proxy.create_standalone_datablock(self.proxy.context())
 
         dst_curve = light.falloff_curve.curves[0]
         self.assertEqual(len(src_points), len(dst_curve.points))
@@ -202,7 +203,6 @@ class TestWriteAttribute(unittest.TestCase):
 
         light_name = "Light"
         light = D.lights["Light"]
-        light_type = light.type
         # extend the source curvemap to 3 points
         src_points = [(0.111, 0.222), (0.333, 0.444), (0.555, 0.666)]
         curve0 = light.falloff_curve.curves[0]
@@ -215,12 +215,12 @@ class TestWriteAttribute(unittest.TestCase):
 
         light.name = "light_bak"
 
-        light = D.lights.new(light_name, light_type)
-
         # the dst curvemap has 2 points by default
         # save() needs to extend
         light_proxy = self.proxy.data("lights").search_one(light_name)
-        light_proxy.save(D.lights, light_name, self.proxy.context())
+        light_proxy._datablock_uuid = "__" + light_proxy._datablock_uuid
+        light, _ = light_proxy.create_standalone_datablock(self.proxy.context())
+
         dst_curve = light.falloff_curve.curves[0]
         self.assertEqual(len(src_points), len(dst_curve.points))
         for i, point in enumerate(src_points):
@@ -237,8 +237,9 @@ class TestWriteAttribute(unittest.TestCase):
         scene.name = "scene_bak"
         scene_bak = D.scenes["scene_bak"]
 
-        scene_proxy.save(D.scenes, scene_name, self.proxy.context())
-        self.assertEqual(D.scenes[scene_name], scene_bak)
+        scene_proxy._datablock_uuid = "__" + scene_proxy._datablock_uuid
+        datablock, _ = scene_proxy.create_standalone_datablock(self.proxy.context())
+        self.assertEqual(datablock, scene_bak)
 
     def test_write_datablock_reference_scene_world(self):
         # just write the Scene.world attribute
@@ -253,12 +254,12 @@ class TestWriteAttribute(unittest.TestCase):
         scene.world = None
         assert scene.world != expected_world
 
-        world_ref_proxy.save(scene, "world", self.proxy.context())
+        world_ref_proxy.save(scene.world, scene, "world", self.proxy.context())
         self.assertEqual(scene.world, expected_world)
 
     def test_write_datablock_with_reference_camera_dof_target(self):
         # Write the whole camera datablock, including its reference to dof target
-
+        # test_write.TestWriteAttribute.test_write_datablock_with_reference_camera_dof_target
         camera_name = "Camera_0"
         camera = D.cameras[camera_name]
 
@@ -271,5 +272,6 @@ class TestWriteAttribute(unittest.TestCase):
         camera.name = "camera_bak"
 
         camera_proxy = self.proxy.data("cameras").search_one(camera_name)
-        camera_proxy.save(D.cameras, camera_name, self.proxy.context())
-        self.assertEqual(D.cameras[camera_name].dof.focus_object, focus_object)
+        camera_proxy._datablock_uuid = "__" + camera_proxy._datablock_uuid
+        datablock, _ = camera_proxy.create_standalone_datablock(self.proxy.context())
+        self.assertEqual(datablock.dof.focus_object, focus_object)

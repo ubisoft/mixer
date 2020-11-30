@@ -29,7 +29,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data.attributes import read_attribute
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
-from mixer.blender_data.proxy import DeltaUpdate, Proxy
+from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
 from mixer.blender_data.type_helpers import bases_of
 
 if TYPE_CHECKING:
@@ -52,7 +52,7 @@ class DatablockRefProxy(Proxy):
         self._datablock_uuid: str = None
         # Not used but "required" by the json codec
         self._data: Dict[str, Any] = {}
-        self._bpy_data_collection: str = None
+        self._bpy_data_collection: str = ""
         self._initial_name: str = None
 
         self._debug_name = None
@@ -85,49 +85,59 @@ class DatablockRefProxy(Proxy):
         self._debug_name = str(datablock)
         return self
 
-    def save(self, container: Union[T.ID, T.bpy_prop_collection], key: str, context: Context):
+    def save(
+        self,
+        unused_attribute,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        context: Context,
+    ):
         """
-        Save the datablock reference represented by this proxy into a datablock member (Scene.camera)
-        or a collection item (Scene.collection.children["Collection"])
+        Save the datablock reference tracked by this proxy into parent.key or parent[key]
+
+        Args:
+            unused_attribute:
+            parent: the structure or collection that contains the target reference (e.g. a Scene instance)
+            key: the name of the bpy_collection (e.g "camera")
+            context: the proxy and visit state
         """
         ref_target = self.target(context)
-        # make sure to differentiate actual None value and unresolved ref
         if ref_target is None:
-            logger.info(f"Unresolved reference {container}.{key} -> {self.display_string()}]")
-        if isinstance(container, T.bpy_prop_collection):
+            logger.info(f"Unresolved reference {parent}.{key} -> {self.display_string()}]")
+
+        if isinstance(parent, T.bpy_prop_collection):
             # reference stored in a collection
             # is there a case for this is is always link() in DatablockCollectionProxy ?
             if isinstance(key, str):
                 try:
                     if ref_target is None:
                         context.proxy_state.unresolved_refs.append(
-                            self.mixer_uuid, lambda datablock: container.__setitem__(key, datablock)
+                            self.mixer_uuid, lambda datablock: parent.__setitem__(key, datablock)
                         )
                     else:
-                        container[key] = ref_target
+                        parent[key] = ref_target
                 except TypeError as e:
                     logger.warning(
-                        f"DatablockRefProxy.save() exception while saving {ref_target} into {container}[{key}]..."
+                        f"DatablockRefProxy.save() exception while saving {ref_target} into {parent}[{key}]..."
                     )
                     logger.warning(f"...{e!r}")
             else:
                 # is there a case for this ?
-                logger.warning(
-                    f"Not implemented: DatablockRefProxy.save() for IDRef into collection {container}[{key}]"
-                )
+                logger.warning(f"Not implemented: DatablockRefProxy.save() for IDRef into collection {parent}[{key}]")
         else:
+            assert isinstance(key, str)
             # reference stored in a struct (e.g. Object.parent)
-            if not container.bl_rna.properties[key].is_readonly:
+            if not parent.bl_rna.properties[key].is_readonly:
                 try:
                     # This is what saves Camera.dof.focus_object
                     if ref_target is None:
                         context.proxy_state.unresolved_refs.append(
-                            self.mixer_uuid, lambda datablock: setattr(container, key, datablock)
+                            self.mixer_uuid, lambda datablock: setattr(parent, key, datablock)
                         )
                     else:
-                        setattr(container, key, ref_target)
+                        setattr(parent, key, ref_target)
                 except Exception as e:
-                    logger.warning(f"write attribute skipped {key} for {container}...")
+                    logger.warning(f"write attribute skipped {key} for {parent}...")
                     logger.warning(f" ...Error: {repr(e)}")
 
     def target(self, context: Context) -> Optional[T.ID]:
@@ -163,9 +173,10 @@ class DatablockRefProxy(Proxy):
 
     def apply(
         self,
-        parent: Any,
+        attribute,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: Union[int, str],
-        delta: Optional[DeltaUpdate],
+        delta: Delta,
         context: Context,
         to_blender: bool = True,
     ) -> Union[NonePtrProxy, DatablockRefProxy]:

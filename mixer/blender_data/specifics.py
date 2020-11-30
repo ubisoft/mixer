@@ -700,7 +700,7 @@ def _diff_must_replace_always(
 def _diff_must_replace_vertex_groups(
     collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
 ) -> bool:
-    # Full replace if anything has changed is easier to cope with in ObjectProxy.update_vertex_groups()
+    # Full replace if anything has changed is easier to cope with in ObjectProxy._update_vertex_groups()
     return (
         any((bl_item.name != proxy.data("name") for bl_item, proxy in zip(collection, sequence)))
         or any((bl_item.index != proxy.data("index") for bl_item, proxy in zip(collection, sequence)))

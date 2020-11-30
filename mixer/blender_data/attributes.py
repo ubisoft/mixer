@@ -101,9 +101,10 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
 
         if issubclass(attr_type, T.ID):
             if attr.is_embedded_data:
+                # TODO probably better to use a StructProxy : all DatablockProxy would be standalone
                 from mixer.blender_data.datablock_proxy import DatablockProxy
 
-                return DatablockProxy.make(attr_property).load(attr, key, context)
+                return DatablockProxy.make(attr_property).load(attr, context)
             else:
                 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
@@ -126,22 +127,36 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
         context.visit_state.recursion_guard.pop()
 
 
-def write_attribute(bl_instance, key: Union[str, int], value: Any, context: Context):
+def write_attribute(
+    parent: Union[T.bpy_struct, T.bpy_prop_collection], key: Union[str, int], value: Any, context: Context
+):
     """
-    Write a value into a Blender property
-    """
-    # Like in apply_attribute parent and key are needed to specify a L-value
-    if bl_instance is None:
-        logger.warning("unexpected write None attribute")
-        return
+    Write value into parent.key or parent[key].
 
+    If value is a Python builtin or the proxy of a bpy_struct, it will be saved into parent.key. If value is a proxy
+    of a bpy_prop_collection, it will be saved into parent[key].
+
+    Args:
+        parent: that Blender attribute that contains the target attribute
+        key: an index of member name that identifies the target attribute
+        value: the proxy or python builtin value to save parent[key] or parent[key]
+        context: proxy and visit state
+    """
+    # Like in apply_attribute parent and key are needed to specify a L-value in setattr()
     try:
         if isinstance(value, Proxy):
-            value.save(bl_instance, key, context)
-        else:
-            assert type(key) is str
+            if isinstance(key, int):
+                target = parent[key]
+            elif isinstance(parent, T.bpy_prop_collection):
+                target = parent.get(key)
+            else:
+                target = getattr(parent, key, None)
 
-            prop = bl_instance.bl_rna.properties.get(key)
+            value.save(target, parent, key, context)
+        else:
+            assert isinstance(key, str)
+
+            prop = parent.bl_rna.properties.get(key)
             if prop is None:
                 # Don't log this, too many messages
                 # f"Attempt to write to non-existent attribute {bl_instance}.{key} : skipped"
@@ -149,64 +164,80 @@ def write_attribute(bl_instance, key: Union[str, int], value: Any, context: Cont
 
             if not prop.is_readonly:
                 try:
-                    setattr(bl_instance, key, value)
+                    setattr(parent, key, value)
                 except TypeError as e:
                     # common for enum that have unsupported default values, such as FFmpegSettings.ffmpeg_preset,
                     # which seems initialized at "" and triggers :
                     #   TypeError('bpy_struct: item.attr = val: enum "" not found in (\'BEST\', \'GOOD\', \'REALTIME\')')
-                    logger.info(f"write attribute skipped {bl_instance}.{key}...")
+                    logger.info(f"write attribute skipped {parent}.{key}...")
                     logger.info(f" ...Exception: {repr(e)}")
 
     except TypeError:
         # common for enum that have unsupported default values, such as FFmpegSettings.ffmpeg_preset,
         # which seems initialized at "" and triggers :
         #   TypeError('bpy_struct: item.attr = val: enum "" not found in (\'BEST\', \'GOOD\', \'REALTIME\')')
-        logger.warning(f"write attribute skipped {bl_instance}.{key}...")
+        logger.warning(f"write attribute skipped {parent}.{key}...")
         for line in traceback.format_exc().splitlines():
             logger.warning(f" ... {line}")
     except AttributeError as e:
-        if isinstance(bl_instance, bpy.types.Collection) and bl_instance.name == "Master Collection" and key == "name":
+        if isinstance(parent, bpy.types.Collection) and parent.name == "Master Collection" and key == "name":
             pass
         else:
-            logger.warning(f"write attribute skipped {bl_instance}.{key}...")
+            logger.warning(f"write attribute skipped {parent}.{key}...")
             logger.warning(f" ...Exception: {repr(e)}")
 
     except Exception:
-        logger.warning(f"write attribute skipped {bl_instance}.{key}...")
+        logger.warning(f"write attribute skipped {parent}.{key}...")
         for line in traceback.format_exc().splitlines():
             logger.warning(f" ... {line}")
 
 
-def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, context: Context, to_blender=True) -> Any:
+def apply_attribute(
+    parent: Union[T.bpy_struct, T.bpy_prop_collection],
+    key: Union[str, int],
+    current_proxy_value: Any,
+    delta: Delta,
+    context: Context,
+    to_blender=True,
+) -> Any:
     """
-    Applies a delta to the Blender attribute identified by bl_instance.key or bl_instance[key]
+    Applies a delta to the Blender attribute identified by parent.key or parent[key]
 
     Args:
-        parent:
-        key:
-        proxy_value:
-        delta:
+        parent: the attribute that contains the Blender attribute to update
+        key: the identifier of the attribute to update inside parent
+        current_value: the current proxy value
+        delta: the delta to apply
+        context: proxy and visit state
+        to_blender: update the managed Blender attribute in addition to current_proxy_value
 
-    Returns: a value to store into the updated proxy
+    Returns:
+        a value to store into the updated proxy
     """
 
     # Like in write_attribute parent and key are needed to specify a L-value
     # assert type(delta) == DeltaUpdate
 
-    value = delta.value
+    delta_value = delta.value
     # assert proxy_value is None or type(proxy_value) == type(value)
 
     try:
-        if isinstance(proxy_value, Proxy):
-            return proxy_value.apply(parent, key, delta, context, to_blender)
+        if isinstance(current_proxy_value, Proxy):
+            if isinstance(key, int):
+                target = parent[key]
+            elif isinstance(parent, T.bpy_prop_collection):
+                target = parent.get(key)
+            else:
+                target = getattr(parent, key, None)
+            return current_proxy_value.apply(target, parent, key, delta, context, to_blender)
         else:
             if to_blender:
                 # try is less costly than fetching the property to find if the attribute is readonly
                 if isinstance(key, int):
-                    parent[key] = value
+                    parent[key] = delta_value
                 else:
                     try:
-                        setattr(parent, key, value)
+                        setattr(parent, key, delta_value)
                     except AttributeError as e:
                         # most likely an addon (runtime) attribute that exists on the sender but no on this
                         # receiver or a readonbly attribute that should be filtered out
@@ -214,7 +245,7 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, con
                         logger.info(f"apply_attribute: exception for {parent} {key}")
                         logger.info(f"... exception {e!r})")
 
-            return value
+            return delta_value
 
     except Exception as e:
         logger.warning(f"apply_attribute: exception for {parent} {key}")
