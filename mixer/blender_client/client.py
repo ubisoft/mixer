@@ -1280,7 +1280,6 @@ def send_scene_content():
         # cause to reenter send_scene_data_to_server() and send duplicate messages
 
         share_data.clear_before_state()
-        share_data.init_proxy()
         share_data.client.send_group_begin()
 
         timer = time.monotonic()

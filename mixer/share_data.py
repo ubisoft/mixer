@@ -395,12 +395,6 @@ class ShareData:
             x.name_full: x.parent.name_full if x.parent is not None else "" for x in self.blender_objects.values()
         }
 
-    def init_proxy(self):
-        if not self.use_vrtist_protocol():
-            # default, not safe
-            # the initialisation must initialize reference target for all useful collections (except screens, ...)
-            self.bpy_data_proxy.initialize_ref_targets(test_properties)
-
     def set_vrtist_protocol(self, vrtist_protocol: bool):
         if not vrtist_protocol:
             logger.warning("Generic protocol sync in ON")

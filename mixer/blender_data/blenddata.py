@@ -173,12 +173,6 @@ class BlendData:
     def bpy_collection(self, collection_name: str) -> T.bpy_prop_collection:
         return self._collections.get(collection_name).bpy_collection()
 
-    def bl_collection_name_from_inner_identifier(self, type_identifier: str) -> str:
-        """
-        Blenddata collection from the name of the inner type (e.g. 'Object', 'Light')
-        """
-        return self._collections_name_from_inner_identifier[type_identifier]
-
     def bl_collection_name_from_ID(self, id: T.ID) -> str:  # noqa N802
         """
         Blenddata collection from an Id.

@@ -67,21 +67,6 @@ class DatablockCollectionProxy(Proxy):
         collection = getattr(bpy.data, self._name)
         datablocks.update({datablock.mixer_uuid: datablock for datablock in collection})
 
-    def load(self, bl_collection: bpy.types.bpy_prop_collection, key: str, context: Context):  # noqa N802
-        """
-        FOR TESTS ONLY Load bl_collection elements as standalone datablocks.
-        """
-        for datablock in bl_collection.values():
-            collection_name = BlendData.instance().bl_collection_name_from_ID(datablock)
-            if skip_bpy_data_item(collection_name, datablock):
-                continue
-            uuid = ensure_uuid(datablock)
-            self._data[uuid] = DatablockProxy.make(datablock).load(
-                datablock, context, bpy_data_collection_name=collection_name
-            )
-
-        return self
-
     def save(self, attribute: bpy.type.Collection, parent: Any, key: str, context: Context):
         """
         OBSOLETE Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data

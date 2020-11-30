@@ -180,40 +180,14 @@ class BpyDataProxy(Proxy):
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}
 
-    def initialize_ref_targets(self, synchronized_properties: SynchronizedProperties):
-        """Keep track of all bpy.data items so that loading recognizes references to them
-
-        Call this before updating the proxy from send_scene_content. It is not needed on the
-        receiver side.
-
-        TODO check is this is actually required or if we can rely upon is_embedded_data being False
-        """
-        # Normal operation no more involve BpyDataProxy.load() ad initial synchronization behaves
-        # like a creation. The current load_as_what() implementation relies on root_ids to determine if
-        # a T.ID must ne loaded as an IDRef (pointer to bpy.data) or an IDDef (pointer to an "owned" ID).
-        # so we need to load all the root_ids before loading anything into the proxy.
-        # However, root_ids may no more be required if we can load all the proxies inside out (deepmost first, i.e
-        # (Mesh, Metaball, ..), then Object, the Scene). This should be possible as as we sort
-        # the updates inside out in update() to the receiver gets them in order
-        for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
-            if name in collection_name_to_type:
-                # TODO use BlendData
-                bl_collection = getattr(bpy.data, name)
-                for _id_name, item in bl_collection.items():
-                    uuid = ensure_uuid(item)
-                    self.state.datablocks[uuid] = item
-
     def load(self, synchronized_properties: SynchronizedProperties):
         """FOR TESTS ONLY Load the current scene into this proxy
 
         Only used for test. The initial load is performed by update()
         """
-        self.initialize_ref_targets(synchronized_properties)
-        context = self.context(synchronized_properties)
-
-        for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
-            collection = getattr(bpy.data, name)
-            self._data[name] = DatablockCollectionProxy(name).load(collection, name, context)
+        diff = BpyBlendDiff()
+        diff.diff(self, synchronized_properties)
+        self.update(diff, {}, False, synchronized_properties)
         return self
 
     def find(self, collection_name: str, key: str) -> Optional[DatablockProxy]:

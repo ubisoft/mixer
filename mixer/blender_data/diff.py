@@ -153,8 +153,7 @@ class BpyBlendDiff:
                 self._collection_deltas.append((collection_name, delta))
 
         # Before this change:
-        # Only datablocks handled by the generic synchronization system get a uuid, either from
-        # BpyDataProxy.initialize_ref_targets() during room creation, or later during diff processing.
+        # Only datablocks handled by the generic synchronization system get a uuid.
         # Datablocks of unhandled types get no uuid and DatablockRefProxy references to them are incorrect.
         # What is more, this means trouble for tests since datablocks of unhandled types are assigned
         # a uuid during the message grabbing, which means that they get different uuids on both ends.
