@@ -99,13 +99,14 @@ class NodeLinksProxy(StructCollectionProxy):
         struct_update = struct_delta.value
         self._sequence = struct_update._sequence
 
+        node_tree = getattr(parent, key)
         # update Blender
         if to_blender:
-            self.save(parent, key, context)
+            self.save(node_tree, parent, key, context)
 
-        node_tree = getattr(parent, key)
         if node_tree is None:
             return None
+
         return self
 
     def diff(self, links: T.NodeLinks, key, prop, context: Context) -> Optional[DeltaUpdate]:

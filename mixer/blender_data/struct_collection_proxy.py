@@ -170,7 +170,7 @@ class StructCollectionProxy(Proxy):
             self._sequence = update._sequence
             if to_blender:
                 specifics.truncate_collection(collection, 0)
-                self.save(parent, key, context)
+                self.save(collection, parent, key, context)
         else:
             # a sparse update
 
