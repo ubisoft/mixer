@@ -30,7 +30,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
-from mixer.blender_data.proxy import DeltaAddition, DeltaReplace, DeltaUpdate
+from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaReplace, DeltaUpdate
 from mixer.blender_data.proxy import Proxy
 from mixer.blender_data.struct_proxy import StructProxy
 
@@ -151,20 +151,29 @@ class StructCollectionProxy(Proxy):
             context.visit_state.path.pop()
 
     def apply(
-        self, parent: Any, key: Union[int, str], delta: DeltaUpdate, context: Context, to_blender=True
+        self,
+        collection: T.bpy_prop_collection,
+        parent: T.bpy_struct,
+        key: Union[int, str],
+        delta: Delta,
+        context: Context,
+        to_blender=True,
     ) -> StructCollectionProxy:
+        """
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
 
-        assert isinstance(key, (int, str))
+        Args:
+            attribute: the collection to update (e.g. a_mesh.material)
+            parent: the attribute that contains attribute (e.g. a a Mesh instance)
+            key: the key that identifies attribute in parent (e.g "materials")
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
+        """
+        assert isinstance(key, str)
 
         update = delta.value
         assert type(update) == type(self)
-        # TODO duplicate code in StructProxy.apply()
-        if isinstance(key, int):
-            collection = parent[key]
-        elif isinstance(parent, T.bpy_prop_collection):
-            collection = parent.get(key)
-        else:
-            collection = getattr(parent, key, None)
 
         if isinstance(delta, DeltaReplace):
             self._sequence = update._sequence

@@ -43,7 +43,8 @@ class Datablock(DifferentialApply):
         self.scene.audio_volume = 0.0
 
         # apply the diff
-        self.scene_proxy.apply(bpy.data.scenes, self.scene.name, delta, self.proxy.context())
+        scene = bpy.data.scenes[self.scene.name]
+        self.scene_proxy.apply(scene, bpy.data.scenes, self.scene.name, delta, self.proxy.context())
         self.assertEqual(self.scene.audio_volume, 0.5)
 
     def test_struct_builtin(self):
@@ -65,7 +66,8 @@ class Datablock(DifferentialApply):
         self.scene.eevee.use_bloom = False
 
         # apply the diff
-        self.scene_proxy.apply(bpy.data.scenes, self.scene.name, delta, self.proxy.context())
+        scene = bpy.data.scenes[self.scene.name]
+        self.scene_proxy.apply(scene, bpy.data.scenes, self.scene.name, delta, self.proxy.context())
         self.assertEqual(self.scene.eevee.use_bloom, True)
 
 
@@ -94,7 +96,8 @@ class StructDatablockRef(DifferentialApply):
         self.scene.world = None
 
         # apply the diff
-        self.scene_proxy.apply(bpy.data.scenes, self.scene.name, delta, self.proxy.context())
+        scene = bpy.data.scenes[self.scene.name]
+        self.scene_proxy.apply(scene, bpy.data.scenes, self.scene.name, delta, self.proxy.context())
         self.assertEqual(self.scene.eevee.use_bloom, True)
 
     def test_update(self):
@@ -116,7 +119,8 @@ class StructDatablockRef(DifferentialApply):
         self.scene.world = world1
 
         # apply the diff
-        self.scene_proxy.apply(bpy.data.scenes, self.scene.name, delta, self.proxy.context())
+        scene = bpy.data.scenes[self.scene.name]
+        self.scene_proxy.apply(scene, bpy.data.scenes, self.scene.name, delta, self.proxy.context())
         self.assertEqual(self.scene.world, world2)
 
     @unittest.skip("Need BpyIDRefNoneProxy")
@@ -177,7 +181,8 @@ class Collection(DifferentialApply):
         # then BpyDataProxy.update()
         self.proxy.load(test_properties)
 
-        self.scene_proxy.apply(bpy.data.scenes, self.scene.name, scene_delta, self.proxy.context())
+        scene = bpy.data.scenes[self.scene.name]
+        self.scene_proxy.apply(scene, bpy.data.scenes, self.scene.name, scene_delta, self.proxy.context())
 
         self.assertIn("Unchanged0", self.scene.collection.objects)
         self.assertIn("Unchanged1", self.scene.collection.objects)
@@ -220,7 +225,8 @@ class Collection(DifferentialApply):
         view_new = views["New"]
         views.remove(view_new)
 
-        self.scene_proxy.apply(bpy.data.scenes, self.scene.name, scene_delta, self.proxy.context())
+        scene = bpy.data.scenes[self.scene.name]
+        self.scene_proxy.apply(scene, bpy.data.scenes, self.scene.name, scene_delta, self.proxy.context())
         self.assertIn("New", views)
         self.assertIn("left", views)
         self.assertEqual(views["left"].file_suffix, "new_suffix")
@@ -258,7 +264,8 @@ class Collection(DifferentialApply):
         points0.new(0.5, 0.5)
         points1.remove(points1[2])
 
-        self.scene_proxy.apply(bpy.data.scenes, self.scene.name, scene_delta, self.proxy.context())
+        scene = bpy.data.scenes[self.scene.name]
+        self.scene_proxy.apply(scene, bpy.data.scenes, self.scene.name, scene_delta, self.proxy.context())
         self.assertEqual(len(points0), 2)
         self.assertEqual(list(points0[0].location), [0.0, 0.0])
         self.assertEqual(list(points0[1].location), [1.0, 1.0])
@@ -301,7 +308,7 @@ class Aos(DifferentialApply):
         # reset mesh state
         mesh.vertices[0].co = (0.0, 1.0, 2.0)
 
-        mesh_proxy.apply(bpy.data.meshes, mesh.name, mesh_delta, self.proxy.context())
+        mesh_proxy.apply(bpy.data.meshes[mesh.name], bpy.data.meshes, mesh.name, mesh_delta, self.proxy.context())
 
         vertices = [list(vertex.co) for vertex in mesh.vertices]
         self.assertEqual(vertices, expected_vertices)

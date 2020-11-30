@@ -29,7 +29,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data.attributes import read_attribute
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
-from mixer.blender_data.proxy import DeltaUpdate, Proxy
+from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
 from mixer.blender_data.type_helpers import bases_of
 
 if TYPE_CHECKING:
@@ -173,9 +173,10 @@ class DatablockRefProxy(Proxy):
 
     def apply(
         self,
-        parent: Any,
+        attribute,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: Union[int, str],
-        delta: DeltaUpdate,
+        delta: Delta,
         context: Context,
         to_blender: bool = True,
     ) -> Union[NonePtrProxy, DatablockRefProxy]:

@@ -192,36 +192,52 @@ def write_attribute(
             logger.warning(f" ... {line}")
 
 
-def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, context: Context, to_blender=True) -> Any:
+def apply_attribute(
+    parent: Union[T.bpy_struct, T.bpy_prop_collection],
+    key: Union[str, int],
+    current_proxy_value: Any,
+    delta: Delta,
+    context: Context,
+    to_blender=True,
+) -> Any:
     """
-    Applies a delta to the Blender attribute identified by bl_instance.key or bl_instance[key]
+    Applies a delta to the Blender attribute identified by parent.key or parent[key]
 
     Args:
-        parent:
-        key:
-        proxy_value:
-        delta:
+        parent: the attribute that contains the Blender attribute to update
+        key: the identifier of the attribute to update inside parent
+        current_value: the current proxy value
+        delta: the delta to apply
+        context: proxy and visit state
+        to_blender: update the managed Blender attribute in addition to current_proxy_value
 
-    Returns: a value to store into the updated proxy
+    Returns:
+        a value to store into the updated proxy
     """
 
     # Like in write_attribute parent and key are needed to specify a L-value
     # assert type(delta) == DeltaUpdate
 
-    value = delta.value
+    delta_value = delta.value
     # assert proxy_value is None or type(proxy_value) == type(value)
 
     try:
-        if isinstance(proxy_value, Proxy):
-            return proxy_value.apply(parent, key, delta, context, to_blender)
+        if isinstance(current_proxy_value, Proxy):
+            if isinstance(key, int):
+                target = parent[key]
+            elif isinstance(parent, T.bpy_prop_collection):
+                target = parent.get(key)
+            else:
+                target = getattr(parent, key, None)
+            return current_proxy_value.apply(target, parent, key, delta, context, to_blender)
         else:
             if to_blender:
                 # try is less costly than fetching the property to find if the attribute is readonly
                 if isinstance(key, int):
-                    parent[key] = value
+                    parent[key] = delta_value
                 else:
                     try:
-                        setattr(parent, key, value)
+                        setattr(parent, key, delta_value)
                     except AttributeError as e:
                         # most likely an addon (runtime) attribute that exists on the sender but no on this
                         # receiver or a readonbly attribute that should be filtered out
@@ -229,7 +245,7 @@ def apply_attribute(parent, key: Union[str, int], proxy_value, delta: Delta, con
                         logger.info(f"apply_attribute: exception for {parent} {key}")
                         logger.info(f"... exception {e!r})")
 
-            return value
+            return delta_value
 
     except Exception as e:
         logger.warning(f"apply_attribute: exception for {parent} {key}")

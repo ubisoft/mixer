@@ -176,12 +176,25 @@ class Proxy:
 
     def apply(
         self,
-        parent: Any,
+        attribute: Any,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: Union[int, str],
-        delta: DeltaUpdate,
+        delta: Delta,
         context: Context,
         to_blender: bool = True,
     ) -> Proxy:
+        """
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
+
+        TODO The parameters parent and key should not be required
+        Args:
+            attribute: the Blender attribute to update
+            parent: the attribute that contains attribute
+            key: the key that identifies attribute in parent
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
+        """
         raise NotImplementedError(f"Proxy.apply() for {parent}[{key}]")
 
     def diff(

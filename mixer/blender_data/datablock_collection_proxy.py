@@ -33,7 +33,7 @@ from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.diff import BpyDataCollectionDiff
-from mixer.blender_data.proxy import DeltaUpdate, DeltaAddition, DeltaDeletion, MaxDepthExceeded
+from mixer.blender_data.proxy import Delta, DeltaUpdate, DeltaAddition, DeltaDeletion, MaxDepthExceeded
 from mixer.blender_data.proxy import ensure_uuid, Proxy
 
 if TYPE_CHECKING:
@@ -314,28 +314,28 @@ class DatablockRefCollectionProxy(Proxy):
 
     def apply(
         self,
+        collection: T.bpy_prop_collection,
         parent: T.Collection,
-        key: str,
-        delta: DeltaUpdate,
+        key: Union[int, str],
+        delta: Delta,
         context: Context,
         to_blender: bool = True,
     ) -> DatablockRefCollectionProxy:
         """
-        Apply a received Delta to this proxy.
-
-        This method is only applicable if this is a proxy to a collection of datablock references
-        like Scene.collection.objects, because changes to bpy.data are processed by xxx_datablock() methods.
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
 
         Args:
-            parent: the Collection to update
-            key: the name of the attribute in parent
+            attribute: a bpy_prop_collection of datablock references with link/unlink API (e.g. a_collection.objects)
+            parent: the attribute that contains attribute (e.g. a Collection instance)
+            key: the name of the bpy_collection in parent (e.g "objects")
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
         """
-
         update: DatablockRefCollectionProxy = delta.value
         assert type(update) == type(self)
 
         # objects or children
-        collection = getattr(parent, key)
         for k, ref_delta in update._data.items():
             try:
                 if not isinstance(ref_delta, (DeltaAddition, DeltaDeletion)):

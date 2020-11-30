@@ -107,20 +107,36 @@ class AosProxy(Proxy):
             context.visit_state.path.pop()
 
     def apply(
-        self, parent: T.bpy_struct, key: str, delta: DeltaUpdate, context: Context, to_blender=True
-    ) -> Optional[AosProxy]:
-        struct_update = delta.value
+        self,
+        attribute: T.bpy_prop_collection,
+        parent: T.bpy_struct,
+        key: Union[int, str],
+        delta: Delta,
+        context: Context,
+        to_blender=True,
+    ) -> AosProxy:
+        """
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
 
-        aos = getattr(parent, key)
+        Args:
+            attribute: a collection of bpy_struct (e.g. a_Mesh_instance.vertices)
+            parent: the attribute that contains attribute (e.g. a Mesh instance)
+            key: the name of the bpy_collection in parent (e.g "vertices")
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
+        """
+
+        struct_update = delta.value
 
         context.visit_state.path.append(key)
         try:
             self._aos_length = struct_update._aos_length
-            specifics.fit_aos(aos, self, context)
+            specifics.fit_aos(attribute, self, context)
             for k, member_delta in struct_update._data.items():
                 current_value = self.data(k)
                 if current_value is not None:
-                    self._data[k] = current_value.apply(aos, k, member_delta, to_blender)
+                    self._data[k] = current_value.apply(None, attribute, k, member_delta, to_blender)
         finally:
             context.visit_state.path.pop()
         return self

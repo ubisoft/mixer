@@ -331,20 +331,20 @@ class DatablockProxy(StructProxy):
 
         try:
             context.visit_state.datablock_proxy = self
-            self.apply(self.collection, datablock.name, delta, context)
+            self.apply(datablock, self.collection, datablock.name, delta, context)
         finally:
             context.visit_state.datablock_proxy = None
 
         return datablock
 
-    def save(self, datablock: T.ID, parent: T.bpy_struct, key: str, context: Context) -> T.ID:
+    def save(self, datablock: T.ID, unused_parent: T.bpy_struct, unused_key: str, context: Context) -> T.ID:
         """
         Save this proxy into an embedded datablock
 
         Args:
             datablock: the datablock into which this proxy is saved
-            parent: the struct that contains the embedded datablock (e.g. a Scene)
-            key: the member name of the datablock in parent (e.g. node_tree)
+            unused_parent: the struct that contains the embedded datablock (e.g. a Scene)
+            unused_key: the member name of the datablock in parent (e.g. node_tree)
             context: proxy and visit state
 
         Returns:
@@ -353,11 +353,10 @@ class DatablockProxy(StructProxy):
 
         # TODO it might be better to load embedded datablocks as StructProxy and remove this method
         # assert self.is_embedded_data, f"save: called {parent}[{key}], which is not standalone"
-        assert isinstance(key, str), f"save: {parent} unexpected type for key : {type(key)}"
 
         target = self._pre_save(datablock, context)
         if target is None:
-            logger.warning(f"DatablockProxy.save() {parent}.{key} is None")
+            logger.error(f"DatablockProxy.save() get None after _pre_save({datablock})")
             return None
 
         try:
@@ -376,11 +375,18 @@ class DatablockProxy(StructProxy):
         context: Context,
     ):
         """
-        Apply delta to this proxy, but do not update Blender state
-        """
+        Apply delta to this proxy without updating the value of the Blender attribute it manages.
 
+        This method is used in the depsgraph update callback, after the Blender attribute value has been updated by
+        the user.
+
+        Args:
+            datablock: the datablock that is managed by this proxy
+            delta: the delta to apply
+            context: proxy and visit state
+        """
         collection = getattr(bpy.data, self.collection_name)
-        self.apply(collection, datablock.name, delta, context, to_blender=False)
+        self.apply(datablock, collection, datablock.name, delta, context, to_blender=False)
 
     def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember]):
 

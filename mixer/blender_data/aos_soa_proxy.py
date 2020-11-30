@@ -190,8 +190,23 @@ class SoaElement(Proxy):
             logger.error(f"... exception {e!r}")
 
     def apply(
-        self, parent: T.bpy_prop_collection, key: str, delta: DeltaUpdate, context: Context, to_blender=True
+        self,
+        unused_attribute,
+        unused_parent: T.bpy_prop_collection,
+        unused_key: str,
+        delta: DeltaUpdate,
+        context: Context,
+        to_blender=True,
     ) -> SoaElement:
+
+        """
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
+
+        Args:
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
+        """
         update = delta.value
         if update is None:
             return self
