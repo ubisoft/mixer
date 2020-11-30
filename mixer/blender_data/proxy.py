@@ -159,11 +159,20 @@ class Proxy:
             return data.value
         return data
 
-    def save(self, bl_instance: Any, attr_name: str, context: Context):
+    def save(
+        self, attribute: Any, parent: Union[T.bpy_struct, T.bpy_prop_collection], key: Union[int, str], context: Context
+    ):
+        """Save this proxy into attribute, which is contained in parent[key] or parent.key
+
+        The attribute parameter is mainly needed to have a uniform API while ensuring that for any datablock,
+        a bpy.data collection is never searched by name, which would fail with libraries.
+
+        Args:
+            attribute: the attribute into which the proxy is saved.
+            parent: the attribute that contains attribute
+            key, the string or index that identifies attribute in parent
         """
-        Save this proxy into a blender object
-        """
-        logger.warning(f"Not implemented: save() for {self.__class__} {bl_instance}.{attr_name}")
+        raise NotImplementedError(f"Proxy.save() for {parent}[{key}]")
 
     def apply(
         self,

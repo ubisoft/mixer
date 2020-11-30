@@ -70,7 +70,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene = D.scenes[0]
         eevee_proxy = self.proxy._data["scenes"].search_one("Scene_0")._data["eevee"]
         eevee_proxy._data["gi_cubemap_resolution"] = "64"
-        eevee_proxy.save(scene, "eevee", self.proxy.context())
+        eevee_proxy.save(scene.eevee, scene, "eevee", self.proxy.context())
         self.assertEqual("64", scene.eevee.gi_cubemap_resolution)
 
     def test_write_bpy_property_group_scene_cycles(self):
@@ -78,7 +78,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene = D.scenes[0]
         cycles_proxy = self.proxy._data["scenes"].search_one("Scene_0")._data["cycles"]
         cycles_proxy._data["shading_system"] = True
-        cycles_proxy.save(scene, "cycles", self.proxy.context())
+        cycles_proxy.save(scene.cycles, scene, "cycles", self.proxy.context())
         self.assertEqual(True, scene.cycles.shading_system)
 
     @unittest.skip("Mesh currently restricted to Mesh.name")
@@ -95,7 +95,7 @@ class TestWriteAttribute(unittest.TestCase):
         co_proxy[1] *= 2
         co_proxy[2] *= 2
 
-        vertices_proxy.save(cube, "vertices", self.proxy.context())
+        vertices_proxy.save(cube.vertices, cube, "vertices", self.proxy.context())
         self.assertListEqual(list(cube.vertices[0].co[0:3]), co_proxy[0:3].tolist())
 
     # explicit test per data type , including addition in collections
@@ -104,7 +104,6 @@ class TestWriteAttribute(unittest.TestCase):
         # Write a whole scene datablock
         light_name = "Light"
         light = D.lights[light_name]
-        light_type = light.type
         light_proxy = self.proxy.data("lights").search_one(light_name)
 
         light.name = "light_bak"
@@ -204,7 +203,6 @@ class TestWriteAttribute(unittest.TestCase):
 
         light_name = "Light"
         light = D.lights["Light"]
-        light_type = light.type
         # extend the source curvemap to 3 points
         src_points = [(0.111, 0.222), (0.333, 0.444), (0.555, 0.666)]
         curve0 = light.falloff_curve.curves[0]
@@ -256,7 +254,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene.world = None
         assert scene.world != expected_world
 
-        world_ref_proxy.save(scene, "world", self.proxy.context())
+        world_ref_proxy.save(scene.world, scene, "world", self.proxy.context())
         self.assertEqual(scene.world, expected_world)
 
     def test_write_datablock_with_reference_camera_dof_target(self):

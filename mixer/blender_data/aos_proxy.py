@@ -82,17 +82,18 @@ class AosProxy(Proxy):
             context.visit_state.path.pop()
         return self
 
-    def save(self, parent: T.bpy_struct, key: str, context: Context):
+    def save(self, attribute: T.bpy_prop_collection, parent: T.bpy_struct, key: str, context: Context):
         """
-        Save this proxy the Blender property
+        Save this proxy into attribute.
+
+        Args:
+            attribute: a collection of bpy_struct (e.g. a_Mesh_instance.vertices)
+            parent: the attribute that contains attribute (e.g. a Mesh instance)
+            key: the name of the bpy_collection in parent (e.g "vertices")
+            context: proxy and visit state
         """
 
-        target = getattr(parent, key, None)
-        if target is None:
-            logger.error("save: {parent}[{key}] is None")
-            return
-
-        specifics.fit_aos(target, self, context)
+        specifics.fit_aos(attribute, self, context)
 
         # nothing to do save here. The buffers that contains vertices and co are serialized apart from the json
         # that contains the Mesh members. The children of this are SoaElement and have no child.
@@ -101,7 +102,7 @@ class AosProxy(Proxy):
         context.visit_state.path.append(key)
         try:
             for k, v in self._data.items():
-                write_attribute(target, k, v, context)
+                write_attribute(attribute, k, v, context)
         finally:
             context.visit_state.path.pop()
 

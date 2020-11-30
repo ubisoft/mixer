@@ -52,7 +52,8 @@ class NodeLinksProxy(StructCollectionProxy):
         self._sequence = self._load(links)
         return self
 
-    def save(self, node_tree: T.NodeTree, links: str, context: Context):
+    def save(self, unused_attribute, node_tree: T.NodeTree, unused_key: str, context: Context):
+        """Saves this proxy into node_tree.links"""
         if not isinstance(node_tree, T.NodeTree):
             logger.error(f"NodeLinksProxy.save() called with {node_tree}. Expected a bpy.types.NodeTree")
             return

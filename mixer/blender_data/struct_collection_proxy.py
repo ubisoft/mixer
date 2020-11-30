@@ -128,24 +128,25 @@ class StructCollectionProxy(Proxy):
             context.visit_state.path.pop()
         return self
 
-    def save(self, bl_instance: Any, attr_name: str, context: Context):
+    def save(self, collection: T.bpy_prop_collection, parent: T.bpy_struct, key: str, context: Context):
         """
-        Save this proxy the Blender property
+        Save this proxy into collection
+
+        Args:
+            collection: the collection into which this proxy is saved
+            parent: the attribute that contains collection (e.g. a Scene instance)
+            key: the name of the collection in parent (e.g "background_images")
+            context: the proxy and visit state
         """
-        target = getattr(bl_instance, attr_name, None)
-        if target is None:
-            # # Don't log this, too many messages
-            # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
-            return
-        context.visit_state.path.append(attr_name)
+        context.visit_state.path.append(key)
         try:
             sequence = self._sequence
-            specifics.truncate_collection(target, len(self._sequence))
-            for i in range(len(target), len(sequence)):
+            specifics.truncate_collection(collection, len(self._sequence))
+            for i in range(len(collection), len(sequence)):
                 item_proxy = sequence[i]
-                specifics.add_element(target, item_proxy, context)
+                specifics.add_element(collection, item_proxy, context)
             for i, v in enumerate(sequence):
-                write_attribute(target, i, v, context)
+                write_attribute(collection, i, v, context)
         finally:
             context.visit_state.path.pop()
 

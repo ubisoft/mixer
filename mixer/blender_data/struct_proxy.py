@@ -76,24 +76,27 @@ class StructProxy(Proxy):
     def _pre_save(self, target: T.bpy_struct, context: Context) -> T.bpy_struct:
         return specifics.pre_save_struct(self, target, context)
 
-    def save(self, bl_instance: Any, key: Union[int, str], context: Context):
+    def save(
+        self,
+        struct: T.bpy_struct,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        context: Context,
+    ):
         """
-        Save this proxy into a Blender attribute
+        Save this proxy into attribute
+
+        Args:
+            struct: the bpy_struct to store this proxy into
+            parent: (e.g an Object instance)
+            key: (e.g. "display)
+            context: the proxy and visit state
         """
-        assert isinstance(key, (int, str))
+        struct = self._pre_save(struct, context)
 
-        if isinstance(key, int):
-            target = bl_instance[key]
-        elif isinstance(bl_instance, T.bpy_prop_collection):
-            target = bl_instance.get(key)
-        else:
-            target = getattr(bl_instance, key, None)
-            if target is not None:
-                self._pre_save(target, context)
-
-        if target is None:
-            if isinstance(bl_instance, T.bpy_prop_collection):
-                logger.warning(f"Cannot write to '{bl_instance}', attribute '{key}' because it does not exist.")
+        if struct is None:
+            if isinstance(parent, T.bpy_prop_collection):
+                logger.warning(f"Cannot write to '{parent}', attribute '{key}' because it does not exist.")
             else:
                 # Don't log this because it produces too many log messages when participants have plugins
                 # f"Note: May be due to a plugin used by the sender and not on this Blender"
@@ -106,7 +109,7 @@ class StructProxy(Proxy):
         context.visit_state.path.append(key)
         try:
             for k, v in self._data.items():
-                write_attribute(target, k, v, context)
+                write_attribute(struct, k, v, context)
         finally:
             context.visit_state.path.pop()
 
@@ -148,7 +151,7 @@ class StructProxy(Proxy):
         if isinstance(struct_delta, DeltaReplace):
             self.copy_data(struct_update)
             if to_blender:
-                self.save(parent, key, context)
+                self.save(struct, parent, key, context)
         else:
 
             if to_blender:

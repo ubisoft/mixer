@@ -238,7 +238,7 @@ class MeshProxy(DatablockProxy):
             self.copy_data(struct_update)
             if to_blender:
                 struct.clear_geometry()
-                self.save(parent, key, context)
+                self.save(struct, parent, key, context)
         else:
             # vertex groups are always replaced as a whole
             vertex_groups_arrays = struct_update._arrays.get("vertex_groups", None)

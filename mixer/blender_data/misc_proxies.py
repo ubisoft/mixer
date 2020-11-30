@@ -57,7 +57,9 @@ class NonePtrProxy(Proxy):
     def load(self, *_):
         return self
 
-    def save(self, parent: T.bpy_struct, key: Union[int, str], context: Context):
+    def save(self, unused_attribute, parent: T.bpy_struct, key: Union[int, str], context: Context):
+        """Save None into parent.key or parent[key]"""
+
         if isinstance(key, int):
             parent[key] = None
         else:

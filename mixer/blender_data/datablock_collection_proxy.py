@@ -80,23 +80,23 @@ class DatablockCollectionProxy(Proxy):
 
         return self
 
-    def save(self, parent: Any, key: str, context: Context):
+    def save(self, attribute: bpy.type.Collection, parent: Any, key: str, context: Context):
         """
-        Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data
-        or a collection of referenced datablocks like bpy.type.Collection.children
+        UNUSED Save this proxy into the a Blender collection referenced by attribute.
+
+        Args:
+            attribute: a collection of standalone datablocks in bpy.data or a collection of referenced datablocks
+                like bpy.type.Collection.children
+            parent: the attribute that contains attribute (e.g. a Mesh instance)
+            key: the name of the bpy_collection in parent (e.g "vertices")
+            context: proxy and visit state
         """
         if not self._data:
             return
 
-        target = getattr(parent, key, None)
-        if target is None:
-            # Don't log this, too many messages
-            # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
-            return
-
         # collection of standalone datablocks
         for k, v in self._data.items():
-            write_attribute(target, k, v, context)
+            write_attribute(attribute, k, v, context)
 
     def find(self, key: str):
         return self._data.get(key)
@@ -319,20 +319,17 @@ class DatablockRefCollectionProxy(Proxy):
                 logger.error(f"unexpected None in {bl_collection}.{key}")
         return self
 
-    def save(self, parent: Any, key: str, context: Context):
+    def save(self, collection: T.bpy_prop_collection, parent: T.bpy_struct, key: str, context: Context):
         """
-        Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data
-        or a collection of referenced datablocks like bpy.type.Collection.children
+        Saves this proxy into collection
+
+        Args:
+            collection: a collection of datablock references with link/unlink interface
+                (e.g a_Collection_instance.objects)
+            parent: the structure that contains collection to be loaded (e.g. a Collection instance)
+            key: the name of the bpy_collection (e.g "objects")
+            context:
         """
-        if not self._data:
-            return
-
-        collection = getattr(parent, key, None)
-        if collection is None:
-            # Don't log this, too many messages
-            # f"Saving {self} into non existent attribute {bl_instance}.{attr_name} : ignored"
-            return
-
         for _, ref_proxy in self._data.items():
             assert isinstance(ref_proxy, DatablockRefProxy)
             datablock = ref_proxy.target(context)

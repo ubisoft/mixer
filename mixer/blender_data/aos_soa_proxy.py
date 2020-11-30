@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import array
 import logging
-from typing import Any, List, Dict, Optional, Tuple, TYPE_CHECKING
+from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -88,10 +88,17 @@ class AosElement(Proxy):
 
         return self
 
-    def save(self, bl_collection: bpy.types.bpy_prop_collection, attr_name: str, context: Context):
+    def save(self, unused_attribute, parent: bpy.types.bpy_prop_collection, key: str, context: Context):
+        """Saves this proxy into all parent[i].key
+
+        Args:
+            unused_attribute:
+            parent: collection of structure (e.g. a SplineBezierPoints instance)
+            key: the name of the structure member (e.g "handle_left_type")
+        """
         for index, item in self._data.items():
             # serialization turns all dict keys to strings
-            write_attribute(bl_collection[int(index)], attr_name, item, context)
+            write_attribute(parent[int(index)], key, item, context)
 
 
 class SoaElement(Proxy):
@@ -157,8 +164,13 @@ class SoaElement(Proxy):
         root = visit_state.datablock_proxy
         root._soas[parent_path].append((self._member_name, self))
 
-    def save(self, bl_instance: Any, attr_name: str, context: Context):
-        self._member_name = attr_name
+    def save(self, unused_attribute, unused_parent, key: str, context: Context):
+        """Saves he name of the structure member managed by the proxy. Saving the values occurs in save_array()
+
+        Args:
+            key: the name of the structure member (e.g "co")
+        """
+        self._member_name = key
 
     def save_array(self, aos: T.bpy_prop_collection, member_name, array_: array.array):
         if logger.isEnabledFor(logging.DEBUG):

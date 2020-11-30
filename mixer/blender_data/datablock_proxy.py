@@ -333,11 +333,12 @@ class DatablockProxy(StructProxy):
 
         return datablock
 
-    def save(self, parent: T.bpy_struct, key: str, context: Context) -> T.ID:
+    def save(self, datablock: T.ID, parent: T.bpy_struct, key: str, context: Context) -> T.ID:
         """
         Save this proxy into an embedded datablock
 
         Args:
+            datablock: the datablock into which this proxy is saved
             parent: the struct that contains the embedded datablock (e.g. a Scene)
             key: the member name of the datablock in parent (e.g. node_tree)
             context: proxy and visit state
@@ -350,7 +351,6 @@ class DatablockProxy(StructProxy):
         # assert self.is_embedded_data, f"save: called {parent}[{key}], which is not standalone"
         assert isinstance(key, str), f"save: {parent} unexpected type for key : {type(key)}"
 
-        datablock = getattr(parent, key)
         target = self._pre_save(datablock, context)
         if target is None:
             logger.warning(f"DatablockProxy.save() {parent}.{key} is None")
