@@ -20,7 +20,7 @@ Proxies for bpy.types.NodeTree and bpy.types.NodeLinks
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Dict, List, Optional, TYPE_CHECKING, Union
 import bpy.types as T  # noqa
 
 from mixer.blender_data.proxy import Delta, DeltaUpdate

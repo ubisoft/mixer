@@ -24,7 +24,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import List, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy.types as T  # noqa
 

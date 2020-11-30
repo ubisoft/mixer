@@ -135,7 +135,6 @@ class StructProxy(Proxy):
         """
 
         # WARNING parent must not be searched for key as it will fail in case of duplicate keys, with libraries
-        
         update = delta.value
 
         if isinstance(delta, DeltaReplace):
