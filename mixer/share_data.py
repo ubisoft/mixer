@@ -26,7 +26,6 @@ from typing import Dict, List, Mapping, Set
 from uuid import uuid4
 
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
-from mixer.blender_data.filter import test_properties
 
 import bpy
 import bpy.types as T  # noqa N812

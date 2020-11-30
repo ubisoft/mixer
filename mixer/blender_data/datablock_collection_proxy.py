@@ -29,12 +29,10 @@ import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data.attributes import diff_attribute, read_attribute, write_attribute
-from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.diff import BpyDataCollectionDiff
-from mixer.blender_data.filter import skip_bpy_data_item
 from mixer.blender_data.proxy import DeltaUpdate, DeltaAddition, DeltaDeletion, MaxDepthExceeded
 from mixer.blender_data.proxy import ensure_uuid, Proxy
 

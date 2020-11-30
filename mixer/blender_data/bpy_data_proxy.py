@@ -29,7 +29,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.blenddata import BlendData, collection_name_to_type
+from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -38,7 +38,6 @@ from mixer.blender_data.filter import SynchronizedProperties, safe_depsgraph_upd
 from mixer.blender_data.proxy import (
     DeltaReplace,
     DeltaUpdate,
-    ensure_uuid,
     Proxy,
     MaxDepthExceeded,
     UnresolvedRefs,
