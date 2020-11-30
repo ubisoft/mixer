@@ -74,6 +74,8 @@ class DatablockProxy(StructProxy):
         self._arrays: ArrayGroups = {}
         """arrays that must not be serialized as json because of their size"""
 
+        self._initialized = False
+
     def copy_data(self, other: DatablockProxy):
         super().copy_data(other)
         self._soas = other._soas
@@ -94,6 +96,7 @@ class DatablockProxy(StructProxy):
                 self._bpy_data_collection = rna_identifier_to_collection_name[type_name]
                 self._datablock_uuid = datablock.mixer_uuid
             self._class_name = datablock.__class__.__name__
+            self._initialized = True
 
     @property
     def arrays(self):
@@ -154,16 +157,18 @@ class DatablockProxy(StructProxy):
             this DatablockProxy
         """
 
-        if bpy_data_collection_name is None:
-            # TODO would be better to load embedded datablocks into StructProxy and use DatablockProxy
-            # only for standalone datablocks
-            assert datablock.is_embedded_data, f"load: {datablock} is not embedded and collection_name is None"
-            self._bpy_data_collection = ""
-        else:
-            assert (
-                not datablock.is_embedded_data
-            ), f"load: {datablock} is embedded and collection_name is {bpy_data_collection_name}"
-            self._bpy_data_collection = bpy_data_collection_name
+        if not self._initialized:
+            if bpy_data_collection_name is None:
+                # TODO would be better to load embedded datablocks into StructProxy and use DatablockProxy
+                # only for standalone datablocks
+                assert datablock.is_embedded_data, f"load: {datablock} is not embedded and collection_name is None"
+                self._bpy_data_collection = ""
+            else:
+                assert (
+                    not datablock.is_embedded_data
+                ), f"load: {datablock} is embedded and collection_name is {bpy_data_collection_name}"
+                self._bpy_data_collection = bpy_data_collection_name
+            self._initialized = True
 
         self._class_name = datablock.__class__.__name__
         self._data.clear()
@@ -299,7 +304,7 @@ class DatablockProxy(StructProxy):
                 logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
         datablock.mixer_uuid = self.mixer_uuid
-
+        self._initialized = True
         return self._save(datablock, context), renames
 
     def _save(self, datablock: T.ID, context: Context) -> T.ID:
