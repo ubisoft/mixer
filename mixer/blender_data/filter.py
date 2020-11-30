@@ -392,6 +392,7 @@ default_exclusions = {
                 "is_instancer",
                 "is_from_instancer",
                 "is_from_set",
+                "name_full",
                 # UI only, define the target of operators
                 "active_material",
                 "active_material_index",

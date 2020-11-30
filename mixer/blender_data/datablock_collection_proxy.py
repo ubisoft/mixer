@@ -196,9 +196,8 @@ class DatablockCollectionProxy(Proxy):
         Rename a bpy.data collection item and update the proxy state (receiver side)
         """
         logger.warning("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
-        # TODO LIB edit the short name and let Blender update name_full
-        proxy.rename(new_name)
         datablock.name = new_name
+        proxy._data["name"] = new_name
 
     def update(self, diff: BpyDataCollectionDiff, context: Context) -> Changeset:
         """
@@ -263,15 +262,9 @@ class DatablockCollectionProxy(Proxy):
         #   Master collection and also a FC/B unlinked
         #
         for proxy, new_name in diff.items_renamed:
-            uuid = proxy.mixer_uuid
-            if proxy.collection[new_name] is not context.proxy_state.datablocks[uuid]:
-                logger.error(
-                    f"update rename : {proxy.collection}[{new_name}] is not {context.proxy_state.datablocks[uuid]} for {proxy}, {uuid}"
-                )
-
             old_name = proxy.data("name")
             changeset.renames.append((proxy.mixer_uuid, old_name, new_name, str(proxy)))
-            proxy.rename(new_name)
+            proxy._data["name"] = new_name
 
         return changeset
 

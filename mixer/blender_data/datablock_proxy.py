@@ -133,7 +133,6 @@ class DatablockProxy(StructProxy):
 
     def rename(self, new_name: str):
         self._data["name"] = new_name
-        self._data["name_full"] = new_name
 
     def __str__(self) -> str:
         return f"DatablockProxy {self.mixer_uuid} for bpy.data.{self.collection_name}[{self.data('name')}]"
