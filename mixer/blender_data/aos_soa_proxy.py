@@ -83,7 +83,7 @@ class AosElement(Proxy):
         try:
             if not isinstance(self._data[0], str):
                 logger.error(f"unsupported type for {bl_collection}[{attr_name}]: {type(self._data[0])}")
-        except IndexError:
+        except KeyError:
             pass
 
         return self
