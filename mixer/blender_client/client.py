@@ -58,6 +58,7 @@ from mixer.blender_client import material as material_api
 from mixer.blender_client import mesh as mesh_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
+from mixer.blender_client import constraint as constraint_api
 from mixer.blender_data.proxy import ensure_uuid
 import mixer.shot_manager as shot_manager
 from mixer.draw_handlers import set_draw_handlers
@@ -1111,6 +1112,11 @@ class BlenderClient(Client):
                         self.build_montage_mode(command.data)
                     elif command.type == MessageType.SHOT_MANAGER_ACTION:
                         shot_manager.build_shot_manager_action(command.data)
+
+                    elif command.type == MessageType.ADD_CONSTRAINT:
+                        constraint_api.build_add_constraint(command.data)
+                    elif command.type == MessageType.REMOVE_CONSTRAINT:
+                        constraint_api.build_remove_constraint(command.data)
 
                     elif command.type == MessageType.BLENDER_DATA_UPDATE:
                         data_api.build_data_update(command.data)
