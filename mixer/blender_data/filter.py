@@ -405,11 +405,10 @@ default_exclusions = {
                 # UI only, define the target of operators
                 "active_material",
                 "active_material_index",
+                "active_shape_key",
+                "active_shape_key_index",
                 # TODO temporary, has a seed member that makes some tests fail
                 "field",
-                # TODO temporary, waiting for shape_key support
-                # there is a loop in active_shape_key/relative_key
-                "active_shape_key",
                 # TODO
                 "particle_systems",
             ]
