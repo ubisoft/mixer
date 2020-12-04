@@ -29,7 +29,6 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.mesh_proxy import VertexGroups
-from mixer.blender_data.misc_proxies import NonePtrProxy
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
@@ -171,16 +170,30 @@ class ObjectProxy(DatablockProxy):
             for index, weight in zip(indices, weights):
                 vertex_group.add([index], weight, "ADD")
 
-    def _diff(
-        self, struct: T.Object, key: str, prop: T.Property, context: Context, diff: Proxy
-    ) -> Optional[DeltaUpdate]:
+    def _diff(self, struct: T.Object, key: str, prop: T.Property, context: Context, diff: Proxy) -> Optional[Delta]:
 
-        datablock_ref = self._data["data"]
-        if datablock_ref and not isinstance(datablock_ref, NonePtrProxy):
-            if datablock_ref.mixer_uuid in context.visit_state.dirty_vertex_groups:
+        data_datablock = struct.data
+        if data_datablock is not None:
+            shape_keys_datablock = data_datablock.shape_keys
+            if (
+                shape_keys_datablock is not None
+                and shape_keys_datablock.mixer_uuid in context.visit_state.dirty_shape_keys
+            ):
+                # Adding or removing an Key.key_blocks item does not trigger an Object DG update, but the receiver
+                # must use the Object API to update Key.key_blocks.
+                # The receiver receive a Key update but cannot retrieve Object from Key to invoke the Object
+                # shape_key API.
+                # So fake an Object update
+                diff._data["_mixer_fake_dirty_shape_keys"] = DeltaUpdate(True)
+
+                # If the same Mesh is linked to several Object, we only need to update any Object
+                context.visit_state.dirty_shape_keys.remove(shape_keys_datablock.mixer_uuid)
+
+            dirty_vertex_groups = data_datablock.mixer_uuid in context.visit_state.dirty_vertex_groups
+            if dirty_vertex_groups:
+                # Replace the whole Object. Otherwise we would have to merge a DeltaReplace for vertex_groups
+                # and a DeltaUpdate for the remaining items
                 logger.debug(f"_diff: {struct} dirty vertex group: replace")
-                # Lazy and heavy : replace the whole Object. Otherwise we would have to merge a DeltaReplace
-                # for vertex_groups and a DeltaUpdate for the remaining items
                 diff.load(struct, context)
                 return DeltaReplace(diff)
 

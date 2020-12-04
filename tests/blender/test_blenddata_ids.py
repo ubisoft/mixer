@@ -369,5 +369,19 @@ bpy.ops.object.material_slot_move(direction='DOWN')
         self.end_test()
 
 
+class TestShapeKey(TestCase):
+    def test_create(self):
+        action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+obj.shape_key_add()
+obj.shape_key_add()
+"""
+
+        self.send_string(action)
+        self.end_test()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -92,8 +92,7 @@ class ShapeKeyProxy(DatablockProxy):
     """
     Proxy for a ShapeKey datablock.
 
-    XXXX
-
+    Exists because the Key.key_blocks API (shape_key_add, shape_key_remove, ...) is in fact in Object
     """
 
     # TODO move bpy_data_ctor_shape_keys into create_standalone_datablock here
@@ -108,9 +107,10 @@ class ShapeKeyProxy(DatablockProxy):
         to_blender: bool = True,
     ) -> StructProxy:
         if to_blender and isinstance(delta, DeltaReplace):
-            # A full replace is required because Key.key_block must be rebuilt.
-            # Update the proxy only and delegate the Blender update to the first Object that will be updated,
-            # which will call ShapeKeyHandler.update_shape_key_datablock()
+            # On the receiver : a full replace is required because Key.key_block must be rebuilt.
+
+            # Delegate the Blender update to the first Object.apply() call, which will call
+            # ShapeKeyHandler.update_shape_key_datablock()
             data_uuid = attribute.user.mixer_uuid
             data_proxy = context.proxy_state.proxies[data_uuid]
             assert hasattr(data_proxy, "shape_key_handler")
@@ -118,6 +118,7 @@ class ShapeKeyProxy(DatablockProxy):
             shape_key_handler = data_proxy.shape_key_handler
             shape_key_handler.pending_creation = attribute.mixer_uuid
 
+            # Update the proxy only
             return super().apply(attribute, parent, key, delta, context, False)
         else:
             return super().apply(attribute, parent, key, delta, context, to_blender)
@@ -128,10 +129,14 @@ class ShapeKeyProxy(DatablockProxy):
         key_blocks_proxy = self._data["key_blocks"]
         must_replace = specifics.diff_must_replace(key_blocks, key_blocks_proxy._sequence, key_bocks_property)
         if must_replace:
-            # If the Key.key_blocks collection must be replaced, Object.shape_key_clear() will be called and
-            # il will remove the Key datablock entirely. Make sure that the datablock can be recreated.
-            # This delta requires that the Object shape_key API is used, si it will be processed
-            # during the Object update
+            # The Key.key_blocks collection must be replaced, and the receiver must call Object.shape_key_clear(),
+            # causing the removal of the Key datablock.
+
+            # The DG does not trigger an Object update, so tell the ObjectProxy to fake an Object update
+            # so that the Object API can be called
+            context.visit_state.dirty_shape_keys.add(datablock.mixer_uuid)
+
+            # Ensure that the whole Key data is available to be reloaded after clear()
             self.load(datablock, context)
             return DeltaReplace(self)
         else:

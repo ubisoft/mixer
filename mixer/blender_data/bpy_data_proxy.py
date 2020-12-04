@@ -133,6 +133,9 @@ class VisitState:
     """Uuids of the Mesh datablocks whose vertex_groups data has been updated since last loaded
     into their MeshProxy"""
 
+    dirty_shape_keys: Set[Uuid] = field(default_factory=set)
+    """Uuids of the Key datablocks whose key_blocks data has been updated"""
+
 
 @dataclass
 class Context:
@@ -218,11 +221,14 @@ class BpyDataProxy(Proxy):
         This updates the local proxy state and return a Changeset to send to the server. This method is also
         used to send the initial scene contents, which is seen as datablock creations.
         """
-        changeset: Changeset = Changeset()
 
         # Update the bpy.data collections status and get the list of newly created bpy.data entries.
         # Updated proxies will contain the IDs to send as an initial transfer.
         # There is no difference between a creation and a subsequent update
+        changeset: Changeset = Changeset()
+
+        # Contains the bpy_data_proxy state (known proxies and datablocks), as well as visit_state that contains
+        # shared state between updated datablock proxies
         context = self.context(synchronized_properties)
 
         # sort the creation so that Object.data target is created before Object

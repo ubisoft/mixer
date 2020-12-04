@@ -345,6 +345,7 @@ default_exclusions = {
                 "total_vert_sel",
                 "total_edge_sel",
                 "total_face_sel",
+                "shape_keys",
                 # do not know how to update this, probably by vertices count
                 "vertex_paint_masks",
             ]
@@ -474,9 +475,8 @@ default_exclusions = {
     T.ShapeKey: [
         NameFilterOut(
             [
+                "frame",
                 "relative_key",
-                # points to the first key_blocks item
-                "reference_key",
             ]
         )
     ],
