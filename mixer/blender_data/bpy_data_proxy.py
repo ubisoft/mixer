@@ -22,6 +22,7 @@ See synchronization.md
 """
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 import logging
 import sys
@@ -96,6 +97,9 @@ class ProxyState:
     datablocks: Dict[Uuid, T.ID] = field(default_factory=dict)
     """Known datablocks"""
 
+    objects: Dict[Uuid, Set[Uuid]] = field(default_factory=lambda: defaultdict(set))
+    """Object.data uuid : (set of uuids of Object using object.data). Mostly used for shape keys"""
+
     unresolved_refs: UnresolvedRefs = UnresolvedRefs()
 
 
@@ -133,9 +137,6 @@ class VisitState:
     """Uuids of the Mesh datablocks whose vertex_groups data has been updated since last loaded
     into their MeshProxy"""
 
-    dirty_shape_keys: Set[Uuid] = field(default_factory=set)
-    """Uuids of the Key datablocks whose key_blocks data has been updated"""
-
 
 @dataclass
 class Context:
@@ -149,10 +150,27 @@ class Context:
     """Current datablock operation state"""
 
 
-_update_order = {
+_creation_order = {
+    # anything else first
+    "objects": 5,  # Object.data is required to create Object
+    "shape_keys": 10,  # Key creation require Object API
+}
+
+
+def _creation_order_predicate(item: Tuple[str, Any]) -> int:
+    # item (bpy.data collection name, delta)
+    return _creation_order.get(item[0], 0)
+
+
+_updates_order = {
     T.Key: 5,  # before Mesh for shape keys
     T.Mesh: 10,  # before Object for vertex_groups
+    # anything else last
 }
+
+
+def _updates_order_predicate(datablock: T.ID) -> int:
+    return _updates_order.get(type(datablock), sys.maxsize)
 
 
 class BpyDataProxy(Proxy):
@@ -196,7 +214,7 @@ class BpyDataProxy(Proxy):
         """
         diff = BpyBlendDiff()
         diff.diff(self, synchronized_properties)
-        self.update(diff, {}, False, synchronized_properties)
+        self.update(diff, set(), False, synchronized_properties)
         return self
 
     def find(self, collection_name: str, key: str) -> Optional[DatablockProxy]:
@@ -231,8 +249,7 @@ class BpyDataProxy(Proxy):
         # shared state between updated datablock proxies
         context = self.context(synchronized_properties)
 
-        # sort the creation so that Object.data target is created before Object
-        deltas = sorted(diff.collection_deltas, key=_objects_last)
+        deltas = sorted(diff.collection_deltas, key=_creation_order_predicate)
         for delta_name, delta in deltas:
             collection_changeset = self._data[delta_name].update(delta, context)
             changeset.creations.extend(collection_changeset.creations)
@@ -249,7 +266,7 @@ class BpyDataProxy(Proxy):
             all_updates |= self._delayed_updates
             self._delayed_updates.clear()
 
-        sorted_updates = sorted(all_updates, key=lambda datablock: _update_order.get(type(datablock), sys.maxsize))
+        sorted_updates = sorted(all_updates, key=_updates_order_predicate)
 
         for datablock in sorted_updates:
             if not isinstance(datablock, safe_depsgraph_updates):
@@ -331,7 +348,23 @@ class BpyDataProxy(Proxy):
             return None
 
         datablock = self.state.datablocks[uuid]
+
+        if isinstance(datablock, T.Object) and datablock.data is not None:
+            data_uuid = datablock.data.mixer_uuid
+        else:
+            data_uuid = None
+
         bpy_data_collection_proxy.remove_datablock(proxy, datablock)
+
+        if data_uuid is not None:
+            # removed an Object
+            self.state.objects[data_uuid].remove(uuid)
+        else:
+            try:
+                # maybe removed an Object.data pointee
+                del self.state.objects[uuid]
+            except KeyError:
+                pass
         del self.state.proxies[uuid]
         del self.state.datablocks[uuid]
 

@@ -280,15 +280,7 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
     object_datablock = collection.new(name, data_datablock)
 
     if data_datablock is not None:
-        # create shape_keys datablock if any
-        data_uuid = data_proxy.mixer_uuid
-        data_proxy = context.proxy_state.proxies[data_uuid]
-        try:
-            shape_key_handler = data_proxy.shape_key_handler
-        except AttributeError:
-            pass
-        else:
-            shape_key_handler.create_shape_keys_datablock(object_datablock, context)
+        context.proxy_state.objects[data_datablock.mixer_uuid].add(proxy.mixer_uuid)
 
     return object_datablock
 
@@ -330,17 +322,10 @@ def bpy_data_ctor_curves(collection_name: str, proxy: DatablockProxy, context: C
 
 @bpy_data_ctor.register("shape_keys")
 def bpy_data_ctor_shape_keys(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
-    # shape key creation is deferred in bpy_data_ctor_objects()
     user = proxy._data["user"]
     user_proxy = context.proxy_state.proxies.get(user.mixer_uuid)
-    if user_proxy is None:
-        # unresolved ref ?
-        # WHAT ?
-        pass
-
-    user_proxy.shape_key_handler.pending_creation = proxy.mixer_uuid
-
-    return None
+    datablock = user_proxy.shape_key_handler.create_shape_key_datablock(proxy, context)
+    return datablock
 
 
 filter_crop_transform = [
@@ -438,20 +423,6 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
 
     if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
         target.clear_geometry()
-    elif isinstance(target, T.Object):
-        data = target.data
-        if data is None:
-            return target
-        data_proxy = context.proxy_state.proxies.get(data.mixer_uuid)
-        try:
-            shape_key_handler = data_proxy.shape_key_handler
-        except AttributeError:
-            pass
-        else:
-            shape_key_handler.update_shape_key_datablock(target, context)
-
-        return target
-
     elif isinstance(target, T.Material):
         use_nodes = proxy.data("use_nodes")
         if use_nodes:

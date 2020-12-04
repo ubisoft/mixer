@@ -30,7 +30,6 @@ import bpy.types as T  # noqa
 from mixer.blender_data import specifics
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.proxy import Delta, DeltaReplace
-from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
@@ -43,49 +42,45 @@ logger = logging.getLogger(__name__)
 
 
 class ShapeKeyHandler:
+    """Implements Key datablock operations that require the use of the Object shape_key API.
+
+    Each instance of "keyable" datablocks (Mesh, Curve, ...) owns ShapeKeyHandler instance
+    """
+
     def __init__(self, proxy: DatablockProxy):
-        self._pending_creation = ""
-        """Uuid of the shape key proxy whose creation is pending"""
+        self._keyable_proxy: DatablockProxy = proxy
+        """Proxy of the Object.data datablock (e.g. Mesh) that owns this ShapeKeyHandler"""
 
-    @property
-    def pending_creation(self):
-        return self._pending_creation
+    def create_shape_key_datablock(self, shape_key_proxy: ShapeKeyProxy, context: Context) -> T.Key:
+        # find any Object using the shapekeyable
+        datablocks = context.proxy_state.datablocks
+        data_uuid = self._keyable_proxy.mixer_uuid
+        objects = context.proxy_state.objects[data_uuid]
+        if not objects:
+            logger.error(
+                f"update_shape_key_datablock: received an update for {datablocks[shape_key_proxy.mixer_uuid]}..."
+            )
+            logger.error(
+                f"... user {datablocks[self._keyable_proxy.mixer_uuid]} not linked to an object. Update skipped"
+            )
+            return None
+        object_uuid = next(iter(objects))
+        object_datablock = datablocks[object_uuid]
 
-    @pending_creation.setter
-    def pending_creation(self, shape_key_uuid: str):
-        self._pending_creation = shape_key_uuid
+        # update the Key datablock using the Object API
+        key_blocks_proxy = shape_key_proxy.data("key_blocks")
 
-    def _create_shape_keys(self, object_datablock: T.Object, key_blocks_proxy: StructCollectionProxy) -> T.Key:
+        object_datablock.shape_key_clear()
         for _ in range(len(key_blocks_proxy)):
             object_datablock.shape_key_add()
 
-        return object_datablock.data.shape_keys
-
-    def create_shape_keys_datablock(self, object_datablock: T.Object, context: Context):
-        if not self._pending_creation:
-            return
-
-        shape_key_proxy = context.proxy_state.proxies[self._pending_creation]
-        assert isinstance(shape_key_proxy, ShapeKeyProxy)
-
-        key_blocks_proxy: StructCollectionProxy = shape_key_proxy.data("key_blocks")
-        shape_key_datablock = self._create_shape_keys(object_datablock, key_blocks_proxy)
+        shape_key_datablock = object_datablock.data.shape_keys
         shape_key_proxy.save(shape_key_datablock, bpy.data.shape_keys, shape_key_datablock, context)
 
         shape_key_uuid = shape_key_proxy.mixer_uuid
-        assert shape_key_uuid in context.proxy_state.datablocks
-
         shape_key_datablock.mixer_uuid = shape_key_uuid
         context.proxy_state.datablocks[shape_key_uuid] = shape_key_datablock
-
-        self._pending_creation = ""
-
-    def update_shape_key_datablock(self, object_datablock: T.Object, context: Context):
-        if not self._pending_creation:
-            return
-
-        object_datablock.shape_key_clear()
-        self.create_shape_keys_datablock(object_datablock, context)
+        return shape_key_datablock
 
 
 class ShapeKeyProxy(DatablockProxy):
@@ -115,11 +110,11 @@ class ShapeKeyProxy(DatablockProxy):
             data_proxy = context.proxy_state.proxies[data_uuid]
             assert hasattr(data_proxy, "shape_key_handler")
 
-            shape_key_handler = data_proxy.shape_key_handler
-            shape_key_handler.pending_creation = attribute.mixer_uuid
-
             # Update the proxy only
-            return super().apply(attribute, parent, key, delta, context, False)
+            result = super().apply(attribute, parent, key, delta, context, False)
+            data_proxy.shape_key_handler.create_shape_key_datablock(self, context)
+
+            return result
         else:
             return super().apply(attribute, parent, key, delta, context, to_blender)
 
@@ -131,10 +126,6 @@ class ShapeKeyProxy(DatablockProxy):
         if must_replace:
             # The Key.key_blocks collection must be replaced, and the receiver must call Object.shape_key_clear(),
             # causing the removal of the Key datablock.
-
-            # The DG does not trigger an Object update, so tell the ObjectProxy to fake an Object update
-            # so that the Object API can be called
-            context.visit_state.dirty_shape_keys.add(datablock.mixer_uuid)
 
             # Ensure that the whole Key data is available to be reloaded after clear()
             self.load(datablock, context)
