@@ -41,48 +41,6 @@ DEBUG = True
 logger = logging.getLogger(__name__)
 
 
-class ShapeKeyHandler:
-    """Implements Key datablock operations that require the use of the Object shape_key API.
-
-    Each instance of "keyable" datablocks (Mesh, Curve, ...) owns ShapeKeyHandler instance
-    """
-
-    def __init__(self, proxy: DatablockProxy):
-        self._keyable_proxy: DatablockProxy = proxy
-        """Proxy of the Object.data datablock (e.g. Mesh) that owns this ShapeKeyHandler"""
-
-    def create_shape_key_datablock(self, shape_key_proxy: ShapeKeyProxy, context: Context) -> T.Key:
-        # find any Object using the shapekeyable
-        datablocks = context.proxy_state.datablocks
-        data_uuid = self._keyable_proxy.mixer_uuid
-        objects = context.proxy_state.objects[data_uuid]
-        if not objects:
-            logger.error(
-                f"update_shape_key_datablock: received an update for {datablocks[shape_key_proxy.mixer_uuid]}..."
-            )
-            logger.error(
-                f"... user {datablocks[self._keyable_proxy.mixer_uuid]} not linked to an object. Update skipped"
-            )
-            return None
-        object_uuid = next(iter(objects))
-        object_datablock = datablocks[object_uuid]
-
-        # update the Key datablock using the Object API
-        key_blocks_proxy = shape_key_proxy.data("key_blocks")
-
-        object_datablock.shape_key_clear()
-        for _ in range(len(key_blocks_proxy)):
-            object_datablock.shape_key_add()
-
-        shape_key_datablock = object_datablock.data.shape_keys
-        shape_key_proxy.save(shape_key_datablock, bpy.data.shape_keys, shape_key_datablock, context)
-
-        shape_key_uuid = shape_key_proxy.mixer_uuid
-        shape_key_datablock.mixer_uuid = shape_key_uuid
-        context.proxy_state.datablocks[shape_key_uuid] = shape_key_datablock
-        return shape_key_datablock
-
-
 class ShapeKeyProxy(DatablockProxy):
     """
     Proxy for a ShapeKey datablock.
@@ -90,7 +48,32 @@ class ShapeKeyProxy(DatablockProxy):
     Exists because the Key.key_blocks API (shape_key_add, shape_key_remove, ...) is in fact in Object
     """
 
-    # TODO move bpy_data_ctor_shape_keys into create_standalone_datablock here
+    def create_shape_key_datablock(self, data_proxy: DatablockProxy, context: Context) -> T.Key:
+        # find any Object using the datablock manages by this Proxy
+        datablocks = context.proxy_state.datablocks
+        data_uuid = data_proxy.mixer_uuid
+        objects = context.proxy_state.objects[data_uuid]
+        if not objects:
+            logger.error(f"update_shape_key_datablock: received an update for {datablocks[self.mixer_uuid]}...")
+            logger.error(f"... user {datablocks[data_uuid]} not linked to an object. Update skipped")
+            return None
+        object_uuid = next(iter(objects))
+        object_datablock = datablocks[object_uuid]
+
+        # update the Key datablock using the Object API
+        key_blocks_proxy = self.data("key_blocks")
+        object_datablock.shape_key_clear()  # removes the Key datablock
+        for _ in range(len(key_blocks_proxy)):
+            object_datablock.shape_key_add()
+
+        new_shape_key_datablock = object_datablock.data.shape_keys
+        self.save(new_shape_key_datablock, bpy.data.shape_keys, new_shape_key_datablock.name, context)
+
+        shape_key_uuid = self.mixer_uuid
+        new_shape_key_datablock.mixer_uuid = shape_key_uuid
+        context.proxy_state.datablocks[shape_key_uuid] = new_shape_key_datablock
+
+        return new_shape_key_datablock
 
     def apply(
         self,
@@ -104,15 +87,13 @@ class ShapeKeyProxy(DatablockProxy):
         if to_blender and isinstance(delta, DeltaReplace):
             # On the receiver : a full replace is required because Key.key_block must be rebuilt.
 
-            # Delegate the Blender update to the first Object.apply() call, which will call
-            # ShapeKeyHandler.update_shape_key_datablock()
-            data_uuid = attribute.user.mixer_uuid
-            data_proxy = context.proxy_state.proxies[data_uuid]
-            assert hasattr(data_proxy, "shape_key_handler")
-
             # Update the proxy only
             result = super().apply(attribute, parent, key, delta, context, False)
-            data_proxy.shape_key_handler.create_shape_key_datablock(self, context)
+
+            # Replace Key
+            data_uuid = attribute.user.mixer_uuid
+            data_proxy = context.proxy_state.proxies[data_uuid]
+            self.create_shape_key_datablock(data_proxy, context)
 
             return result
         else:

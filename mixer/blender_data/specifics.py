@@ -324,7 +324,7 @@ def bpy_data_ctor_curves(collection_name: str, proxy: DatablockProxy, context: C
 def bpy_data_ctor_shape_keys(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     user = proxy._data["user"]
     user_proxy = context.proxy_state.proxies.get(user.mixer_uuid)
-    datablock = user_proxy.shape_key_handler.create_shape_key_datablock(proxy, context)
+    datablock = proxy.create_shape_key_datablock(user_proxy, context)
     return datablock
 
 

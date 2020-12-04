@@ -32,7 +32,6 @@ from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate
-from mixer.blender_data.shape_key_proxy import ShapeKeyHandler
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
@@ -158,14 +157,6 @@ class MeshProxy(DatablockProxy):
                     )
                     return True
         return False
-
-    def __init__(self, *args, **kwargs):
-        self._shape_key_handler = ShapeKeyHandler(self)
-        super().__init__(*args, **kwargs)
-
-    @property
-    def shape_key_handler(self) -> ShapeKeyHandler:
-        return self._shape_key_handler
 
     def load(
         self,
