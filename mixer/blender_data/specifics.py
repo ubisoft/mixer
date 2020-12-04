@@ -773,7 +773,7 @@ def diff_must_replace(
                 return True
             if bl_material is not None and bl_material.mixer_uuid != material_proxy.mixer_uuid:
                 return True
-            if bl_item.link != proxy.data("LINK"):
+            if bl_item.link != proxy.data("link"):
                 return True
 
     elif collection_property == _key_key_blocks_property:
