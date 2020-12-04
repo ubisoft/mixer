@@ -279,15 +279,16 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
 
     object_datablock = collection.new(name, data_datablock)
 
-    # create shape_keys datablock if any
-    data_uuid = data_proxy.mixer_uuid
-    data_proxy = context.proxy_state.proxies[data_uuid]
-    try:
-        shape_key_handler = data_proxy.shape_key_handler
-    except AttributeError:
-        pass
-    else:
-        shape_key_handler.create_shape_keys_datablock(object_datablock, context)
+    if data_datablock is not None:
+        # create shape_keys datablock if any
+        data_uuid = data_proxy.mixer_uuid
+        data_proxy = context.proxy_state.proxies[data_uuid]
+        try:
+            shape_key_handler = data_proxy.shape_key_handler
+        except AttributeError:
+            pass
+        else:
+            shape_key_handler.create_shape_keys_datablock(object_datablock, context)
 
     return object_datablock
 
