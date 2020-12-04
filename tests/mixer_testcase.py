@@ -50,7 +50,12 @@ class MixerTestCase(unittest.TestCase):
         self.ignored_messages = set()
         self.experimental_sync = True
 
-    def set_log_level(self, log_level):
+    @property
+    def log_level(self):
+        return self._log_level
+
+    @log_level.setter
+    def log_level(self, log_level):
         self._log_level = log_level
 
     @classmethod
