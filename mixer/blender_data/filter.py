@@ -228,23 +228,24 @@ would be loaded ad a DatablockProxy instead of a DatablockRefProxy
 """
 
 _exclude_names = {
-    "type_info",  # for Available (?) keyingset
-    "depsgraph",  # found in Viewlayer
-    "rna_type",
+    # Related to the UI
+    "active_index",
+    # found in Viewlayer
+    "depsgraph",
     "is_editmode",
     "is_embedded_data",
     "is_evaluated",
     "is_library_indirect",
-    "original",
-    "users",
-    "use_fake_user",
-    "tag",
     "library",
+    "mixer_uuid",
+    "original",
     "override_library",
     "preview",
-    "mixer_uuid",
-    # Related to the UI
-    "active_index",
+    "rna_type",
+    "tag",
+    "type_info",
+    "users",
+    "use_fake_user",
 }
 """Names of properties that are always excluded"""
 
