@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 import bpy
 import bpy.types as T  # noqa
 
+from mixer.blender_data import specifics
 from mixer.blender_data.attributes import diff_attribute, read_attribute, write_attribute
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -152,12 +153,7 @@ class DatablockCollectionProxy(Proxy):
         """Remove a bpy.data collection item and update the proxy state"""
         logger.warning("Perform removal for %s", proxy)
         try:
-            if isinstance(datablock, T.Scene):
-                from mixer.blender_client.scene import delete_scene
-
-                delete_scene(datablock)
-            else:
-                proxy.collection.remove(datablock)
+            specifics.remove_datablock(proxy.collection, datablock)
         except ReferenceError as e:
             # We probably have processed previously the deletion of a datablock referenced by Object.data (e.g. Light).
             # On both sides it deletes the Object as well. So the sender issues a message for object deletion

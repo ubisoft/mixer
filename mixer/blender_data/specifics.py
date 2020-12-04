@@ -849,3 +849,16 @@ def _truncate_collection_clear(collection: T.bpy_prop_collection, size: int):
 def _truncate_collection_pop(collection: T.bpy_prop_collection, size: int):
     while len(collection) > max(size, 0):
         collection.pop()
+
+
+def remove_datablock(collection: T.bpy_prop_collection, datablock: T.ID):
+    """Delete a datablock from its bpy.data collection"""
+    if isinstance(datablock, T.Scene):
+        from mixer.blender_client.scene import delete_scene
+
+        delete_scene(datablock)
+    elif isinstance(datablock, T.Key):
+        # the doc labels it unsafe, use sparingly
+        bpy.data.batch_remove([datablock])
+    else:
+        collection.remove(datablock)
