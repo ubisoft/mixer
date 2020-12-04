@@ -220,7 +220,7 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
 
 
 @bpy_data_ctor.register("images")
-def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
+def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     image = None
     image_name = proxy.data("name")
@@ -259,7 +259,7 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: A
 
 
 @bpy_data_ctor.register("objects")
-def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
+def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
     from mixer.blender_data.misc_proxies import NonePtrProxy
 
@@ -282,7 +282,7 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
 
 
 @bpy_data_ctor.register("lights")
-def bpy_data_ctor_lights(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
+def bpy_data_ctor_lights(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
     light_type = proxy.data("type")
@@ -291,7 +291,7 @@ def bpy_data_ctor_lights(collection_name: str, proxy: DatablockProxy, context: A
 
 
 @bpy_data_ctor.register("node_groups")
-def bpy_data_ctor_node_groups(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
+def bpy_data_ctor_node_groups(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
     type_ = node_tree_type[proxy.data("type")]
@@ -299,7 +299,7 @@ def bpy_data_ctor_node_groups(collection_name: str, proxy: DatablockProxy, conte
 
 
 @bpy_data_ctor.register("sounds")
-def bpy_data_ctor_sounds(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
+def bpy_data_ctor_sounds(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     filepath = proxy.data("filepath")
     # TODO what about "check_existing" ?
@@ -310,7 +310,7 @@ def bpy_data_ctor_sounds(collection_name: str, proxy: DatablockProxy, context: A
 
 
 @bpy_data_ctor.register("curves")
-def bpy_data_ctor_curves(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
+def bpy_data_ctor_curves(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
     return collection.new(name, "CURVE")
