@@ -22,17 +22,16 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
-    from mixer.blender_data.changeset import RenameChangeset
+    from mixer.blender_data.datablock_proxy import DatablockProxy
 
 
 DEBUG = True
@@ -40,53 +39,37 @@ DEBUG = True
 logger = logging.getLogger(__name__)
 
 
-class ShapeKeyUser:
-    def __init__(self):
-        self._pending_creation: Optional[ShapeKeyProxy] = None
+class ShapeKeyHandler:
+    def __init__(self, proxy: DatablockProxy):
+        self._proxy = proxy
+        self._pending_creation = ""
+        """Uuid of the shape key proxy whose creation is pending"""
 
-    def add_pending_shape_key_creation(self, shape_key_proxy: ShapeKeyProxy):
-        self._pending_creation = shape_key_proxy
+    @property
+    def pending_creation(self):
+        return self._pending_creation
+
+    @pending_creation.setter
+    def pending_creation(self, value: str):
+        self._pending_creation = value
 
     def create_shape_keys_datablock(self, object_datablock: T.Object, context: Context):
-        if self._pending_creation is None:
+        if not self._pending_creation:
             return
 
-        key_blocks_proxy: StructCollectionProxy = self._pending_creation.data("key_blocks")
+        shape_key_proxy = context.proxy_state.proxies[self._pending_creation]
+        key_blocks_proxy: StructCollectionProxy = shape_key_proxy.data("key_blocks")
         for _ in range(len(key_blocks_proxy)):
             object_datablock.shape_key_add()
 
         shape_key_datablock = object_datablock.data.shape_keys
-        self._pending_creation.save(shape_key_datablock, bpy.data.shape_keys, shape_key_datablock, context)
+        shape_key_proxy.save(shape_key_datablock, bpy.data.shape_keys, shape_key_datablock, context)
 
-        uuid = self._pending_creation.mixer_uuid
-        assert uuid in context.proxy_state.datablocks
-        assert context.proxy_state.datablocks[uuid] is None
+        shape_key_uuid = shape_key_proxy.mixer_uuid
+        assert shape_key_uuid in context.proxy_state.datablocks
+        assert context.proxy_state.datablocks[shape_key_uuid] is None
 
-        shape_key_datablock.mixer_uuid = uuid
-        context.proxy_state.datablocks[uuid] = shape_key_datablock
+        shape_key_datablock.mixer_uuid = shape_key_uuid
+        context.proxy_state.datablocks[shape_key_uuid] = shape_key_datablock
 
-        self._pending_creation = None
-
-
-class ShapeKeyProxy(DatablockProxy):
-    """
-    Proxy for a ShapeKey datablock.
-
-    XXXX
-
-    """
-
-    def create_standalone_datablock(self, context: Context) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
-        """
-        Save this proxy into its target standalone datablock
-        """
-        user = self._data["user"]
-        user_proxy = context.proxy_state.proxies.get(user.mixer_uuid)
-        if user_proxy is None:
-            # unresolved ref ?
-            # WHAT ?
-            pass
-
-        user_proxy.add_pending_shape_key_creation(self)
-
-        return super().create_standalone_datablock(context)
+        self._pending_creation = ""

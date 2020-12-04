@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import logging
+import sys
 from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
 
 import bpy
@@ -145,6 +146,12 @@ class Context:
     """Current datablock operation state"""
 
 
+_update_order = {
+    T.Key: 5,  # before Mesh for shape keys
+    T.Mesh: 10,  # before Object for vertex_groups
+}
+
+
 class BpyDataProxy(Proxy):
     """Proxy to bpy.data collections
 
@@ -236,8 +243,7 @@ class BpyDataProxy(Proxy):
             all_updates |= self._delayed_updates
             self._delayed_updates.clear()
 
-        # It is required that Object are processed after Mesh (search for "dirty_vertex_groups")
-        sorted_updates = sorted(all_updates, key=lambda datablock: 0 if isinstance(datablock, T.Mesh) else 1)
+        sorted_updates = sorted(all_updates, key=lambda datablock: _update_order.get(type(datablock), sys.maxsize))
 
         for datablock in sorted_updates:
             if not isinstance(datablock, safe_depsgraph_updates):

@@ -117,10 +117,6 @@ class DatablockProxy(StructProxy):
             from mixer.blender_data.mesh_proxy import MeshProxy
 
             return MeshProxy()
-        if isinstance(datablock, T.Key):
-            from mixer.blender_data.shape_key_proxy import ShapeKeyProxy
-
-            return ShapeKeyProxy()
         return DatablockProxy()
 
     @property

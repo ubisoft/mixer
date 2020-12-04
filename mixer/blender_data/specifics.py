@@ -265,31 +265,31 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
 
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
-    target = None
-    target_proxy = proxy.data("data")
-    if isinstance(target_proxy, DatablockRefProxy):
-        target = target_proxy.target(context)
-    elif isinstance(target_proxy, NonePtrProxy):
-        target = None
+    data_datablock = None
+    data_proxy = proxy.data("data")
+    if isinstance(data_proxy, DatablockRefProxy):
+        data_datablock = data_proxy.target(context)
+    elif isinstance(data_proxy, NonePtrProxy):
+        data_datablock = None
     else:
         # error on the sender side
-        logger.warning(f"bpy.data.objects[{name}].data proxy is a {target_proxy.__class__}.")
+        logger.warning(f"bpy.data.objects[{name}].data proxy is a {data_proxy.__class__}.")
         logger.warning("... loaded as Empty")
-        target = None
+        data_datablock = None
 
-    datablock = collection.new(name, target)
+    object_datablock = collection.new(name, data_datablock)
 
     # create shape_keys datablock if any
-    target_uuid = target_proxy.mixer_uuid
-    target_pointee = context.proxy_state.proxies[target_uuid]
+    data_uuid = data_proxy.mixer_uuid
+    data_proxy = context.proxy_state.proxies[data_uuid]
     try:
-        create_shape_keys_datablock = target_pointee.create_shape_keys_datablock
+        shape_key_handler = data_proxy.shape_key_handler
     except AttributeError:
         pass
     else:
-        create_shape_keys_datablock(datablock, context)
+        shape_key_handler.create_shape_keys_datablock(object_datablock, context)
 
-    return datablock
+    return object_datablock
 
 
 @bpy_data_ctor.register("lights")
@@ -330,6 +330,15 @@ def bpy_data_ctor_curves(collection_name: str, proxy: DatablockProxy, context: C
 @bpy_data_ctor.register("shape_keys")
 def bpy_data_ctor_shape_keys(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     # shape key creation is deferred in bpy_data_ctor_objects()
+    user = proxy._data["user"]
+    user_proxy = context.proxy_state.proxies.get(user.mixer_uuid)
+    if user_proxy is None:
+        # unresolved ref ?
+        # WHAT ?
+        pass
+
+    user_proxy.shape_key_handler.pending_creation = proxy.mixer_uuid
+
     return None
 
 
@@ -825,7 +834,7 @@ def truncate_collection(collection: T.bpy_prop_collection, size: int):
     """Truncates collection to _at most_ size elements, ensuring that items can safely be saved into
     the collection. This might clear the collection if its elements cannot be updated.
 
-    This method is useful for bpy _ppop_collections that cannot be safely be overwritten in place,
+    This method is useful for bpy _prop_collections that cannot be safely be overwritten in place,
     because the items cannot be morphed."""
     return
 
