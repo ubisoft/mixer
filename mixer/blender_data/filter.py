@@ -238,6 +238,7 @@ _exclude_names = {
     "is_library_indirect",
     "library",
     "mixer_uuid",
+    "name_full",
     "original",
     "override_library",
     "preview",
@@ -402,7 +403,6 @@ default_exclusions = {
                 "is_instancer",
                 "is_from_instancer",
                 "is_from_set",
-                "name_full",
                 # UI only, define the target of operators
                 "active_material",
                 "active_material_index",
