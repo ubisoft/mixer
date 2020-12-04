@@ -165,7 +165,7 @@ class StructProxy(Proxy):
 
         return self
 
-    def diff(self, struct: T.Struct, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(self, struct: T.Struct, key: str, prop: T.Property, context: Context) -> Optional[Delta]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
 

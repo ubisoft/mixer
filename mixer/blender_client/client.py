@@ -1251,7 +1251,6 @@ def clear_scene_content():
         for name in data:
             collection = getattr(bpy.data, name)
             for datablock in collection:
-                print(f"removing {datablock}")
                 collection.remove(datablock)
 
         bpy.data.batch_remove(bpy.data.shape_keys.values())

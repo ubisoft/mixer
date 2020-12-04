@@ -199,7 +199,7 @@ class Proxy:
 
     def diff(
         self, container: Union[T.bpy_prop_collection, T.Struct], key: Union[str, int], context: Context
-    ) -> Optional[DeltaUpdate]:
+    ) -> Optional[Delta]:
         raise NotImplementedError(f"diff for {container}[{key}]")
 
     def find_by_path(

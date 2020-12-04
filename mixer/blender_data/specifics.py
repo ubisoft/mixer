@@ -438,6 +438,20 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
 
     if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
         target.clear_geometry()
+    elif isinstance(target, T.Object):
+        data = target.data
+        if data is None:
+            return target
+        data_proxy = context.proxy_state.proxies.get(data.mixer_uuid)
+        try:
+            shape_key_handler = data_proxy.shape_key_handler
+        except AttributeError:
+            pass
+        else:
+            shape_key_handler.update_shape_key_datablock(target, context)
+
+        return target
+
     elif isinstance(target, T.Material):
         use_nodes = proxy.data("use_nodes")
         if use_nodes:
@@ -728,6 +742,7 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
 # must_replace
 #
 _object_material_slots_property = T.Object.bl_rna.properties["material_slots"]
+_key_key_blocks_property = T.Key.bl_rna.properties["key_blocks"]
 
 
 @dispatch_rna
@@ -761,7 +776,10 @@ def diff_must_replace(
             if bl_item.link != proxy.data("LINK"):
                 return True
 
-        return False
+    elif collection_property == _key_key_blocks_property:
+        if len(collection) != len(sequence):
+            return True
+        return any((bl_item.name != proxy.data("name") for bl_item, proxy in zip(collection, sequence)))
 
     return False
 

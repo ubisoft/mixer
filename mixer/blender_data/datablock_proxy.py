@@ -32,7 +32,7 @@ from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 
 from mixer.blender_data.attributes import read_attribute, write_attribute
-from mixer.blender_data.proxy import DeltaUpdate
+from mixer.blender_data.proxy import Delta, DeltaUpdate
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.type_helpers import sub_id_type
 from mixer.local_data import get_source_file_path
@@ -117,6 +117,11 @@ class DatablockProxy(StructProxy):
             from mixer.blender_data.mesh_proxy import MeshProxy
 
             return MeshProxy()
+
+        if isinstance(datablock, T.Key):
+            from mixer.blender_data.shape_key_proxy import ShapeKeyProxy
+
+            return ShapeKeyProxy()
         return DatablockProxy()
 
     @property
@@ -321,7 +326,7 @@ class DatablockProxy(StructProxy):
 
         return datablock
 
-    def update_standalone_datablock(self, datablock: T.ID, delta: DeltaUpdate, context: Context) -> T.ID:
+    def update_standalone_datablock(self, datablock: T.ID, delta: Delta, context: Context) -> T.ID:
         """
         Update this proxy and datablock according to delta
         """
@@ -405,7 +410,7 @@ class DatablockProxy(StructProxy):
         elif isinstance(bl_item, T.Curve):
             bl_item.twist_mode = bl_item.twist_mode
 
-    def diff(self, datablock: T.ID, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(self, datablock: T.ID, key: str, prop: T.Property, context: Context) -> Optional[Delta]:
         try:
             diff = self.__class__()
             diff.init(datablock)
