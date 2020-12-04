@@ -184,8 +184,14 @@ class DatablockCollectionProxy(Proxy):
         """
         changeset = Changeset()
 
-        # Sort so that the tests receive the messages in deterministic order. Sad but not very harmfull
-        added_names = sorted(diff.items_added, key=lambda x: id(x[0].name_full))
+        # Sort so that the tests receive the messages in deterministic order for two reasons :
+        # - The tests compare the creation message streams received from participating Blender and there
+        #   is not reason why they would emit creation messages
+        # - TestObjectRenameGeneric.test_update_object exhibits a random failure without the sort
+        #   Scene creation messages order is then random and an update is missed when the scene that links
+        #   the update object is not current. Setting PYTHONHASHSEED is not enough to get a deterministic test outcome.
+        added_names = sorted(diff.items_added, key=lambda x: x[0].name_full)
+
         for datablock, collection_name in added_names:
             name_full = datablock.name_full
             logger.info("Perform update/creation for %s[%s]", collection_name, name_full)
