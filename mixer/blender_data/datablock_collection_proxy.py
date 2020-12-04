@@ -90,6 +90,7 @@ class DatablockCollectionProxy(Proxy):
         """
 
         datablock, renames = incoming_proxy.create_standalone_datablock(context)
+        # returned datablock is None for a ShapeKey. The datablock creation is defered until Object update
 
         if incoming_proxy.collection_name == "scenes":
             logger.warning(f"Creating scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}'")
@@ -107,15 +108,12 @@ class DatablockCollectionProxy(Proxy):
                 logger.warning(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
                 delete_scene(scene_to_remove)
 
-        if not datablock:
-            return None, None
-
         uuid = incoming_proxy.mixer_uuid
         self._data[uuid] = incoming_proxy
         context.proxy_state.datablocks[uuid] = datablock
         context.proxy_state.proxies[uuid] = incoming_proxy
-
-        context.proxy_state.unresolved_refs.resolve(uuid, datablock)
+        if datablock is not None:
+            context.proxy_state.unresolved_refs.resolve(uuid, datablock)
         return datablock, renames
 
     def update_datablock(self, delta: DeltaUpdate, context: Context):

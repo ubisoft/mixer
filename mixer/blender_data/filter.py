@@ -471,6 +471,15 @@ default_exclusions = {
         )
     ],
     T.SequenceEditor: [NameFilterOut(["active_strip", "sequences_all"])],
+    T.ShapeKey: [
+        NameFilterOut(
+            [
+                "relative_key",
+                # points to the first key_blocks item
+                "reference_key",
+            ]
+        )
+    ],
     T.ViewLayer: [
         # Not useful. Requires array insertion (to do shortly)
         NameFilterOut("freestyle_settings"),
@@ -495,6 +504,7 @@ safe_depsgraph_updates = (
     T.Curve,
     T.Image,
     T.GreasePencil,
+    T.Key,
     T.Light,
     T.Material,
     T.Mesh,
@@ -525,6 +535,7 @@ safe_blenddata_collections = [
     "metaballs",
     "objects",
     "scenes",
+    "shape_keys",
     "sounds",
     "worlds",
 ]

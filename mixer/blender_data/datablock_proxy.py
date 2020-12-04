@@ -117,6 +117,10 @@ class DatablockProxy(StructProxy):
             from mixer.blender_data.mesh_proxy import MeshProxy
 
             return MeshProxy()
+        if isinstance(datablock, T.Key):
+            from mixer.blender_data.shape_key_proxy import ShapeKeyProxy
+
+            return ShapeKeyProxy()
         return DatablockProxy()
 
     @property
@@ -291,8 +295,10 @@ class DatablockProxy(StructProxy):
         else:
             datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
 
+        self._initialized = True
         if datablock is None:
-            logger.warning(f"Cannot create bpy.data.{self.collection_name}[{self.data('name')}]")
+            if self.collection_name != "shape_keys":
+                logger.warning(f"Cannot create bpy.data.{self.collection_name}[{self.data('name')}]")
             return None, None
 
         if DEBUG:
@@ -303,7 +309,6 @@ class DatablockProxy(StructProxy):
                 logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
         datablock.mixer_uuid = self.mixer_uuid
-        self._initialized = True
         return self._save(datablock, context), renames
 
     def _save(self, datablock: T.ID, context: Context) -> T.ID:

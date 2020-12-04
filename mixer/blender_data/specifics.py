@@ -277,8 +277,19 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
         logger.warning("... loaded as Empty")
         target = None
 
-    object_ = collection.new(name, target)
-    return object_
+    datablock = collection.new(name, target)
+
+    # create shape_keys datablock if any
+    target_uuid = target_proxy.mixer_uuid
+    target_pointee = context.proxy_state.proxies[target_uuid]
+    try:
+        create_shape_keys_datablock = target_pointee.create_shape_keys_datablock
+    except AttributeError:
+        pass
+    else:
+        create_shape_keys_datablock(datablock, context)
+
+    return datablock
 
 
 @bpy_data_ctor.register("lights")
@@ -314,6 +325,12 @@ def bpy_data_ctor_curves(collection_name: str, proxy: DatablockProxy, context: C
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
     return collection.new(name, "CURVE")
+
+
+@bpy_data_ctor.register("shape_keys")
+def bpy_data_ctor_shape_keys(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+    # shape key creation is deferred in bpy_data_ctor_objects()
+    return None
 
 
 filter_crop_transform = [

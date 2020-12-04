@@ -251,13 +251,13 @@ class BpyDataProxy(Proxy):
                 # Not an error for embedded IDs.
                 if not datablock.is_embedded_data:
                     logger.warning(f"depsgraph update for {datablock} : no proxy and not datablock.is_embedded_data")
-
-                # For instance Scene.node_tree is not a reference to a bpy.data collection element
-                # but a "pointer" to a NodeTree owned by Scene. In such a case, the update list contains
-                # scene.node_tree, then scene. We can ignore the scene.node_tree update since the
-                # processing of scene will process scene.node_tree.
-                # However, it is not obvious to detect the safe cases and remove the message in such cases
-                logger.info("depsgraph update: Ignoring embedded %s", datablock)
+                else:
+                    # For instance Scene.node_tree is not a reference to a bpy.data collection element
+                    # but a "pointer" to a NodeTree owned by Scene. In such a case, the update list contains
+                    # scene.node_tree, then scene. We can ignore the scene.node_tree update since the
+                    # processing of scene will process scene.node_tree.
+                    # However, it is not obvious to detect the safe cases and remove the message in such cases
+                    logger.info("depsgraph update: Ignoring embedded %s", datablock)
                 continue
             delta = proxy.diff(datablock, datablock.name, None, context)
             if delta:

@@ -32,7 +32,7 @@ from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate
-
+from mixer.blender_data.shape_key_proxy import ShapeKeyUser
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
@@ -134,7 +134,7 @@ class VertexGroups:
         return array_sequence
 
 
-class MeshProxy(DatablockProxy):
+class MeshProxy(DatablockProxy, ShapeKeyUser):
     """
     Proxy for a Mesh datablock. This specialization is required to handle geometry resize processing, that
     spans across Mesh (for clear_geometry()) and geometry arrays of structures (Mesh.vertices.add() and others)
