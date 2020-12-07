@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 import bpy
 import bpy.types as T  # noqa
 
+from mixer.blender_data import specifics
 from mixer.blender_data.attributes import diff_attribute, read_attribute, write_attribute
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -90,6 +91,7 @@ class DatablockCollectionProxy(Proxy):
         """
 
         datablock, renames = incoming_proxy.create_standalone_datablock(context)
+        # returned datablock is None for a ShapeKey. The datablock creation is defered until Object update
 
         if incoming_proxy.collection_name == "scenes":
             logger.warning(f"Creating scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}'")
@@ -107,15 +109,15 @@ class DatablockCollectionProxy(Proxy):
                 logger.warning(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
                 delete_scene(scene_to_remove)
 
-        if not datablock:
-            return None, None
-
         uuid = incoming_proxy.mixer_uuid
         self._data[uuid] = incoming_proxy
+
+        # TODO code placement is inconsistent with BpyDataProxy.remove_datablock()
         context.proxy_state.datablocks[uuid] = datablock
         context.proxy_state.proxies[uuid] = incoming_proxy
+        if datablock is not None:
+            context.proxy_state.unresolved_refs.resolve(uuid, datablock)
 
-        context.proxy_state.unresolved_refs.resolve(uuid, datablock)
         return datablock, renames
 
     def update_datablock(self, delta: DeltaUpdate, context: Context):
@@ -154,12 +156,7 @@ class DatablockCollectionProxy(Proxy):
         """Remove a bpy.data collection item and update the proxy state"""
         logger.warning("Perform removal for %s", proxy)
         try:
-            if isinstance(datablock, T.Scene):
-                from mixer.blender_client.scene import delete_scene
-
-                delete_scene(datablock)
-            else:
-                proxy.collection.remove(datablock)
+            specifics.remove_datablock(proxy.collection, datablock)
         except ReferenceError as e:
             # We probably have processed previously the deletion of a datablock referenced by Object.data (e.g. Light).
             # On both sides it deletes the Object as well. So the sender issues a message for object deletion

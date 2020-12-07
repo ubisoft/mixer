@@ -83,6 +83,9 @@ class StructCollectionProxy(Proxy):
     def __len__(self):
         return len(self._sequence)
 
+    def __iter__(self):
+        return iter(self._sequence)
+
     @property
     def length(self) -> int:
         return len(self._sequence)

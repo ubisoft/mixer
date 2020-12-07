@@ -16,6 +16,7 @@ from tests.process import ServerProcess
 
 import mixer.codec
 from mixer.broadcaster.common import Command, MessageType
+from mixer.blender_data.types import Soa
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -238,6 +239,13 @@ class MixerTestCase(unittest.TestCase):
             if isinstance(a, dict):
                 dict_a, dict_b = a, b
             else:
+                if isinstance(a, Soa):
+                    # soa members are not delivered in deterministic order, sort by name
+                    def first_item_pred(x):
+                        return x[0]
+
+                    a.members.sort(key=first_item_pred)
+                    b.members.sort(key=first_item_pred)
                 dict_a, dict_b = vars(a), vars(b)
 
             keys_a, keys_b = sorted(dict_a.keys()), sorted(dict_b.keys())

@@ -33,7 +33,6 @@ from mixer.blender_data.attributes import apply_attribute, diff_attribute
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate
 
-
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
     from mixer.blender_data.types import ArrayGroup
@@ -147,7 +146,7 @@ class MeshProxy(DatablockProxy):
             existing_length = len(soa)
             incoming_soa = self.data(k)
             if incoming_soa:
-                incoming_length = incoming_soa.length
+                incoming_length = len(incoming_soa)
                 if existing_length != incoming_length:
                     logger.debug(
                         "need_clear_geometry: %s.%s (current/incoming) (%s/%s)",

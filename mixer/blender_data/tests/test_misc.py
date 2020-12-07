@@ -156,58 +156,6 @@ class TestLoadProxy(unittest.TestCase):
         self.assertIsInstance(focus_object_proxy, NonePtrProxy)
 
 
-class TestProperties(unittest.TestCase):
-    def test_one(self):
-        synchronized_properties = test_properties
-        camera = D.cameras[0]
-
-        # for 2.83.4
-        expected_names = {
-            "name",
-            "name_full",
-            "type",
-            "sensor_fit",
-            "passepartout_alpha",
-            "angle_x",
-            "angle_y",
-            "angle",
-            "clip_start",
-            "clip_end",
-            "lens",
-            "sensor_width",
-            "sensor_height",
-            "ortho_scale",
-            "display_size",
-            "shift_x",
-            "shift_y",
-            "stereo",
-            "show_limits",
-            "show_mist",
-            "show_passepartout",
-            "show_safe_areas",
-            "show_safe_center",
-            "show_name",
-            "show_sensor",
-            "show_background_images",
-            "lens_unit",
-            "show_composition_center",
-            "show_composition_center_diagonal",
-            "show_composition_thirds",
-            "show_composition_golden",
-            "show_composition_golden_tria_a",
-            "show_composition_golden_tria_b",
-            "show_composition_harmony_tri_a",
-            "show_composition_harmony_tri_b",
-            "dof",
-            "background_images",
-            "animation_data",
-            "cycles",
-        }
-        names = {prop[0] for prop in synchronized_properties.properties(camera)}
-        for name in expected_names:
-            self.assertIn(name, names, "Expected list from 2.83.4, check version")
-
-
 class TestBlendData(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
