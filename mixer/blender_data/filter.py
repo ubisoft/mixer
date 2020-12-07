@@ -488,6 +488,18 @@ default_exclusions = {
             ]
         )
     ],
+    T.Spline: [
+        NameFilterOut(
+            [
+                # FIXME Not always writable. Nurbs only ?
+                "order_u",
+                "order_v",
+                # readonly
+                "point_count_u",
+                "point_count_v",
+            ]
+        )
+    ],
     T.ViewLayer: [
         # Not useful. Requires array insertion (to do shortly)
         NameFilterOut("freestyle_settings"),
