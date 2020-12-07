@@ -420,6 +420,18 @@ key0.data[0].co[2] = key0.data[0].co[2]
         self.send_string(action)
         self.end_test()
 
+    def test_update_relative_key(self):
+        self.send_string(self._create_on_mesh)
+        action = """
+import bpy
+obj = bpy.data.objects[0]
+keys = bpy.data.shape_keys[0]
+keys.key_blocks[2].relative_key = keys.key_blocks[1]
+"""
+
+        self.send_string(action)
+        self.end_test()
+
     def test_remove_key(self):
         self.send_string(self._create_on_mesh)
 

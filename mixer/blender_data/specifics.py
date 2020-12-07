@@ -751,7 +751,12 @@ def diff_must_replace(
     elif collection_property == _key_key_blocks_property:
         if len(collection) != len(sequence):
             return True
-        return any((bl_item.name != proxy.data("name") for bl_item, proxy in zip(collection, sequence)))
+        for bl_item, proxy in zip(collection, sequence):
+            if bl_item.name != proxy.data("name"):
+                return True
+            if bl_item.relative_key.name != proxy.data("relative_key"):
+                # see ShapeKeyProxy.load()
+                return True
 
     return False
 
