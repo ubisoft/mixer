@@ -23,7 +23,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional, Union, TYPE_CHECKING
+from typing import Dict, Iterable, Optional, Union, TYPE_CHECKING
 
 import bpy.types as T  # noqa
 
@@ -38,6 +38,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_unknown_type_attributes = {"__doc__", "__module__", "__slots__", "bl_rna", "rna_type"}
+"""Attributes of bpy.types.UnknownType to not synchronize"""
+
 
 class AosProxy(Proxy):
     """
@@ -50,6 +53,9 @@ class AosProxy(Proxy):
     def __init__(self):
         self._data: Dict[str, Union[AosElement, SoaElement, Delta]] = {}
         self._aos_length = 0
+
+    def __len__(self):
+        return self._aos_length
 
     @property
     def length(self) -> int:
@@ -68,21 +74,29 @@ class AosProxy(Proxy):
         context.visit_state.path.append(key)
         try:
             item_bl_rna = bl_collection_property.fixed_type.bl_rna
-            for attr_name, bl_rna_property in context.synchronized_properties.properties(item_bl_rna):
-                if is_soable_property(bl_rna_property):
-                    # element supported by foreach_get()/foreach_set(), e.g. MeshVertices.co
-                    # The collection is loaded as an array.array and encoded as a binary buffer
-                    self._data[attr_name] = SoaElement().load(bl_collection, attr_name, item_bl_rna, context)
-                else:
-                    # element not supported by foreach_get()/foreach_set(), e.g. BezierSplinePoint.handle_left_type,
-                    # which is an enum, loaded as string
-                    # The collection is loaded as a dict, encoded as such
-                    self._data[attr_name] = AosElement().load(bl_collection, attr_name, item_bl_rna, context)
+            if bl_collection_property.fixed_type.bl_rna is T.UnknownType.bl_rna:
+                # UnknownType used in ShakeKey. Contents depends on the items that has the Key (Curve, Mesh, Lattice)
+                if len(self) != 0:
+                    item = bl_collection[0]
+                    names = set(dir(item)) - _unknown_type_attributes
+                    for attr_name in names:
+                        self._data[attr_name] = SoaElement().load(bl_collection, attr_name, item_bl_rna, context)
+            else:
+                for attr_name, bl_rna_property in context.synchronized_properties.properties(item_bl_rna):
+                    if is_soable_property(bl_rna_property):
+                        # element supported by foreach_get()/foreach_set(), e.g. MeshVertices.co
+                        # The collection is loaded as an array.array and encoded as a binary buffer
+                        self._data[attr_name] = SoaElement().load(bl_collection, attr_name, item_bl_rna, context)
+                    else:
+                        # element not supported by foreach_get()/foreach_set(), e.g. BezierSplinePoint.handle_left_type,
+                        # which is an enum, loaded as string
+                        # The collection is loaded as a dict, encoded as such
+                        self._data[attr_name] = AosElement().load(bl_collection, attr_name, item_bl_rna, context)
         finally:
             context.visit_state.path.pop()
         return self
 
-    def save(self, attribute: T.bpy_prop_collection, parent: T.bpy_struct, key: str, context: Context):
+    def save(self, attribute: T.bpy_prop_collection, parent: T.bpy_struct, key: Union[int, str], context: Context):
         """
         Save this proxy into attribute.
 
@@ -141,7 +155,9 @@ class AosProxy(Proxy):
             context.visit_state.path.pop()
         return self
 
-    def diff(self, aos: T.bpy_prop_collection, key: str, prop: T.Property, context: Context) -> Optional[DeltaUpdate]:
+    def diff(
+        self, aos: T.bpy_prop_collection, key: Union[int, str], prop: T.Property, context: Context
+    ) -> Optional[DeltaUpdate]:
         """"""
 
         # Create a proxy that will be populated with attributes differences, resulting in a hollow dict,
@@ -153,12 +169,21 @@ class AosProxy(Proxy):
         context.visit_state.path.append(key)
         try:
             item_bl_rna = prop.fixed_type.bl_rna
-            for attr_name, _ in context.synchronized_properties.properties(item_bl_rna):
+            member_names: Iterable[str] = []
+            if item_bl_rna is T.UnknownType.bl_rna:
+                # UnknownType used in ShapeKey. Contents depends on the items that has the Key (Curve, Mesh, Lattice)
+                if len(self) != 0:
+                    member_names = set(dir(aos[0])) - _unknown_type_attributes
+            else:
+                member_names = [item[0] for item in context.synchronized_properties.properties(item_bl_rna)]
+
+            for member_name in member_names:
                 # co, normals, ...
-                proxy_data = self._data.get(attr_name, SoaElement())
-                delta = diff_attribute(aos, attr_name, item_bl_rna, proxy_data, context)
+                proxy_data = self._data.get(member_name, SoaElement())
+                delta = diff_attribute(aos, member_name, item_bl_rna, proxy_data, context)
                 if delta is not None:
-                    diff._data[attr_name] = delta
+                    diff._data[member_name] = delta
+
         finally:
             context.visit_state.path.pop()
 

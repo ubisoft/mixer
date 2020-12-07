@@ -175,7 +175,7 @@ class DatablockProxy(StructProxy):
             self._initialized = True
 
         self._class_name = datablock.__class__.__name__
-        self._data.clear()
+        self.clear_data()
         properties = context.synchronized_properties.properties(datablock)
         # this assumes that specifics.py apply only to ID, not Struct
         properties = specifics.conditional_properties(datablock, properties)

@@ -370,15 +370,80 @@ bpy.ops.object.material_slot_move(direction='DOWN')
 
 
 class TestShapeKey(TestCase):
-    def test_create(self):
-        action = """
+    _create_on_mesh = """
 import bpy
 bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
 obj = bpy.data.objects[0]
 obj.shape_key_add()
 obj.shape_key_add()
+obj.shape_key_add()
+keys = bpy.data.shape_keys[0]
+key0 = keys.key_blocks[0]
+key0.data[0].co[2] = 1.
+key1 = keys.key_blocks[1]
+key1.value = 0.1
+key2 = keys.key_blocks[2]
+key2.value = 0.2
 """
 
+    _create_on_curve = """
+import bpy
+bpy.ops.curve.primitive_bezier_circle_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+obj.shape_key_add()
+obj.shape_key_add()
+obj.shape_key_add()
+keys = bpy.data.shape_keys[0]
+key0 = keys.key_blocks[0]
+key0.data[0].co[2] = 1.
+key1 = keys.key_blocks[1]
+key1.value = 0.1
+key2 = keys.key_blocks[2]
+key2.value = 0.2
+"""
+
+    def test_create_mesh(self):
+        self.send_string(self._create_on_mesh)
+        self.end_test()
+
+    def test_rename_key(self):
+        self.send_string(self._create_on_mesh)
+        action = """
+import bpy
+obj = bpy.data.objects[0]
+keys = bpy.data.shape_keys[0]
+key0 = keys.key_blocks[0]
+key0.name = "plop"
+key0.data[0].co[2] = key0.data[0].co[2]
+"""
+
+        self.send_string(action)
+        self.end_test()
+
+    def test_remove_key(self):
+        self.send_string(self._create_on_mesh)
+
+        action = """
+import bpy
+obj = bpy.data.objects[0]
+keys = bpy.data.shape_keys[0]
+key1 = keys.key_blocks[1]
+obj.shape_key_remove(key1)
+"""
+        self.send_string(action)
+        self.end_test()
+
+    def test_update_curve_handle(self):
+        self.send_string(self._create_on_curve)
+
+        action = """
+import bpy
+obj = bpy.data.objects[0]
+keys = bpy.data.shape_keys[0]
+key0 = keys.key_blocks[0]
+key0.data[0].handle_left[2] = 10.
+key0.data[0].handle_right[2] = 10.
+"""
         self.send_string(action)
         self.end_test()
 

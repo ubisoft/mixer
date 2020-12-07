@@ -146,7 +146,7 @@ class MeshProxy(DatablockProxy):
             existing_length = len(soa)
             incoming_soa = self.data(k)
             if incoming_soa:
-                incoming_length = incoming_soa.length
+                incoming_length = len(incoming_soa)
                 if existing_length != incoming_length:
                     logger.debug(
                         "need_clear_geometry: %s.%s (current/incoming) (%s/%s)",

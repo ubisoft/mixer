@@ -59,10 +59,11 @@ soable_collection_properties = {
     T.Mesh.bl_rna.properties["loop_triangles"],
     T.Mesh.bl_rna.properties["polygons"],
     T.Mesh.bl_rna.properties["vertices"],
-    T.Spline.bl_rna.properties["bezier_points"],
     T.MeshFaceMapLayer.bl_rna.properties["data"],
     T.MeshLoopColorLayer.bl_rna.properties["data"],
     T.MeshUVLoopLayer.bl_rna.properties["data"],
+    T.ShapeKey.bl_rna.properties["data"],
+    T.Spline.bl_rna.properties["bezier_points"],
 }
 _resize_geometry_types = tuple(
     type(t.bl_rna)
@@ -674,7 +675,7 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
     target_rna = target.bl_rna
     if isinstance(target_rna, _resize_geometry_types):
         existing_length = len(target)
-        incoming_length = proxy.length
+        incoming_length = len(proxy)
         if existing_length != incoming_length:
             if existing_length != 0:
                 logger.error(f"resize_geometry(): size mismatch for {target}")
@@ -698,7 +699,7 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
 
     if isinstance(target_rna, type(T.SplineBezierPoints.bl_rna)):
         existing_length = len(target)
-        incoming_length = proxy.length
+        incoming_length = len(proxy)
         delta = incoming_length - existing_length
         if delta > 0:
             target.add(delta)

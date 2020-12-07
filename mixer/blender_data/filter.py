@@ -324,6 +324,14 @@ default_exclusions = {
             ]
         )
     ],
+    T.Key: [
+        NameFilterOut(
+            [
+                # is always the first key_blocks item
+                "reference_key"
+            ]
+        )
+    ],
     T.MaterialSlot: [
         NameFilterOut(
             [
