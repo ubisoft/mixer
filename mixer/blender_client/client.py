@@ -60,6 +60,7 @@ from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
 from mixer.blender_data.proxy import ensure_uuid
 import mixer.shot_manager as shot_manager
+import mixer.asset_bank as asset_bank
 from mixer.draw_handlers import set_draw_handlers
 
 from mixer.blender_client.camera import send_camera
@@ -1111,6 +1112,9 @@ class BlenderClient(Client):
                         self.build_montage_mode(command.data)
                     elif command.type == MessageType.SHOT_MANAGER_ACTION:
                         shot_manager.build_shot_manager_action(command.data)
+
+                    elif command.type == MessageType.ASSET_BANK:
+                        asset_bank.receive_message(command.data)
 
                     elif command.type == MessageType.BLENDER_DATA_UPDATE:
                         data_api.build_data_update(command.data)
