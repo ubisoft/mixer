@@ -46,7 +46,6 @@ from uuid import uuid4
 from bpy.app.handlers import persistent
 
 from mixer.share_data import object_visibility
-from mixer.blender_client import constraint
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import update_params
 
