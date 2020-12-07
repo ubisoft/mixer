@@ -16,10 +16,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from enum import IntEnum
+import bpy
 import logging
 from mixer.broadcaster import common
 from mixer.share_data import share_data
-
+from mixer.broadcaster.client import Client
 
 logger = logging.getLogger(__name__)
 
@@ -89,3 +90,13 @@ def get_or_create_constraint(ob, constraint_type: str):
             return constraint
     constraint = ob.constraints.new(type=constraint_type)
     return constraint
+
+
+def send_add_constraint(client: Client, object_: bpy.types.Object, constraint_type: ConstraintType, target: str):
+    buffer = common.encode_int(constraint_type) + common.encode_string(object_.name_full) + common.encode_string(target)
+    client.add_command(common.Command(common.MessageType.ADD_CONSTRAINT, buffer, 0))
+
+
+def send_remove_constraints(client: Client, object_: bpy.types.Object, constraint_type: ConstraintType):
+    buffer = common.encode_int(constraint_type) + common.encode_string(object_.name_full)
+    client.add_command(common.Command(common.MessageType.REMOVE_CONSTRAINT, buffer, 0))
