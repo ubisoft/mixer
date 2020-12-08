@@ -1256,8 +1256,10 @@ def clear_scene_content():
 
         for name in data:
             collection = getattr(bpy.data, name)
-            for obj in collection:
-                collection.remove(obj)
+            for datablock in collection:
+                collection.remove(datablock)
+
+        bpy.data.batch_remove(bpy.data.shape_keys.values())
 
         # Cannot remove the last scene at this point, treat it differently
         for scene in bpy.data.scenes[:-1]:

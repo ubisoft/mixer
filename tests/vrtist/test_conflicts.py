@@ -5,6 +5,7 @@ for instance rename a collection on one side and add to collection on the other 
 Such conflits need a server with throttling control to reproduce the problem reliably.
 
 """
+import logging
 import time
 import unittest
 
@@ -226,6 +227,7 @@ bpy.data.collections.remove(collection)
 
 class TestObjectRenameGeneric(ThrottledTestCase):
     def setUp(self):
+        self.log_level = logging.INFO
         super().setUp("file2.blend")
 
         # work around the ADD_OBJECT_TO_VRTIST mismatch that is caused because the message generation depends on the
@@ -237,10 +239,18 @@ bpy.data.scenes.remove(bpy.data.scenes["Scene.001"])
         self.send_string(cleanup_scenes, to=0)
 
     def test_update_object(self):
-        self.send_strings([bl.data_objects_rename("A", "B")], to=0)
+        rename = """
+import bpy
+bpy.data.objects["A"].name = "B"
+"""
+        self.send_string(rename, to=0)
         delay = 0.0
         time.sleep(delay)
-        self.send_strings([bl.data_objects_update("B", ".location[1] = 2.")], to=1)
+        update = """
+import bpy
+bpy.data.objects["B"].location[1] = 2.
+"""
+        self.send_string(update, to=1)
         time.sleep(1.0)
         # wrong object updated
         self.assert_matches()

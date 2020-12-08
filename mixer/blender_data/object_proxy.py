@@ -29,8 +29,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.mesh_proxy import VertexGroups
-from mixer.blender_data.misc_proxies import NonePtrProxy
-from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate
+from mixer.blender_data.proxy import Delta, DeltaReplace
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 if TYPE_CHECKING:
@@ -171,16 +170,15 @@ class ObjectProxy(DatablockProxy):
             for index, weight in zip(indices, weights):
                 vertex_group.add([index], weight, "ADD")
 
-    def _diff(
-        self, struct: T.Object, key: str, prop: T.Property, context: Context, diff: Proxy
-    ) -> Optional[DeltaUpdate]:
+    def _diff(self, struct: T.Object, key: str, prop: T.Property, context: Context, diff: Proxy) -> Optional[Delta]:
 
-        datablock_ref = self._data["data"]
-        if datablock_ref and not isinstance(datablock_ref, NonePtrProxy):
-            if datablock_ref.mixer_uuid in context.visit_state.dirty_vertex_groups:
+        data_datablock = struct.data
+        if data_datablock is not None:
+            dirty_vertex_groups = data_datablock.mixer_uuid in context.visit_state.dirty_vertex_groups
+            if dirty_vertex_groups:
+                # Replace the whole Object. Otherwise we would have to merge a DeltaReplace for vertex_groups
+                # and a DeltaUpdate for the remaining items
                 logger.debug(f"_diff: {struct} dirty vertex group: replace")
-                # Lazy and heavy : replace the whole Object. Otherwise we would have to merge a DeltaReplace
-                # for vertex_groups and a DeltaUpdate for the remaining items
                 diff.load(struct, context)
                 return DeltaReplace(diff)
 
