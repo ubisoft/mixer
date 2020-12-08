@@ -296,7 +296,7 @@ bpy.ops.object.vertex_group_move(direction="UP")
         self.end_test()
 
 
-class TestObject(TestCase):
+class TestObjectMaterialSlot(TestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._create_action = """
@@ -363,6 +363,33 @@ import bpy
 obj = bpy.data.objects[0]
 obj.active_material_index = 0
 bpy.ops.object.material_slot_move(direction='DOWN')
+"""
+
+        self.send_string(action)
+        self.end_test()
+
+
+class TestObjectParent(TestCase):
+    _create_action = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(1., 0., 0))
+bpy.ops.mesh.primitive_plane_add(location=(0., 1., 1))
+"""
+
+    def test_parent_set(self):
+        self.send_string(self._create_action)
+
+        action = """
+import bpy
+obj0 = bpy.data.objects[0]
+obj1 = bpy.data.objects[1]
+bpy.context.view_layer.objects.active=obj1
+obj0.select_set(True)
+
+# obj0 is child of obj1
+# the operator also modifies local_matrix and matrix_parent_inverse
+
+bpy.ops.object.parent_set(type='OBJECT')
 """
 
         self.send_string(action)
