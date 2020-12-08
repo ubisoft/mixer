@@ -34,6 +34,7 @@ from mixer.connection import (
     is_client_connected,
     connect,
     join_room,
+    create_room,
     leave_current_room,
     disconnect,
     network_consumer_timer,
@@ -94,7 +95,7 @@ class CreateRoomOperator(bpy.types.Operator):
         prefs = get_mixer_prefs()
         room = prefs.room
         logger.warning(f"CreateRoomOperator.execute({room})")
-        join_room(room, prefs.vrtist_protocol)
+        create_room(room, prefs.vrtist_protocol)
 
         return {"FINISHED"}
 
