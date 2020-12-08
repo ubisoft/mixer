@@ -76,7 +76,6 @@ _classes.update({c.__name__: c for c in delta_classes})
 
 _classes_tuple = tuple(_classes.values())
 
-options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name"]
 MIXER_CLASS = "__mixer_class__"
 
 
@@ -95,26 +94,31 @@ def default(obj):
     # called top down
     class_ = obj.__class__
 
-    # TODO AOS and SOA
-
     is_known = issubclass(class_, _classes_tuple)
     if is_known:
         # Add the proxy class so that the decoder and instantiate the right type
         d = {MIXER_CLASS: class_.__name__}
         if issubclass(class_, Delta):
             d.update({"value": obj.value})
-        elif issubclass(class_, (NonePtrProxy, SoaElement)):
+        else:
+            try:
+                _data = obj._data
+            except AttributeError:
+                pass
+            else:
+                d.update({"_data": _data})
+
+        try:
+            _serialize = class_._serialize
+        except AttributeError:
             pass
         else:
-            d.update({"_data": obj._data})
-
-        for option in options:
-            d.update(default_optional(obj, option))
-        serialize = getattr(class_, "_serialize", None)
-        if serialize is not None:
-            for option in serialize:
+            for option in _serialize:
                 d.update(default_optional(obj, option))
+
         return d
+    else:
+        logger.error(f"Unknown class {class_}")
     return None
 
 
@@ -134,17 +138,23 @@ def decode_hook(x):
 
     if class_ in delta_classes:
         obj = class_(x["value"])
-    elif class_ in (SoaElement, NonePtrProxy):
-        obj = class_()
     else:
         obj = class_()
-        obj._data.update(x["_data"])
+        try:
+            _data = x["_data"]
+        except KeyError:
+            pass
+        else:
+            obj._data.update(_data)
 
-    for option in options:
-        decode_optional(obj, x, option)
-    if hasattr(class_, "_serialize"):
-        for option in class_._serialize:
-            decode_optional(obj, x, option)
+        try:
+            _serialize = class_._serialize
+        except AttributeError:
+            pass
+        else:
+            for option in _serialize:
+                decode_optional(obj, x, option)
+
     return obj
 
 

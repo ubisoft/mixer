@@ -53,6 +53,8 @@ class DatablockProxy(StructProxy):
     Proxy to a datablock, standalone (bpy.data.cameras['Camera']) or embedded.
     """
 
+    _serialize = ("_bpy_data_collection", "_class_name", "_datablock_uuid")
+
     def __init__(self):
         super().__init__()
 
