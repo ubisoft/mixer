@@ -23,7 +23,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union
 
 import bpy.types as T  # noqa
 
@@ -52,20 +52,24 @@ class StructProxy(Proxy):
     def clear_data(self):
         self._data.clear()
 
-    def load(self, bl_instance: Any, parent_key: Union[int, str], context: Context):
-
+    def load(self, attribute: T.bpy_struct, key: Union[int, str], context: Context) -> StructProxy:
         """
-        Load a Blender object into this proxy
+        Load the attribute Blender struct into this proxy
+
+        Args:
+            attribute: the Blender struct to load into this proxy, (e.g an ObjectDisplay instance)
+            key: the identifier of attribute in its parent (e.g. "display")
+            context: the proxy and visit state
         """
         self.clear_data()
-        properties = context.synchronized_properties.properties(bl_instance)
+        properties = context.synchronized_properties.properties(attribute)
         # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
         # that we do not want to load anyway
-        properties = specifics.conditional_properties(bl_instance, properties)
-        context.visit_state.path.append(parent_key)
+        properties = specifics.conditional_properties(attribute, properties)
+        context.visit_state.path.append(key)
         try:
             for name, bl_rna_property in properties:
-                attr = getattr(bl_instance, name)
+                attr = getattr(attribute, name)
                 attr_value = read_attribute(attr, name, bl_rna_property, context)
                 self._data[name] = attr_value
         finally:
@@ -73,12 +77,17 @@ class StructProxy(Proxy):
 
         return self
 
-    def _pre_save(self, target: T.bpy_struct, context: Context) -> T.bpy_struct:
-        return specifics.pre_save_struct(self, target, context)
+    def _pre_save(self, struct: T.bpy_struct, context: Context) -> T.bpy_struct:
+        """Save the struct attributes that must be saved first because they influence the saving
+        of other attributes
+
+        For instance, Scene.use_nodes needs to be set to True before Scene.node_tree can be saved.
+        """
+        return specifics.pre_save_struct(self, struct, context)
 
     def save(
         self,
-        struct: T.bpy_struct,
+        attribute: T.bpy_struct,
         parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: Union[int, str],
         context: Context,
@@ -87,14 +96,14 @@ class StructProxy(Proxy):
         Save this proxy into attribute
 
         Args:
-            struct: the bpy_struct to store this proxy into
+            attribute: the bpy_struct to store this proxy into
             parent: (e.g an Object instance)
             key: (e.g. "display)
             context: the proxy and visit state
         """
-        struct = self._pre_save(struct, context)
+        attribute = self._pre_save(attribute, context)
 
-        if struct is None:
+        if attribute is None:
             if isinstance(parent, T.bpy_prop_collection):
                 logger.warning(f"Cannot write to '{parent}', attribute '{key}' because it does not exist.")
             else:
@@ -109,7 +118,7 @@ class StructProxy(Proxy):
         context.visit_state.path.append(key)
         try:
             for k, v in self._data.items():
-                write_attribute(struct, k, v, context)
+                write_attribute(attribute, k, v, context)
         finally:
             context.visit_state.path.pop()
 
@@ -165,30 +174,50 @@ class StructProxy(Proxy):
 
         return self
 
-    def diff(self, struct: T.Struct, key: Union[int, str], prop: T.Property, context: Context) -> Optional[Delta]:
+    def diff(
+        self, attribute: T.bpy_struct, key: Union[int, str], prop: T.Property, context: Context
+    ) -> Optional[Delta]:
         """
         Computes the difference between the state of an item tracked by this proxy and its Blender state.
 
         As this proxy tracks a Struct or ID, the result will be a DeltaUpdate that contains a StructProxy
         or a DatablockProxy with an Delta item per added, deleted or updated property. One expect only DeltaUpdate,
         although DeltalAddition or DeltaDeletion may be produced when an addon is loaded or unloaded while
-        a room is joined. This situation, is not really supported as there is no handler to track
+        a room is joined. This situation is not really supported as there is no handler to track
         addon changes.
 
         Args:
-            struct: the Struct that must be diffed against this proxy
-            struct_property: the Property of struct as found in its enclosing object
+            attribute: the struct to update (e.g. a Material instance)
+            key: the key that identifies attribute in parent (e.g "Material")
+            prop: the Property of struct as found in its enclosing object
+            context: proxy and visit state
         """
 
-        # Create a proxy that will be populated with attributes differences, resulting in a hollow dict,
-        # as opposed as the dense self
+        # Create a proxy that will be populated with attributes differences.
         diff = self.__class__()
-        diff.init(struct)
-        return self._diff(struct, key, prop, context, diff)
+        diff.init(attribute)
+        delta = self._diff(attribute, key, prop, context, diff)
+        return delta
 
     def _diff(
-        self, struct: T.Struct, key: Union[int, str], prop: T.Property, context: Context, diff: StructProxy
+        self, attribute: T.bpy_struct, key: Union[int, str], prop: T.Property, context: Context, diff: StructProxy
     ) -> Optional[Delta]:
+        """
+        Computes the difference between the state of an item tracked by this proxy and its Blender state
+        and attached the difference to diff.
+
+        See diff()
+
+        Args:
+            attribute: the struct to update (e.g. a Material instance)
+            key: the key that identifies attribute in parent (e.g "Material")
+            prop: the Property of struct as found in its enclosing object
+            context: proxy and visit state
+            diff: the proxy that holds the difference and will be transmitted in a Delta
+
+        Returns:
+            a delta if any difference is found, None otherwise
+        """
         # PERF accessing the properties from the synchronized_properties is **far** cheaper that iterating over
         # _data and the getting the properties with
         #   member_property = struct.bl_rna.properties[k]
@@ -196,8 +225,8 @@ class StructProxy(Proxy):
         if prop is not None:
             context.visit_state.path.append(key)
         try:
-            properties = context.synchronized_properties.properties(struct)
-            properties = specifics.conditional_properties(struct, properties)
+            properties = context.synchronized_properties.properties(attribute)
+            properties = specifics.conditional_properties(attribute, properties)
             for k, member_property in properties:
                 # TODO in test_differential.StructDatablockRef.test_remove
                 # target et a scene, k is world and v (current world value) is None
@@ -205,9 +234,9 @@ class StructProxy(Proxy):
 
                 # make a difference between None value and no member
                 try:
-                    member = getattr(struct, k)
+                    member = getattr(attribute, k)
                 except AttributeError:
-                    logger.info(f"diff: unknown attribute {k} in {struct}")
+                    logger.info(f"diff: unknown attribute {k} in {attribute}")
                     continue
 
                 proxy_data = self._data.get(k)

@@ -153,8 +153,7 @@ class DatablockProxy(StructProxy):
         context: Context,
         bpy_data_collection_name: str = None,
     ) -> DatablockProxy:
-        """
-        Load a datablock into this proxy?
+        """Load a datablock into this proxy
 
         Args:
             datablock: the datablock to load into this proxy, may be standalone or embedded
@@ -349,12 +348,12 @@ class DatablockProxy(StructProxy):
 
         return datablock
 
-    def save(self, datablock: T.ID, unused_parent: T.bpy_struct, unused_key: Union[int, str], context: Context) -> T.ID:
+    def save(self, attribute: T.ID, unused_parent: T.bpy_struct, unused_key: Union[int, str], context: Context) -> T.ID:
         """
         Save this proxy into an embedded datablock
 
         Args:
-            datablock: the datablock into which this proxy is saved
+            attribute: the datablock into which this proxy is saved
             unused_parent: the struct that contains the embedded datablock (e.g. a Scene)
             unused_key: the member name of the datablock in parent (e.g. node_tree)
             context: proxy and visit state
@@ -366,30 +365,40 @@ class DatablockProxy(StructProxy):
         # TODO it might be better to load embedded datablocks as StructProxy and remove this method
         # assert self.is_embedded_data, f"save: called {parent}[{key}], which is not standalone"
 
-        target = self._pre_save(datablock, context)
-        if target is None:
-            logger.error(f"DatablockProxy.save() get None after _pre_save({datablock})")
+        datablock = self._pre_save(attribute, context)
+        if datablock is None:
+            logger.error(f"DatablockProxy.save() get None after _pre_save({attribute})")
             return None
 
         try:
             context.visit_state.datablock_proxy = self
             for k, v in self._data.items():
-                write_attribute(target, k, v, context)
+                write_attribute(datablock, k, v, context)
         finally:
             context.visit_state.datablock_proxy = None
 
-        return target
+        return datablock
 
     def apply(
         self,
-        attribute: T.bpy_struct,
+        attribute: T.ID,
         parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: Union[int, str],
         delta: Delta,
         context: Context,
         to_blender: bool = True,
     ) -> StructProxy:
+        """
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
 
+        Args:
+            attribute: the struct to update (e.g. a Material instance)
+            parent: the attribute that contains attribute (e.g. bpy.data.materials)
+            key: the key that identifies attribute in parent (e.g "Material")
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
+        """
         custom_properties_update = delta.value._custom_properties
         if custom_properties_update is not None:
             self._custom_properties = custom_properties_update
@@ -400,7 +409,7 @@ class DatablockProxy(StructProxy):
 
     def apply_to_proxy(
         self,
-        datablock: T.ID,
+        attribute: T.ID,
         delta: DeltaUpdate,
         context: Context,
     ):
@@ -411,12 +420,12 @@ class DatablockProxy(StructProxy):
         the user.
 
         Args:
-            datablock: the datablock that is managed by this proxy
+            attribute: the datablock that is managed by this proxy
             delta: the delta to apply
             context: proxy and visit state
         """
         collection = getattr(bpy.data, self.collection_name)
-        self.apply(datablock, collection, datablock.name, delta, context, to_blender=False)
+        self.apply(attribute, collection, attribute.name, delta, context, to_blender=False)
 
     def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember]):
 
@@ -434,19 +443,30 @@ class DatablockProxy(StructProxy):
         elif isinstance(bl_item, T.Curve):
             bl_item.twist_mode = bl_item.twist_mode
 
-    def diff(self, datablock: T.ID, key: Union[int, str], prop: T.Property, context: Context) -> Optional[Delta]:
+    def diff(self, attribute: T.ID, key: Union[int, str], prop: T.Property, context: Context) -> Optional[Delta]:
+        """
+        Computes the difference between the state of an item tracked by this proxy and its Blender state.
+
+        Args:
+            attribute: the datablock to update (e.g. a Material instance)
+            key: the key that identifies attribute in parent (e.g "Material")
+            prop: the Property of struct as found in its enclosing object
+            context: proxy and visit state
+        """
+
+        # Create a proxy that will be populated with attributes differences.
         diff = self.__class__()
-        diff.init(datablock)
+        diff.init(attribute)
 
         context.visit_state.datablock_proxy = diff
         try:
-            delta = self._diff(datablock, key, prop, context, diff)
+            delta = self._diff(attribute, key, prop, context, diff)
         finally:
             context.visit_state.datablock_proxy = None
 
         # compute the custom properties update
         if not isinstance(delta, DeltaReplace):
-            custom_properties_update = self._custom_properties.diff(datablock)
+            custom_properties_update = self._custom_properties.diff(attribute)
             if custom_properties_update is not None:
                 if delta is None:
                     # regular diff had found no delta: create one
