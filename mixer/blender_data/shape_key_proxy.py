@@ -95,7 +95,7 @@ class ShapeKeyProxy(DatablockProxy):
 
         return self
 
-    def save(self, datablock: T.ID, unused_parent: T.bpy_struct, unused_key: str, context: Context) -> T.ID:
+    def save(self, datablock: T.ID, unused_parent: T.bpy_struct, unused_key: Union[int, str], context: Context) -> T.ID:
         super().save(datablock, unused_parent, unused_key, context)
 
         # see load()
@@ -131,7 +131,9 @@ class ShapeKeyProxy(DatablockProxy):
         else:
             return super().apply(attribute, parent, key, delta, context, to_blender)
 
-    def diff(self, datablock: T.ID, key: str, prop: T.Property, context: Context) -> Optional[Delta]:
+    def _diff(
+        self, datablock: T.ID, key: Union[int, str], prop: T.Property, context: Context, diff: DatablockProxy
+    ) -> Optional[Delta]:
         key_blocks = datablock.key_blocks
         key_bocks_property = datablock.bl_rna.properties["key_blocks"]
         key_blocks_proxy = self._data["key_blocks"]
@@ -141,8 +143,8 @@ class ShapeKeyProxy(DatablockProxy):
             # causing the removal of the Key datablock.
 
             # Ensure that the whole Key data is available to be reloaded after clear()
-            self.load(datablock, context)
-            return DeltaReplace(self)
+            diff.load(datablock, context)
+            return DeltaReplace(diff)
         else:
             # this delta is processed by the regular apply
-            return super().diff(datablock, key, prop, context)
+            return super()._diff(datablock, key, prop, context, diff)

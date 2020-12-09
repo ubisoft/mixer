@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import logging
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -32,7 +32,8 @@ from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 
 from mixer.blender_data.attributes import read_attribute, write_attribute
-from mixer.blender_data.proxy import Delta, DeltaUpdate
+from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate
+from mixer.blender_data.misc_proxies import CustomPropertiesProxy
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.type_helpers import sub_id_type
 from mixer.local_data import get_source_file_path
@@ -53,7 +54,7 @@ class DatablockProxy(StructProxy):
     Proxy to a datablock, standalone (bpy.data.cameras['Camera']) or embedded.
     """
 
-    _serialize = ("_bpy_data_collection", "_class_name", "_datablock_uuid")
+    _serialize = ("_bpy_data_collection", "_class_name", "_datablock_uuid", "_custom_properties")
 
     def __init__(self):
         super().__init__()
@@ -77,6 +78,8 @@ class DatablockProxy(StructProxy):
         """arrays that must not be serialized as json because of their size"""
 
         self._initialized = False
+
+        self._custom_properties = CustomPropertiesProxy()
 
     def copy_data(self, other: DatablockProxy):
         super().copy_data(other)
@@ -209,6 +212,7 @@ class DatablockProxy(StructProxy):
             context.proxy_state.proxies[uuid] = self
 
         self.attach_media_descriptor(datablock)
+        self._custom_properties.load(datablock)
         return self
 
     def attach_media_descriptor(self, datablock: T.ID):
@@ -325,7 +329,7 @@ class DatablockProxy(StructProxy):
                 write_attribute(datablock, k, v, context)
         finally:
             context.visit_state.datablock_proxy = None
-
+        self._custom_properties.save(datablock)
         return datablock
 
     def update_standalone_datablock(self, datablock: T.ID, delta: Delta, context: Context) -> T.ID:
@@ -345,7 +349,7 @@ class DatablockProxy(StructProxy):
 
         return datablock
 
-    def save(self, datablock: T.ID, unused_parent: T.bpy_struct, unused_key: str, context: Context) -> T.ID:
+    def save(self, datablock: T.ID, unused_parent: T.bpy_struct, unused_key: Union[int, str], context: Context) -> T.ID:
         """
         Save this proxy into an embedded datablock
 
@@ -375,6 +379,24 @@ class DatablockProxy(StructProxy):
             context.visit_state.datablock_proxy = None
 
         return target
+
+    def apply(
+        self,
+        attribute: T.bpy_struct,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        delta: Delta,
+        context: Context,
+        to_blender: bool = True,
+    ) -> StructProxy:
+
+        custom_properties_update = delta.value._custom_properties
+        if custom_properties_update is not None:
+            self._custom_properties = custom_properties_update
+            if to_blender:
+                custom_properties_update.save(attribute)
+
+        return super().apply(attribute, parent, key, delta, context, to_blender)
 
     def apply_to_proxy(
         self,
@@ -412,12 +434,21 @@ class DatablockProxy(StructProxy):
         elif isinstance(bl_item, T.Curve):
             bl_item.twist_mode = bl_item.twist_mode
 
-    def diff(self, datablock: T.ID, key: str, prop: T.Property, context: Context) -> Optional[Delta]:
+    def diff(self, datablock: T.ID, key: Union[int, str], prop: T.Property, context: Context) -> Optional[Delta]:
         try:
             diff = self.__class__()
             diff.init(datablock)
             context.visit_state.datablock_proxy = diff
-            return self._diff(datablock, key, prop, context, diff)
+            delta = self._diff(datablock, key, prop, context, diff)
+            if not isinstance(delta, DeltaReplace):
+                custom_properties_update = self._custom_properties.diff(datablock)
+                if custom_properties_update is not None:
+                    if delta is None:
+                        # regular diff had found no delta: create one
+                        delta = DeltaUpdate(diff)
+                    diff._custom_properties = custom_properties_update
+
+            return delta
         finally:
             context.visit_state.datablock_proxy = None
 

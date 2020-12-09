@@ -31,8 +31,8 @@ from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaR
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy, DatablockRefCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
-from mixer.blender_data.misc_proxies import NonePtrProxy
 from mixer.blender_data.mesh_proxy import MeshProxy
+from mixer.blender_data.misc_proxies import CustomPropertiesProxy, NonePtrProxy
 from mixer.blender_data.node_proxy import NodeLinksProxy
 from mixer.blender_data.object_proxy import ObjectProxy
 from mixer.blender_data.shape_key_proxy import ShapeKeyProxy
@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 # https://stackoverflow.com/questions/31085153/easiest-way-to-serialize-object-in-a-nested-dictionary
 
 struct_like_classes = [
+    CustomPropertiesProxy,
     DatablockProxy,
     DatablockRefProxy,
     MeshProxy,
@@ -70,7 +71,7 @@ delta_classes = [
     DeltaUpdate,
     DeltaReplace,
 ]
-_classes = {c.__name__: c for c in struct_like_classes}
+_classes: Dict[str, type] = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
 _classes.update({c.__name__: c for c in delta_classes})
 
