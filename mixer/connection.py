@@ -48,11 +48,6 @@ def set_client_attributes():
     )
 
 
-def create_room(room_name: str, vrtist_protocol: bool = False):
-    join_room(room_name, vrtist_protocol)
-    share_data.client.send_set_current_scene(bpy.context.scene.name_full)
-
-
 def join_room(room_name: str, vrtist_protocol: bool = False):
     prefs = get_mixer_prefs()
     logger.warning(f"join: room: {room_name}, user: {prefs.user}")

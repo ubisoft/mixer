@@ -1294,6 +1294,7 @@ def send_scene_content():
 
         share_data.clear_before_state()
         share_data.client.send_group_begin()
+        share_data.client.send_set_current_scene(bpy.context.scene.name_full)
 
         timer = time.monotonic()
         if not share_data.use_vrtist_protocol():
@@ -1314,5 +1315,4 @@ def send_scene_content():
         share_data.start_frame = bpy.context.scene.frame_start
         share_data.end_frame = bpy.context.scene.frame_end
         share_data.client.send_frame(bpy.context.scene.frame_current)
-
         share_data.client.send_group_end()
