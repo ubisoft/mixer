@@ -435,22 +435,25 @@ class DatablockProxy(StructProxy):
             bl_item.twist_mode = bl_item.twist_mode
 
     def diff(self, datablock: T.ID, key: Union[int, str], prop: T.Property, context: Context) -> Optional[Delta]:
-        try:
-            diff = self.__class__()
-            diff.init(datablock)
-            context.visit_state.datablock_proxy = diff
-            delta = self._diff(datablock, key, prop, context, diff)
-            if not isinstance(delta, DeltaReplace):
-                custom_properties_update = self._custom_properties.diff(datablock)
-                if custom_properties_update is not None:
-                    if delta is None:
-                        # regular diff had found no delta: create one
-                        delta = DeltaUpdate(diff)
-                    diff._custom_properties = custom_properties_update
+        diff = self.__class__()
+        diff.init(datablock)
 
-            return delta
+        context.visit_state.datablock_proxy = diff
+        try:
+            delta = self._diff(datablock, key, prop, context, diff)
         finally:
             context.visit_state.datablock_proxy = None
+
+        # compute the custom properties update
+        if not isinstance(delta, DeltaReplace):
+            custom_properties_update = self._custom_properties.diff(datablock)
+            if custom_properties_update is not None:
+                if delta is None:
+                    # regular diff had found no delta: create one
+                    delta = DeltaUpdate(diff)
+                diff._custom_properties = custom_properties_update
+
+        return delta
 
     def _pre_save(self, target: T.bpy_struct, context: Context) -> T.ID:
         return specifics.pre_save_datablock(self, target, context)
