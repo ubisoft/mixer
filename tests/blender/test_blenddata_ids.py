@@ -487,5 +487,58 @@ key0.data[0].handle_right[2] = 10.
         self.end_test()
 
 
+class TestCustomProperties(TestCase):
+    def test_create(self):
+        create = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+bpy.context.view_layer.objects.active = obj
+bpy.ops.wm.properties_add(data_path="active_object")
+"""
+        self.send_string(create)
+        self.end_test()
+
+    def test_update(self):
+        create = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+bpy.context.view_layer.objects.active = obj
+bpy.ops.wm.properties_add(data_path="active_object")
+"""
+        self.send_string(create)
+        update = """
+import bpy
+obj = bpy.data.objects[0]
+rna_ui = obj["_RNA_UI"]
+key = list(rna_ui.keys())[0]
+rna_ui[key]["description"]= "the tooltip"
+# trigger update
+obj.location[0] += 1
+"""
+        self.send_string(update)
+        self.end_test()
+
+    def test_remove(self):
+        create = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+bpy.context.view_layer.objects.active = obj
+bpy.ops.wm.properties_add(data_path="active_object")
+"""
+        self.send_string(create)
+        remove = """
+import bpy
+obj = bpy.data.objects[0]
+rna_ui = obj["_RNA_UI"]
+key = list(rna_ui.keys())[0]
+bpy.ops.wm.properties_remove(data_path='active_object', property=key)
+"""
+        self.send_string(remove)
+        self.end_test()
+
+
 if __name__ == "__main__":
     unittest.main()
