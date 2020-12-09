@@ -122,3 +122,61 @@ class NonePtrProxy(Proxy):
         if isinstance(attr, NonePtrProxy):
             return None
         return DeltaUpdate(attr)
+
+
+class CustomPropertiesProxy:
+    """Proxy-like for datablock Custom Properties"""
+
+    _serialize = ("_dict", "_rna_ui")
+
+    def __init__(self):
+        self._dict = {}
+        """Custom properties and their values"""
+
+        self._rna_ui = {}
+        """_RNA_UI dictionnary"""
+
+    def _user_keys(self, datablock: T.ID):
+        keys = set(datablock.keys())
+        rna_ui = datablock.get("_RNA_UI", None)
+        keys -= {"_RNA_UI"}
+        keys -= set(datablock.bl_rna.properties.keys())
+        return keys, rna_ui
+
+    def load(self, datablock: T.ID):
+        """Load the custom properties of datablock, skipping API defined properties"""
+        keys, rna_ui = self._user_keys(datablock)
+        if rna_ui is None:
+            self._dict.clear()
+            self._rna_ui.clear()
+            return self
+
+        self._rna_ui = rna_ui.to_dict()
+        self._dict = {name: datablock.get(name) for name in keys}
+
+    def save(self, datablock: T.ID):
+        """Overwrite all the custom properties in datablock, including the UI"""
+        datablock["_RNA_UI"] = self._rna_ui
+        current_keys, _ = self._user_keys(datablock)
+        remove = current_keys - set(self._dict.keys())
+        for key in remove:
+            del datablock[key]
+        for key, value in self._dict.items():
+            datablock[key] = value
+
+    def diff(self, datablock: T.ID) -> Optional[CustomPropertiesProxy]:
+        current = CustomPropertiesProxy()
+        current.load(datablock)
+        if self._dict == current._dict and self._rna_ui == current._rna_ui:
+            return None
+
+        return current
+
+    def apply(self, datablock: T.ID, update: Optional[CustomPropertiesProxy], to_blender: bool):
+        if update is None:
+            return
+
+        self._rna_ui = update._rna_ui
+        self._dict = update._dict
+        if to_blender:
+            self.save(datablock)
