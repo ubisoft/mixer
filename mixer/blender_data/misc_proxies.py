@@ -22,12 +22,12 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Any, Optional, TYPE_CHECKING, Set, Union
 
 import bpy.types as T  # noqa
 
 from mixer.blender_data.attributes import read_attribute
-from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
+from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Proxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
 if TYPE_CHECKING:
@@ -122,6 +122,94 @@ class NonePtrProxy(Proxy):
         if isinstance(attr, NonePtrProxy):
             return None
         return DeltaUpdate(attr)
+
+
+class SetProxy(Proxy):
+    """Proxy for sets of primitive types
+
+    Found in DecimateModifier.delimit
+    """
+
+    def __init__(self):
+        self._data: Set[Any] = set()
+
+    def load(self, attribute: Set[Any]) -> SetProxy:
+        """
+        Load the attribute Blender struct into this proxy
+
+        Args:
+            attribute: the Blender set to load into this proxy
+        """
+        self._data = attribute
+        return self
+
+    def save(
+        self,
+        attribute: Set[Any],
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        context: Context,
+    ):
+        """Save this proxy into attribute, which is contained in parent[key] or parent.key
+
+        Args:
+            attribute: the attribute into which the proxy is saved.
+            parent: the attribute that contains attribute
+            key: the string or index that identifies attribute in parent
+        """
+        try:
+            if isinstance(key, int):
+                parent[key] = self._data
+            else:
+                setattr(parent, key, self._data)
+        except Exception as e:
+            logger.error(f"SetProxy.save() at {parent}.{key}. Exception ...")
+            logger.error(f"... {e!r}")
+
+    def apply(
+        self,
+        attribute: Any,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        delta: Delta,
+        context: Context,
+        to_blender: bool = True,
+    ) -> Proxy:
+        """
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
+
+        Args:
+            attribute: the Blender attribute to update
+            parent: the attribute that contains attribute
+            key: the key that identifies attribute in parent
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
+        """
+        assert isinstance(delta, DeltaReplace)
+        self._data = delta.value._data
+        if to_blender:
+            self.save(attribute, parent, key, context)
+        return self
+
+    def diff(
+        self, attribute: Set[Any], unused_key: Union[int, str], unused_prop: T.Property, unused_context: Context
+    ) -> Optional[Delta]:
+        """
+        Computes the difference between the state of an item tracked by this proxy and its Blender state.
+
+        Args:
+            attribute: the set to update (e.g. a the "delimit" attribute of a DecimateModifier instance)
+            unused_key: the key that identifies attribute in parent (e.g "delimit")
+            unused_prop: the Property of attribute as found in its parent attribute
+            unused_context: proxy and visit state
+        """
+        if self._data == attribute:
+            return None
+
+        new_set = SetProxy()
+        new_set._data = attribute
+        return DeltaReplace(new_set)
 
 
 class CustomPropertiesProxy:

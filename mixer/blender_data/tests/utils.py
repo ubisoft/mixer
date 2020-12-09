@@ -22,7 +22,6 @@ import unittest
 
 from bpy import data as D  # noqa
 from bpy import types as T  # noqa
-from mixer.blender_data.type_helpers import is_builtin, is_vector, is_matrix
 from mixer.blender_data.filter import test_properties
 
 
@@ -56,9 +55,7 @@ def equals(attr_a, attr_b, synchronized_properties=test_properties):
     if type_a != type_b:
         return False
 
-    if attr_a is None or is_builtin(type_a) or is_vector(type_a) or is_matrix(type_a):
-        return attr_a == attr_b
-    elif type_a == T.bpy_prop_array:
+    if type_a == T.bpy_prop_array:
         return attr_a == attr_b
     elif issubclass(type_a, T.bpy_prop_collection):
         for key in attr_a.keys():
@@ -73,7 +70,7 @@ def equals(attr_a, attr_b, synchronized_properties=test_properties):
             if not equals(attr_a_i, attr_b_i):
                 return False
     else:
-        raise TypeError("equals: Unexpected type {type_a}")
+        return attr_a == attr_b
 
     return True
 
@@ -87,10 +84,8 @@ def bl_equals(attr_a, attr_b, msg=None, skip_name=False, synchronized_properties
     type_b = type(attr_b)
     if type_a != type_b:
         raise failureException(f"Different types : {type_a} and {type_b}")
-    if attr_a is None or is_builtin(type_a) or is_vector(type_a) or is_matrix(type_a):
-        if attr_a != attr_b:
-            raise failureException(f"Different values : {attr_a} and {attr_b}")
-    elif type_a == T.bpy_prop_array:
+
+    if type_a == T.bpy_prop_array:
         if list(attr_a) != list(attr_b):
             raise failureException(f"Different values for array : {attr_a} and {attr_b}")
     elif issubclass(type_a, T.bpy_prop_collection):
@@ -128,7 +123,8 @@ def bl_equals(attr_a, attr_b, msg=None, skip_name=False, synchronized_properties
                 raise failureException(f'Different values for struct items at key "{name}" : {attr_a_i} and {attr_b_i}')
 
     else:
-        raise NotImplementedError
+        if attr_a != attr_b:
+            raise failureException(f"Different values : {attr_a} and {attr_b}")
 
     return True
 

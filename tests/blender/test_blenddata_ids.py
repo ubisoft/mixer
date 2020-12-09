@@ -369,17 +369,29 @@ bpy.ops.object.material_slot_move(direction='DOWN')
         self.end_test()
 
 
-class TestObjectParent(TestCase):
-    _create_action = """
+class TestObject(TestCase):
+    def test_decimate_with_set_proxy(self):
+        # for SetProxy
+        create = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(1., 0., 0))
+obj = bpy.data.objects[0]
+modifier = obj.modifiers.new("decimate", "DECIMATE")
+# in "planar" tab
+modifier.delimit = {"SEAM", "UV"}
+"""
+        self.send_string(create)
+        self.end_test()
+
+    def test_parent_set(self):
+        create = """
 import bpy
 bpy.ops.mesh.primitive_plane_add(location=(1., 0., 0))
 bpy.ops.mesh.primitive_plane_add(location=(0., 1., 1))
 """
+        self.send_string(create)
 
-    def test_parent_set(self):
-        self.send_string(self._create_action)
-
-        action = """
+        parent = """
 import bpy
 obj0 = bpy.data.objects[0]
 obj1 = bpy.data.objects[1]
@@ -392,7 +404,7 @@ obj0.select_set(True)
 bpy.ops.object.parent_set(type='OBJECT')
 """
 
-        self.send_string(action)
+        self.send_string(parent)
         self.end_test()
 
 

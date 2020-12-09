@@ -27,7 +27,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data.blenddata import bl_rna_to_type
 from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
 from mixer.blender_data.specifics import is_soable_collection
-from mixer.blender_data.type_helpers import is_builtin, is_vector, is_matrix
+from mixer.blender_data.type_helpers import is_vector, is_matrix
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
@@ -44,20 +44,26 @@ def is_ID_subclass_rna(bl_rna):  # noqa
 
 MAX_DEPTH = 30
 
+_builtin_types = (float, int, bool, str, bytes)
 
-# @debug_check_stack_overflow
+
 def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, context: Context):
     """
     Load a property into a python object of the appropriate type, be it a Proxy or a native python object
     """
-    attr_type = type(attr)
 
-    if is_builtin(attr_type):
+    if isinstance(attr, _builtin_types):
         return attr
+
+    attr_type = type(attr)
     if is_vector(attr_type):
         return list(attr)
     if is_matrix(attr_type):
         return [list(col) for col in attr.col]
+    if isinstance(attr, set):
+        from mixer.blender_data.misc_proxies import SetProxy
+
+        return SetProxy().load(attr)
 
     # We have tested the types that are usefully reported by the python binding, now harder work.
     # These were implemented first and may be better implemented with the bl_rna property of the parent struct

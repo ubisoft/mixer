@@ -25,7 +25,7 @@ import logging
 import traceback
 from typing import List, TYPE_CHECKING
 
-from mixer.blender_data.json_codec import Codec, DecodeError
+from mixer.blender_data.json_codec import Codec, DecodeError, EncodeError
 from mixer.blender_data.messages import BlenderDataMessage, BlenderRemoveMessage, BlenderRenamesMessage
 from mixer.broadcaster.common import (
     Command,
@@ -77,11 +77,15 @@ def send_data_creations(proxies: CreationChangeset):
         send_media_creations(datablock_proxy)
         try:
             encoded_proxy = codec.encode(datablock_proxy)
+        except EncodeError as e:
+            logger.error(f"send_data_create: encode exception for {datablock_proxy}")
+            logger.error(f"... {e!r}")
+            return
         except Exception:
             logger.error(f"send_data_create: encode exception for {datablock_proxy}")
             for line in traceback.format_exc().splitlines():
                 logger.error(line)
-            return b""
+            return
 
         buffer = BlenderDataMessage.encode(datablock_proxy, encoded_proxy)
         command = Command(MessageType.BLENDER_DATA_CREATE, buffer, 0)
