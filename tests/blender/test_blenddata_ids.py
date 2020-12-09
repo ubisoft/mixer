@@ -552,5 +552,16 @@ bpy.ops.wm.properties_remove(data_path='active_object', property=key)
         self.end_test()
 
 
+class TestImage(TestCase):
+    def test_create_from_file(self):
+        path = str(files_folder() / "image_a.png")
+        create = f"""
+import bpy
+bpy.data.images.load(r"{path}")
+"""
+        self.send_string(create)
+        self.end_test()
+
+
 if __name__ == "__main__":
     unittest.main()
