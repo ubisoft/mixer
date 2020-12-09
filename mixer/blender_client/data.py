@@ -26,13 +26,13 @@ import traceback
 from typing import List, TYPE_CHECKING
 
 from mixer.blender_data.json_codec import Codec, DecodeError, EncodeError
-from mixer.blender_data.messages import BlenderDataMessage, BlenderRemoveMessage, BlenderRenamesMessage
-from mixer.broadcaster.common import (
-    Command,
-    decode_string,
-    encode_string,
-    MessageType,
+from mixer.blender_data.messages import (
+    BlenderDataMessage,
+    BlenderMediaMessage,
+    BlenderRemoveMessage,
+    BlenderRenamesMessage,
 )
+from mixer.broadcaster.common import Command, MessageType
 from mixer.local_data import get_local_or_create_cache_file
 from mixer.share_data import share_data
 
@@ -47,23 +47,19 @@ logger = logging.getLogger(__name__)
 
 
 def send_media_creations(proxy: DatablockProxy):
-    media_desc = getattr(proxy, "_media", None)
-    if media_desc is None:
-        return
-
-    path, bytes_ = media_desc
-    items = [encode_string(path), bytes_]
-    command = Command(MessageType.BLENDER_DATA_MEDIA, b"".join(items), 0)
-    share_data.client.add_command(command)
+    bytes_ = BlenderMediaMessage.encode(proxy)
+    if bytes_:
+        command = Command(MessageType.BLENDER_DATA_MEDIA, bytes_, 0)
+        share_data.client.add_command(command)
 
 
 def build_data_media(buffer: bytes):
     # TODO save to resolved path.
     # The packed data with be saved to file, not a problem
-    path, index = decode_string(buffer, 0)
-    bytes_ = buffer[index:]
+    message = BlenderMediaMessage()
+    message.decode(buffer)
     # TODO this does not overwrite outdated local files
-    get_local_or_create_cache_file(path, bytes_)
+    get_local_or_create_cache_file(message.path, message.bytes_)
 
 
 def send_data_creations(proxies: CreationChangeset):
