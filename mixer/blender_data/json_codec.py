@@ -119,6 +119,8 @@ def default(obj):
         except AttributeError:
             pass
         else:
+            if not isinstance(_serialize, (tuple, list)):
+                raise EncodeError(f"Expected tuple or list for _serialize, got {type(_serialize)} for {obj}")
             for option in _serialize:
                 d.update(default_optional(obj, option))
 

@@ -22,7 +22,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, TYPE_CHECKING, Set, Union
+from typing import Any, Optional, TYPE_CHECKING, List, Set, Union
 
 import bpy.types as T  # noqa
 
@@ -130,8 +130,19 @@ class SetProxy(Proxy):
     Found in DecimateModifier.delimit
     """
 
+    _serialize = ("_items",)
+
     def __init__(self):
-        self._data: Set[Any] = set()
+        self._items: List[Any] = []
+
+    @property
+    def items(self):
+        return self._items
+
+    @items.setter
+    def items(self, value):
+        self._items = list(value)
+        self._items.sort()
 
     def load(self, attribute: Set[Any]) -> SetProxy:
         """
@@ -140,7 +151,7 @@ class SetProxy(Proxy):
         Args:
             attribute: the Blender set to load into this proxy
         """
-        self._data = attribute
+        self.items = attribute
         return self
 
     def save(
@@ -159,9 +170,9 @@ class SetProxy(Proxy):
         """
         try:
             if isinstance(key, int):
-                parent[key] = self._data
+                parent[key] = set(self.items)
             else:
-                setattr(parent, key, self._data)
+                setattr(parent, key, set(self.items))
         except Exception as e:
             logger.error(f"SetProxy.save() at {parent}.{key}. Exception ...")
             logger.error(f"... {e!r}")
@@ -187,7 +198,7 @@ class SetProxy(Proxy):
             to_blender: update the managed Blender attribute in addition to this Proxy
         """
         assert isinstance(delta, DeltaReplace)
-        self._data = delta.value._data
+        self.items = delta.value.items
         if to_blender:
             self.save(attribute, parent, key, context)
         return self
@@ -204,11 +215,11 @@ class SetProxy(Proxy):
             unused_prop: the Property of attribute as found in its parent attribute
             unused_context: proxy and visit state
         """
-        if self._data == attribute:
+        if set(self.items) == attribute:
             return None
 
         new_set = SetProxy()
-        new_set._data = attribute
+        new_set.items = attribute
         return DeltaReplace(new_set)
 
 
