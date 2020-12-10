@@ -214,3 +214,28 @@ class BlenderRenamesMessage:
     @staticmethod
     def encode(renames: List[str]) -> bytes:
         return encode_string_array(renames)
+
+
+class BlenderMediaMessage:
+    def __init__(self):
+        self.path: str = ""
+        self.bytes_: bytes = b""
+
+    def __lt__(self, other):
+        # for sorting by the tests
+        return self.path < other.path
+
+    def decode(self, buffer: bytes) -> int:
+        self.path, index = decode_string(buffer, 0)
+        self.bytes_ = buffer[index:]
+        return len(buffer)
+
+    @staticmethod
+    def encode(datablock_proxy: DatablockProxy) -> bytes:
+        media_desc = getattr(datablock_proxy, "_media", None)
+        if media_desc is None:
+            return b""
+
+        path, bytes_ = media_desc
+        items = [encode_string(path), bytes_]
+        return b"".join(items)

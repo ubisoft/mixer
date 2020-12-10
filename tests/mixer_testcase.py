@@ -50,6 +50,8 @@ class MixerTestCase(unittest.TestCase):
         self._blenders: List[BlenderApp] = []
         self.ignored_messages = set()
         self.experimental_sync = True
+        self.workspaces: List[List[str]] = []
+        """One list of workspace folders per Blender"""
 
     @property
     def log_level(self):
@@ -84,7 +86,6 @@ class MixerTestCase(unittest.TestCase):
         blenderdescs: Tuple[BlenderDesc, BlenderDesc] = (BlenderDesc(), BlenderDesc()),
         server_args: Optional[List[str]] = None,
         join=True,
-        join_delay: Optional[float] = None,
     ):
         """
         if a blendfile if not specified, blender will start with its default file.
@@ -103,6 +104,10 @@ class MixerTestCase(unittest.TestCase):
             window_width = int(1920 / len(blenderdescs))
 
             for i, blenderdesc in enumerate(blenderdescs):
+                workspace_folders = self.workspaces[i] if i < len(self.workspaces) else []
+                if not isinstance(workspace_folders, (list, tuple)):
+                    self.fail(f"workspace must be a list or tuple, not a {type(workspace_folders)}")
+
                 window_x = str(i * window_width)
                 args = ["--window-geometry", window_x, "0", "960", "1080"]
                 if blenderdesc.load_file is not None:
@@ -113,9 +118,9 @@ class MixerTestCase(unittest.TestCase):
                 if join:
                     blender.connect_mixer()
                     if i == 0:
-                        blender.create_room(vrtist_protocol=self.vrtist_protocol)
+                        blender.create_room(vrtist_protocol=self.vrtist_protocol, workspace_folders=workspace_folders)
                     else:
-                        blender.join_room(vrtist_protocol=self.vrtist_protocol)
+                        blender.join_room(vrtist_protocol=self.vrtist_protocol, workspace_folders=workspace_folders)
 
                 self._blenders.append(blender)
 
