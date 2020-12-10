@@ -125,10 +125,8 @@ def default(obj):
                 d.update(default_optional(obj, option))
 
         return d
-    elif isinstance(obj, set):
-        return list(obj)
 
-    raise EncodeError(f"Unknown class {class_}")
+    raise EncodeError(f"Unknown class {class_} for {obj}")
 
 
 def decode_optional(obj, x, option_name):
