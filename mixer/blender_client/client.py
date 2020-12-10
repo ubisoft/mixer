@@ -1075,10 +1075,6 @@ class BlenderClient(Client):
 
                     elif command.type == MessageType.SCENE:
                         scene_api.build_scene(command.data)
-                    elif command.type == MessageType.SCENE_REMOVED:
-                        scene_api.build_scene_removed(command.data)
-                    elif command.type == MessageType.SCENE_RENAMED:
-                        scene_api.build_scene_renamed(command.data)
 
                     elif command.type == MessageType.OBJECT_VISIBILITY:
                         object_api.build_object_visibility(command.data)

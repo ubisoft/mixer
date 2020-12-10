@@ -92,8 +92,6 @@ class ShareData:
         self.collections_added: Set(str) = set()
         self.collections_removed: Set(str) = set()
         self.scenes_added: List[str] = []
-        self.scenes_removed: List[str] = []
-        self.scenes_renamed: List[str, str] = []
 
         # key : collection name
         self.objects_added_to_collection: Mapping(str, str) = {}
@@ -286,7 +284,6 @@ class ShareData:
         Clear the lists that record change between previous and current state
         """
         self.scenes_added.clear()
-        self.scenes_removed.clear()
 
         self.collections_added.clear()
         self.collections_removed.clear()
