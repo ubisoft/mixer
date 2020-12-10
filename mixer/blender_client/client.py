@@ -119,6 +119,13 @@ class TextureData:
         self.height = kwargs.get("height")
 
 
+def delayed_message_call(func, *args, **kwargs):
+    def wrapper():
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
 class BlenderClient(Client):
     """
     Client specialized for Blender. Extends Client base class by adding and handling data related to Blender.
@@ -939,6 +946,7 @@ class BlenderClient(Client):
             received_commands = self.fetch_commands(get_mixer_prefs().commands_send_interval)
 
             set_dirty = True
+            delayed_messages = []
             # Process all received commands
             for command in received_commands:
                 if self._joining and command.type.value > common.MessageType.COMMAND.value:
@@ -1114,7 +1122,7 @@ class BlenderClient(Client):
                         shot_manager.build_shot_manager_action(command.data)
 
                     elif command.type == MessageType.ASSET_BANK:
-                        asset_bank.receive_message(command.data)
+                        delayed_messages.append(delayed_message_call(asset_bank.receive_message, command.data))
 
                     elif command.type == MessageType.BLENDER_DATA_UPDATE:
                         data_api.build_data_update(command.data)
@@ -1150,6 +1158,13 @@ class BlenderClient(Client):
 
         if not set_dirty:
             share_data.update_current_data()
+
+        # Some messages must change the scene and send an update
+        previous_skip_next = self.skip_next_depsgraph_update
+        for delayed_message in delayed_messages:
+            self.skip_next_depsgraph_update = False
+            delayed_message()
+        self.skip_next_depsgraph_update = previous_skip_next
 
         # Some objects may have been obtained before their parent
         # In that case we resolve parenting here
@@ -1216,6 +1231,9 @@ def update_params(obj):
 
     if typename == "Mesh" or typename == "Curve" or typename == "Text Curve":
         if obj.mode == "OBJECT":
+            # materials of imported libraries are sync here
+            for material in obj.data.materials:
+                share_data.client.send_material(material)
             share_data.client.send_mesh(obj)
 
 

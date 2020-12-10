@@ -31,14 +31,17 @@ import mixer.broadcaster.common as common
 
 
 class AssetBankAction(IntEnum):
-    LIST = 0
-    IMPORT = 1
+    LIST_REQUEST = 0
+    LIST_RESPONSE = 1
+    IMPORT_REQUEST = 2
+    IMPORT_RESPONSE = 3
 
 
 def send_asset_bank_entries():
     if bpy.context.window_manager.uas_asset_bank is None:
         return
 
+    bpy.ops.uas.asset_bank_refresh()
     assets = bpy.context.window_manager.uas_asset_bank.assets
     names = []
     tags = []
@@ -49,9 +52,12 @@ def send_asset_bank_entries():
         tags.append(asset.tags)
         thumbnails.append(asset.thumbnail_path)
 
-    buffer = common.encode_string_array(names)
-    +common.encode_string_array(tags)
-    +common.encode_string_array(thumbnails)
+    buffer = (
+        common.encode_int(AssetBankAction.LIST_RESPONSE)
+        + common.encode_string_array(names)
+        + common.encode_string_array(tags)
+        + common.encode_string_array(thumbnails)
+    )
 
     share_data.client.add_command(common.Command(common.MessageType.ASSET_BANK, buffer, 0))
 
@@ -60,17 +66,34 @@ def receive_message(data):
     index = 0
     action, index = common.decode_int(data, index)
 
-    if action == AssetBankAction.LIST:
+    if action == AssetBankAction.LIST_REQUEST:
         send_asset_bank_entries()
-    elif action == AssetBankAction.IMPORT:
+    elif action == AssetBankAction.IMPORT_REQUEST:
         import_asset(data, index)
 
 
 def import_asset(data, index):
     name, index = common.decode_string(data, index)
     asset_index = -1
+    old_objects = set(bpy.context.scene.objects)
     for asset in bpy.context.window_manager.uas_asset_bank.assets:
         asset_index += 1
         if asset.nice_name == name:
-            bpy.ops.uas.asset_bank_import(asset_index)
+            # Import
+            bpy.ops.uas.asset_bank_import(index=asset_index)
+
+            # Send imported object names
+            new_objects = set(bpy.context.scene.objects)
+            diff = new_objects - old_objects
+            for ob in diff:
+                send_imported_object_name(ob.name_full, name)
             return
+
+
+def send_imported_object_name(blender_name: str, nice_name: str):
+    buffer = (
+        common.encode_int(AssetBankAction.IMPORT_RESPONSE)
+        + common.encode_string(blender_name)
+        + common.encode_string(nice_name)
+    )
+    share_data.client.add_command(common.Command(common.MessageType.ASSET_BANK, buffer, 0))
