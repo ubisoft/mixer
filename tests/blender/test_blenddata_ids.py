@@ -1,5 +1,7 @@
 import unittest
 
+from mixer.broadcaster.common import MessageType
+
 from tests import files_folder
 from tests.blender.blender_testcase import BlenderTestCase, TestGenericJoinBefore
 from tests.mixer_testcase import BlenderDesc
@@ -108,16 +110,55 @@ light.type = "SUN"
 
 
 class TestScene(TestGenericJoinBefore):
+    def setUp(self):
+        super().setUp()
+        # for VRtist. Blender sends the active scene, which is not the same on sender (new scene)
+        # and receiver
+        self.ignored_messages |= {MessageType.SET_SCENE}
+
     def test_bpy_ops_scene_new(self):
         action = """
 import bpy
-scene = bpy.ops.scene_new(type="NEW")
-print(scene)
-print(f"new scene is {scene}")
+bpy.ops.scene.new(type="NEW")
+# force update
+scene = bpy.context.scene
 scene.unit_settings.system = "IMPERIAL"
 scene.use_gravity = True
 """
         self.send_string(action)
+        self.end_test()
+
+    def test_bpy_ops_scene_delete(self):
+        create = """
+import bpy
+bpy.ops.scene.new(type="NEW")
+# force update
+scene = bpy.context.scene
+scene.use_gravity = True
+"""
+        self.send_string(create)
+        delete = """
+import bpy
+bpy.ops.scene.delete()
+"""
+        self.send_string(delete)
+        self.end_test()
+
+    def test_scene_rename(self):
+        create = """
+import bpy
+bpy.ops.scene.new(type="NEW")
+# force update
+scene = bpy.context.scene
+scene.use_gravity = True
+"""
+        self.send_string(create)
+        rename = """
+import bpy
+scene = bpy.context.scene
+scene.name = "new_name"
+"""
+        self.send_string(rename)
         self.end_test()
 
 
