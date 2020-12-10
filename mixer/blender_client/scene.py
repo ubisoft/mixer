@@ -73,46 +73,6 @@ def build_scene(data):
         delete_scene(to_remove)
 
 
-def send_scene_removed(client: Client, scene_name: str):
-    logger.info("send_scene_removed %s", scene_name)
-    buffer = common.encode_string(scene_name)
-    client.add_command(common.Command(common.MessageType.SCENE_REMOVED, buffer, 0))
-
-
-def build_scene_removed(data):
-
-    # TODO check if obsolete
-    scene_name, _ = common.decode_string(data, 0)
-    logger.info("build_scene_removed %s", scene_name)
-    scene = share_data.blender_scenes.get(scene_name)
-    delete_scene(scene)
-    share_data.blender_scenes_dirty = True
-
-
-def send_scene_renamed(client: Client, old_name: str, new_name: str):
-    logger.info("send_scene_renamed %s to %s", old_name, new_name)
-    buffer = common.encode_string(old_name) + common.encode_string(new_name)
-    client.add_command(common.Command(common.MessageType.SCENE_RENAMED, buffer, 0))
-
-
-def build_scene_renamed(data):
-    # TODO check if obsolete
-
-    old_name, index = common.decode_string(data, 0)
-    new_name, _ = common.decode_string(data, index)
-
-    # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
-    # In generic mode, it conflicts with generic messages, so drop it
-    if not share_data.use_vrtist_protocol():
-        logger.warning("build_scene_renamed  %s to %s", old_name, new_name)
-        return
-
-    logger.info("build_scene_renamed %s to %s", old_name, new_name)
-    scene = share_data.blender_scenes.get(old_name)
-    scene.name = new_name
-    share_data.blender_scenes_dirty = True
-
-
 def send_add_collection_to_scene(client: Client, scene_name: str, collection_name: str):
     logger.info("send_add_collection_to_scene %s <- %s", scene_name, collection_name)
 
@@ -127,7 +87,7 @@ def build_collection_to_scene(data):
     # This message is not emitted by VRtist, only by Blender, so it is used only for Blender/Blender sync.
     # In generic mode, it conflicts with generic messages, so drop it
     if not share_data.use_vrtist_protocol():
-        logger.warning("build_scene_renamed %s <- %s", scene_name, collection_name)
+        logger.warning("build_collection_to_scene %s <- %s", scene_name, collection_name)
         return
 
     logger.info("build_collection_to_scene %s <- %s", scene_name, collection_name)
