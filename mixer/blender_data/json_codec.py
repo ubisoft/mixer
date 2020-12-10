@@ -32,7 +32,7 @@ from mixer.blender_data.datablock_collection_proxy import DatablockCollectionPro
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.mesh_proxy import MeshProxy
-from mixer.blender_data.misc_proxies import CustomPropertiesProxy, NonePtrProxy
+from mixer.blender_data.misc_proxies import CustomPropertiesProxy, NonePtrProxy, SetProxy
 from mixer.blender_data.node_proxy import NodeLinksProxy
 from mixer.blender_data.object_proxy import ObjectProxy
 from mixer.blender_data.shape_key_proxy import ShapeKeyProxy
@@ -62,6 +62,7 @@ collection_classes = [
     DatablockRefCollectionProxy,
     AosProxy,
     NodeLinksProxy,
+    SetProxy,
 ]
 
 delta_classes = [
@@ -78,6 +79,10 @@ _classes.update({c.__name__: c for c in delta_classes})
 _classes_tuple = tuple(_classes.values())
 
 MIXER_CLASS = "__mixer_class__"
+
+
+class EncodeError(Exception):
+    pass
 
 
 class DecodeError(Exception):
@@ -114,13 +119,14 @@ def default(obj):
         except AttributeError:
             pass
         else:
+            if not isinstance(_serialize, (tuple, list)):
+                raise EncodeError(f"Expected tuple or list for _serialize, got {type(_serialize)} for {obj}")
             for option in _serialize:
                 d.update(default_optional(obj, option))
 
         return d
-    else:
-        logger.error(f"Unknown class {class_}")
-    return None
+
+    raise EncodeError(f"Unknown class {class_} for {obj}")
 
 
 def decode_optional(obj, x, option_name):

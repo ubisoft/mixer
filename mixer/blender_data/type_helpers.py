@@ -24,12 +24,7 @@ from typing import Any, List, Type
 import bpy.types as T  # noqa N812
 import mathutils
 
-builtin_types = {float, int, bool, str, set, bytes}
 vector_types = {mathutils.Vector, mathutils.Color, mathutils.Quaternion, mathutils.Euler}
-
-
-def is_builtin(type_: Type):
-    return type_ in builtin_types
 
 
 def is_vector(type_: Type):
