@@ -22,14 +22,16 @@ See synchronization.md
 """
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 import logging
+import sys
 from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.blenddata import BlendData, collection_name_to_type
+from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -38,7 +40,6 @@ from mixer.blender_data.filter import SynchronizedProperties, safe_depsgraph_upd
 from mixer.blender_data.proxy import (
     DeltaReplace,
     DeltaUpdate,
-    ensure_uuid,
     Proxy,
     MaxDepthExceeded,
     UnresolvedRefs,
@@ -96,6 +97,9 @@ class ProxyState:
     datablocks: Dict[Uuid, T.ID] = field(default_factory=dict)
     """Known datablocks"""
 
+    objects: Dict[Uuid, Set[Uuid]] = field(default_factory=lambda: defaultdict(set))
+    """Object.data uuid : (set of uuids of Object using object.data). Mostly used for shape keys"""
+
     unresolved_refs: UnresolvedRefs = UnresolvedRefs()
 
 
@@ -146,6 +150,29 @@ class Context:
     """Current datablock operation state"""
 
 
+_creation_order = {
+    # anything else first
+    "objects": 5,  # Object.data is required to create Object
+    "shape_keys": 10,  # Key creation require Object API
+}
+
+
+def _creation_order_predicate(item: Tuple[str, Any]) -> int:
+    # item (bpy.data collection name, delta)
+    return _creation_order.get(item[0], 0)
+
+
+_updates_order = {
+    T.Key: 5,  # before Mesh for shape keys
+    T.Mesh: 10,  # before Object for vertex_groups
+    # anything else last
+}
+
+
+def _updates_order_predicate(datablock: T.ID) -> int:
+    return _updates_order.get(type(datablock), sys.maxsize)
+
+
 class BpyDataProxy(Proxy):
     """Proxy to bpy.data collections
 
@@ -180,43 +207,17 @@ class BpyDataProxy(Proxy):
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}
 
-    def initialize_ref_targets(self, synchronized_properties: SynchronizedProperties):
-        """Keep track of all bpy.data items so that loading recognizes references to them
-
-        Call this before updating the proxy from send_scene_content. It is not needed on the
-        receiver side.
-
-        TODO check is this is actually required or if we can rely upon is_embedded_data being False
-        """
-        # Normal operation no more involve BpyDataProxy.load() ad initial synchronization behaves
-        # like a creation. The current load_as_what() implementation relies on root_ids to determine if
-        # a T.ID must ne loaded as an IDRef (pointer to bpy.data) or an IDDef (pointer to an "owned" ID).
-        # so we need to load all the root_ids before loading anything into the proxy.
-        # However, root_ids may no more be required if we can load all the proxies inside out (deepmost first, i.e
-        # (Mesh, Metaball, ..), then Object, the Scene). This should be possible as as we sort
-        # the updates inside out in update() to the receiver gets them in order
-        for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
-            if name in collection_name_to_type:
-                # TODO use BlendData
-                bl_collection = getattr(bpy.data, name)
-                for _id_name, item in bl_collection.items():
-                    uuid = ensure_uuid(item)
-                    self.state.datablocks[uuid] = item
-
     def load(self, synchronized_properties: SynchronizedProperties):
-        """Load the current scene into this proxy
+        """FOR TESTS ONLY Load the current scene into this proxy
 
         Only used for test. The initial load is performed by update()
         """
-        self.initialize_ref_targets(synchronized_properties)
-        context = self.context(synchronized_properties)
-
-        for name, _ in synchronized_properties.properties(bpy_type=T.BlendData):
-            collection = getattr(bpy.data, name)
-            self._data[name] = DatablockCollectionProxy(name).load(collection, name, context)
+        diff = BpyBlendDiff()
+        diff.diff(self, synchronized_properties)
+        self.update(diff, set(), False, synchronized_properties)
         return self
 
-    def find(self, collection_name: str, key: str) -> DatablockProxy:
+    def find(self, collection_name: str, key: str) -> Optional[DatablockProxy]:
         # TODO not used ?
         if not self._data:
             return None
@@ -238,15 +239,17 @@ class BpyDataProxy(Proxy):
         This updates the local proxy state and return a Changeset to send to the server. This method is also
         used to send the initial scene contents, which is seen as datablock creations.
         """
-        changeset: Changeset = Changeset()
 
         # Update the bpy.data collections status and get the list of newly created bpy.data entries.
         # Updated proxies will contain the IDs to send as an initial transfer.
         # There is no difference between a creation and a subsequent update
+        changeset: Changeset = Changeset()
+
+        # Contains the bpy_data_proxy state (known proxies and datablocks), as well as visit_state that contains
+        # shared state between updated datablock proxies
         context = self.context(synchronized_properties)
 
-        # sort the creation so that Object.data target is created before Object
-        deltas = sorted(diff.collection_deltas, key=_objects_last)
+        deltas = sorted(diff.collection_deltas, key=_creation_order_predicate)
         for delta_name, delta in deltas:
             collection_changeset = self._data[delta_name].update(delta, context)
             changeset.creations.extend(collection_changeset.creations)
@@ -263,8 +266,7 @@ class BpyDataProxy(Proxy):
             all_updates |= self._delayed_updates
             self._delayed_updates.clear()
 
-        # It is required that Object are processed after Mesh (search for "dirty_vertex_groups")
-        sorted_updates = sorted(all_updates, key=lambda datablock: 0 if isinstance(datablock, T.Mesh) else 1)
+        sorted_updates = sorted(all_updates, key=_updates_order_predicate)
 
         for datablock in sorted_updates:
             if not isinstance(datablock, safe_depsgraph_updates):
@@ -278,13 +280,13 @@ class BpyDataProxy(Proxy):
                 # Not an error for embedded IDs.
                 if not datablock.is_embedded_data:
                     logger.warning(f"depsgraph update for {datablock} : no proxy and not datablock.is_embedded_data")
-
-                # For instance Scene.node_tree is not a reference to a bpy.data collection element
-                # but a "pointer" to a NodeTree owned by Scene. In such a case, the update list contains
-                # scene.node_tree, then scene. We can ignore the scene.node_tree update since the
-                # processing of scene will process scene.node_tree.
-                # However, it is not obvious to detect the safe cases and remove the message in such cases
-                logger.info("depsgraph update: Ignoring embedded %s", datablock)
+                else:
+                    # For instance Scene.node_tree is not a reference to a bpy.data collection element
+                    # but a "pointer" to a NodeTree owned by Scene. In such a case, the update list contains
+                    # scene.node_tree, then scene. We can ignore the scene.node_tree update since the
+                    # processing of scene will process scene.node_tree.
+                    # However, it is not obvious to detect the safe cases and remove the message in such cases
+                    logger.info("depsgraph update: Ignoring embedded %s", datablock)
                 continue
             delta = proxy.diff(datablock, datablock.name, None, context)
             if delta:
@@ -308,7 +310,7 @@ class BpyDataProxy(Proxy):
             logger.warning(
                 f"create_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} "
             )
-            return None
+            return None, None
 
         context = self.context(synchronized_properties)
         return bpy_data_collection_proxy.create_datablock(incoming_proxy, context)
@@ -338,6 +340,7 @@ class BpyDataProxy(Proxy):
         proxy = self.state.proxies.get(uuid)
         if proxy is None:
             logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
+            return
 
         bpy_data_collection_proxy = self._data.get(proxy.collection_name)
         if bpy_data_collection_proxy is None:
@@ -345,13 +348,30 @@ class BpyDataProxy(Proxy):
             return None
 
         datablock = self.state.datablocks[uuid]
+
+        if isinstance(datablock, T.Object) and datablock.data is not None:
+            data_uuid = datablock.data.mixer_uuid
+        else:
+            data_uuid = None
+
         bpy_data_collection_proxy.remove_datablock(proxy, datablock)
+
+        if data_uuid is not None:
+            # removed an Object
+            self.state.objects[data_uuid].remove(uuid)
+        else:
+            try:
+                # maybe removed an Object.data pointee
+                del self.state.objects[uuid]
+            except KeyError:
+                pass
         del self.state.proxies[uuid]
         del self.state.datablocks[uuid]
 
-    def rename_datablocks(self, items: List[str, str, str]) -> RenameChangeset:
+    def rename_datablocks(self, items: List[Tuple[str, str, str]]) -> RenameChangeset:
         """
         Process a received datablock rename command, renaming the datablocks and updating the proxy state.
+        (receiver side)
         """
         rename_changeset_to_send: RenameChangeset = []
         renames = []
@@ -359,7 +379,7 @@ class BpyDataProxy(Proxy):
             proxy = self.state.proxies.get(uuid)
             if proxy is None:
                 logger.error(f"rename_datablocks(): no proxy for {uuid} (debug info)")
-                return
+                return []
 
             bpy_data_collection_proxy = self._data.get(proxy.collection_name)
             if bpy_data_collection_proxy is None:

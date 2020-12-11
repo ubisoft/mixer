@@ -228,23 +228,25 @@ would be loaded ad a DatablockProxy instead of a DatablockRefProxy
 """
 
 _exclude_names = {
-    "type_info",  # for Available (?) keyingset
-    "depsgraph",  # found in Viewlayer
-    "rna_type",
+    # Related to the UI
+    "active_index",
+    # found in Viewlayer
+    "depsgraph",
     "is_editmode",
     "is_embedded_data",
     "is_evaluated",
     "is_library_indirect",
-    "original",
-    "users",
-    "use_fake_user",
-    "tag",
     "library",
+    "mixer_uuid",
+    "name_full",
+    "original",
     "override_library",
     "preview",
-    "mixer_uuid",
-    # Related to the UI
-    "active_index",
+    "rna_type",
+    "tag",
+    "type_info",
+    "users",
+    "use_fake_user",
 }
 """Names of properties that are always excluded"""
 
@@ -255,6 +257,15 @@ default_exclusions = {
         NameFilterOut(_exclude_names),
     ],
     T.ActionGroup: [NameFilterOut("channels")],
+    T.BezierSplinePoint: [
+        NameFilterOut(
+            [
+                "select_control_point",
+                "select_left_handle",
+                "select_right_handle",
+            ]
+        )
+    ],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
     # makes a loop
     T.Bone: [NameFilterOut("parent")],
@@ -313,6 +324,14 @@ default_exclusions = {
             ]
         )
     ],
+    T.Key: [
+        NameFilterOut(
+            [
+                # is always the first key_blocks item
+                "reference_key"
+            ]
+        )
+    ],
     T.MaterialSlot: [
         NameFilterOut(
             [
@@ -334,6 +353,7 @@ default_exclusions = {
                 "total_vert_sel",
                 "total_edge_sel",
                 "total_face_sel",
+                "shape_keys",
                 # do not know how to update this, probably by vertices count
                 "vertex_paint_masks",
             ]
@@ -388,20 +408,37 @@ default_exclusions = {
                 "dimensions",
                 "bound_box",
                 "mode",
+                # read_only
+                "is_instancer",
+                "is_from_instancer",
+                "is_from_set",
                 # UI only, define the target of operators
                 "active_material",
                 "active_material_index",
+                "active_shape_key",
+                "active_shape_key_index",
                 # TODO temporary, has a seed member that makes some tests fail
                 "field",
-                # TODO temporary, waiting for shape_key support
-                # there is a loop in active_shape_key/relative_key
-                "active_shape_key",
+                # TODO
+                "particle_systems",
             ]
         )
     ],
     T.PackedFile: [
         # send by a BLENDER_DATA_MEDIA command, not serialized with proxies
         NameFilterOut("data")
+    ],
+    T.PointCache: [
+        NameFilterOut(
+            [
+                # read_only
+                "info",
+                "is_backed",
+                "is_baking",
+                "is_frame_skip",
+                "is_outdated",
+            ]
+        )
     ],
     T.RenderSettings: [
         NameFilterOut(
@@ -443,12 +480,23 @@ default_exclusions = {
         )
     ],
     T.SequenceEditor: [NameFilterOut(["active_strip", "sequences_all"])],
-    T.BezierSplinePoint: [
+    T.ShapeKey: [
         NameFilterOut(
             [
-                "select_control_point",
-                "select_left_handle",
-                "select_right_handle",
+                "frame",
+                "relative_key",
+            ]
+        )
+    ],
+    T.Spline: [
+        NameFilterOut(
+            [
+                # FIXME Not always writable. Nurbs only ?
+                "order_u",
+                "order_v",
+                # readonly
+                "point_count_u",
+                "point_count_v",
             ]
         )
     ],
@@ -476,6 +524,7 @@ safe_depsgraph_updates = (
     T.Curve,
     T.Image,
     T.GreasePencil,
+    T.Key,
     T.Light,
     T.Material,
     T.Mesh,
@@ -506,6 +555,7 @@ safe_blenddata_collections = [
     "metaballs",
     "objects",
     "scenes",
+    "shape_keys",
     "sounds",
     "worlds",
 ]

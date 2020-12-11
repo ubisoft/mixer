@@ -16,6 +16,7 @@ from tests.process import ServerProcess
 
 import mixer.codec
 from mixer.broadcaster.common import Command, MessageType
+from mixer.blender_data.types import Soa
 
 logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -49,8 +50,15 @@ class MixerTestCase(unittest.TestCase):
         self._blenders: List[BlenderApp] = []
         self.ignored_messages = set()
         self.experimental_sync = True
+        self.workspaces: List[List[str]] = []
+        """One list of workspace folders per Blender"""
 
-    def set_log_level(self, log_level):
+    @property
+    def log_level(self):
+        return self._log_level
+
+    @log_level.setter
+    def log_level(self, log_level):
         self._log_level = log_level
 
     @classmethod
@@ -78,7 +86,6 @@ class MixerTestCase(unittest.TestCase):
         blenderdescs: Tuple[BlenderDesc, BlenderDesc] = (BlenderDesc(), BlenderDesc()),
         server_args: Optional[List[str]] = None,
         join=True,
-        join_delay: Optional[float] = None,
     ):
         """
         if a blendfile if not specified, blender will start with its default file.
@@ -97,6 +104,10 @@ class MixerTestCase(unittest.TestCase):
             window_width = int(1920 / len(blenderdescs))
 
             for i, blenderdesc in enumerate(blenderdescs):
+                workspace_folders = self.workspaces[i] if i < len(self.workspaces) else []
+                if not isinstance(workspace_folders, (list, tuple)):
+                    self.fail(f"workspace must be a list or tuple, not a {type(workspace_folders)}")
+
                 window_x = str(i * window_width)
                 args = ["--window-geometry", window_x, "0", "960", "1080"]
                 if blenderdesc.load_file is not None:
@@ -107,9 +118,9 @@ class MixerTestCase(unittest.TestCase):
                 if join:
                     blender.connect_mixer()
                     if i == 0:
-                        blender.create_room(vrtist_protocol=self.vrtist_protocol)
+                        blender.create_room(vrtist_protocol=self.vrtist_protocol, workspace_folders=workspace_folders)
                     else:
-                        blender.join_room(vrtist_protocol=self.vrtist_protocol)
+                        blender.join_room(vrtist_protocol=self.vrtist_protocol, workspace_folders=workspace_folders)
 
                 self._blenders.append(blender)
 
@@ -233,6 +244,13 @@ class MixerTestCase(unittest.TestCase):
             if isinstance(a, dict):
                 dict_a, dict_b = a, b
             else:
+                if isinstance(a, Soa):
+                    # soa members are not delivered in deterministic order, sort by name
+                    def first_item_pred(x):
+                        return x[0]
+
+                    a.members.sort(key=first_item_pred)
+                    b.members.sort(key=first_item_pred)
                 dict_a, dict_b = vars(a), vars(b)
 
             keys_a, keys_b = sorted(dict_a.keys()), sorted(dict_b.keys())

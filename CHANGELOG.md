@@ -1,3 +1,9 @@
+# 0.19.0 (wip)
+
+## Fixes
+
+- Decimate modifier: fix synchronization of delimit attribute
+
 # 0.18.0 (2020-11-18)
 
 ## Features

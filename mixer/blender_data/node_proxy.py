@@ -20,10 +20,10 @@ Proxies for bpy.types.NodeTree and bpy.types.NodeLinks
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING, Union
 import bpy.types as T  # noqa
 
-from mixer.blender_data.proxy import DeltaUpdate
+from mixer.blender_data.proxy import Delta, DeltaUpdate
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 if TYPE_CHECKING:
@@ -52,7 +52,8 @@ class NodeLinksProxy(StructCollectionProxy):
         self._sequence = self._load(links)
         return self
 
-    def save(self, node_tree: T.NodeTree, links: str, context: Context):
+    def save(self, unused_attribute, node_tree: T.NodeTree, unused_key: str, context: Context):
+        """Saves this proxy into node_tree.links"""
         if not isinstance(node_tree, T.NodeTree):
             logger.error(f"NodeLinksProxy.save() called with {node_tree}. Expected a bpy.types.NodeTree")
             return
@@ -88,23 +89,33 @@ class NodeLinksProxy(StructCollectionProxy):
 
     def apply(
         self,
-        parent: Any,
-        key: str,
-        struct_delta: Optional[DeltaUpdate],
+        attribute: T.bpy_prop_collection,
+        parent: T.NodeTree,
+        key: Union[int, str],
+        delta: Delta,
         context: Context,
         to_blender: bool = True,
-    ) -> Optional[NodeLinksProxy]:
+    ) -> NodeLinksProxy:
+        """
+        Apply delta to a NodeTree.links attribute
 
-        struct_update = struct_delta.value
-        self._sequence = struct_update._sequence
+        Args:
+            attribute: a NodeTree.links collection to update
+            parent: the attribute that contains attribute (e.g. a NodeTree instance)
+            key: the key that identifies attribute in parent (e.g; "links").
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update attribute in addition to this Proxy
+        """
+
+        assert isinstance(key, str)
+        update = delta.value
+        self._sequence = update._sequence
 
         # update Blender
         if to_blender:
-            self.save(parent, key, context)
+            self.save(attribute, parent, key, context)
 
-        node_tree = getattr(parent, key)
-        if node_tree is None:
-            return None
         return self
 
     def diff(self, links: T.NodeLinks, key, prop, context: Context) -> Optional[DeltaUpdate]:

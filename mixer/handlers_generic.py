@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 
 import bpy
+import bpy.types as T  # noqa N812
 
 from mixer.blender_client import data as data_api
 from mixer.blender_data.diff import BpyBlendDiff
@@ -27,9 +28,14 @@ def send_scene_data_to_server(scene, dummy):
 
     depsgraph = bpy.context.evaluated_depsgraph_get()
     if depsgraph.updates:
-        logger.debug("Current dg updates ...")
+        logger.debug("DG updates for {depsgraph.scene} {depsgraph.view_layer}")
         for update in depsgraph.updates:
             logger.debug(" ......%s", update.id.original)
+    else:
+        # FIXME Possible missed update :
+        # If an updated datablock is not linked in the current scene/view_layer, the update triggers
+        # an empty DG update batch. This can happen when the update is from a script.
+        logger.warning(f"DG updates empty for {depsgraph.scene} {depsgraph.view_layer}")
 
     # prevent processing self events, but always process test updates
     if not share_data.pending_test_update and share_data.client.skip_next_depsgraph_update:
@@ -40,6 +46,16 @@ def send_scene_data_to_server(scene, dummy):
     share_data.pending_test_update = False
     bpy_data_proxy = share_data.bpy_data_proxy
     depsgraph = bpy.context.evaluated_depsgraph_get()
+
+    updates = {update.id.original for update in depsgraph.updates}
+
+    # in some cases (TestShapeKey.test_rename_key), the Key update is missing. Always check for shape_keys
+    shape_key_updates = {
+        datablock.shape_keys
+        for datablock in updates
+        if hasattr(datablock, "shape_keys") and isinstance(datablock.shape_keys, T.Key)
+    }
+    updates.update(shape_key_updates)
 
     # Delay the update of Object data to avoid Mesh updates in edit or paint mode, but keep other updates.
     # Mesh separate delivers Collection as well as created Object and Mesh updates while the edited
@@ -52,7 +68,7 @@ def send_scene_data_to_server(scene, dummy):
     active_object = getattr(bpy.context, "active_object", None)
     if active_object:
         current_objects.add(active_object)
-    updates = {update.id.original for update in depsgraph.updates}
+
     delayed_updates = set()
     for datablock in updates:
         if datablock in current_objects and datablock.mode != "OBJECT" and datablock.data is not None:

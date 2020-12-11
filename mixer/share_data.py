@@ -26,7 +26,6 @@ from typing import Dict, List, Mapping, Set
 from uuid import uuid4
 
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
-from mixer.blender_data.filter import test_properties
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -93,8 +92,6 @@ class ShareData:
         self.collections_added: Set(str) = set()
         self.collections_removed: Set(str) = set()
         self.scenes_added: List[str] = []
-        self.scenes_removed: List[str] = []
-        self.scenes_renamed: List[str, str] = []
 
         # key : collection name
         self.objects_added_to_collection: Mapping(str, str) = {}
@@ -287,7 +284,6 @@ class ShareData:
         Clear the lists that record change between previous and current state
         """
         self.scenes_added.clear()
-        self.scenes_removed.clear()
 
         self.collections_added.clear()
         self.collections_removed.clear()
@@ -394,12 +390,6 @@ class ShareData:
         self.objects_parents = {
             x.name_full: x.parent.name_full if x.parent is not None else "" for x in self.blender_objects.values()
         }
-
-    def init_proxy(self):
-        if not self.use_vrtist_protocol():
-            # default, not safe
-            # the initialisation must initialize reference target for all useful collections (except screens, ...)
-            self.bpy_data_proxy.initialize_ref_targets(test_properties)
 
     def set_vrtist_protocol(self, vrtist_protocol: bool):
         if not vrtist_protocol:

@@ -159,25 +159,51 @@ class Proxy:
             return data.value
         return data
 
-    def save(self, bl_instance: Any, attr_name: str, context: Context):
+    def save(
+        self, attribute: Any, parent: Union[T.bpy_struct, T.bpy_prop_collection], key: Union[int, str], context: Context
+    ):
+        """Save this proxy into attribute, which is contained in parent[key] or parent.key
+
+        The attribute parameter is mainly needed to have a uniform API while ensuring that for any datablock,
+        a bpy.data collection is never searched by name, which would fail with libraries.
+
+        Args:
+            attribute: the attribute into which the proxy is saved.
+            parent: the attribute that contains attribute
+            key, the string or index that identifies attribute in parent
         """
-        Save this proxy into a blender object
-        """
-        logger.warning(f"Not implemented: save() for {self.__class__} {bl_instance}.{attr_name}")
+        raise NotImplementedError(f"Proxy.save() for {parent}[{key}]")
 
     def apply(
         self,
-        parent: Any,
+        attribute: Any,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: Union[int, str],
-        delta: Optional[DeltaUpdate],
+        delta: Delta,
         context: Context,
         to_blender: bool = True,
     ) -> Proxy:
+        """
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
+
+        TODO The parameters parent and key should not be required
+        Args:
+            attribute: the Blender attribute to update
+            parent: the attribute that contains attribute
+            key: the key that identifies attribute in parent
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
+        """
         raise NotImplementedError(f"Proxy.apply() for {parent}[{key}]")
 
     def diff(
-        self, container: Union[T.bpy_prop_collection, T.Struct], key: Union[str, int], context: Context
-    ) -> Optional[DeltaUpdate]:
+        self,
+        container: Union[T.bpy_prop_collection, T.Struct],
+        key: Union[str, int],
+        prop: T.Property,
+        context: Context,
+    ) -> Optional[Delta]:
         raise NotImplementedError(f"diff for {container}[{key}]")
 
     def find_by_path(

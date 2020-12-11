@@ -31,8 +31,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute
 from mixer.blender_data.datablock_proxy import DatablockProxy
-from mixer.blender_data.proxy import DeltaReplace, DeltaUpdate
-
+from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
@@ -147,7 +146,7 @@ class MeshProxy(DatablockProxy):
             existing_length = len(soa)
             incoming_soa = self.data(k)
             if incoming_soa:
-                incoming_length = incoming_soa.length
+                incoming_length = len(incoming_soa)
                 if existing_length != incoming_length:
                     logger.debug(
                         "need_clear_geometry: %s.%s (current/incoming) (%s/%s)",
@@ -162,11 +161,10 @@ class MeshProxy(DatablockProxy):
     def load(
         self,
         datablock: T.ID,
-        key: str,
         context: Context,
         bpy_data_collection_name: str = None,
     ) -> MeshProxy:
-        super().load(datablock, key, context, bpy_data_collection_name)
+        super().load(datablock, context, bpy_data_collection_name)
         self._arrays["vertex_groups"] = VertexGroups.from_mesh(datablock).to_array_sequence()
         return self
 
@@ -178,7 +176,7 @@ class MeshProxy(DatablockProxy):
             # If any mesh buffer changes requires a clear geometry on the receiver, the receiver will clear all
             # buffers, including uv_layers and vertex_colors.
             # Resend everything
-            diff.load(struct, key, context)
+            diff.load(struct, context)
 
             # force ObjectProxy._diff to resend the Vertex groups
             logger.debug(f"_diff: {struct} requires clear_geometry: replace")
@@ -225,21 +223,33 @@ class MeshProxy(DatablockProxy):
 
     def apply(
         self,
+        attribute: T.Mesh,
         parent: T.BlendDataMeshes,
-        key: str,
-        struct_delta: DeltaUpdate,
+        key: Union[int, str],
+        delta: Delta,
         context: Context,
         to_blender: bool = True,
     ) -> MeshProxy:
+        """
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
 
-        struct = parent.get(key)
-        struct_update = struct_delta.value
+        Args:
+            attribute: the Mesh datablock to update
+            parent: the attribute that contains attribute (e.g. a bpy.data.meshes)
+            key: the key that identifies attribute in parent.
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
+        """
 
-        if isinstance(struct_delta, DeltaReplace):
+        struct_update = delta.value
+
+        if isinstance(delta, DeltaReplace):
             self.copy_data(struct_update)
             if to_blender:
-                struct.clear_geometry()
-                self.save(parent, key, context)
+                attribute.clear_geometry()
+                # WARNING ensure that parent is not queried for key, which would fail with libraries and duplicate names
+                self.save(attribute, parent, key, context)
         else:
             # vertex groups are always replaced as a whole
             vertex_groups_arrays = struct_update._arrays.get("vertex_groups", None)
@@ -253,10 +263,10 @@ class MeshProxy(DatablockProxy):
                 for k, member_delta in struct_update._data.items():
                     current_value = self._data.get(k)
                     try:
-                        self._data[k] = apply_attribute(struct, k, current_value, member_delta, context, to_blender)
+                        self._data[k] = apply_attribute(attribute, k, current_value, member_delta, context, to_blender)
                     except Exception as e:
                         logger.warning(f"Struct.apply(). Processing {member_delta}")
-                        logger.warning(f"... for {struct}.{k}")
+                        logger.warning(f"... for {attribute}.{k}")
                         logger.warning(f"... Exception: {e!r}")
                         logger.warning("... Update ignored")
                         continue

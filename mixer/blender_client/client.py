@@ -64,6 +64,7 @@ from mixer.draw_handlers import set_draw_handlers
 
 from mixer.blender_client.camera import send_camera
 from mixer.blender_client.light import send_light
+from mixer.blender_client.empty import send_empty
 from mixer.local_data import get_local_or_create_cache_file, get_source_file_path
 
 logger = logging.getLogger(__name__)
@@ -1074,10 +1075,6 @@ class BlenderClient(Client):
 
                     elif command.type == MessageType.SCENE:
                         scene_api.build_scene(command.data)
-                    elif command.type == MessageType.SCENE_REMOVED:
-                        scene_api.build_scene_removed(command.data)
-                    elif command.type == MessageType.SCENE_RENAMED:
-                        scene_api.build_scene_renamed(command.data)
 
                     elif command.type == MessageType.OBJECT_VISIBILITY:
                         object_api.build_object_visibility(command.data)
@@ -1175,12 +1172,16 @@ def update_params(obj):
         collection_api.send_collection_instance(share_data.client, obj)
         return
 
-    if not hasattr(obj, "data"):
-        return
+    # if not hasattr(obj, "data"):
+    #    return
 
     typename = obj.bl_rna.name
     if obj.data:
         typename = obj.data.bl_rna.name
+    else:
+        if typename == "Object":
+            send_empty(share_data.client, obj)
+        return
 
     supported_lights = ["Sun Light", "Point Light", "Spot Light", "Area Light"]
     if (
@@ -1245,8 +1246,10 @@ def clear_scene_content():
 
         for name in data:
             collection = getattr(bpy.data, name)
-            for obj in collection:
-                collection.remove(obj)
+            for datablock in collection:
+                collection.remove(datablock)
+
+        bpy.data.batch_remove(bpy.data.shape_keys.values())
 
         # Cannot remove the last scene at this point, treat it differently
         for scene in bpy.data.scenes[:-1]:
@@ -1280,7 +1283,6 @@ def send_scene_content():
         # cause to reenter send_scene_data_to_server() and send duplicate messages
 
         share_data.clear_before_state()
-        share_data.init_proxy()
         share_data.client.send_group_begin()
 
         timer = time.monotonic()

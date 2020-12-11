@@ -59,10 +59,11 @@ soable_collection_properties = {
     T.Mesh.bl_rna.properties["loop_triangles"],
     T.Mesh.bl_rna.properties["polygons"],
     T.Mesh.bl_rna.properties["vertices"],
-    T.Spline.bl_rna.properties["bezier_points"],
     T.MeshFaceMapLayer.bl_rna.properties["data"],
     T.MeshLoopColorLayer.bl_rna.properties["data"],
     T.MeshUVLoopLayer.bl_rna.properties["data"],
+    T.ShapeKey.bl_rna.properties["data"],
+    T.Spline.bl_rna.properties["bezier_points"],
 }
 _resize_geometry_types = tuple(
     type(t.bl_rna)
@@ -153,6 +154,38 @@ def dispatch_rna(no_rna_impl: Callable[..., Any]):
     return wrapper
 
 
+def dispatch_value(default_func):
+    """Decorator to select a function implementation according to the value of its fist parameter"""
+    registry: Dict[type, Callable[..., Any]] = {}
+    default: Callable[..., Any] = default_func
+
+    def register(value: Any):
+        """Registers the decorated function f as the implementaton to use if the first argument
+        has the same value a the value parameter"""
+
+        def decorator(f: Callable[..., Any]):
+            registry[value] = f
+            return f
+
+        return decorator
+
+    def dispatch(value: Any):
+        func = registry.get(value)
+        if func:
+            return func
+
+        return default
+
+    def wrapper(value: Any, *args, **kwargs):
+        """Calls the function registered for value"""
+        func = dispatch(value)
+        return func(value, *args, **kwargs)
+
+    # wrapper.register = register  genarates mypy error
+    setattr(wrapper, "register", register)  # noqa B010
+    return wrapper
+
+
 def is_soable_collection(prop):
     return prop in soable_collection_properties
 
@@ -168,6 +201,7 @@ node_tree_type = {
 }
 
 
+@dispatch_value
 def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
     """
     Create an element in a bpy.data collection.
@@ -175,103 +209,132 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
     Contains collection-specific code is the mathod to add an element is not new(name: str)
     """
     collection = getattr(bpy.data, collection_name)
-    if collection_name == "images":
-        image = None
-        image_name = proxy.data("name")
-        filepath = proxy.data("filepath")
-
-        resolved_filepath = proxy._filepath_raw
-        if not proxy._is_in_workspace:
-            resolved_filepath = get_cache_file_path(proxy._filepath_raw)
-        else:
-            if not proxy.is_file_in_workspace(proxy._filepath_raw):
-                logger.warning(f'"{proxy._filepath_raw}" not is workspace')
-                return None
-
-        packed_files = proxy.data("packed_files")
-        if packed_files is not None and packed_files.length:
-            name = proxy.data("name")
-            width, height = proxy.data("size")
-            try:
-                with open(resolved_filepath, "rb") as image_file:
-                    buffer = image_file.read()
-                image = collection.new(name, width, height)
-                image.pack(data=buffer, data_len=len(buffer))
-            except RuntimeError as e:
-                logger.warning(
-                    f'Cannot load packed image original "{filepath}"", resolved "{resolved_filepath}". Exception: '
-                )
-                logger.warning(f"... {e}")
-                return None
-
-        else:
-            try:
-                image = collection.load(resolved_filepath)
-                image.name = image_name
-            except RuntimeError as e:
-                logger.warning(f'Cannot load image original "{filepath}"", resolved "{resolved_filepath}". Exception: ')
-                logger.warning(f"... {e}")
-                return None
-
-        # prevent filepath to be overwritten by the incoming proxy value as it would attempt to reload the file
-        # from the incoming path that may not exist
-        proxy._data["filepath"] = resolved_filepath
-        proxy._data["filepath_raw"] = resolved_filepath
-        return image
-
-    if collection_name == "objects":
-        from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
-        from mixer.blender_data.misc_proxies import NonePtrProxy
-
-        name = proxy.data("name")
-        target = None
-        target_proxy = proxy.data("data")
-        if isinstance(target_proxy, DatablockRefProxy):
-            target = target_proxy.target(context)
-        elif isinstance(target_proxy, NonePtrProxy):
-            target = None
-        else:
-            # error on the sender side
-            logger.warning(f"bpy.data.objects[{name}].data proxy is a {target_proxy.__class__}.")
-            logger.warning("... loaded as Empty")
-            target = None
-
-        object_ = collection.new(name, target)
-        return object_
-
-    if collection_name == "lights":
-        name = proxy.data("name")
-        light_type = proxy.data("type")
-        light = collection.new(name, light_type)
-        return light
-
-    if collection_name == "node_groups":
-        name = proxy.data("name")
-        type_ = node_tree_type[proxy.data("type")]
-        return collection.new(name, type_)
-
-    if collection_name == "sounds":
-        filepath = proxy.data("filepath")
-        # TODO what about "check_existing" ?
-        id_ = collection.load(filepath)
-        # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
-        id_.name = proxy.data("name")
-
-        return id_
-
-    if collection_name == "curves":
-        name = proxy.data("name")
-        return bpy.data.curves.new(name, "CURVE")
-
     name = proxy.data("name")
     try:
         id_ = collection.new(name)
-    except TypeError as e:
+    except Exception as e:
         logger.error(f"Exception while calling : bpy.data.{collection_name}.new({name})")
-        logger.error(f"TypeError : {e!r}")
+        logger.error(f"... {e!r}")
         return None
 
     return id_
+
+
+@bpy_data_ctor.register("images")
+def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+    collection = getattr(bpy.data, collection_name)
+    image = None
+    image_name = proxy.data("name")
+    filepath = proxy.data("filepath")
+
+    resolved_filepath = proxy._filepath_raw
+    if not proxy._is_in_workspace:
+        resolved_filepath = get_cache_file_path(proxy._filepath_raw)
+    else:
+        if not proxy.is_file_in_workspace(proxy._filepath_raw):
+            logger.warning(f'"{proxy._filepath_raw}" not is workspace')
+            return None
+
+    packed_files = proxy.data("packed_files")
+    if packed_files is not None and packed_files.length:
+        name = proxy.data("name")
+        width, height = proxy.data("size")
+        try:
+            with open(resolved_filepath, "rb") as image_file:
+                buffer = image_file.read()
+            image = collection.new(name, width, height)
+            image.pack(data=buffer, data_len=len(buffer))
+        except RuntimeError as e:
+            logger.warning(
+                f'Cannot load packed image original "{filepath}"", resolved "{resolved_filepath}". Exception: '
+            )
+            logger.warning(f"... {e}")
+            return None
+
+    else:
+        try:
+            image = collection.load(resolved_filepath)
+            image.name = image_name
+        except RuntimeError as e:
+            logger.warning(f'Cannot load image original "{filepath}"", resolved "{resolved_filepath}". Exception: ')
+            logger.warning(f"... {e}")
+            return None
+
+    # prevent filepath to be overwritten by the incoming proxy value as it would attempt to reload the file
+    # from the incoming path that may not exist
+    proxy._data["filepath"] = resolved_filepath
+    proxy._data["filepath_raw"] = resolved_filepath
+    return image
+
+
+@bpy_data_ctor.register("objects")
+def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+    from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+    from mixer.blender_data.misc_proxies import NonePtrProxy
+
+    collection = getattr(bpy.data, collection_name)
+    name = proxy.data("name")
+    data_datablock = None
+    data_proxy = proxy.data("data")
+    if isinstance(data_proxy, DatablockRefProxy):
+        data_datablock = data_proxy.target(context)
+    elif isinstance(data_proxy, NonePtrProxy):
+        data_datablock = None
+    else:
+        # error on the sender side
+        logger.warning(f"bpy.data.objects[{name}].data proxy is a {data_proxy.__class__}.")
+        logger.warning("... loaded as Empty")
+        data_datablock = None
+
+    object_datablock = collection.new(name, data_datablock)
+
+    if data_datablock is not None:
+        context.proxy_state.objects[data_datablock.mixer_uuid].add(proxy.mixer_uuid)
+
+    return object_datablock
+
+
+@bpy_data_ctor.register("lights")
+def bpy_data_ctor_lights(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+    collection = getattr(bpy.data, collection_name)
+    name = proxy.data("name")
+    light_type = proxy.data("type")
+    light = collection.new(name, light_type)
+    return light
+
+
+@bpy_data_ctor.register("node_groups")
+def bpy_data_ctor_node_groups(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+    collection = getattr(bpy.data, collection_name)
+    name = proxy.data("name")
+    type_ = node_tree_type[proxy.data("type")]
+    return collection.new(name, type_)
+
+
+@bpy_data_ctor.register("sounds")
+def bpy_data_ctor_sounds(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+    collection = getattr(bpy.data, collection_name)
+    filepath = proxy.data("filepath")
+    # TODO what about "check_existing" ?
+    id_ = collection.load(filepath)
+    # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
+    id_.name = proxy.data("name")
+    return id_
+
+
+@bpy_data_ctor.register("curves")
+def bpy_data_ctor_curves(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+    collection = getattr(bpy.data, collection_name)
+    name = proxy.data("name")
+    return collection.new(name, "CURVE")
+
+
+@bpy_data_ctor.register("shape_keys")
+def bpy_data_ctor_shape_keys(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+    user = proxy._data["user"]
+    user_proxy = context.proxy_state.proxies.get(user.mixer_uuid)
+    datablock = proxy.create_shape_key_datablock(user_proxy, context)
+    return datablock
 
 
 filter_crop_transform = [
@@ -620,7 +683,7 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
     target_rna = target.bl_rna
     if isinstance(target_rna, _resize_geometry_types):
         existing_length = len(target)
-        incoming_length = proxy.length
+        incoming_length = len(proxy)
         if existing_length != incoming_length:
             if existing_length != 0:
                 logger.error(f"resize_geometry(): size mismatch for {target}")
@@ -644,11 +707,11 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
 
     if isinstance(target_rna, type(T.SplineBezierPoints.bl_rna)):
         existing_length = len(target)
-        incoming_length = proxy.length
+        incoming_length = len(proxy)
         delta = incoming_length - existing_length
         if delta > 0:
             target.add(delta)
-        else:
+        elif delta < 0:
             logger.error("Remove not implemented for type SplineBezierPoints")
         return
 
@@ -659,6 +722,7 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
 # must_replace
 #
 _object_material_slots_property = T.Object.bl_rna.properties["material_slots"]
+_key_key_blocks_property = T.Key.bl_rna.properties["key_blocks"]
 
 
 @dispatch_rna
@@ -689,10 +753,18 @@ def diff_must_replace(
                 return True
             if bl_material is not None and bl_material.mixer_uuid != material_proxy.mixer_uuid:
                 return True
-            if bl_item.link != proxy.data("LINK"):
+            if bl_item.link != proxy.data("link"):
                 return True
 
-        return False
+    elif collection_property == _key_key_blocks_property:
+        if len(collection) != len(sequence):
+            return True
+        for bl_item, proxy in zip(collection, sequence):
+            if bl_item.name != proxy.data("name"):
+                return True
+            if bl_item.relative_key.name != proxy.data("relative_key"):
+                # see ShapeKeyProxy.load()
+                return True
 
     return False
 
@@ -708,7 +780,7 @@ def _diff_must_replace_always(
 def _diff_must_replace_vertex_groups(
     collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
 ) -> bool:
-    # Full replace if anything has changed is easier to cope with in ObjectProxy.update_vertex_groups()
+    # Full replace if anything has changed is easier to cope with in ObjectProxy._update_vertex_groups()
     return (
         any((bl_item.name != proxy.data("name") for bl_item, proxy in zip(collection, sequence)))
         or any((bl_item.index != proxy.data("index") for bl_item, proxy in zip(collection, sequence)))
@@ -766,7 +838,7 @@ def truncate_collection(collection: T.bpy_prop_collection, size: int):
     """Truncates collection to _at most_ size elements, ensuring that items can safely be saved into
     the collection. This might clear the collection if its elements cannot be updated.
 
-    This method is useful for bpy _ppop_collections that cannot be safely be overwritten in place,
+    This method is useful for bpy _prop_collections that cannot be safely be overwritten in place,
     because the items cannot be morphed."""
     return
 
@@ -790,3 +862,16 @@ def _truncate_collection_clear(collection: T.bpy_prop_collection, size: int):
 def _truncate_collection_pop(collection: T.bpy_prop_collection, size: int):
     while len(collection) > max(size, 0):
         collection.pop()
+
+
+def remove_datablock(collection: T.bpy_prop_collection, datablock: T.ID):
+    """Delete a datablock from its bpy.data collection"""
+    if isinstance(datablock, T.Scene):
+        from mixer.blender_client.scene import delete_scene
+
+        delete_scene(datablock)
+    elif isinstance(datablock, T.Key):
+        # the doc labels it unsafe, use sparingly
+        bpy.data.batch_remove([datablock])
+    else:
+        collection.remove(datablock)
