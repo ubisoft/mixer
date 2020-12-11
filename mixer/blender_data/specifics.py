@@ -231,8 +231,9 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
     if not proxy._is_in_workspace:
         resolved_filepath = get_cache_file_path(proxy._filepath_raw)
     else:
-        if not proxy.is_file_in_workspace(proxy._filepath_raw):
-            logger.warning(f'"{proxy._filepath_raw}" not is workspace')
+        resolved_filepath = proxy.resolve_workspace_file(proxy._filepath_raw)
+        if resolved_filepath is None:
+            logger.warning(f'"{proxy._filepath_raw}" not in workspace')
             return None
 
     packed_files = proxy.data("packed_files")

@@ -231,13 +231,24 @@ class DatablockProxy(StructProxy):
             path = get_source_file_path(bpy.path.abspath(datablock.filepath))
             self._filepath_raw = str(pathlib.Path(path).resolve(strict=False))
 
-    def is_file_in_workspace(self, filepath):
+    def matches_workspace(self, filepath):
         filepath = str(pathlib.Path(filepath))
         for item in get_mixer_prefs().workspace_directories:
             workspace = item.workspace
+            while workspace[-1] == "/" or workspace[-1] == "\\":
+                workspace = workspace[:-1]
+
             if filepath.startswith(str(pathlib.Path(workspace))):
-                return True
-        return False
+                return filepath[len(workspace) + 1 :]
+        return None
+
+    def resolve_workspace_file(self, relative_path):
+        for item in get_mixer_prefs().workspace_directories:
+            workspace = item.workspace
+            workspace_file = pathlib.Path(workspace) / relative_path
+            if workspace_file.is_file():
+                return str(workspace_file)
+        return None
 
     def attach_media_descriptor(self, datablock: T.ID):
         # if Image, Sound, Library, MovieClip, Text, VectorFont, Volume
@@ -255,7 +266,9 @@ class DatablockProxy(StructProxy):
                 self._media = (get_source_file_path(self._filepath_raw), data)
                 return
 
-            if self.is_file_in_workspace(self._filepath_raw):
+            relative_to_workspace_path = self.matches_workspace(self._filepath_raw)
+            if relative_to_workspace_path is not None:
+                self._filepath_raw = relative_to_workspace_path
                 self._is_in_workspace = True
                 self._media = None
                 return
