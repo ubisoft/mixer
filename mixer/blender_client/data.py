@@ -59,7 +59,7 @@ def build_data_media(buffer: bytes):
     message = BlenderMediaMessage()
     message.decode(buffer)
     # TODO this does not overwrite outdated local files
-    get_or_create_cache_file(message.path, messagebytes_)
+    get_or_create_cache_file(message.path, message.bytes_)
 
 
 def send_data_creations(proxies: CreationChangeset):
