@@ -66,6 +66,10 @@ def join_room(room_name: str, vrtist_protocol: bool = False):
     share_data.client.send_set_current_scene(bpy.context.scene.name_full)
 
     share_data.set_vrtist_protocol(vrtist_protocol)
+    workspaces = []
+    for item in prefs.workspace_directories:
+        workspaces.append(item.workspace)
+    share_data.set_preferences("workspaces", workspaces)
     share_data.pending_test_update = False
 
     # join a room <==> want to track local changes

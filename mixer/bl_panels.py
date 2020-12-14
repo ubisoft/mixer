@@ -177,23 +177,24 @@ def draw_connection_settings_ui(layout: bpy.types.UILayout):
     layout.prop(mixer_prefs, "port")
 
 
-def draw_advanced_settings_ui(layout: bpy.types.UILayout):
-    mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "data_directory", text="Data Directory")
-    layout.prop(mixer_prefs, "log_level")
-    layout.prop(mixer_prefs, "show_server_console")
-    layout.prop(mixer_prefs, "vrtist_protocol")
-
+def draw_workspaces_settings_ui(layout: bpy.types.UILayout):
     mixer_props = get_mixer_props()
-    box = layout.box()
-    box.label(text="Shared Workspaces")
-    row = box.row()
+    mixer_prefs = get_mixer_prefs()
+    row = layout.row()
     row.template_list(
         "WORKSPACE_UL_ItemRenderer", "", mixer_prefs, "workspace_directories", mixer_props, "workspace_index", rows=4
     )
     col = row.column(align=True)
     col.operator(bl_operators.WorkspaceAddDirectoryOperator.bl_idname, text="", icon="ADD")
     col.operator(bl_operators.WorkspaceRemoveDirectoryOperator.bl_idname, text="", icon="REMOVE")
+
+
+def draw_advanced_settings_ui(layout: bpy.types.UILayout):
+    mixer_prefs = get_mixer_prefs()
+    layout.prop(mixer_prefs, "data_directory", text="Data Directory")
+    layout.prop(mixer_prefs, "log_level")
+    layout.prop(mixer_prefs, "show_server_console")
+    layout.prop(mixer_prefs, "vrtist_protocol")
 
 
 def draw_developer_settings_ui(layout: bpy.types.UILayout):
@@ -341,6 +342,7 @@ class MixerSettingsPanel(bpy.types.Panel):
             self.draw_rooms(layout)
             self.draw_users(layout)
 
+        self.draw_workspaces_options(layout)
         self.draw_advanced_options(layout)
         self.draw_developer_options(layout)
 
@@ -369,6 +371,12 @@ class MixerSettingsPanel(bpy.types.Panel):
                     text="File",
                     icon=("ERROR" if not os.path.exists(mixer_props.upload_room_filepath) else "NONE"),
                 )
+
+    def draw_workspaces_options(self, layout):
+        mixer_props = get_mixer_props()
+        collapsable_panel(layout, mixer_props, "display_workspaces_options", text="Workspaces")
+        if mixer_props.display_workspaces_options:
+            draw_workspaces_settings_ui(layout.box().column())
 
     def draw_advanced_options(self, layout):
         mixer_props = get_mixer_props()

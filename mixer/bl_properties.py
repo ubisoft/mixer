@@ -140,6 +140,7 @@ class MixerProperties(bpy.types.PropertyGroup):
     users: bpy.props.CollectionProperty(name="Users", type=UserItem)
     user_index: bpy.props.IntProperty()  # index in the list of users
 
+    display_workspaces_options: bpy.props.BoolProperty(default=True)
     display_advanced_options: bpy.props.BoolProperty(default=False)
     display_developer_options: bpy.props.BoolProperty(default=False)
     display_rooms: bpy.props.BoolProperty(default=True)

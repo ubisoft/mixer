@@ -149,6 +149,9 @@ class Context:
     visit_state: VisitState = field(default_factory=VisitState)
     """Current datablock operation state"""
 
+    preferences: Dict = field(default_factory=dict)
+    """Mixer preferences"""
+
 
 _creation_order = {
     # anything else first
@@ -189,6 +192,8 @@ class BpyDataProxy(Proxy):
 
         self._delayed_updates: Set[T.ID] = set()
 
+        self.preferences = {}
+
     def clear(self):
         self._data.clear()
         self.state.proxies.clear()
@@ -202,7 +207,12 @@ class BpyDataProxy(Proxy):
             collection_proxy.reload_datablocks(datablocks)
 
     def context(self, synchronized_properties: SynchronizedProperties = safe_properties) -> Context:
-        return Context(self.state, synchronized_properties)
+        ctx = Context(self.state, synchronized_properties)
+        ctx.preferences = self.preferences
+        return ctx
+
+    def set_preferences(self, preferences):
+        self.preferences = preferences
 
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}

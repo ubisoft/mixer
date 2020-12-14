@@ -128,10 +128,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
         name="Data Directory", default=os.environ.get("MIXER_DATA_DIR", get_data_directory()), subtype="FILE_PATH"
     )
 
-    workspace_directories: bpy.props.CollectionProperty(
-        name="Workspace Directories",
-        type=WorkspaceItem,
-    )
+    workspace_directories: bpy.props.CollectionProperty(name="Workspace Directories", type=WorkspaceItem)
 
     # Developer option to avoid sending scene content to server at the first connexion
     # Allow to quickly iterate debugging/test on large scenes with only one client in room

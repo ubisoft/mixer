@@ -86,6 +86,8 @@ class ShareData:
         self.clear_room_data()
         self.shot_manager = ShotManager()
 
+        self.preferences = {}
+
     def clear_room_data(self):
         self.objects_added: Set(str) = set()
         self.objects_removed: Set(str) = set()
@@ -395,6 +397,7 @@ class ShareData:
         if not vrtist_protocol:
             logger.warning("Generic protocol sync in ON")
             self.bpy_data_proxy = BpyDataProxy()
+            self.bpy_data_proxy.set_preferences(self.preferences)
         else:
             logger.warning("VRtist protocol sync in ON")
             if self.bpy_data_proxy:
@@ -402,6 +405,9 @@ class ShareData:
 
     def use_vrtist_protocol(self):
         return self.bpy_data_proxy is None
+
+    def set_preferences(self, key: str, value):
+        self.preferences[key] = value
 
 
 share_data = ShareData()  # Instance storing addon state, is used by most of the sub-modules.

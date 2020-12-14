@@ -38,7 +38,6 @@ from mixer.blender_data.misc_proxies import CustomPropertiesProxy
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.type_helpers import sub_id_type
 from mixer.local_data import get_source_file_path
-from mixer.bl_utils import get_mixer_prefs
 
 if TYPE_CHECKING:
     from mixer.blender_data.aos_soa_proxy import SoaElement
@@ -222,7 +221,7 @@ class DatablockProxy(StructProxy):
             context.proxy_state.proxies[uuid] = self
 
         self.attach_filepath_raw(datablock)
-        self.attach_media_descriptor(datablock)
+        self.attach_media_descriptor(datablock, context)
         self._custom_properties.load(datablock)
         return self
 
@@ -231,10 +230,9 @@ class DatablockProxy(StructProxy):
             path = get_source_file_path(bpy.path.abspath(datablock.filepath))
             self._filepath_raw = str(pathlib.Path(path).resolve(strict=False))
 
-    def matches_workspace(self, filepath):
+    def matches_workspace(self, filepath: str, context: Context):
         filepath = str(pathlib.Path(filepath))
-        for item in get_mixer_prefs().workspace_directories:
-            workspace = item.workspace
+        for workspace in context.preferences["workspaces"]:
             while workspace[-1] == "/" or workspace[-1] == "\\":
                 workspace = workspace[:-1]
 
@@ -242,15 +240,20 @@ class DatablockProxy(StructProxy):
                 return filepath[len(workspace) + 1 :]
         return None
 
-    def resolve_workspace_file(self, relative_path):
-        for item in get_mixer_prefs().workspace_directories:
-            workspace = item.workspace
+    def resolve_workspace_file(self, relative_path: str, context: Context):
+        resolved_path = None
+        for workspace in context.preferences["workspaces"]:
             workspace_file = pathlib.Path(workspace) / relative_path
             if workspace_file.is_file():
-                return str(workspace_file)
-        return None
+                if resolved_path is None:
+                    resolved_path = str(workspace_file)
+                else:
+                    logger.warning("Unable to resolve workspace file: multiple matches found")
+                    resolved_path = None
+                    break
+        return resolved_path
 
-    def attach_media_descriptor(self, datablock: T.ID):
+    def attach_media_descriptor(self, datablock: T.ID, context: Context):
         # if Image, Sound, Library, MovieClip, Text, VectorFont, Volume
         # create a self._media with the data to be sent
         # - filepath
@@ -266,7 +269,7 @@ class DatablockProxy(StructProxy):
                 self._media = (get_source_file_path(self._filepath_raw), data)
                 return
 
-            relative_to_workspace_path = self.matches_workspace(self._filepath_raw)
+            relative_to_workspace_path = self.matches_workspace(self._filepath_raw, context)
             if relative_to_workspace_path is not None:
                 self._filepath_raw = relative_to_workspace_path
                 self._is_in_workspace = True
