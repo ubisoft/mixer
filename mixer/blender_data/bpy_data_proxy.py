@@ -53,18 +53,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _objects_last(item: Tuple[str, Any]):
-    if item[0] == "objects":
-        return 1
-    return 0
-
-
-def _objects_first(removal: Removal):
-    if removal[1] == "objects":
-        return 0
-    return 1
-
-
 class RecursionGuard:
     """
     Limits allowed attribute depth, and guards against recursion caused by unfiltered circular references
@@ -152,8 +140,10 @@ class Context:
 
 _creation_order = {
     # anything else first
-    "objects": 5,  # Object.data is required to create Object
-    "shape_keys": 10,  # Key creation require Object API
+    # Object.data is required to create Object
+    "objects": 30,
+    # Key creation require Object API
+    "shape_keys": 40,
 }
 
 
@@ -171,6 +161,18 @@ _updates_order = {
 
 def _updates_order_predicate(datablock: T.ID) -> int:
     return _updates_order.get(type(datablock), sys.maxsize)
+
+
+_removal_order = {
+    # remove Object before its data otherwise data is removed at the time the Object is removed
+    # and the data removal fails
+    T.Object: 10,
+    # anything else last
+}
+
+
+def _remove_order_predicate(removal: Removal) -> int:
+    return _updates_order.get(removal[1], sys.maxsize)
 
 
 class BpyDataProxy(Proxy):
@@ -259,7 +261,7 @@ class BpyDataProxy(Proxy):
         # Everything is sorted with Object last, but the removals need to be sorted the other way round,
         # otherwise the receiver might get a Mesh remove (that removes the Object as well), then an Object remove
         # message for a non existent objjet that triggers a noisy warning, otherwise useful
-        changeset.removals = sorted(changeset.removals, key=_objects_first)
+        changeset.removals = sorted(changeset.removals, key=_remove_order_predicate)
 
         all_updates = updates
         if process_delayed_updates:
