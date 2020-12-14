@@ -534,7 +534,7 @@ Per-type property exclusions
 """
 
 
-_property_order: PropertiesOrder = {
+property_order: PropertiesOrder = {
     T.Scene: {
         # Required to save view_layers
         # LayerCollection.children is a view into the corresponding Collection with additional visibility
@@ -547,7 +547,7 @@ _property_order: PropertiesOrder = {
 """Properties to deliver first because their value enables the possibility to write other attributes."""
 
 test_filter.append(default_exclusions)
-test_properties = SynchronizedProperties(test_filter, _property_order)
+test_properties = SynchronizedProperties(test_filter, property_order)
 """For tests"""
 
 safe_exclusions = {}
@@ -603,7 +603,7 @@ safe_blenddata = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
 safe_filter.append(default_exclusions)
 safe_filter.append(safe_exclusions)
 safe_filter.append(safe_blenddata)
-safe_properties = SynchronizedProperties(safe_filter, _property_order)
+safe_properties = SynchronizedProperties(safe_filter, property_order)
 """
 The default context used for synchronization, that provides per-type lists of properties to synchronize
 """

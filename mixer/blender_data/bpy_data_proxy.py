@@ -91,12 +91,31 @@ class ProxyState:
     unresolved_refs: UnresolvedRefs = UnresolvedRefs()
 
 
-@dataclass
 class VisitState:
     """
     Visit state updated during the proxy structure hierarchy with local (per datablock)
     or global (inter datablock) state
     """
+
+    class CurrentDatablockContext:
+        """Context manager to keep track of the current standalone datablock"""
+
+        def __init__(self, visit_state: VisitState, proxy: DatablockProxy, datablock: T.ID):
+            self._visit_state = visit_state
+            self._datablock = datablock
+            self._proxy = proxy
+
+        def __enter__(self):
+            if self._datablock.is_embedded_data:
+                return
+            self._visit_state.datablock_proxy = self._proxy
+            self._visit_state.datablock = self._datablock
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            if self._datablock.is_embedded_data:
+                return
+            self._visit_state.datablock_proxy = None
+            self._visit_state.datablock = None
 
     Path = List[Union[str, int]]
     """The current visit path relative to the datablock, for instance in a GreasePencil datablock
@@ -106,24 +125,40 @@ class VisitState:
     Local state
     """
 
-    datablock_proxy: Optional[DatablockProxy] = None
-    """The datablock proxy being visited
-    Local state
-    """
+    def __init__(self):
 
-    path: Path = field(default_factory=list)
-    """The path to the current property from the current datablock, for instance in GreasePencil
-    ["layers", "fills", "frames", 0, "strokes", 1, "points", 0]
-    Local state"""
+        self.datablock_proxy: Optional[DatablockProxy] = None
+        """The datablock proxy being visited.
 
-    recursion_guard: RecursionGuard = RecursionGuard()
-    """Keeps track of the data depth and guards agains excessive depth that may be caused
-    by circular references
-    Local state"""
+        Local state
+        """
 
-    dirty_vertex_groups: Set[Uuid] = field(default_factory=set)
-    """Uuids of the Mesh datablocks whose vertex_groups data has been updated since last loaded
-    into their MeshProxy"""
+        self.datablock: Optional[T.ID] = None
+        """The datablock being visited.
+
+        Local state
+        """
+
+        self.path: Path = []
+        """The path to the current property from the current datablock, for instance in GreasePencil
+        ["layers", "fills", "frames", 0, "strokes", 1, "points", 0].
+
+        Local state"""
+
+        self.recursion_guard = RecursionGuard()
+        """Keeps track of the data depth and guards agains excessive depth that may be caused
+        by circular references.
+
+        Local state"""
+
+        self.dirty_vertex_groups: Set[Uuid] = set()
+        """Uuids of the Mesh datablocks whose vertex_groups data has been updated since last loaded
+        into their MeshProxy.
+
+        Global state"""
+
+    def enter_datablock(self, proxy: DatablockProxy, datablock: T.ID) -> VisitState.CurrentDatablockContext:
+        return VisitState.CurrentDatablockContext(self, proxy, datablock)
 
 
 @dataclass
