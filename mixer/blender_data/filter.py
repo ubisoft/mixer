@@ -532,6 +532,12 @@ Per-type property exclusions
 
 
 property_order: PropertiesOrder = {
+    T.ColorManagedViewSettings: {
+        "use_curve_mapping",
+    },
+    T.Material: {
+        "use_nodes",
+    },
     T.Scene: {
         # Required to save view_layers
         # LayerCollection.children is a view into the corresponding Collection with additional visibility
@@ -539,6 +545,10 @@ property_order: PropertiesOrder = {
         # Scene.view_layers ensures that LayerCollection.children items are present when Scene.view_layers
         # is saved
         "collection",
+        "use_nodes",
+    },
+    T.World: {
+        "use_nodes",
     },
 }
 """Properties to deliver first because their value enables the possibility to write other attributes."""
