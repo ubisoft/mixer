@@ -44,7 +44,6 @@ if TYPE_CHECKING:
     from mixer.blender_data.datablock_proxy import DatablockProxy
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
     from mixer.blender_data.proxy import Context, Proxy
-    from mixer.blender_data.struct_proxy import StructProxy
 
 logger = logging.getLogger(__name__)
 
@@ -460,10 +459,6 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
             # must reload the reference
             target = proxy.target(context)
 
-    return target
-
-
-def pre_save_struct(proxy: StructProxy, target: T.bpy_struct, context: Context) -> T.bpy_struct:
     return target
 
 

@@ -192,8 +192,6 @@ class DatablockProxy(StructProxy):
                 # master collection will conflicting writes with Master Collection
                 self._data[name] = attr_value
 
-        specifics.post_save_id(self, datablock)
-
         uuid = datablock.get("mixer_uuid")
         if uuid:
             # It is a bpy.data ID, not an ID "embedded" inside another ID, like scene.collection
