@@ -33,8 +33,8 @@ from mixer.share_data import share_data
 share_data.client.set_room_keep_open("{room_name}", {keep_room_open})
 """
 _set_workspace = """
-from mixer.tructruc import set_workspace
-set_workspace({workspace_folders})
+from mixer.share_data import share_data
+share_data.set_preferences("workspaces",{workspace_folders})
 """
 _join_room = """
 from mixer.connection import join_room

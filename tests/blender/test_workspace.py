@@ -83,7 +83,6 @@ bpy.data.images.load(r"{path_b}")
     ],
     class_name_func=_get_class_name,
 )
-@unittest.skip("not implemented")
 class TestImageTwoFolders(TestCase):
     def __init__(self, *args, **kwargs):
 
