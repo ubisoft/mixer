@@ -103,16 +103,17 @@ class VisitState:
         def __init__(self, visit_state: VisitState, proxy: DatablockProxy, datablock: T.ID):
             self._visit_state = visit_state
             self._datablock = datablock
+            self._is_embedded_data = datablock.is_embedded_data
             self._proxy = proxy
 
         def __enter__(self):
-            if self._datablock.is_embedded_data:
+            if self._is_embedded_data:
                 return
             self._visit_state.datablock_proxy = self._proxy
             self._visit_state.datablock = self._datablock
 
         def __exit__(self, exc_type, exc_value, traceback):
-            if self._datablock.is_embedded_data:
+            if self._is_embedded_data:
                 return
             self._visit_state.datablock_proxy = None
             self._visit_state.datablock = None
