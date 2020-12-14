@@ -23,8 +23,10 @@ according to user preferences.
 
 see synchronization.md
 """
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, ItemsView, Iterable, List, Union
+from typing import Any, Dict, ItemsView, Iterable, List, Set, Union
 
 from bpy import types as T  # noqa
 
@@ -138,10 +140,8 @@ class FilterStack:
     def __init__(self):
         self._filter_stack: List[FilterSet] = []
 
-    def get(self, bl_rna):
-        pass
-
-    def apply(self, bl_rna, properties):
+    def apply(self, bl_rna: T.bpy_struct) -> List[T.Property]:
+        properties = list(bl_rna.properties)
         for class_ in bases(bl_rna):
             bl_rna = None if class_ is None else class_.bl_rna
             for filter_set in self._filter_stack:
@@ -159,6 +159,8 @@ BlRna = Any
 PropertyName = str
 Property = Any
 Properties = Dict[PropertyName, Property]
+PropertiesOrder = Dict[T.bpy_struct, Set[str]]
+"""type: {properties to deliver first}"""
 
 
 class SynchronizedProperties:
@@ -171,10 +173,24 @@ class SynchronizedProperties:
     and never unloaded
     """
 
-    def __init__(self, filter_stack):
+    def __init__(self, filter_stack, order: PropertiesOrder):
         self._properties: Dict[BlRna, Properties] = {}
         self._filter_stack: FilterStack = filter_stack
         self._unhandled_bpy_data_collection_names: List[str] = None
+        self._order = {k.bl_rna: v for k, v in order.items()}
+
+    def _sort(self, bl_rna, properties: List[T.Property]):
+        try:
+            order = self._order[bl_rna]
+        except KeyError:
+            return properties
+
+        def predicate(prop: T.Property):
+            if prop.identifier in order:
+                return 0
+            return 1
+
+        return sorted(properties, key=predicate)
 
     def properties(self, bl_rna_property: T.Property = None, bpy_type=None) -> ItemsView:
         """
@@ -190,10 +206,9 @@ class SynchronizedProperties:
             bl_rna = bpy_type.bl_rna
         bl_rna_properties = self._properties.get(bl_rna)
         if bl_rna_properties is None:
-            filtered_properties = self._filter_stack.apply(bl_rna, list(bl_rna.properties))
-            # Differential update requires that the properties are delivered in the same order
-            # as Blender delivers them
-            bl_rna_properties = {p.identifier: p for p in filtered_properties}
+            filtered_properties = self._filter_stack.apply(bl_rna)
+            sorted_properties = self._sort(bl_rna, filtered_properties)
+            bl_rna_properties = {p.identifier: p for p in sorted_properties}
             self._properties[bl_rna] = bl_rna_properties
         return bl_rna_properties.items()
 
@@ -292,14 +307,6 @@ default_exclusions = {
             ]
         ),
     ],
-    T.LayerCollection: [
-        # TODO temporary
-        # Scene.viewlayers[i].layer_collection.collection is Scene.collection,
-        # see test_scene_viewlayer_layercollection_is_master
-        NameFilterOut("collection"),
-        # Seems to be a view of the master collection children
-        NameFilterOut("children"),
-    ],
     T.GreasePencil: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
         # but do not synchronize its contents
@@ -329,6 +336,18 @@ default_exclusions = {
             [
                 # is always the first key_blocks item
                 "reference_key"
+            ]
+        )
+    ],
+    T.LayerCollection: [
+        NameFilterOut(
+            [
+                # UI related
+                "hide_viewport",
+                # readonly, computed
+                "is_visible",
+                # A reference to the wrapped Collection
+                "collection",
             ]
         )
     ],
@@ -466,8 +485,10 @@ default_exclusions = {
                 "display",
                 # TODO temporary, not implemented
                 "node_tree",
-                "view_layers",
                 "rigidbody_world",
+                # TODO
+                # a view into builtin U keying_sets ?
+                "keying_sets_all",
             ]
         ),
     ],
@@ -512,8 +533,21 @@ default_exclusions = {
 Per-type property exclusions
 """
 
+
+_property_order: PropertiesOrder = {
+    T.Scene: {
+        # Required to save view_layers
+        # LayerCollection.children is a view into the corresponding Collection with additional visibility
+        # information and it is not possible to add/remove items from it. Saving Scene.collection before
+        # Scene.view_layers ensures that LayerCollection.children items are present when Scene.view_layers
+        # is saved
+        "collection",
+    },
+}
+"""Properties to deliver first because their value enables the possibility to write other attributes."""
+
 test_filter.append(default_exclusions)
-test_properties = SynchronizedProperties(test_filter)
+test_properties = SynchronizedProperties(test_filter, _property_order)
 """For tests"""
 
 safe_exclusions = {}
@@ -569,7 +603,7 @@ safe_blenddata = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
 safe_filter.append(default_exclusions)
 safe_filter.append(safe_exclusions)
 safe_filter.append(safe_blenddata)
-safe_properties = SynchronizedProperties(safe_filter)
+safe_properties = SynchronizedProperties(safe_filter, _property_order)
 """
 The default context used for synchronization, that provides per-type lists of properties to synchronize
 """
