@@ -65,7 +65,7 @@ class StructProxy(Proxy):
         properties = context.synchronized_properties.properties(attribute)
         # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
         # that we do not want to load anyway
-        properties = specifics.conditional_properties(attribute, properties, context)
+        properties = specifics.conditional_properties(attribute, properties)
         context.visit_state.path.append(key)
         try:
             for name, bl_rna_property in properties:
@@ -226,7 +226,7 @@ class StructProxy(Proxy):
             context.visit_state.path.append(key)
         try:
             properties = context.synchronized_properties.properties(attribute)
-            properties = specifics.conditional_properties(attribute, properties, context)
+            properties = specifics.conditional_properties(attribute, properties)
             for k, member_property in properties:
                 # TODO in test_differential.StructDatablockRef.test_remove
                 # target et a scene, k is world and v (current world value) is None

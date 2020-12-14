@@ -198,7 +198,7 @@ class MeshProxy(DatablockProxy):
                     context.visit_state.dirty_vertex_groups.add(struct.mixer_uuid)
 
                 properties = context.synchronized_properties.properties(struct)
-                properties = specifics.conditional_properties(struct, properties, context)
+                properties = specifics.conditional_properties(struct, properties)
                 for k, member_property in properties:
                     try:
                         member = getattr(struct, k)

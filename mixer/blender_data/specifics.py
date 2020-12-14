@@ -340,7 +340,7 @@ filter_crop_transform = [
 ]
 
 
-def conditional_properties(bpy_struct: T.Struct, properties: ItemsView, context: Context) -> ItemsView:
+def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     """Filter properties list according to a specific property value in the same ID
 
     This prevents loading values that cannot always be saved, such as Object.instance_collection
@@ -403,7 +403,7 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView, context:
         return filtered.items()
 
     if isinstance(bpy_struct, T.LayerCollection):
-        scene = context.visit_state.datablock
+        scene = bpy_struct.id_data
         if bpy_struct.collection != scene.collection:
             return properties
 

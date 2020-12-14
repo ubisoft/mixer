@@ -102,21 +102,16 @@ class VisitState:
 
         def __init__(self, visit_state: VisitState, proxy: DatablockProxy, datablock: T.ID):
             self._visit_state = visit_state
-            self._datablock = datablock
             self._is_embedded_data = datablock.is_embedded_data
             self._proxy = proxy
 
         def __enter__(self):
-            if self._is_embedded_data:
-                return
-            self._visit_state.datablock_proxy = self._proxy
-            self._visit_state.datablock = self._datablock
+            if not self._is_embedded_data:
+                self._visit_state.datablock_proxy = self._proxy
 
         def __exit__(self, exc_type, exc_value, traceback):
-            if self._is_embedded_data:
-                return
-            self._visit_state.datablock_proxy = None
-            self._visit_state.datablock = None
+            if not self._is_embedded_data:
+                self._visit_state.datablock_proxy = None
 
     Path = List[Union[str, int]]
     """The current visit path relative to the datablock, for instance in a GreasePencil datablock
@@ -129,13 +124,7 @@ class VisitState:
     def __init__(self):
 
         self.datablock_proxy: Optional[DatablockProxy] = None
-        """The datablock proxy being visited.
-
-        Local state
-        """
-
-        self.datablock: Optional[T.ID] = None
-        """The datablock being visited.
+        """The standalone datablock proxy being visited.
 
         Local state
         """
@@ -144,19 +133,22 @@ class VisitState:
         """The path to the current property from the current datablock, for instance in GreasePencil
         ["layers", "fills", "frames", 0, "strokes", 1, "points", 0].
 
-        Local state"""
+        Local state
+        """
 
         self.recursion_guard = RecursionGuard()
         """Keeps track of the data depth and guards agains excessive depth that may be caused
         by circular references.
 
-        Local state"""
+        Local state
+        """
 
         self.dirty_vertex_groups: Set[Uuid] = set()
         """Uuids of the Mesh datablocks whose vertex_groups data has been updated since last loaded
         into their MeshProxy.
 
-        Global state"""
+        Global state
+        """
 
     def enter_datablock(self, proxy: DatablockProxy, datablock: T.ID) -> VisitState.CurrentDatablockContext:
         return VisitState.CurrentDatablockContext(self, proxy, datablock)
