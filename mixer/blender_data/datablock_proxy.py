@@ -448,7 +448,7 @@ class DatablockProxy(StructProxy):
         diff = self.__class__()
         diff.init(attribute)
 
-        with context.visit_state.enter_datablock(self, attribute):
+        with context.visit_state.enter_datablock(diff, attribute):
             delta = self._diff(attribute, key, prop, context, diff)
 
         # compute the custom properties update
