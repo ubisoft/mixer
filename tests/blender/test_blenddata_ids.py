@@ -162,6 +162,120 @@ scene.name = "new_name"
         self.end_test()
 
 
+class TestSceneViewLayer(TestCase):
+    _setup = """
+import bpy
+scene = bpy.context.scene
+vl = scene.view_layers
+# makes it possible to distinguish new view layers created with NEW
+vl[0].pass_alpha_threshold = 0.0
+"""
+
+    def test_add(self):
+        self.send_string(self._setup)
+
+        create = """
+import bpy
+bpy.ops.scene.view_layer_add(type="NEW")
+# force sync
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[1].pass_alpha_threshold = 0.1
+"""
+        self.send_string(create)
+        self.end_test()
+
+    def test_rename(self):
+        self.send_string(self._setup)
+
+        create = """
+import bpy
+bpy.ops.scene.view_layer_add(type="NEW")
+bpy.ops.scene.view_layer_add(type="NEW")
+# force sync
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[1].pass_alpha_threshold = 0.1
+vl[2].pass_alpha_threshold = 0.2
+"""
+        self.send_string(create)
+        rename = """
+import bpy
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[0].name = "vl0"
+vl[1].name = "vl1"
+vl[2].name = "vl2"
+"""
+        self.send_string(rename)
+        self.end_test()
+
+    def test_rename_conflict(self):
+        create = """
+import bpy
+bpy.ops.scene.view_layer_add(type="NEW")
+bpy.ops.scene.view_layer_add(type="NEW")
+# force sync
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[1].pass_alpha_threshold = 0.1
+vl[2].pass_alpha_threshold = 0.2
+"""
+        self.send_string(create)
+        rename = """
+import bpy
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[0].name = "vl"
+vl[1].name = "vl" # vl.001
+vl[2].name = "vl" # vl.002
+vl[0].name = "vl.001" # vl.003
+"""
+        self.send_string(rename)
+        self.end_test()
+
+    def test_remove(self):
+        create = """
+import bpy
+bpy.ops.scene.view_layer_add(type="NEW")
+bpy.ops.scene.view_layer_add(type="NEW")
+# force sync
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[1].pass_alpha_threshold = 0.1
+vl[2].pass_alpha_threshold = 0.2
+"""
+        self.send_string(create)
+        remove = """
+import bpy
+scene = bpy.context.scene
+vl = scene.view_layers
+bpy.context.window.view_layer = vl[1]
+bpy.ops.scene.view_layer_remove()
+"""
+        self.send_string(remove)
+        self.end_test()
+
+    def test_add_blank(self):
+        # synchronization of LayerCollection.exclude deserves a test since it must not be synchronized for the
+        # master collection
+        create = """
+import bpy
+bpy.ops.collection.create(name="Collection")
+collection = bpy.data.collections[0]
+bpy.data.scenes[0].collection.children.link(collection)
+# collection is "included" in existing view layer
+# and excluded from new view_layer
+bpy.ops.scene.view_layer_add(type="EMPTY")
+# force sync
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[1].pass_alpha_threshold = 0.1
+"""
+        self.send_string(create)
+        self.end_test()
+
+
 class TestMesh(TestGenericJoinBefore):
     def test_bpy_ops_mesh_plane_add(self):
         # Same polygon sizes
