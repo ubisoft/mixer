@@ -645,6 +645,12 @@ def _add_element_material_ref(collection: T.bpy_prop_collection, proxy: Proxy, c
     return collection.append(material_datablock)
 
 
+@add_element.register(T.ColorRampElements)
+def _add_element_position(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    position = proxy.data("position")
+    return collection.new(position)
+
+
 def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
     """
     Adjust the size of a bpy_prop_collection proxified as an array of structures (e.g. MeshVertices)
