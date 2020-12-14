@@ -26,7 +26,7 @@ see synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, ItemsView, Iterable, List, Set, Union
+from typing import Any, Dict, ItemsView, Iterable, List, Optional, Set, Union
 
 from bpy import types as T  # noqa
 
@@ -50,6 +50,9 @@ def skip_bpy_data_item(collection_name, item):
 
 
 class Filter:
+    def apply(self, properties):
+        return properties
+
     def is_active(self):
         return True
 
@@ -94,17 +97,12 @@ class FuncFilterOut(Filter):
 
 
 class NameFilter(Filter):
-    def __init__(self, names: Union[Any, Iterable[str]]):
-        if isinstance(names, set):
-            self._names = list(names)
-        elif isinstance(names, str):
-            self._names = [names]
-        else:
-            self._names = names
+    def __init__(self, names: List[str]):
+        self._names = names
 
     def check_unknown(self, properties):
         identifiers = [p.identifier for p in properties]
-        local_exclusions = set(self._names) - _exclude_names
+        local_exclusions = set(self._names) - set(_exclude_names)
         unknowns = [name for name in local_exclusions if name not in identifiers]
         for unknown in unknowns:
             logger.warning(f"Internal error: Filtering unknown property {unknown}. Check spelling")
@@ -125,7 +123,7 @@ class NameFilterIn(NameFilter):
 
 
 # true class with isactive()
-FilterSet = Dict[Any, Iterable[Filter]]
+FilterSet = Dict[Optional[Any], Iterable[Filter]]
 
 
 def bases(bl_rna):
@@ -146,7 +144,6 @@ class FilterStack:
             bl_rna = None if class_ is None else class_.bl_rna
             for filter_set in self._filter_stack:
                 filters = filter_set.get(bl_rna, [])
-                filters = filters if isinstance(filters, Iterable) else [filters]
                 for filter_ in filters:
                     properties = filter_.apply(properties)
         return properties
@@ -176,7 +173,7 @@ class SynchronizedProperties:
     def __init__(self, filter_stack, order: PropertiesOrder):
         self._properties: Dict[BlRna, Properties] = {}
         self._filter_stack: FilterStack = filter_stack
-        self._unhandled_bpy_data_collection_names: List[str] = None
+        self._unhandled_bpy_data_collection_names: Optional[List[str]] = None
         self._order = {k.bl_rna: v for k, v in order.items()}
 
     def _sort(self, bl_rna, properties: List[T.Property]):
@@ -197,7 +194,7 @@ class SynchronizedProperties:
         Return the properties to synchronize for bpy_type
         """
         if (bl_rna_property is None) and (bpy_type is None):
-            return []
+            return {}.items()
         if (bl_rna_property is not None) and (bpy_type is not None):
             raise ValueError("Exactly one of bl_rna and bpy_type must be provided")
         if bl_rna_property is not None:
@@ -242,7 +239,7 @@ Do not exclude collections that may be a target of Object.data. It we did so, an
 would be loaded ad a DatablockProxy instead of a DatablockRefProxy
 """
 
-_exclude_names = {
+_exclude_names = [
     # Related to the UI
     "active_index",
     # found in Viewlayer
@@ -262,16 +259,16 @@ _exclude_names = {
     "type_info",
     "users",
     "use_fake_user",
-}
+]
 """Names of properties that are always excluded"""
 
-default_exclusions = {
+default_exclusions: FilterSet = {
     None: [
         # Temporary: parent and child are involved in circular reference
         TypeFilterOut(T.PoseBone),
         NameFilterOut(_exclude_names),
     ],
-    T.ActionGroup: [NameFilterOut("channels")],
+    T.ActionGroup: [NameFilterOut(["channels"])],
     T.BezierSplinePoint: [
         NameFilterOut(
             [
@@ -283,11 +280,11 @@ default_exclusions = {
     ],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
     # makes a loop
-    T.Bone: [NameFilterOut("parent")],
+    T.Bone: [NameFilterOut(["parent"])],
     # TODO temporary ?
-    T.Collection: [NameFilterOut("all_objects")],
-    T.CompositorNodeRLayers: [NameFilterOut("scene")],
-    T.CurveMapPoint: [NameFilterOut("select")],
+    T.Collection: [NameFilterOut(["all_objects"])],
+    T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
+    T.CurveMapPoint: [NameFilterOut(["select"])],
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foreach_get()
@@ -445,7 +442,7 @@ default_exclusions = {
     ],
     T.PackedFile: [
         # send by a BLENDER_DATA_MEDIA command, not serialized with proxies
-        NameFilterOut("data")
+        NameFilterOut(["data"])
     ],
     T.PointCache: [
         NameFilterOut(
@@ -523,10 +520,10 @@ default_exclusions = {
     ],
     T.ViewLayer: [
         # Not useful. Requires array insertion (to do shortly)
-        NameFilterOut("freestyle_settings"),
+        NameFilterOut(["freestyle_settings"]),
         # A view into ViewLayer objects
-        NameFilterOut("objects"),
-        NameFilterOut("active_layer_collection"),
+        NameFilterOut(["objects"]),
+        NameFilterOut(["active_layer_collection"]),
     ],
 }
 """
@@ -549,8 +546,6 @@ property_order: PropertiesOrder = {
 test_filter.append(default_exclusions)
 test_properties = SynchronizedProperties(test_filter, property_order)
 """For tests"""
-
-safe_exclusions = {}
 
 safe_depsgraph_updates = (
     T.Camera,
@@ -599,9 +594,8 @@ The bpy.data collections in this list are checked for creation/removal and renam
 Add a new collection to this list to synchronize creation, remova and rename events.
 """
 
-safe_blenddata = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
+safe_blenddata: FilterSet = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
 safe_filter.append(default_exclusions)
-safe_filter.append(safe_exclusions)
 safe_filter.append(safe_blenddata)
 safe_properties = SynchronizedProperties(safe_filter, property_order)
 """

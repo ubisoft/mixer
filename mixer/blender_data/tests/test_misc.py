@@ -83,7 +83,7 @@ class TestLoadProxy(unittest.TestCase):
         self.assertTrue("eevee" in scene)
 
         filter_stack = copy.copy(test_filter)
-        filter_stack.append({T.Scene: TypeFilterOut(T.SceneEEVEE)})
+        filter_stack.append({T.Scene: [TypeFilterOut(T.SceneEEVEE)]})
         proxy = BpyDataProxy()
         proxy.load(SynchronizedProperties(filter_stack, property_order))
         blend_data_ = proxy._data
