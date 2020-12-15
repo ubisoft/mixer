@@ -48,7 +48,7 @@ def set_client_attributes():
     )
 
 
-def join_room(room_name: str, vrtist_protocol: bool = False, workspaces: List = ()):
+def join_room(room_name: str, vrtist_protocol: bool = False, workspaces=None):
     prefs = get_mixer_prefs()
     logger.warning(f"join: room: {room_name}, user: {prefs.user}")
 
@@ -65,6 +65,8 @@ def join_room(room_name: str, vrtist_protocol: bool = False, workspaces: List = 
     share_data.client.join_room(room_name)
     share_data.client.send_set_current_scene(bpy.context.scene.name_full)
 
+    if workspaces is None:
+        workspaces = []
     share_data.init_protocol(vrtist_protocol, workspaces)
     share_data.pending_test_update = False
 

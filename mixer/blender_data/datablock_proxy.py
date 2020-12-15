@@ -231,12 +231,12 @@ class DatablockProxy(StructProxy):
             self._filepath_raw = str(pathlib.Path(path).resolve(strict=False))
 
     def matches_workspace(self, filepath: str, context: Context):
-        filepath = str(pathlib.Path(filepath))
+        filepath = str(pathlib.Path(filepath)).lower()
         for workspace in context.proxy_state.workspaces:
             while workspace[-1] == "/" or workspace[-1] == "\\":
                 workspace = workspace[:-1]
 
-            if filepath.startswith(str(pathlib.Path(workspace))):
+            if filepath.startswith(workspace.lower()):
                 return filepath[len(workspace) + 1 :]
         return None
 
