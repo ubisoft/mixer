@@ -43,7 +43,6 @@ def _get_class_name(cls, num, params_dict):
     ],
     class_name_func=_get_class_name,
 )
-@unittest.skip("not implemented")
 class TestImageOneFolder(TestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

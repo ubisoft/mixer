@@ -123,10 +123,14 @@ class CreateRoomOperator(bpy.types.Operator):
         if not is_client_connected():
             return {"CANCELLED"}
 
-        prefs = get_mixer_prefs()
-        room = prefs.room
+        mixer_prefs = get_mixer_prefs()
+        room = mixer_prefs.room
         logger.warning(f"CreateRoomOperator.execute({room})")
-        join_room(room, prefs.vrtist_protocol)
+
+        workspaces = []
+        for item in mixer_prefs.workspace_directories:
+            workspaces.append(item.workspace)
+        join_room(room, mixer_prefs.vrtist_protocol, workspaces)
 
         return {"FINISHED"}
 
@@ -183,8 +187,11 @@ class JoinRoomOperator(bpy.types.Operator):
         room = props.rooms[room_index].name
         logger.warning(f"JoinRoomOperator.execute({room})")
 
-        prefs = get_mixer_prefs()
-        join_room(room, prefs.vrtist_protocol)
+        mixer_prefs = get_mixer_prefs()
+        workspaces = []
+        for item in mixer_prefs.workspace_directories:
+            workspaces.append(item.workspace)
+        join_room(room, mixer_prefs.vrtist_protocol, workspaces)
 
         return {"FINISHED"}
 
@@ -388,7 +395,10 @@ class LaunchVRtistOperator(bpy.types.Operator):
                 return {"CANCELLED"}
 
             logger.warning("LaunchVRtistOperator.execute({mixer_prefs.room})")
-            join_room(mixer_prefs.room, True)
+            workspaces = []
+            for item in mixer_prefs.workspace_directories:
+                workspaces.append(item.workspace)
+            join_room(mixer_prefs.room, True, workspaces)
 
             # Wait for room creation/join
             timeout = 10

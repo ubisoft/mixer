@@ -232,7 +232,7 @@ class DatablockProxy(StructProxy):
 
     def matches_workspace(self, filepath: str, context: Context):
         filepath = str(pathlib.Path(filepath))
-        for workspace in context.preferences["workspaces"]:
+        for workspace in context.proxy_state.workspaces:
             while workspace[-1] == "/" or workspace[-1] == "\\":
                 workspace = workspace[:-1]
 
@@ -242,7 +242,7 @@ class DatablockProxy(StructProxy):
 
     def resolve_workspace_file(self, relative_path: str, context: Context):
         resolved_path = None
-        for workspace in context.preferences["workspaces"]:
+        for workspace in context.proxy_state.workspaces:
             workspace_file = pathlib.Path(workspace) / relative_path
             if workspace_file.is_file():
                 if resolved_path is None:
