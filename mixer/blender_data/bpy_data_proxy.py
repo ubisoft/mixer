@@ -53,18 +53,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _objects_last(item: Tuple[str, Any]):
-    if item[0] == "objects":
-        return 1
-    return 0
-
-
-def _objects_first(removal: Removal):
-    if removal[1] == "objects":
-        return 0
-    return 1
-
-
 class RecursionGuard:
     """
     Limits allowed attribute depth, and guards against recursion caused by unfiltered circular references
@@ -105,12 +93,27 @@ class ProxyState:
     workspaces: List = field(default_factory=list)
 
 
-@dataclass
 class VisitState:
     """
     Visit state updated during the proxy structure hierarchy with local (per datablock)
     or global (inter datablock) state
     """
+
+    class CurrentDatablockContext:
+        """Context manager to keep track of the current standalone datablock"""
+
+        def __init__(self, visit_state: VisitState, proxy: DatablockProxy, datablock: T.ID):
+            self._visit_state = visit_state
+            self._is_embedded_data = datablock.is_embedded_data
+            self._proxy = proxy
+
+        def __enter__(self):
+            if not self._is_embedded_data:
+                self._visit_state.datablock_proxy = self._proxy
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            if not self._is_embedded_data:
+                self._visit_state.datablock_proxy = None
 
     Path = List[Union[str, int]]
     """The current visit path relative to the datablock, for instance in a GreasePencil datablock
@@ -120,24 +123,37 @@ class VisitState:
     Local state
     """
 
-    datablock_proxy: Optional[DatablockProxy] = None
-    """The datablock proxy being visited
-    Local state
-    """
+    def __init__(self):
 
-    path: Path = field(default_factory=list)
-    """The path to the current property from the current datablock, for instance in GreasePencil
-    ["layers", "fills", "frames", 0, "strokes", 1, "points", 0]
-    Local state"""
+        self.datablock_proxy: Optional[DatablockProxy] = None
+        """The standalone datablock proxy being visited.
 
-    recursion_guard: RecursionGuard = RecursionGuard()
-    """Keeps track of the data depth and guards agains excessive depth that may be caused
-    by circular references
-    Local state"""
+        Local state
+        """
 
-    dirty_vertex_groups: Set[Uuid] = field(default_factory=set)
-    """Uuids of the Mesh datablocks whose vertex_groups data has been updated since last loaded
-    into their MeshProxy"""
+        self.path: Path = []
+        """The path to the current property from the current datablock, for instance in GreasePencil
+        ["layers", "fills", "frames", 0, "strokes", 1, "points", 0].
+
+        Local state
+        """
+
+        self.recursion_guard = RecursionGuard()
+        """Keeps track of the data depth and guards agains excessive depth that may be caused
+        by circular references.
+
+        Local state
+        """
+
+        self.dirty_vertex_groups: Set[Uuid] = set()
+        """Uuids of the Mesh datablocks whose vertex_groups data has been updated since last loaded
+        into their MeshProxy.
+
+        Global state
+        """
+
+    def enter_datablock(self, proxy: DatablockProxy, datablock: T.ID) -> VisitState.CurrentDatablockContext:
+        return VisitState.CurrentDatablockContext(self, proxy, datablock)
 
 
 @dataclass
@@ -154,8 +170,13 @@ class Context:
 
 _creation_order = {
     # anything else first
-    "objects": 5,  # Object.data is required to create Object
-    "shape_keys": 10,  # Key creation require Object API
+    "collections": 10,
+    # Scene after Collection. Scene.collection must be up to date before Scene.view_layers can be saved
+    "scenes": 20,
+    # Object.data is required to create Object
+    "objects": 30,
+    # Key creation require Object API
+    "shape_keys": 40,
 }
 
 
@@ -173,6 +194,18 @@ _updates_order = {
 
 def _updates_order_predicate(datablock: T.ID) -> int:
     return _updates_order.get(type(datablock), sys.maxsize)
+
+
+_removal_order = {
+    # remove Object before its data otherwise data is removed at the time the Object is removed
+    # and the data removal fails
+    T.Object: 10,
+    # anything else last
+}
+
+
+def _remove_order_predicate(removal: Removal) -> int:
+    return _updates_order.get(removal[1], sys.maxsize)
 
 
 class BpyDataProxy(Proxy):
@@ -264,7 +297,7 @@ class BpyDataProxy(Proxy):
         # Everything is sorted with Object last, but the removals need to be sorted the other way round,
         # otherwise the receiver might get a Mesh remove (that removes the Object as well), then an Object remove
         # message for a non existent objjet that triggers a noisy warning, otherwise useful
-        changeset.removals = sorted(changeset.removals, key=_objects_first)
+        changeset.removals = sorted(changeset.removals, key=_remove_order_predicate)
 
         all_updates = updates
         if process_delayed_updates:

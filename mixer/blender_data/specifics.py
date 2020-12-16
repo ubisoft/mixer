@@ -44,7 +44,6 @@ if TYPE_CHECKING:
     from mixer.blender_data.datablock_proxy import DatablockProxy
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
     from mixer.blender_data.proxy import Context, Proxy
-    from mixer.blender_data.struct_proxy import StructProxy
 
 logger = logging.getLogger(__name__)
 
@@ -411,6 +410,15 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
 
+    if isinstance(bpy_struct, T.LayerCollection):
+        scene = bpy_struct.id_data
+        if bpy_struct.collection != scene.collection:
+            return properties
+
+        filter_props = ["exclude"]
+        filtered = {k: v for k, v in properties if k not in filter_props}
+        return filtered.items()
+
     filter_props = []
     if any(isinstance(bpy_struct, t) for t in filter_crop_transform):
         if not bpy_struct.use_crop:
@@ -434,10 +442,6 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
     if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
         target.clear_geometry()
     elif isinstance(target, T.Material):
-        use_nodes = proxy.data("use_nodes")
-        if use_nodes:
-            target.use_nodes = True
-
         is_grease_pencil = proxy.data("is_grease_pencil")
         # will be None for a DeltaUpdate that does not modify "is_grease_pencil"
         if is_grease_pencil is not None:
@@ -448,11 +452,6 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
                 bpy.data.materials.remove_gpencil_data(target)
     elif isinstance(target, T.Scene):
         from mixer.blender_data.misc_proxies import NonePtrProxy
-
-        # Set 'use_node' to True first is the only way I know to be able to set the 'node_tree' attribute
-        use_nodes = proxy.data("use_nodes")
-        if use_nodes:
-            target.use_nodes = True
 
         sequence_editor = proxy.data("sequence_editor")
         if sequence_editor is not None:
@@ -468,26 +467,8 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
             target.type = light_type
             # must reload the reference
             target = proxy.target(context)
-    elif isinstance(target, T.World):
-        use_nodes = proxy.data("use_nodes")
-        if use_nodes:
-            target.use_nodes = True
 
     return target
-
-
-def pre_save_struct(proxy: StructProxy, target: T.bpy_struct, context: Context) -> T.bpy_struct:
-    """Process attributes that must be saved first"""
-    if isinstance(target, T.ColorManagedViewSettings):
-        use_curve_mapping = proxy.data("use_curve_mapping")
-        if use_curve_mapping:
-            target.use_curve_mapping = True
-    return target
-
-
-def post_save_id(proxy: Proxy, bpy_id: T.ID):
-    """Apply type specific patches after loading bpy_struct into proxy"""
-    pass
 
 
 #
@@ -671,6 +652,12 @@ def _add_element_sequence(collection: T.bpy_prop_collection, proxy: Proxy, conte
 def _add_element_material_ref(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
     material_datablock = proxy.target(context)
     return collection.append(material_datablock)
+
+
+@add_element.register(T.ColorRampElements)
+def _add_element_position(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    position = proxy.data("position")
+    return collection.new(position)
 
 
 def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):

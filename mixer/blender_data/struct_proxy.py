@@ -77,14 +77,6 @@ class StructProxy(Proxy):
 
         return self
 
-    def _pre_save(self, struct: T.bpy_struct, context: Context) -> T.bpy_struct:
-        """Save the struct attributes that must be saved first because they influence the saving
-        of other attributes
-
-        For instance, Scene.use_nodes needs to be set to True before Scene.node_tree can be saved.
-        """
-        return specifics.pre_save_struct(self, struct, context)
-
     def save(
         self,
         attribute: T.bpy_struct,
@@ -101,8 +93,6 @@ class StructProxy(Proxy):
             key: (e.g. "display)
             context: the proxy and visit state
         """
-        attribute = self._pre_save(attribute, context)
-
         if attribute is None:
             if isinstance(parent, T.bpy_prop_collection):
                 logger.warning(f"Cannot write to '{parent}', attribute '{key}' because it does not exist.")
@@ -151,9 +141,6 @@ class StructProxy(Proxy):
             if to_blender:
                 self.save(attribute, parent, key, context)
         else:
-
-            if to_blender:
-                attribute = update._pre_save(attribute, context)
 
             assert type(update) == type(self)
 
