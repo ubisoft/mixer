@@ -251,12 +251,19 @@ class CustomPropertiesProxy:
             self._rna_ui.clear()
             return self
 
+        self._rna_ui = rna_ui.to_dict()
         self._dict = {name: datablock.get(name) for name in keys}
 
     def save(self, datablock: T.ID):
         """Overwrite all the custom properties in datablock, including the UI"""
         if self._rna_ui:
             datablock["_RNA_UI"] = self._rna_ui
+        else:
+            try:
+                del datablock["_RNA_UI"]
+            except KeyError:
+                pass
+
         current_keys, _ = self._user_keys(datablock)
         remove = current_keys - set(self._dict.keys())
         for key in remove:
