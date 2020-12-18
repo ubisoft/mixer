@@ -1,8 +1,20 @@
-# 0.19.0 (wip)
+# 0.19.0-beta1 (14-12-2020)
+
+## Features
+
+- Vertex groups: synchronization
+- Shape keys: synchronization
+- Material assignment: synchronization
+- View layers: synchronization
 
 ## Fixes
 
+- Object parenting: wrong child object location
 - Decimate modifier: fix synchronization of delimit attribute
+- Curves: exceptions when loading empty curve
+- Metaballs: misc error messages
+- Logging: More focused messages in warning mode
+
 
 # 0.18.0 (2020-11-18)
 

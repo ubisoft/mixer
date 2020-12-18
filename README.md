@@ -1,22 +1,23 @@
 # Mixer
 
-**Disclaimer**: This project is in alpha state and actively developed. Do not use it to edit your production assets without a backup or you might break them. In the code you might see references to VRtist or Shot Manager, which are other technologies / addons that are developed in our studio. Don't pay too much attention to related code since we plan to extract it in some way, probably with a plugins strategy.
+**Disclaimer**: This project is in alpha state and actively developed. Do not use it to edit your production assets without a backup or you might break them.
 
 Note that development is on Windows 10. Please report issues and submit PRs for other OSs.
 
-Look for the details about the latest version in its announcement issue.
+Look for the details about the latest version in its [announcement issue](https://gitlab.com/ubisoft-animation-studio/mixer/-/issues?label_name%5B%5D=Information).
 
 ## Introduction
 
 Mixer is a Blender addon developed at Ubisoft Animation Studio for Real Time Collaboration in 3D edition. It allows multiple Blender users to work on the same scene at the same time. Thanks to a broadcasting server that is independent from Blender, it is also possible to implement a connection for other 3D editing softwares.
 
+The synchronization currently supports cameras, collections, curves, grease pencils, lights, materials, metaballs, meshes, objects, scenes and worlds.
+
+
 ## Usage
 
-As a Blender user, you can download the addon from the Gitlab release page https://gitlab.com/ubisoft-animation-studio/mixer/-/releases and install it into Blender. Pick the archive under Assets/Other part of the last release.
+Download the addon ZIP file from the `Assets/Other` of the Gitlab release page https://gitlab.com/ubisoft-animation-studio/mixer/-/releases and install it into Blender. 
 
-We didn't write extensive documentation for the user interface because it is still a work in progress and might change often. We'll write a tutorial with screenshots and make videos once the UI become stable.
-
-From the Mixer panel in the 3D viewport you can enter an IP address, a port and connect to a server. If you enter `localhost` and no Mixer server is already running on your computer, then the addon will start one in the background when you click `Connect`.
+From the Mixer panel in the 3D viewport you can enter an IP address, a port and connect to a server. If you enter `localhost` and no Mixer server is already running on your computer, then the addon will start a server in the background when you click `Connect`.
 
 Then you can test locally between two Blender instances, or you can open the port on your router and give your external IP address to other people so they can join your session.
 
@@ -31,7 +32,7 @@ As a Developer, you may want to read the [Developer environment](doc/development
 ### Known limitations
 
 - Avoid using Undo as it may cause problems like disappearing objects or crashes.
-- Synchronization is currently limited to cameras, collections, grease pencils, lights, materials, metaballs, meshes, objects and scenes (without view layers).
+- Synchronization is currently limited to cameras, collections, curves, grease pencils, lights, materials, metaballs, meshes, objects, scenes and worlds.
 
 You will find more detailed information in the changelogs and in the announcement issue that comes with the new version.
 
@@ -49,6 +50,8 @@ We also have a mirror on Github https://github.com/ubisoft/mixer, as part of Ubi
 ## Contributing
 
 You can [report any bug through issues on Gitlab](https://gitlab.com/ubisoft-animation-studio/mixer/-/issues). Please include the version you use in the issue and how to reproduce the bug, if possible. You can join a blender file, or a room file that you can save with the "Download Room" button in advanced room options.
+
+ In the code you might see references to VRtist or Shot Manager, which are other technologies / addons that are developed in our studio. Don't pay too much attention to related code since we plan to extract it in some way, probably with a plugins strategy.
 
 You can [submit a merge requests on Gitlab](https://gitlab.com/ubisoft-animation-studio/mixer/-/merge_requests), but keep in mind that the architecture of the addon is likely to change significantly in the next few months. For bugfixes, simple refactoring, typos, documentation, or things related to the usage of the Blender API you can directly submit the merge request. For features please also open an issue to discuss it, so we can think about how it would fit in the future architecture.
 

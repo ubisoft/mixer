@@ -1,13 +1,14 @@
 # How to release a new version ?
 
-The release process of Mixer is handled with CI/CD and based on git tags. The tags that are considered to be a release tag and should trigger the release job of the CI/CD are : 
+The release process of Mixer is handled with CI/CD and based on git tags. The tags that are considered to be a release tag and should trigger the release job of the CI/CD are :
 
 - `v{major}.{minor}.{bugfix}`
 - `v{major}.{minor}.{bugfix}-{prerelease}`
 - `v{major}.{minor}.{bugfix}+{build}`
 - `v{major}.{minor}.{bugfix}-{prerelease}+{build}`
 
-The preliminary steps for creating a release tagged as described above are : 
+The preliminary steps for creating a release tagged as described above are :
+
 - check that the tag does not exist
 - ensure all the changes have been committed
 - edit `CHANGELOG.md` to add a section describing the release and starting with a comment line containing the release tag
