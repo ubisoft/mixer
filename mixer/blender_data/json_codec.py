@@ -126,7 +126,9 @@ def default(obj):
 
         return d
 
-    raise EncodeError(f"Unknown class {class_} for {obj}")
+    logger.warning(f"Unknown class {class_} for {obj}")
+    # No exception as it would cancel the whole datablock
+    return None
 
 
 def decode_optional(obj, x, option_name):
