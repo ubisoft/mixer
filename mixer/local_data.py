@@ -53,6 +53,8 @@ def get_cache_file_path(path: str):
 
 
 def get_source_file_path(cache_path: str):
+    if cache_path is None:
+        return None
     metadata_path = Path(cache_path).with_suffix(".metadata")
     if not metadata_path.exists():
         return cache_path

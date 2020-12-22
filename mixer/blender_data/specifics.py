@@ -227,6 +227,9 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
     filepath = proxy.data("filepath")
 
     resolved_filepath = proxy._filepath_raw
+    if resolved_filepath is None:
+        return None
+
     if not proxy._is_in_shared_folder:
         resolved_filepath = get_cache_file_path(proxy._filepath_raw)
     else:
