@@ -231,7 +231,7 @@ blenddata_exclude = [
     # we do not need those
     "screens",
     "window_managers",
-    "workspaces",
+    "shared_folders",
 ]
 """Members of bpy.data that will be totally excluded from synchronization.
 

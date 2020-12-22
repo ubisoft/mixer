@@ -90,7 +90,7 @@ class ProxyState:
 
     unresolved_refs: UnresolvedRefs = UnresolvedRefs()
 
-    workspaces: List = field(default_factory=list)
+    shared_folders: List = field(default_factory=list)
 
 
 class VisitState:
@@ -239,8 +239,8 @@ class BpyDataProxy(Proxy):
     def context(self, synchronized_properties: SynchronizedProperties = safe_properties) -> Context:
         return Context(self.state, synchronized_properties)
 
-    def set_workspaces(self, workspaces: List):
-        self.state.workspaces = workspaces
+    def set_shared_folders(self, shared_folders: List):
+        self.state.shared_folders = shared_folders
 
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}

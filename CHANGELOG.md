@@ -1,8 +1,8 @@
-# 0.19.0-beta1+workspaces (16-12-2020)
+# 0.19.0-beta1+shared_folders (16-12-2020)
 
 ## Features
 
-- Workspaces
+- Shared folders
 - Vertex groups: synchronization
 - Shape keys: synchronization
 - Material assignment: synchronization

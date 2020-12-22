@@ -45,12 +45,12 @@ logger = logging.getLogger(__name__)
 
 
 poll_is_client_connected = (lambda: is_client_connected(), "Client not connected")
-poll_already_in_a_room = (lambda: not share_data.client.current_room, "Already in a room")
+poll_already_in_a_room = (lambda: not is_client_connected() or not share_data.client.current_room, "Already in a room")
 
 
-class WorkspaceAddDirectoryOperator(bpy.types.Operator, ImportHelper):
-    bl_idname = "mixer.add_workspace"
-    bl_label = "Add Workspace"
+class SharedFoldersAddFolderOperator(bpy.types.Operator, ImportHelper):
+    bl_idname = "mixer.add_shared_folder"
+    bl_label = "Add Shared Folder"
     filepath: bpy.props.StringProperty(subtype="DIR_PATH")
 
     def execute(self, context):
@@ -59,23 +59,43 @@ class WorkspaceAddDirectoryOperator(bpy.types.Operator, ImportHelper):
         if not Path(path).is_dir():
             path = str(Path(path).parent)
 
-        for item in get_mixer_prefs().workspace_directories:
-            if item.workspace == path:
+        for item in get_mixer_prefs().shared_folders:
+            if item.shared_folder == path:
                 return {"FINISHED"}
 
-        item = get_mixer_prefs().workspace_directories.add()
-        item.workspace = path
+        item = get_mixer_prefs().shared_folders.add()
+        item.shared_folder = path
         return {"FINISHED"}
 
+    @classmethod
+    def poll_functors(cls, context):
+        return [
+            poll_already_in_a_room,
+        ]
 
-class WorkspaceRemoveDirectoryOperator(bpy.types.Operator):
-    bl_idname = "mixer.remove_workspace"
-    bl_label = "Remove Workspace"
+    @classmethod
+    def poll(cls, context):
+        return generic_poll(cls, context)
+
+
+class SharedFoldersRemoveFolderOperator(bpy.types.Operator):
+    bl_idname = "mixer.remove_shared_folder"
+    bl_label = "Remove Shared Folder"
 
     def execute(self, context):
         props = get_mixer_props()
-        get_mixer_prefs().workspace_directories.remove(props.workspace_index)
+        get_mixer_prefs().shared_folders.remove(props.shared_folder_index)
         return {"FINISHED"}
+
+    @classmethod
+    def poll_functors(cls, context):
+        return [
+            poll_already_in_a_room,
+        ]
+
+    @classmethod
+    def poll(cls, context):
+        return generic_poll(cls, context)
 
 
 def generic_poll(cls, context):
@@ -127,10 +147,10 @@ class CreateRoomOperator(bpy.types.Operator):
         room = mixer_prefs.room
         logger.warning(f"CreateRoomOperator.execute({room})")
 
-        workspaces = []
-        for item in mixer_prefs.workspace_directories:
-            workspaces.append(item.workspace)
-        join_room(room, mixer_prefs.vrtist_protocol, workspaces)
+        shared_folders = []
+        for item in mixer_prefs.shared_folders:
+            shared_folders.append(item.shared_folder)
+        join_room(room, mixer_prefs.vrtist_protocol, shared_folders)
 
         return {"FINISHED"}
 
@@ -188,10 +208,10 @@ class JoinRoomOperator(bpy.types.Operator):
         logger.warning(f"JoinRoomOperator.execute({room})")
 
         mixer_prefs = get_mixer_prefs()
-        workspaces = []
-        for item in mixer_prefs.workspace_directories:
-            workspaces.append(item.workspace)
-        join_room(room, mixer_prefs.vrtist_protocol, workspaces)
+        shared_folders = []
+        for item in mixer_prefs.shared_folders:
+            shared_folders.append(item.shared_folder)
+        join_room(room, mixer_prefs.vrtist_protocol, shared_folders)
 
         return {"FINISHED"}
 
@@ -395,10 +415,10 @@ class LaunchVRtistOperator(bpy.types.Operator):
                 return {"CANCELLED"}
 
             logger.warning("LaunchVRtistOperator.execute({mixer_prefs.room})")
-            workspaces = []
-            for item in mixer_prefs.workspace_directories:
-                workspaces.append(item.workspace)
-            join_room(mixer_prefs.room, True, workspaces)
+            shared_folders = []
+            for item in mixer_prefs.shared_folders:
+                shared_folders.append(item.shared_folder)
+            join_room(mixer_prefs.room, True, shared_folders)
 
             # Wait for room creation/join
             timeout = 10
@@ -459,8 +479,8 @@ classes = (
     LeaveRoomOperator,
     DownloadRoomOperator,
     UploadRoomOperator,
-    WorkspaceAddDirectoryOperator,
-    WorkspaceRemoveDirectoryOperator,
+    SharedFoldersAddFolderOperator,
+    SharedFoldersRemoveFolderOperator,
 )
 
 register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)

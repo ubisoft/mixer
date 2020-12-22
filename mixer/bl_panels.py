@@ -160,9 +160,9 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
             split.prop(item, "joinable", text="")
 
 
-class WORKSPACE_UL_ItemRenderer(bpy.types.UIList):  # noqa
+class SHAREDFOLDER_UL_ItemRenderer(bpy.types.UIList):  # noqa
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
-        layout.prop(item, "workspace", text="", emboss=False, icon_value=icon)
+        layout.prop(item, "shared_folder", text="", emboss=False, icon_value=icon)
 
 
 def draw_user_settings_ui(layout: bpy.types.UILayout):
@@ -177,16 +177,16 @@ def draw_connection_settings_ui(layout: bpy.types.UILayout):
     layout.prop(mixer_prefs, "port")
 
 
-def draw_workspaces_settings_ui(layout: bpy.types.UILayout):
+def draw_shared_folders_settings_ui(layout: bpy.types.UILayout):
     mixer_props = get_mixer_props()
     mixer_prefs = get_mixer_prefs()
     row = layout.row()
     row.template_list(
-        "WORKSPACE_UL_ItemRenderer", "", mixer_prefs, "workspace_directories", mixer_props, "workspace_index", rows=4
+        "SHAREDFOLDER_UL_ItemRenderer", "", mixer_prefs, "shared_folders", mixer_props, "shared_folder_index", rows=4
     )
     col = row.column(align=True)
-    col.operator(bl_operators.WorkspaceAddDirectoryOperator.bl_idname, text="", icon="ADD")
-    col.operator(bl_operators.WorkspaceRemoveDirectoryOperator.bl_idname, text="", icon="REMOVE")
+    col.operator(bl_operators.SharedFoldersAddFolderOperator.bl_idname, text="", icon="ADD")
+    col.operator(bl_operators.SharedFoldersRemoveFolderOperator.bl_idname, text="", icon="REMOVE")
 
 
 def draw_advanced_settings_ui(layout: bpy.types.UILayout):
@@ -342,7 +342,7 @@ class MixerSettingsPanel(bpy.types.Panel):
             self.draw_rooms(layout)
             self.draw_users(layout)
 
-        self.draw_workspaces_options(layout)
+        self.draw_shared_folders_options(layout)
         self.draw_advanced_options(layout)
         self.draw_developer_options(layout)
 
@@ -372,11 +372,11 @@ class MixerSettingsPanel(bpy.types.Panel):
                     icon=("ERROR" if not os.path.exists(mixer_props.upload_room_filepath) else "NONE"),
                 )
 
-    def draw_workspaces_options(self, layout):
+    def draw_shared_folders_options(self, layout):
         mixer_props = get_mixer_props()
-        collapsable_panel(layout, mixer_props, "display_workspaces_options", text="Workspaces")
-        if mixer_props.display_workspaces_options:
-            draw_workspaces_settings_ui(layout.box().column())
+        collapsable_panel(layout, mixer_props, "display_shared_folders_options", text="Shared Folders")
+        if mixer_props.display_shared_folders_options:
+            draw_shared_folders_settings_ui(layout.box().column())
 
     def draw_advanced_options(self, layout):
         mixer_props = get_mixer_props()
@@ -438,7 +438,7 @@ def update_panels_category(self, context):
         logger.error(f"Updating Panel category has failed {e!r}")
 
 
-classes = (ROOM_UL_ItemRenderer, WORKSPACE_UL_ItemRenderer, MixerSettingsPanel, VRtistSettingsPanel)
+classes = (ROOM_UL_ItemRenderer, SHAREDFOLDER_UL_ItemRenderer, MixerSettingsPanel, VRtistSettingsPanel)
 register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)
 
 

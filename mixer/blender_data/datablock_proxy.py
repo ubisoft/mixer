@@ -60,7 +60,7 @@ class DatablockProxy(StructProxy):
         "_class_name",
         "_datablock_uuid",
         "_custom_properties",
-        "_is_in_workspace",
+        "_is_in_shared_folder",
         "_filepath_raw",
     )
 
@@ -81,7 +81,7 @@ class DatablockProxy(StructProxy):
 
         # TODO move into _arrays
         self._media: Optional[Tuple[str, bytes]] = None
-        self._is_in_workspace: Optional[bool] = None
+        self._is_in_shared_folder: Optional[bool] = None
         self._filepath_raw: Optional[str] = None
 
         self._arrays: ArrayGroups = {}
@@ -225,25 +225,25 @@ class DatablockProxy(StructProxy):
             path = get_source_file_path(bpy.path.abspath(datablock.filepath))
             self._filepath_raw = str(pathlib.Path(path).resolve(strict=False))
 
-    def matches_workspace(self, filepath: str, context: Context):
+    def matches_shared_folder(self, filepath: str, context: Context):
         filepath = str(pathlib.Path(filepath)).lower()
-        for workspace in context.proxy_state.workspaces:
-            while workspace[-1] == "/" or workspace[-1] == "\\":
-                workspace = workspace[:-1]
+        for shared_folder in context.proxy_state.shared_folders:
+            while shared_folder[-1] == "/" or shared_folder[-1] == "\\":
+                shared_folder = shared_folder[:-1]
 
-            if filepath.startswith(workspace.lower()):
-                return filepath[len(workspace) + 1 :]
+            if filepath.startswith(shared_folder.lower()):
+                return filepath[len(shared_folder) + 1 :]
         return None
 
-    def resolve_workspace_file(self, relative_path: str, context: Context):
+    def resolve_shared_folder_file(self, relative_path: str, context: Context):
         resolved_path = None
-        for workspace in context.proxy_state.workspaces:
-            workspace_file = pathlib.Path(workspace) / relative_path
-            if workspace_file.is_file():
+        for shared_folder in context.proxy_state.shared_folders:
+            shared_folder_file = pathlib.Path(shared_folder) / relative_path
+            if shared_folder_file.is_file():
                 if resolved_path is None:
-                    resolved_path = str(workspace_file)
+                    resolved_path = str(shared_folder_file)
                 else:
-                    logger.warning("Unable to resolve workspace file: multiple matches found")
+                    logger.warning("Unable to resolve shared_folder file: multiple matches found")
                     resolved_path = None
                     break
         return resolved_path
@@ -256,7 +256,7 @@ class DatablockProxy(StructProxy):
         #
         #
         if isinstance(datablock, T.Image):
-            self._is_in_workspace = False
+            self._is_in_shared_folder = False
             packed_file = datablock.packed_file
             data = None
             if packed_file is not None:
@@ -264,10 +264,10 @@ class DatablockProxy(StructProxy):
                 self._media = (get_source_file_path(self._filepath_raw), data)
                 return
 
-            relative_to_workspace_path = self.matches_workspace(self._filepath_raw, context)
-            if relative_to_workspace_path is not None:
-                self._filepath_raw = relative_to_workspace_path
-                self._is_in_workspace = True
+            relative_to_shared_folder_path = self.matches_shared_folder(self._filepath_raw, context)
+            if relative_to_shared_folder_path is not None:
+                self._filepath_raw = relative_to_shared_folder_path
+                self._is_in_shared_folder = True
                 self._media = None
                 return
 

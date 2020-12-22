@@ -123,8 +123,8 @@ user_to_unique_index = {}
 next_user_unique_index = 0
 
 
-class WorkspaceItem(bpy.types.PropertyGroup):
-    workspace: bpy.props.StringProperty(default="", subtype="DIR_PATH", name="Workspace Directory")
+class SharedFolderItem(bpy.types.PropertyGroup):
+    shared_folder: bpy.props.StringProperty(default="", subtype="DIR_PATH", name="Shared Folder")
 
 
 class MixerProperties(bpy.types.PropertyGroup):
@@ -140,7 +140,7 @@ class MixerProperties(bpy.types.PropertyGroup):
     users: bpy.props.CollectionProperty(name="Users", type=UserItem)
     user_index: bpy.props.IntProperty()  # index in the list of users
 
-    display_workspaces_options: bpy.props.BoolProperty(default=True)
+    display_shared_folders_options: bpy.props.BoolProperty(default=True)
     display_advanced_options: bpy.props.BoolProperty(default=False)
     display_developer_options: bpy.props.BoolProperty(default=False)
     display_rooms: bpy.props.BoolProperty(default=True)
@@ -163,8 +163,8 @@ class MixerProperties(bpy.types.PropertyGroup):
     display_snapping_options: bpy.props.BoolProperty(default=False)
     snap_view_user_enabled: bpy.props.BoolProperty(default=False)
 
-    workspaces: bpy.props.CollectionProperty(name="Workspaces", type=WorkspaceItem)
-    workspace_index: bpy.props.IntProperty()
+    shared_folders: bpy.props.CollectionProperty(name="Shared Folders", type=SharedFolderItem)
+    shared_folder_index: bpy.props.IntProperty()
 
     def update_user_to_unique_index_dict(self):
         global user_to_unique_index
@@ -247,7 +247,7 @@ classes = (
     UserWindowItem,
     UserSceneItem,
     UserItem,
-    WorkspaceItem,
+    SharedFolderItem,
     MixerProperties,
 )
 

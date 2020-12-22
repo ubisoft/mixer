@@ -31,6 +31,7 @@ from mixer.broadcaster.common import ClientAttributes
 from mixer.os_utils import getuser
 from mixer.share_data import share_data
 from mixer.local_data import get_data_directory
+from mixer.connection import is_client_connected
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,8 @@ def set_log_level(self, value):
     logger.log(value, "Logging level changed")
 
 
-class WorkspaceItem(bpy.types.PropertyGroup):
-    workspace: bpy.props.StringProperty(default="", subtype="DIR_PATH", name="Workspace Directory")
+class SharedFolderItem(bpy.types.PropertyGroup):
+    shared_folder: bpy.props.StringProperty(default="", subtype="DIR_PATH", name="Shared Folder")
 
 
 class MixerPreferences(bpy.types.AddonPreferences):
@@ -128,7 +129,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
         name="Data Directory", default=os.environ.get("MIXER_DATA_DIR", get_data_directory()), subtype="FILE_PATH"
     )
 
-    workspace_directories: bpy.props.CollectionProperty(name="Workspace Directories", type=WorkspaceItem)
+    shared_folders: bpy.props.CollectionProperty(name="Shared Folders", type=SharedFolderItem)
 
     # Developer option to avoid sending scene content to server at the first connexion
     # Allow to quickly iterate debugging/test on large scenes with only one client in room
@@ -157,7 +158,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
 
 
 classes = (
-    WorkspaceItem,
+    SharedFolderItem,
     MixerPreferences,
 )
 

@@ -50,8 +50,8 @@ class MixerTestCase(unittest.TestCase):
         self._blenders: List[BlenderApp] = []
         self.ignored_messages = set()
         self.experimental_sync = True
-        self.workspaces: List[List[str]] = []
-        """One list of workspace folders per Blender"""
+        self.shared_folders: List[List[str]] = []
+        """One list of shared_folder folders per Blender"""
 
     @property
     def log_level(self):
@@ -104,9 +104,9 @@ class MixerTestCase(unittest.TestCase):
             window_width = int(1920 / len(blenderdescs))
 
             for i, blenderdesc in enumerate(blenderdescs):
-                workspace_folders = self.workspaces[i] if i < len(self.workspaces) else []
-                if not isinstance(workspace_folders, (list, tuple)):
-                    self.fail(f"workspace must be a list or tuple, not a {type(workspace_folders)}")
+                shared_folders = self.shared_folders[i] if i < len(self.shared_folders) else []
+                if not isinstance(shared_folders, (list, tuple)):
+                    self.fail(f"shared_folder must be a list or tuple, not a {type(shared_folders)}")
 
                 window_x = str(i * window_width)
                 args = ["--window-geometry", window_x, "0", "960", "1080"]
@@ -118,9 +118,9 @@ class MixerTestCase(unittest.TestCase):
                 if join:
                     blender.connect_mixer()
                     if i == 0:
-                        blender.create_room(vrtist_protocol=self.vrtist_protocol, workspace_folders=workspace_folders)
+                        blender.create_room(vrtist_protocol=self.vrtist_protocol, shared_folders=shared_folders)
                     else:
-                        blender.join_room(vrtist_protocol=self.vrtist_protocol, workspace_folders=workspace_folders)
+                        blender.join_room(vrtist_protocol=self.vrtist_protocol, shared_folders=shared_folders)
 
                 self._blenders.append(blender)
 

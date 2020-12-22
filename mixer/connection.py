@@ -48,7 +48,7 @@ def set_client_attributes():
     )
 
 
-def join_room(room_name: str, vrtist_protocol: bool = False, workspaces=None):
+def join_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None):
     prefs = get_mixer_prefs()
     logger.warning(f"join: room: {room_name}, user: {prefs.user}")
 
@@ -65,9 +65,9 @@ def join_room(room_name: str, vrtist_protocol: bool = False, workspaces=None):
     share_data.client.join_room(room_name)
     share_data.client.send_set_current_scene(bpy.context.scene.name_full)
 
-    if workspaces is None:
-        workspaces = []
-    share_data.init_protocol(vrtist_protocol, workspaces)
+    if shared_folders is None:
+        shared_folders = []
+    share_data.init_protocol(vrtist_protocol, shared_folders)
     share_data.pending_test_update = False
 
     # join a room <==> want to track local changes
