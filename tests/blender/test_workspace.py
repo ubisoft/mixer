@@ -43,6 +43,7 @@ def _get_class_name(cls, num, params_dict):
     ],
     class_name_func=_get_class_name,
 )
+@unittest.skip("")
 class TestImageOneFolder(TestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -82,6 +83,7 @@ bpy.data.images.load(r"{path_b}")
     ],
     class_name_func=_get_class_name,
 )
+@unittest.skip("")
 class TestImageTwoFolders(TestCase):
     def __init__(self, *args, **kwargs):
 
