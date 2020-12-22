@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 import logging
 import sys
 from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
+import pathlib
 
 import bpy
 import bpy.types as T  # noqa
@@ -240,7 +241,10 @@ class BpyDataProxy(Proxy):
         return Context(self.state, synchronized_properties)
 
     def set_shared_folders(self, shared_folders: List):
-        self.state.shared_folders = shared_folders
+        normalized_folders = []
+        for folder in shared_folders:
+            normalized_folders.append(pathlib.Path(folder))
+        self.state.shared_folders = normalized_folders
 
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}

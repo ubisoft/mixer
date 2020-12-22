@@ -223,22 +223,22 @@ class DatablockProxy(StructProxy):
     def attach_filepath_raw(self, datablock: T.ID):
         if isinstance(datablock, T.Image):
             path = get_source_file_path(bpy.path.abspath(datablock.filepath))
-            self._filepath_raw = str(pathlib.Path(path).resolve(strict=False))
+            self._filepath_raw = str(pathlib.Path(path))
 
     def matches_shared_folder(self, filepath: str, context: Context):
-        filepath = str(pathlib.Path(filepath)).lower()
+        filepath = pathlib.Path(filepath)
         for shared_folder in context.proxy_state.shared_folders:
-            while shared_folder[-1] == "/" or shared_folder[-1] == "\\":
-                shared_folder = shared_folder[:-1]
-
-            if filepath.startswith(shared_folder.lower()):
-                return filepath[len(shared_folder) + 1 :]
+            try:
+                relative_path = filepath.relative_to(shared_folder)
+            except ValueError:
+                continue
+            return str(relative_path)
         return None
 
     def resolve_shared_folder_file(self, relative_path: str, context: Context):
         resolved_path = None
         for shared_folder in context.proxy_state.shared_folders:
-            shared_folder_file = pathlib.Path(shared_folder) / relative_path
+            shared_folder_file = shared_folder / relative_path
             if shared_folder_file.is_file():
                 if resolved_path is None:
                     resolved_path = str(shared_folder_file)
