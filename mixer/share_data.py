@@ -35,9 +35,33 @@ from mixer.shot_manager_data import ShotManager
 logger = logging.getLogger(__name__)
 ObjectVisibility = namedtuple("ObjectVisibility", ["hide_viewport", "hide_select", "hide_render", "hide_get"])
 
+ObjectConstraint = namedtuple(
+    "ObjectConstraint", ["has_parent_constraint", "parent_target", "has_look_at_constraint", "look_at_target"]
+)
+
 
 def object_visibility(o: bpy.types.Object):
     return ObjectVisibility(o.hide_viewport, o.hide_select, o.hide_render, o.hide_get())
+
+
+def get_object_constraints(o: bpy.types.Object):
+    has_parent_constraint = False
+    parent_target = None
+    has_look_at_constraint = False
+    look_at_target = None
+
+    for constraint in o.constraints:
+        if constraint.type == "CHILD_OF":
+            if constraint.target is not None:
+                has_parent_constraint = True
+                parent_target = constraint.target
+        if constraint.type == "TRACK_TO":
+            if constraint.target is not None:
+                has_look_at_constraint = True
+                look_at_target = constraint.target
+
+    constraints = ObjectConstraint(has_parent_constraint, parent_target, has_look_at_constraint, look_at_target)
+    return constraints
 
 
 class CollectionInfo:
@@ -118,6 +142,9 @@ class ShareData:
         self.objects_transforms = {}
         self.objects_visibility_changed: Set[str] = set()
         self.objects_visibility: Mapping[str, ObjectVisibility] = {}
+        self.objects_constraints_added: Set[str] = set()
+        self.objects_constraints_removed: Set[str] = set()
+        self.objects_constraints: Mapping[str, ObjectConstraint] = {}
 
         self.old_objects: Mapping[str, bpy.types.Object] = {}
 
@@ -301,6 +328,8 @@ class ShareData:
         self.objects_reparented.clear()
         self.objects_renamed.clear()
         self.objects_visibility_changed.clear()
+        self.objects_constraints_added.clear()
+        self.objects_constraints_removed.clear()
         self.clear_changed_frame_related_lists()
 
     def update_scenes_info(self):
@@ -387,6 +416,7 @@ class ShareData:
         self.update_collections_info()
         self.update_objects_info()
         self.objects_visibility = {x.name_full: object_visibility(x) for x in self.blender_objects.values()}
+        self.objects_constraints = {x.name_full: get_object_constraints(x) for x in self.blender_objects.values()}
         self.objects_parents = {
             x.name_full: x.parent.name_full if x.parent is not None else "" for x in self.blender_objects.values()
         }
