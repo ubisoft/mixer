@@ -638,37 +638,6 @@ def update_objects_data():
             update_params(c)
 
 
-def send_animated_data():
-    animated_camera_set = set()
-    animated_light_set = set()
-    camera_dict = {}
-    light_dict = {}
-    depsgraph = bpy.context.evaluated_depsgraph_get()
-    for update in depsgraph.updates:
-        obj = update.id.original
-        typename = obj.bl_rna.name
-        if typename == "Object":
-            if obj.data and obj.data.animation_data is not None:
-                if obj.data.bl_rna.name == "Camera":
-                    camera_dict[obj.data.animation_data.action.name_full] = obj
-                if (
-                    obj.data.bl_rna.name == "Point Light"
-                    or obj.data.bl_rna.name == "Sun Light"
-                    or obj.data.bl_rna.name == "Spot Light"
-                ):
-                    light_dict[obj.data.animation_data.action.name_full] = obj
-        if typename == "Action":
-            if camera_dict.get(obj.name_full):
-                animated_camera_set.add(camera_dict[obj.name_full])
-            if light_dict.get(obj.name_full):
-                animated_light_set.add(light_dict[obj.name_full])
-
-    for camera in animated_camera_set:
-        share_data.client.send_camera_attributes(camera)
-    for light in animated_light_set:
-        share_data.client.send_light_attributes(light)
-
-
 def send_frame_changed(scene):
     logger.debug("send_frame_changed")
 
@@ -698,12 +667,6 @@ def send_frame_changed(scene):
 
     # update for next change
     share_data.update_objects_info()
-
-    # temporary code :
-    # animated parameters are not sent, we need camera & light animated parameters for VRtist
-    # (focal lens etc.)
-    # please remove this when animation is managed
-    send_animated_data()
 
     scene_camera_name = ""
     if bpy.context.scene.camera is not None:
