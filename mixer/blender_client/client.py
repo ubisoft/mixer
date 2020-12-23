@@ -58,6 +58,7 @@ from mixer.blender_client import material as material_api
 from mixer.blender_client import mesh as mesh_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
+from mixer.blender_client import constraint as constraint_api
 from mixer.blender_data.proxy import ensure_uuid
 import mixer.shot_manager as shot_manager
 import mixer.asset_bank as asset_bank
@@ -1100,6 +1101,10 @@ class BlenderClient(Client):
                     elif command.type == MessageType.SHOT_MANAGER_ACTION:
                         shot_manager.build_shot_manager_action(command.data)
 
+                    elif command.type == MessageType.ADD_CONSTRAINT:
+                        constraint_api.build_add_constraint(command.data)
+                    elif command.type == MessageType.REMOVE_CONSTRAINT:
+                        constraint_api.build_remove_constraint(command.data)
                     elif command.type == MessageType.ASSET_BANK:
                         delayed_messages.append(delayed_message_call(asset_bank.receive_message, command.data))
 
@@ -1289,6 +1294,7 @@ def send_scene_content():
 
         share_data.clear_before_state()
         share_data.client.send_group_begin()
+        share_data.client.send_set_current_scene(bpy.context.scene.name_full)
 
         timer = time.monotonic()
         if not share_data.use_vrtist_protocol():
@@ -1309,5 +1315,4 @@ def send_scene_content():
         share_data.start_frame = bpy.context.scene.frame_start
         share_data.end_frame = bpy.context.scene.frame_end
         share_data.client.send_frame(bpy.context.scene.frame_current)
-
         share_data.client.send_group_end()
