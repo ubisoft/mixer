@@ -31,7 +31,6 @@ from mixer.broadcaster.common import ClientAttributes
 from mixer.os_utils import getuser
 from mixer.share_data import share_data
 from mixer.local_data import get_data_directory
-from mixer.connection import is_client_connected
 
 logger = logging.getLogger(__name__)
 
