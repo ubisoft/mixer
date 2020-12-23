@@ -22,7 +22,7 @@ This module defines global state of the addon. It is encapsulated in a ShareData
 from collections import namedtuple
 from datetime import datetime
 import logging
-from typing import Dict, List, Mapping, Set
+from typing import Dict, List, Mapping, Optional, Set
 from uuid import uuid4
 
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
@@ -116,8 +116,6 @@ class ShareData:
         self.collections_added: Set(str) = set()
         self.collections_removed: Set(str) = set()
         self.scenes_added: List[str] = []
-        self.scenes_removed: List[str] = []
-        self.scenes_renamed: List[str, str] = []
 
         # key : collection name
         self.objects_added_to_collection: Mapping(str, str) = {}
@@ -186,7 +184,7 @@ class ShareData:
         self.start_frame = 0
         self.end_frame = 0
 
-        self.bpy_data_proxy: BpyDataProxy = None
+        self.bpy_data_proxy: Optional[BpyDataProxy] = None
 
     def leave_current_room(self):
         if self.client is not None:
@@ -313,7 +311,6 @@ class ShareData:
         Clear the lists that record change between previous and current state
         """
         self.scenes_added.clear()
-        self.scenes_removed.clear()
 
         self.collections_added.clear()
         self.collections_removed.clear()

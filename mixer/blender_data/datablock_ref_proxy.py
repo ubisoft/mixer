@@ -22,7 +22,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union
 
 import bpy
 import bpy.types as T  # noqa
@@ -48,10 +48,10 @@ class DatablockRefProxy(Proxy):
     - Camera.dof.focus_object
     """
 
+    _serialize = ("_bpy_data_collection", "_datablock_uuid", "_initial_name")
+
     def __init__(self):
         self._datablock_uuid: str = None
-        # Not used but "required" by the json codec
-        self._data: Dict[str, Any] = {}
         self._bpy_data_collection: str = ""
         self._initial_name: str = None
 

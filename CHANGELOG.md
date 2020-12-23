@@ -1,3 +1,22 @@
+# 0.19.0 (18-12-2020)
+
+## Features
+
+- Mesh: synchronization of vertex groups and shape keys
+- Curves: synchronization of shape keys
+- View layers: synchronization
+- Custom properties: synchronization
+
+## Fixes
+
+- Object parenting: synchronization of child object location
+- Decimate modifier: synchronization of delimit attribute
+- Curves: exception when loading empty curve
+- Metaballs: error messages
+- Material assignment: synchronization with multiple materials
+- Logging: more focused messages in warning mode
+
+
 # 0.18.0 (2020-11-18)
 
 ## Features

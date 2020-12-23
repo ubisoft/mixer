@@ -28,6 +28,7 @@ message_types = {
     MessageType.BLENDER_DATA_CREATE: messages.BlenderDataMessage,
     MessageType.BLENDER_DATA_REMOVE: messages.BlenderRemoveMessage,
     MessageType.BLENDER_DATA_RENAME: messages.BlenderRenamesMessage,
+    MessageType.BLENDER_DATA_MEDIA: messages.BlenderMediaMessage,
 }
 
 

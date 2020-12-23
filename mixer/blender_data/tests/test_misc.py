@@ -28,7 +28,13 @@ from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.misc_proxies import NonePtrProxy
-from mixer.blender_data.filter import SynchronizedProperties, TypeFilterOut, test_properties, test_filter
+from mixer.blender_data.filter import (
+    property_order,
+    SynchronizedProperties,
+    TypeFilterOut,
+    test_properties,
+    test_filter,
+)
 from mixer.blender_data.tests.utils import test_blend_file
 from mixer.blender_data.specifics import dispatch_rna
 
@@ -77,9 +83,9 @@ class TestLoadProxy(unittest.TestCase):
         self.assertTrue("eevee" in scene)
 
         filter_stack = copy.copy(test_filter)
-        filter_stack.append({T.Scene: TypeFilterOut(T.SceneEEVEE)})
+        filter_stack.append({T.Scene: [TypeFilterOut(T.SceneEEVEE)]})
         proxy = BpyDataProxy()
-        proxy.load(SynchronizedProperties(filter_stack))
+        proxy.load(SynchronizedProperties(filter_stack, property_order))
         blend_data_ = proxy._data
         scene_ = blend_data_["scenes"].search_one("Scene_0")._data
         self.assertFalse("eevee" in scene_)

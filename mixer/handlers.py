@@ -236,13 +236,7 @@ def update_scenes_state():
     scenes_before = {
         scene.mixer_uuid: name for name, scene in share_data.scenes_info.items() if name != "_mixer_to_be_removed_"
     }
-    share_data.scenes_added, share_data.scenes_removed, share_data.scenes_renamed = find_renamed(
-        scenes_before, scenes_after
-    )
-
-    for old_name, new_name in share_data.scenes_renamed:
-        share_data.scenes_info[new_name] = share_data.scenes_info[old_name]
-        del share_data.scenes_info[old_name]
+    share_data.scenes_added, _, _ = find_renamed(scenes_before, scenes_after)
 
     # walk the old scenes
     for scene_name, scene_info in share_data.scenes_info.items():
@@ -468,17 +462,6 @@ def add_scenes():
     changed = False
     for scene in share_data.scenes_added:
         scene_api.send_scene(share_data.client, scene)
-        changed = True
-    for old_name, new_name in share_data.scenes_renamed:
-        scene_api.send_scene_renamed(share_data.client, old_name, new_name)
-        changed = True
-    return changed
-
-
-def remove_scenes():
-    changed = False
-    for scene in share_data.scenes_removed:
-        scene_api.send_scene_removed(share_data.client, scene)
         changed = True
     return changed
 
@@ -848,7 +831,6 @@ def send_scene_data_to_server(scene, dummy):
     changed |= remove_collections_from_collections()
     changed |= remove_collections_from_scenes()
     changed |= remove_collections()
-    changed |= remove_scenes()
     changed |= add_scenes()
     changed |= add_collections()
     changed |= add_objects()
@@ -940,7 +922,6 @@ def handler_on_undo_redo_post(scene, dummy):
     remove_collections_from_collections()
 
     remove_collections()
-    remove_scenes()
     add_scenes()
     add_objects()
     add_collections()

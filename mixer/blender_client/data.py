@@ -25,14 +25,14 @@ import logging
 import traceback
 from typing import List, TYPE_CHECKING
 
-from mixer.blender_data.json_codec import Codec, DecodeError
-from mixer.blender_data.messages import BlenderDataMessage, BlenderRemoveMessage, BlenderRenamesMessage
-from mixer.broadcaster.common import (
-    Command,
-    decode_string,
-    encode_string,
-    MessageType,
+from mixer.blender_data.json_codec import Codec, DecodeError, EncodeError
+from mixer.blender_data.messages import (
+    BlenderDataMessage,
+    BlenderMediaMessage,
+    BlenderRemoveMessage,
+    BlenderRenamesMessage,
 )
+from mixer.broadcaster.common import Command, MessageType
 from mixer.local_data import get_local_or_create_cache_file
 from mixer.share_data import share_data
 
@@ -47,23 +47,19 @@ logger = logging.getLogger(__name__)
 
 
 def send_media_creations(proxy: DatablockProxy):
-    media_desc = getattr(proxy, "_media", None)
-    if media_desc is None:
-        return
-
-    path, bytes_ = media_desc
-    items = [encode_string(path), bytes_]
-    command = Command(MessageType.BLENDER_DATA_MEDIA, b"".join(items), 0)
-    share_data.client.add_command(command)
+    bytes_ = BlenderMediaMessage.encode(proxy)
+    if bytes_:
+        command = Command(MessageType.BLENDER_DATA_MEDIA, bytes_, 0)
+        share_data.client.add_command(command)
 
 
 def build_data_media(buffer: bytes):
     # TODO save to resolved path.
     # The packed data with be saved to file, not a problem
-    path, index = decode_string(buffer, 0)
-    bytes_ = buffer[index:]
+    message = BlenderMediaMessage()
+    message.decode(buffer)
     # TODO this does not overwrite outdated local files
-    get_local_or_create_cache_file(path, bytes_)
+    get_local_or_create_cache_file(message.path, message.bytes_)
 
 
 def send_data_creations(proxies: CreationChangeset):
@@ -77,11 +73,15 @@ def send_data_creations(proxies: CreationChangeset):
         send_media_creations(datablock_proxy)
         try:
             encoded_proxy = codec.encode(datablock_proxy)
+        except EncodeError as e:
+            logger.error(f"send_data_create: encode exception for {datablock_proxy}")
+            logger.error(f"... {e!r}")
+            return
         except Exception:
             logger.error(f"send_data_create: encode exception for {datablock_proxy}")
             for line in traceback.format_exc().splitlines():
                 logger.error(line)
-            return b""
+            return
 
         buffer = BlenderDataMessage.encode(datablock_proxy, encoded_proxy)
         command = Command(MessageType.BLENDER_DATA_CREATE, buffer, 0)
@@ -120,6 +120,7 @@ def build_data_create(buffer):
         message = BlenderDataMessage()
         message.decode(buffer)
         datablock_proxy = codec.decode(message.proxy_string)
+        logger.info("%s %s", "build_data_create", datablock_proxy)
         datablock_proxy.arrays = message.arrays
         _, rename_changeset = share_data.bpy_data_proxy.create_datablock(datablock_proxy)
         _build_soas(datablock_proxy.mixer_uuid, message.soas)

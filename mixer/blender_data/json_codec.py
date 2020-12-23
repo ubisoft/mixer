@@ -31,8 +31,8 @@ from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaDeletion, DeltaR
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy, DatablockRefCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
-from mixer.blender_data.misc_proxies import NonePtrProxy
 from mixer.blender_data.mesh_proxy import MeshProxy
+from mixer.blender_data.misc_proxies import CustomPropertiesProxy, NonePtrProxy, SetProxy
 from mixer.blender_data.node_proxy import NodeLinksProxy
 from mixer.blender_data.object_proxy import ObjectProxy
 from mixer.blender_data.shape_key_proxy import ShapeKeyProxy
@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 # https://stackoverflow.com/questions/31085153/easiest-way-to-serialize-object-in-a-nested-dictionary
 
 struct_like_classes = [
+    CustomPropertiesProxy,
     DatablockProxy,
     DatablockRefProxy,
     MeshProxy,
@@ -61,6 +62,7 @@ collection_classes = [
     DatablockRefCollectionProxy,
     AosProxy,
     NodeLinksProxy,
+    SetProxy,
 ]
 
 delta_classes = [
@@ -70,14 +72,17 @@ delta_classes = [
     DeltaUpdate,
     DeltaReplace,
 ]
-_classes = {c.__name__: c for c in struct_like_classes}
+_classes: Dict[str, type] = {c.__name__: c for c in struct_like_classes}
 _classes.update({c.__name__: c for c in collection_classes})
 _classes.update({c.__name__: c for c in delta_classes})
 
 _classes_tuple = tuple(_classes.values())
 
-options = ["_bpy_data_collection", "_class_name", "_datablock_uuid", "_initial_name"]
 MIXER_CLASS = "__mixer_class__"
+
+
+class EncodeError(Exception):
+    pass
 
 
 class DecodeError(Exception):
@@ -95,26 +100,34 @@ def default(obj):
     # called top down
     class_ = obj.__class__
 
-    # TODO AOS and SOA
-
     is_known = issubclass(class_, _classes_tuple)
     if is_known:
         # Add the proxy class so that the decoder and instantiate the right type
         d = {MIXER_CLASS: class_.__name__}
         if issubclass(class_, Delta):
             d.update({"value": obj.value})
-        elif issubclass(class_, (NonePtrProxy, SoaElement)):
+        else:
+            try:
+                _data = obj._data
+            except AttributeError:
+                pass
+            else:
+                d.update({"_data": _data})
+
+        try:
+            _serialize = class_._serialize
+        except AttributeError:
             pass
         else:
-            d.update({"_data": obj._data})
-
-        for option in options:
-            d.update(default_optional(obj, option))
-        serialize = getattr(class_, "_serialize", None)
-        if serialize is not None:
-            for option in serialize:
+            if not isinstance(_serialize, (tuple, list)):
+                raise EncodeError(f"Expected tuple or list for _serialize, got {type(_serialize)} for {obj}")
+            for option in _serialize:
                 d.update(default_optional(obj, option))
+
         return d
+
+    logger.warning(f"Unknown class {class_} for {obj}")
+    # No exception as it would cancel the whole datablock
     return None
 
 
@@ -134,17 +147,23 @@ def decode_hook(x):
 
     if class_ in delta_classes:
         obj = class_(x["value"])
-    elif class_ in (SoaElement, NonePtrProxy):
-        obj = class_()
     else:
         obj = class_()
-        obj._data.update(x["_data"])
+        try:
+            _data = x["_data"]
+        except KeyError:
+            pass
+        else:
+            obj._data.update(_data)
 
-    for option in options:
-        decode_optional(obj, x, option)
-    if hasattr(class_, "_serialize"):
-        for option in class_._serialize:
-            decode_optional(obj, x, option)
+        try:
+            _serialize = class_._serialize
+        except AttributeError:
+            pass
+        else:
+            for option in _serialize:
+                decode_optional(obj, x, option)
+
     return obj
 
 

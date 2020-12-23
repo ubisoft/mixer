@@ -171,18 +171,32 @@ class ObjectProxy(DatablockProxy):
                 vertex_group.add([index], weight, "ADD")
 
     def _diff(self, struct: T.Object, key: str, prop: T.Property, context: Context, diff: Proxy) -> Optional[Delta]:
+        from mixer.blender_data.attributes import diff_attribute
+
+        must_replace = False
 
         data_datablock = struct.data
         if data_datablock is not None:
             dirty_vertex_groups = data_datablock.mixer_uuid in context.visit_state.dirty_vertex_groups
-            if dirty_vertex_groups:
-                # Replace the whole Object. Otherwise we would have to merge a DeltaReplace for vertex_groups
-                # and a DeltaUpdate for the remaining items
-                logger.debug(f"_diff: {struct} dirty vertex group: replace")
-                diff.load(struct, context)
-                return DeltaReplace(diff)
+            # Replace the whole Object. Otherwise we would have to merge a DeltaReplace for vertex_groups
+            # and a DeltaUpdate for the remaining items
+            logger.debug(f"_diff: {struct} dirty vertex group: replace")
+            must_replace |= dirty_vertex_groups
 
-        return super()._diff(struct, key, prop, context, diff)
+        if not must_replace:
+            # Parenting with ctrl-P generates a Delta with parent, local_matrix and matrix_parent_inverse.
+            # Applying this delta causes a position shift in the parented object. A full replace fixes the problem.
+            # Not that parenting with just updating the parent property in the property panel does not cause
+            # the same problem
+            parent_property = struct.bl_rna.properties["parent"]
+            parent_delta = diff_attribute(struct.parent, "parent", parent_property, self._data["parent"], context)
+            must_replace |= parent_delta is not None
+
+        if must_replace:
+            diff.load(struct, context)
+            return DeltaReplace(diff)
+        else:
+            return super()._diff(struct, key, prop, context, diff)
 
     def apply(
         self,

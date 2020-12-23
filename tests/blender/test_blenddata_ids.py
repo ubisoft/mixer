@@ -1,5 +1,7 @@
 import unittest
 
+from mixer.broadcaster.common import MessageType
+
 from tests import files_folder
 from tests.blender.blender_testcase import BlenderTestCase, TestGenericJoinBefore
 from tests.mixer_testcase import BlenderDesc
@@ -108,16 +110,169 @@ light.type = "SUN"
 
 
 class TestScene(TestGenericJoinBefore):
+    def setUp(self):
+        super().setUp()
+        # for VRtist. Blender sends the active scene, which is not the same on sender (new scene)
+        # and receiver
+        self.ignored_messages |= {MessageType.SET_SCENE}
+
     def test_bpy_ops_scene_new(self):
         action = """
 import bpy
-scene = bpy.ops.scene_new(type="NEW")
-print(scene)
-print(f"new scene is {scene}")
+bpy.ops.scene.new(type="NEW")
+# force update
+scene = bpy.context.scene
 scene.unit_settings.system = "IMPERIAL"
 scene.use_gravity = True
 """
         self.send_string(action)
+        self.end_test()
+
+    def test_bpy_ops_scene_delete(self):
+        create = """
+import bpy
+bpy.ops.scene.new(type="NEW")
+# force update
+scene = bpy.context.scene
+scene.use_gravity = True
+"""
+        self.send_string(create)
+        delete = """
+import bpy
+bpy.ops.scene.delete()
+"""
+        self.send_string(delete)
+        self.end_test()
+
+    def test_scene_rename(self):
+        create = """
+import bpy
+bpy.ops.scene.new(type="NEW")
+# force update
+scene = bpy.context.scene
+scene.use_gravity = True
+"""
+        self.send_string(create)
+        rename = """
+import bpy
+scene = bpy.context.scene
+scene.name = "new_name"
+"""
+        self.send_string(rename)
+        self.end_test()
+
+
+class TestSceneViewLayer(TestCase):
+    _setup = """
+import bpy
+scene = bpy.context.scene
+vl = scene.view_layers
+# makes it possible to distinguish new view layers created with NEW
+vl[0].pass_alpha_threshold = 0.0
+"""
+
+    def test_add(self):
+        self.send_string(self._setup)
+
+        create = """
+import bpy
+bpy.ops.scene.view_layer_add(type="NEW")
+# force sync
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[1].pass_alpha_threshold = 0.1
+"""
+        self.send_string(create)
+        self.end_test()
+
+    def test_rename(self):
+        self.send_string(self._setup)
+
+        create = """
+import bpy
+bpy.ops.scene.view_layer_add(type="NEW")
+bpy.ops.scene.view_layer_add(type="NEW")
+# force sync
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[1].pass_alpha_threshold = 0.1
+vl[2].pass_alpha_threshold = 0.2
+"""
+        self.send_string(create)
+        rename = """
+import bpy
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[0].name = "vl0"
+vl[1].name = "vl1"
+vl[2].name = "vl2"
+"""
+        self.send_string(rename)
+        self.end_test()
+
+    def test_rename_conflict(self):
+        create = """
+import bpy
+bpy.ops.scene.view_layer_add(type="NEW")
+bpy.ops.scene.view_layer_add(type="NEW")
+# force sync
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[1].pass_alpha_threshold = 0.1
+vl[2].pass_alpha_threshold = 0.2
+"""
+        self.send_string(create)
+        rename = """
+import bpy
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[0].name = "vl"
+vl[1].name = "vl" # vl.001
+vl[2].name = "vl" # vl.002
+vl[0].name = "vl.001" # vl.003
+"""
+        self.send_string(rename)
+        self.end_test()
+
+    def test_remove(self):
+        create = """
+import bpy
+bpy.ops.scene.view_layer_add(type="NEW")
+bpy.ops.scene.view_layer_add(type="NEW")
+# force sync
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[1].pass_alpha_threshold = 0.1
+vl[2].pass_alpha_threshold = 0.2
+"""
+        self.send_string(create)
+        remove = """
+import bpy
+scene = bpy.context.scene
+vl = scene.view_layers
+bpy.context.window.view_layer = vl[1]
+bpy.ops.scene.view_layer_remove()
+"""
+        self.send_string(remove)
+        self.end_test()
+
+    def test_add_blank(self):
+        # synchronization of LayerCollection.exclude deserves a test since it must not be synchronized for the
+        # master collection
+        create = """
+import bpy
+bpy.ops.collection.create(name="Collection")
+collection = bpy.data.collections[0]
+bpy.data.scenes[0].collection.children.link(collection)
+# collection is "included" in existing view layer
+# and excluded from new view_layer
+bpy.ops.scene.view_layer_add(type="EMPTY")
+# force sync
+scene = bpy.context.scene
+vl = scene.view_layers
+vl[1].pass_alpha_threshold = 0.1
+"""
+        self.send_string(create)
         self.end_test()
 
 
@@ -296,7 +451,7 @@ bpy.ops.object.vertex_group_move(direction="UP")
         self.end_test()
 
 
-class TestObject(TestCase):
+class TestObjectMaterialSlot(TestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._create_action = """
@@ -366,6 +521,45 @@ bpy.ops.object.material_slot_move(direction='DOWN')
 """
 
         self.send_string(action)
+        self.end_test()
+
+
+class TestObject(TestCase):
+    def test_decimate_with_set_proxy(self):
+        # for SetProxy
+        create = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(1., 0., 0))
+obj = bpy.data.objects[0]
+modifier = obj.modifiers.new("decimate", "DECIMATE")
+# in "planar" tab
+modifier.delimit = {"SEAM", "UV"}
+"""
+        self.send_string(create)
+        self.end_test()
+
+    def test_parent_set(self):
+        create = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(1., 0., 0))
+bpy.ops.mesh.primitive_plane_add(location=(0., 1., 1))
+"""
+        self.send_string(create)
+
+        parent = """
+import bpy
+obj0 = bpy.data.objects[0]
+obj1 = bpy.data.objects[1]
+bpy.context.view_layer.objects.active=obj1
+obj0.select_set(True)
+
+# obj0 is child of obj1
+# the operator also modifies local_matrix and matrix_parent_inverse
+
+bpy.ops.object.parent_set(type='OBJECT')
+"""
+
+        self.send_string(parent)
         self.end_test()
 
 
@@ -457,6 +651,70 @@ key0.data[0].handle_left[2] = 10.
 key0.data[0].handle_right[2] = 10.
 """
         self.send_string(action)
+        self.end_test()
+
+
+class TestCustomProperties(TestCase):
+    def test_create(self):
+        create = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+bpy.context.view_layer.objects.active = obj
+bpy.ops.wm.properties_add(data_path="active_object")
+"""
+        self.send_string(create)
+        self.end_test()
+
+    def test_update(self):
+        create = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+bpy.context.view_layer.objects.active = obj
+bpy.ops.wm.properties_add(data_path="active_object")
+"""
+        self.send_string(create)
+        update = """
+import bpy
+obj = bpy.data.objects[0]
+rna_ui = obj["_RNA_UI"]
+key = list(rna_ui.keys())[0]
+rna_ui[key]["description"]= "the tooltip"
+# trigger update
+obj.location[0] += 1
+"""
+        self.send_string(update)
+        self.end_test()
+
+    def test_remove(self):
+        create = """
+import bpy
+bpy.ops.mesh.primitive_plane_add(location=(0., 0., 0))
+obj = bpy.data.objects[0]
+bpy.context.view_layer.objects.active = obj
+bpy.ops.wm.properties_add(data_path="active_object")
+"""
+        self.send_string(create)
+        remove = """
+import bpy
+obj = bpy.data.objects[0]
+rna_ui = obj["_RNA_UI"]
+key = list(rna_ui.keys())[0]
+bpy.ops.wm.properties_remove(data_path='active_object', property=key)
+"""
+        self.send_string(remove)
+        self.end_test()
+
+
+class TestImage(TestCase):
+    def test_create_from_file(self):
+        path = str(files_folder() / "image_a.png")
+        create = f"""
+import bpy
+bpy.data.images.load(r"{path}")
+"""
+        self.send_string(create)
         self.end_test()
 
 

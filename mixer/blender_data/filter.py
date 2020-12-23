@@ -23,8 +23,10 @@ according to user preferences.
 
 see synchronization.md
 """
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, ItemsView, Iterable, List, Union
+from typing import Any, Dict, ItemsView, Iterable, List, Optional, Set, Union
 
 from bpy import types as T  # noqa
 
@@ -48,6 +50,9 @@ def skip_bpy_data_item(collection_name, item):
 
 
 class Filter:
+    def apply(self, properties):
+        return properties
+
     def is_active(self):
         return True
 
@@ -92,17 +97,12 @@ class FuncFilterOut(Filter):
 
 
 class NameFilter(Filter):
-    def __init__(self, names: Union[Any, Iterable[str]]):
-        if isinstance(names, set):
-            self._names = list(names)
-        elif isinstance(names, str):
-            self._names = [names]
-        else:
-            self._names = names
+    def __init__(self, names: List[str]):
+        self._names = names
 
     def check_unknown(self, properties):
         identifiers = [p.identifier for p in properties]
-        local_exclusions = set(self._names) - _exclude_names
+        local_exclusions = set(self._names) - set(_exclude_names)
         unknowns = [name for name in local_exclusions if name not in identifiers]
         for unknown in unknowns:
             logger.warning(f"Internal error: Filtering unknown property {unknown}. Check spelling")
@@ -123,7 +123,7 @@ class NameFilterIn(NameFilter):
 
 
 # true class with isactive()
-FilterSet = Dict[Any, Iterable[Filter]]
+FilterSet = Dict[Optional[Any], Iterable[Filter]]
 
 
 def bases(bl_rna):
@@ -138,15 +138,12 @@ class FilterStack:
     def __init__(self):
         self._filter_stack: List[FilterSet] = []
 
-    def get(self, bl_rna):
-        pass
-
-    def apply(self, bl_rna, properties):
+    def apply(self, bl_rna: T.bpy_struct) -> List[T.Property]:
+        properties = list(bl_rna.properties)
         for class_ in bases(bl_rna):
             bl_rna = None if class_ is None else class_.bl_rna
             for filter_set in self._filter_stack:
                 filters = filter_set.get(bl_rna, [])
-                filters = filters if isinstance(filters, Iterable) else [filters]
                 for filter_ in filters:
                     properties = filter_.apply(properties)
         return properties
@@ -159,6 +156,8 @@ BlRna = Any
 PropertyName = str
 Property = Any
 Properties = Dict[PropertyName, Property]
+PropertiesOrder = Dict[T.bpy_struct, Set[str]]
+"""type: {properties to deliver first}"""
 
 
 class SynchronizedProperties:
@@ -171,17 +170,31 @@ class SynchronizedProperties:
     and never unloaded
     """
 
-    def __init__(self, filter_stack):
+    def __init__(self, filter_stack, order: PropertiesOrder):
         self._properties: Dict[BlRna, Properties] = {}
         self._filter_stack: FilterStack = filter_stack
-        self._unhandled_bpy_data_collection_names: List[str] = None
+        self._unhandled_bpy_data_collection_names: Optional[List[str]] = None
+        self._order = {k.bl_rna: v for k, v in order.items()}
+
+    def _sort(self, bl_rna, properties: List[T.Property]):
+        try:
+            order = self._order[bl_rna]
+        except KeyError:
+            return properties
+
+        def predicate(prop: T.Property):
+            if prop.identifier in order:
+                return 0
+            return 1
+
+        return sorted(properties, key=predicate)
 
     def properties(self, bl_rna_property: T.Property = None, bpy_type=None) -> ItemsView:
         """
         Return the properties to synchronize for bpy_type
         """
         if (bl_rna_property is None) and (bpy_type is None):
-            return []
+            return {}.items()
         if (bl_rna_property is not None) and (bpy_type is not None):
             raise ValueError("Exactly one of bl_rna and bpy_type must be provided")
         if bl_rna_property is not None:
@@ -190,10 +203,9 @@ class SynchronizedProperties:
             bl_rna = bpy_type.bl_rna
         bl_rna_properties = self._properties.get(bl_rna)
         if bl_rna_properties is None:
-            filtered_properties = self._filter_stack.apply(bl_rna, list(bl_rna.properties))
-            # Differential update requires that the properties are delivered in the same order
-            # as Blender delivers them
-            bl_rna_properties = {p.identifier: p for p in filtered_properties}
+            filtered_properties = self._filter_stack.apply(bl_rna)
+            sorted_properties = self._sort(bl_rna, filtered_properties)
+            bl_rna_properties = {p.identifier: p for p in sorted_properties}
             self._properties[bl_rna] = bl_rna_properties
         return bl_rna_properties.items()
 
@@ -227,7 +239,7 @@ Do not exclude collections that may be a target of Object.data. It we did so, an
 would be loaded ad a DatablockProxy instead of a DatablockRefProxy
 """
 
-_exclude_names = {
+_exclude_names = [
     # Related to the UI
     "active_index",
     # found in Viewlayer
@@ -247,16 +259,16 @@ _exclude_names = {
     "type_info",
     "users",
     "use_fake_user",
-}
+]
 """Names of properties that are always excluded"""
 
-default_exclusions = {
+default_exclusions: FilterSet = {
     None: [
         # Temporary: parent and child are involved in circular reference
         TypeFilterOut(T.PoseBone),
         NameFilterOut(_exclude_names),
     ],
-    T.ActionGroup: [NameFilterOut("channels")],
+    T.ActionGroup: [NameFilterOut(["channels"])],
     T.BezierSplinePoint: [
         NameFilterOut(
             [
@@ -268,11 +280,11 @@ default_exclusions = {
     ],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
     # makes a loop
-    T.Bone: [NameFilterOut("parent")],
+    T.Bone: [NameFilterOut(["parent"])],
     # TODO temporary ?
-    T.Collection: [NameFilterOut("all_objects")],
-    T.CompositorNodeRLayers: [NameFilterOut("scene")],
-    T.CurveMapPoint: [NameFilterOut("select")],
+    T.Collection: [NameFilterOut(["all_objects"])],
+    T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
+    T.CurveMapPoint: [NameFilterOut(["select"])],
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
     # TODO temporary ? Restore after foreach_get()
@@ -291,14 +303,6 @@ default_exclusions = {
                 "channels",
             ]
         ),
-    ],
-    T.LayerCollection: [
-        # TODO temporary
-        # Scene.viewlayers[i].layer_collection.collection is Scene.collection,
-        # see test_scene_viewlayer_layercollection_is_master
-        NameFilterOut("collection"),
-        # Seems to be a view of the master collection children
-        NameFilterOut("children"),
     ],
     T.GreasePencil: [
         # Temporary while we use VRtist message for meshes. Handle the datablock for uuid
@@ -329,6 +333,18 @@ default_exclusions = {
             [
                 # is always the first key_blocks item
                 "reference_key"
+            ]
+        )
+    ],
+    T.LayerCollection: [
+        NameFilterOut(
+            [
+                # UI related
+                "hide_viewport",
+                # readonly, computed
+                "is_visible",
+                # A reference to the wrapped Collection
+                "collection",
             ]
         )
     ],
@@ -426,7 +442,7 @@ default_exclusions = {
     ],
     T.PackedFile: [
         # send by a BLENDER_DATA_MEDIA command, not serialized with proxies
-        NameFilterOut("data")
+        NameFilterOut(["data"])
     ],
     T.PointCache: [
         NameFilterOut(
@@ -466,8 +482,10 @@ default_exclusions = {
                 "display",
                 # TODO temporary, not implemented
                 "node_tree",
-                "view_layers",
                 "rigidbody_world",
+                # TODO
+                # a view into builtin U keying_sets ?
+                "keying_sets_all",
             ]
         ),
     ],
@@ -502,21 +520,42 @@ default_exclusions = {
     ],
     T.ViewLayer: [
         # Not useful. Requires array insertion (to do shortly)
-        NameFilterOut("freestyle_settings"),
+        NameFilterOut(["freestyle_settings"]),
         # A view into ViewLayer objects
-        NameFilterOut("objects"),
-        NameFilterOut("active_layer_collection"),
+        NameFilterOut(["objects"]),
+        NameFilterOut(["active_layer_collection"]),
     ],
 }
 """
 Per-type property exclusions
 """
 
-test_filter.append(default_exclusions)
-test_properties = SynchronizedProperties(test_filter)
-"""For tests"""
 
-safe_exclusions = {}
+property_order: PropertiesOrder = {
+    T.ColorManagedViewSettings: {
+        "use_curve_mapping",
+    },
+    T.Material: {
+        "use_nodes",
+    },
+    T.Scene: {
+        # Required to save view_layers
+        # LayerCollection.children is a view into the corresponding Collection with additional visibility
+        # information and it is not possible to add/remove items from it. Saving Scene.collection before
+        # Scene.view_layers ensures that LayerCollection.children items are present when Scene.view_layers
+        # is saved
+        "collection",
+        "use_nodes",
+    },
+    T.World: {
+        "use_nodes",
+    },
+}
+"""Properties to deliver first because their value enables the possibility to write other attributes."""
+
+test_filter.append(default_exclusions)
+test_properties = SynchronizedProperties(test_filter, property_order)
+"""For tests"""
 
 safe_depsgraph_updates = (
     T.Camera,
@@ -565,11 +604,10 @@ The bpy.data collections in this list are checked for creation/removal and renam
 Add a new collection to this list to synchronize creation, remova and rename events.
 """
 
-safe_blenddata = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
+safe_blenddata: FilterSet = {T.BlendData: [NameFilterIn(safe_blenddata_collections)]}
 safe_filter.append(default_exclusions)
-safe_filter.append(safe_exclusions)
 safe_filter.append(safe_blenddata)
-safe_properties = SynchronizedProperties(safe_filter)
+safe_properties = SynchronizedProperties(safe_filter, property_order)
 """
 The default context used for synchronization, that provides per-type lists of properties to synchronize
 """
