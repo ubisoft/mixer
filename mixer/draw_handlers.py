@@ -254,10 +254,10 @@ def users_selection_name_draw():
         bbox_corner = matrix @ Vector(local_bbox[1])
         draw_user_name(user_dict, bbox_corner)
 
-    users_selection_draw_iteration(per_user_callback, per_object_callback)
+    users_selection_draw_iteration(per_user_callback, per_object_callback, collection_detail=False)
 
 
-def users_selection_draw_iteration(per_user_callback, per_object_callback):
+def users_selection_draw_iteration(per_user_callback, per_object_callback, collection_detail=True):
     if share_data.client is None:
         return
 
@@ -296,7 +296,10 @@ def users_selection_draw_iteration(per_user_callback, per_object_callback):
                 parent_matrix = IDENTITY_MATRIX
 
                 if obj.type == "EMPTY" and obj.instance_collection is not None:
-                    objects = obj.instance_collection.objects
+                    if collection_detail:
+                        objects = obj.instance_collection.objects
+                    else:
+                        objects = []
                     parent_matrix = obj.matrix_world
 
                     per_object_callback(user_dict, obj, obj.matrix_world @ BBOX_SCALE_MATRIX, DEFAULT_BBOX)
