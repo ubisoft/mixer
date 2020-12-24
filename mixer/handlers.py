@@ -48,6 +48,7 @@ from bpy.app.handlers import persistent
 from mixer.share_data import object_visibility
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import update_params
+from mixer.bl_utils import get_mixer_prefs
 
 logger = logging.getLogger(__name__)
 
@@ -860,7 +861,12 @@ def send_scene_data_to_server(scene, dummy):
 
 @persistent
 def handler_on_undo_redo_pre(scene):
-    logger.info("on_undo_redo_pre")
+    logger.error(f"Undo/redo pre on {scene}")
+    share_data.client.send_error(f"Undo/redo pre from {get_mixer_prefs().user}")
+    if share_data.use_experimental_sync():
+        # generic.send_scene_data_to_server(scene, None)
+        return
+
     send_scene_data_to_server(scene, None)
 
 
@@ -897,7 +903,14 @@ def remap_objects_info():
 
 @persistent
 def handler_on_undo_redo_post(scene, dummy):
-    logger.info("on_undo_redo_post")
+    logger.error(f"Undo/redo post on {scene}")
+    share_data.client.send_error(f"Undo/redo post from {get_mixer_prefs().user}")
+
+    if share_data.use_experimental_sync():
+        # reload all datablocks
+
+        # generic.send_scene_data_to_server(scene, None)
+        return
 
     share_data.set_dirty()
     share_data.clear_lists()
