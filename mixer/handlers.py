@@ -863,11 +863,8 @@ def send_scene_data_to_server(scene, dummy):
 def handler_on_undo_redo_pre(scene):
     logger.error(f"Undo/redo pre on {scene}")
     share_data.client.send_error(f"Undo/redo pre from {get_mixer_prefs().user}")
-    if share_data.use_experimental_sync():
-        # generic.send_scene_data_to_server(scene, None)
-        return
-
-    send_scene_data_to_server(scene, None)
+    if share_data.use_vrtist_protocol():
+        send_scene_data_to_server(scene, None)
 
 
 def remap_objects_info():
@@ -906,9 +903,9 @@ def handler_on_undo_redo_post(scene, dummy):
     logger.error(f"Undo/redo post on {scene}")
     share_data.client.send_error(f"Undo/redo post from {get_mixer_prefs().user}")
 
-    if share_data.use_experimental_sync():
-        # reload all datablocks
-
+    if not share_data.use_vrtist_protocol():
+        # Generic sync: reload all datablocks
+        share_data.bpy_data_proxy.reload_datablocks()
         # generic.send_scene_data_to_server(scene, None)
         return
 
