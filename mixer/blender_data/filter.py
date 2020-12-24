@@ -259,6 +259,8 @@ _exclude_names = [
     "type_info",
     "users",
     "use_fake_user",
+    # TODO
+    "animation_data",
 ]
 """Names of properties that are always excluded"""
 

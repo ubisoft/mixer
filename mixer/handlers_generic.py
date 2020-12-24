@@ -35,7 +35,7 @@ def send_scene_data_to_server(scene, dummy):
         # FIXME Possible missed update :
         # If an updated datablock is not linked in the current scene/view_layer, the update triggers
         # an empty DG update batch. This can happen when the update is from a script.
-        logger.warning(f"DG updates empty for {depsgraph.scene} {depsgraph.view_layer}")
+        logger.info(f"DG updates empty for {depsgraph.scene} {depsgraph.view_layer}")
 
     # prevent processing self events, but always process test updates
     if not share_data.pending_test_update and share_data.client.skip_next_depsgraph_update:
