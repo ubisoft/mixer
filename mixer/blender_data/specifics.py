@@ -32,7 +32,7 @@ from pathlib import Path
 import traceback
 from typing import Any, Callable, Dict, ItemsView, List, Optional, TYPE_CHECKING, Union
 
-from mixer.local_data import get_resolved_file_path
+from mixer.local_data import get_cache_file_path
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -225,7 +225,19 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
     image = None
     image_name = proxy.data("name")
     filepath = proxy.data("filepath")
-    resolved_filepath = get_resolved_file_path(filepath)
+
+    resolved_filepath = proxy._filepath_raw
+    if resolved_filepath is None:
+        return None
+
+    if not proxy._is_in_shared_folder:
+        resolved_filepath = get_cache_file_path(proxy._filepath_raw)
+    else:
+        resolved_filepath = proxy.resolve_shared_folder_file(proxy._filepath_raw, context)
+        if resolved_filepath is None:
+            logger.warning(f'"{proxy._filepath_raw}" not in shared_folder')
+            return None
+
     packed_files = proxy.data("packed_files")
     if packed_files is not None and packed_files.length:
         name = proxy.data("name")

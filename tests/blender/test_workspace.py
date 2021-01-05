@@ -1,4 +1,4 @@
-"""Tests for workspaces"""
+"""Tests for shared_folders"""
 import unittest
 from parameterized import parameterized_class
 
@@ -31,25 +31,25 @@ def _get_class_name(cls, num, params_dict):
 @parameterized_class(
     [
         {
-            "ws0": files_folder() / "workspaces" / "ws0_0",
-            "ws1": files_folder() / "workspaces" / "ws0_0",
+            "ws0": files_folder() / "shared_folder" / "ws0_0",
+            "ws1": files_folder() / "shared_folder" / "ws0_0",
             "name": "Same",
         },
         {
-            "ws0": files_folder() / "workspaces" / "ws0_0",
-            "ws1": files_folder() / "workspaces" / "ws1_0",
+            "ws0": files_folder() / "shared_folder" / "ws0_0",
+            "ws1": files_folder() / "shared_folder" / "ws1_0",
             "name": "Different",
         },
     ],
     class_name_func=_get_class_name,
 )
-@unittest.skip("not implemented")
+@unittest.skip("")
 class TestImageOneFolder(TestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def setUp(self):
-        self.workspaces = [[str(self.ws0)], [str(self.ws1)]]
+        self.shared_folders = [[str(self.ws0)], [str(self.ws1)]]
         super().setUp()
 
     def test_create_one_file(self):
@@ -76,21 +76,21 @@ bpy.data.images.load(r"{path_b}")
 @parameterized_class(
     [
         {
-            "ws0": [files_folder() / "workspaces" / "ws0_0", files_folder() / "workspaces" / "ws0_1"],
-            "ws1": [files_folder() / "workspaces" / "ws1_0", files_folder() / "workspaces" / "ws1_1"],
+            "ws0": [files_folder() / "shared_folder" / "ws0_0", files_folder() / "shared_folder" / "ws0_1"],
+            "ws1": [files_folder() / "shared_folder" / "ws1_0", files_folder() / "shared_folder" / "ws1_1"],
             "name": "",
         },
     ],
     class_name_func=_get_class_name,
 )
-@unittest.skip("not implemented")
+@unittest.skip("")
 class TestImageTwoFolders(TestCase):
     def __init__(self, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
 
     def setUp(self):
-        self.workspaces = [[str(self.ws0)], [str(self.ws1)]]
+        self.shared_folders = [[str(self.ws0)], [str(self.ws1)]]
         super().setUp()
 
     def test_create(self):

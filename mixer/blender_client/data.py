@@ -33,7 +33,7 @@ from mixer.blender_data.messages import (
     BlenderRenamesMessage,
 )
 from mixer.broadcaster.common import Command, MessageType
-from mixer.local_data import get_local_or_create_cache_file
+from mixer.local_data import get_or_create_cache_file
 from mixer.share_data import share_data
 
 if TYPE_CHECKING:
@@ -59,7 +59,7 @@ def build_data_media(buffer: bytes):
     message = BlenderMediaMessage()
     message.decode(buffer)
     # TODO this does not overwrite outdated local files
-    get_local_or_create_cache_file(message.path, message.bytes_)
+    get_or_create_cache_file(message.path, message.bytes_)
 
 
 def send_data_creations(proxies: CreationChangeset):

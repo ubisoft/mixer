@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 import logging
 import sys
 from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
+import pathlib
 
 import bpy
 import bpy.types as T  # noqa
@@ -89,6 +90,8 @@ class ProxyState:
     """Object.data uuid : (set of uuids of Object using object.data). Mostly used for shape keys"""
 
     unresolved_refs: UnresolvedRefs = UnresolvedRefs()
+
+    shared_folders: List = field(default_factory=list)
 
 
 class VisitState:
@@ -236,6 +239,12 @@ class BpyDataProxy(Proxy):
 
     def context(self, synchronized_properties: SynchronizedProperties = safe_properties) -> Context:
         return Context(self.state, synchronized_properties)
+
+    def set_shared_folders(self, shared_folders: List):
+        normalized_folders = []
+        for folder in shared_folders:
+            normalized_folders.append(pathlib.Path(folder))
+        self.state.shared_folders = normalized_folders
 
     def get_non_empty_collections(self):
         return {key: value for key, value in self._data.items() if len(value) > 0}

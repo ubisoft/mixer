@@ -24,6 +24,7 @@ from __future__ import annotations
 from collections import defaultdict
 import logging
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING, Union
+import pathlib
 
 import bpy
 import bpy.types as T  # noqa
@@ -54,7 +55,14 @@ class DatablockProxy(StructProxy):
     Proxy to a datablock, standalone (bpy.data.cameras['Camera']) or embedded.
     """
 
-    _serialize = ("_bpy_data_collection", "_class_name", "_datablock_uuid", "_custom_properties")
+    _serialize = (
+        "_bpy_data_collection",
+        "_class_name",
+        "_datablock_uuid",
+        "_custom_properties",
+        "_is_in_shared_folder",
+        "_filepath_raw",
+    )
 
     def __init__(self):
         super().__init__()
@@ -73,6 +81,8 @@ class DatablockProxy(StructProxy):
 
         # TODO move into _arrays
         self._media: Optional[Tuple[str, bytes]] = None
+        self._is_in_shared_folder: Optional[bool] = None
+        self._filepath_raw: Optional[str] = None
 
         self._arrays: ArrayGroups = {}
         """arrays that must not be serialized as json because of their size"""
@@ -205,11 +215,42 @@ class DatablockProxy(StructProxy):
             self._datablock_uuid = datablock.mixer_uuid
             context.proxy_state.proxies[uuid] = self
 
-        self.attach_media_descriptor(datablock)
+        self.attach_filepath_raw(datablock)
+        self.attach_media_descriptor(datablock, context)
         self._custom_properties.load(datablock)
         return self
 
-    def attach_media_descriptor(self, datablock: T.ID):
+    def attach_filepath_raw(self, datablock: T.ID):
+        if isinstance(datablock, T.Image):
+            if len(datablock.filepath) == 0:
+                return
+            path = get_source_file_path(bpy.path.abspath(datablock.filepath))
+            self._filepath_raw = str(pathlib.Path(path))
+
+    def matches_shared_folder(self, filepath: str, context: Context):
+        filepath = pathlib.Path(filepath)
+        for shared_folder in context.proxy_state.shared_folders:
+            try:
+                relative_path = filepath.relative_to(shared_folder)
+            except ValueError:
+                continue
+            return str(relative_path)
+        return None
+
+    def resolve_shared_folder_file(self, relative_path: str, context: Context):
+        resolved_path = None
+        for shared_folder in context.proxy_state.shared_folders:
+            shared_folder_file = shared_folder / relative_path
+            if shared_folder_file.is_file():
+                if resolved_path is None:
+                    resolved_path = str(shared_folder_file)
+                else:
+                    logger.warning("Unable to resolve shared_folder file: multiple matches found")
+                    resolved_path = None
+                    break
+        return resolved_path
+
+    def attach_media_descriptor(self, datablock: T.ID, context: Context):
         # if Image, Sound, Library, MovieClip, Text, VectorFont, Volume
         # create a self._media with the data to be sent
         # - filepath
@@ -217,14 +258,27 @@ class DatablockProxy(StructProxy):
         #
         #
         if isinstance(datablock, T.Image):
-            path = get_source_file_path(datablock.filepath)
+            self._is_in_shared_folder = False
             packed_file = datablock.packed_file
             data = None
             if packed_file is not None:
                 data = packed_file.data
-            else:
-                with open(bpy.path.abspath(path), "rb") as data_file:
-                    data = data_file.read()
+                self._media = (get_source_file_path(self._filepath_raw), data)
+                return
+
+            if self._filepath_raw is None:
+                return
+
+            relative_to_shared_folder_path = self.matches_shared_folder(self._filepath_raw, context)
+            if relative_to_shared_folder_path is not None:
+                self._filepath_raw = relative_to_shared_folder_path
+                self._is_in_shared_folder = True
+                self._media = None
+                return
+
+            path = get_source_file_path(self._filepath_raw)
+            with open(bpy.path.abspath(path), "rb") as data_file:
+                data = data_file.read()
             self._media = (path, data)
 
     @property

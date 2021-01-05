@@ -2,6 +2,7 @@
 
 ## Features
 
+- Shared folders
 - Mesh: synchronization of vertex groups and shape keys
 - Curves: synchronization of shape keys
 - View layers: synchronization
