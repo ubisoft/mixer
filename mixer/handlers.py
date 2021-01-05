@@ -32,11 +32,12 @@ import logging
 
 import bpy
 
-from mixer.share_data import share_data
+from mixer.share_data import share_data, get_object_constraints
 from mixer import handlers_generic as generic
 from mixer.blender_client import collection as collection_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
+from mixer.blender_client import constraint as constraint_api
 import mixer.shot_manager as shot_manager
 import itertools
 from typing import Mapping, Any
@@ -47,6 +48,7 @@ from bpy.app.handlers import persistent
 from mixer.share_data import object_visibility
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import update_params
+from mixer.bl_utils import get_mixer_prefs
 
 logger = logging.getLogger(__name__)
 
@@ -373,6 +375,41 @@ def update_object_state(old_objects: dict, new_objects: dict):
         if visibility != object_visibility(new_obj):
             share_data.objects_visibility_changed.add(obj_name)
 
+    for obj_name, constraints in share_data.objects_constraints.items():
+        new_obj = share_data.old_objects.get(obj_name)
+        if not new_obj:
+            continue
+        new_constraints = get_object_constraints(new_obj)
+        if new_constraints.has_parent_constraint and not constraints.has_parent_constraint:
+            share_data.objects_constraints_added.add(
+                (obj_name, constraint_api.ConstraintType.PARENT, new_constraints.parent_target.name_full)
+            )
+        elif (
+            constraints.has_parent_constraint
+            and new_constraints.has_parent_constraint
+            and constraints.parent_target != new_constraints.parent_target
+        ):
+            share_data.objects_constraints_added.add(
+                (obj_name, constraint_api.ConstraintType.PARENT, new_constraints.parent_target.name_full)
+            )
+        elif not new_constraints.has_parent_constraint and constraints.has_parent_constraint:
+            share_data.objects_constraints_removed.add((obj_name, constraint_api.ConstraintType.PARENT))
+
+        if new_constraints.has_look_at_constraint and not constraints.has_look_at_constraint:
+            share_data.objects_constraints_added.add(
+                (obj_name, constraint_api.ConstraintType.LOOK_AT, new_constraints.look_at_target.name_full)
+            )
+        elif (
+            constraints.has_look_at_constraint
+            and new_constraints.has_look_at_constraint
+            and constraints.look_at_target != new_constraints.look_at_target
+        ):
+            share_data.objects_constraints_added.add(
+                (obj_name, constraint_api.ConstraintType.LOOK_AT, new_constraints.look_at_target.name_full)
+            )
+        elif not new_constraints.has_look_at_constraint and constraints.has_look_at_constraint:
+            share_data.objects_constraints_removed.add((obj_name, constraint_api.ConstraintType.LOOK_AT))
+
     update_frame_changed_related_objects_state(old_objects, new_objects)
 
 
@@ -545,6 +582,38 @@ def update_objects_visibility():
             object_api.send_object_visibility(share_data.client, obj)
             changed = True
     return changed
+
+
+def update_objects_constraints():
+    constraint_sent = False
+    for obj_name in share_data.objects_added:
+        if obj_name in share_data.blender_objects:
+            obj = share_data.blender_objects[obj_name]
+            for constr in obj.constraints:
+                constraint_type = None
+                if constr.type == "CHILD_OF":
+                    constraint_type = constraint_api.ConstraintType.PARENT
+                elif constr.type == "TRACK_TO":
+                    constraint_type = constraint_api.ConstraintType.LOOK_AT
+                if constraint_type is not None:
+                    constraint_api.send_add_constraint(share_data.client, obj, constraint_type, constr.target.name_full)
+                    constraint_sent = True
+
+    changed_added = False
+    for obj_name, constraint_type, target in share_data.objects_constraints_added:
+        if obj_name in share_data.blender_objects:
+            obj = share_data.blender_objects[obj_name]
+            constraint_api.send_add_constraint(share_data.client, obj, constraint_type, target)
+            changed_added = True
+
+    changed_removed = False
+    for obj_name, constraint_type in share_data.objects_constraints_removed:
+        if obj_name in share_data.blender_objects:
+            obj = share_data.blender_objects[obj_name]
+            constraint_api.send_remove_constraints(share_data.client, obj, constraint_type)
+            changed_removed = True
+
+    return constraint_sent or changed_added or changed_removed
 
 
 def update_objects_transforms():
@@ -776,6 +845,7 @@ def send_scene_data_to_server(scene, dummy):
     changed |= delete_scene_objects()
     changed |= rename_objects()
     changed |= update_objects_visibility()
+    changed |= update_objects_constraints()
     changed |= update_objects_transforms()
     changed |= reparent_objects()
     changed |= shot_manager.check_montage_mode()
@@ -791,8 +861,10 @@ def send_scene_data_to_server(scene, dummy):
 
 @persistent
 def handler_on_undo_redo_pre(scene):
-    logger.info("on_undo_redo_pre")
-    send_scene_data_to_server(scene, None)
+    logger.error(f"Undo/redo pre on {scene}")
+    share_data.client.send_error(f"Undo/redo pre from {get_mixer_prefs().user}")
+    if share_data.use_vrtist_protocol():
+        send_scene_data_to_server(scene, None)
 
 
 def remap_objects_info():
@@ -807,6 +879,10 @@ def remap_objects_info():
         visible = share_data.objects_visibility[old_name]
         del share_data.objects_visibility[old_name]
         share_data.objects_visibility[new_name] = visible
+
+        constraints = share_data.objects_constraints[old_name]
+        del share_data.objects_constraints[old_name]
+        share_data.objects_constraints[new_name] = constraints
 
         parent = share_data.objects_parents[old_name]
         del share_data.objects_parents[old_name]
@@ -824,7 +900,14 @@ def remap_objects_info():
 
 @persistent
 def handler_on_undo_redo_post(scene, dummy):
-    logger.info("on_undo_redo_post")
+    logger.error(f"Undo/redo post on {scene}")
+    share_data.client.send_error(f"Undo/redo post from {get_mixer_prefs().user}")
+
+    if not share_data.use_vrtist_protocol():
+        # Generic sync: reload all datablocks
+        share_data.bpy_data_proxy.reload_datablocks()
+        # generic.send_scene_data_to_server(scene, None)
+        return
 
     share_data.set_dirty()
     share_data.clear_lists()
@@ -864,6 +947,7 @@ def handler_on_undo_redo_post(scene, dummy):
     delete_scene_objects()
     rename_objects()
     update_objects_visibility()
+    update_objects_constraints()
     update_objects_transforms()
     reparent_objects()
 

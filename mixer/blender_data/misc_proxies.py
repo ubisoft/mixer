@@ -245,6 +245,7 @@ class CustomPropertiesProxy:
     def load(self, datablock: T.ID):
         """Load the custom properties of datablock, skipping API defined properties"""
         keys, rna_ui = self._user_keys(datablock)
+        # This only load custom properties with a UI
         if rna_ui is None:
             self._dict.clear()
             self._rna_ui.clear()
@@ -255,7 +256,14 @@ class CustomPropertiesProxy:
 
     def save(self, datablock: T.ID):
         """Overwrite all the custom properties in datablock, including the UI"""
-        datablock["_RNA_UI"] = self._rna_ui
+        if self._rna_ui:
+            datablock["_RNA_UI"] = self._rna_ui
+        else:
+            try:
+                del datablock["_RNA_UI"]
+            except KeyError:
+                pass
+
         current_keys, _ = self._user_keys(datablock)
         remove = current_keys - set(self._dict.keys())
         for key in remove:

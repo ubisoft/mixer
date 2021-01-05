@@ -1,20 +1,21 @@
-# 0.19.0-beta1+shared_folders (16-12-2020)
+# 0.19.0 (18-12-2020)
 
 ## Features
 
 - Shared folders
-- Vertex groups: synchronization
-- Shape keys: synchronization
-- Material assignment: synchronization
+- Mesh: synchronization of vertex groups and shape keys
+- Curves: synchronization of shape keys
 - View layers: synchronization
+- Custom properties: synchronization
 
 ## Fixes
 
-- Object parenting: wrong child object location
-- Decimate modifier: fix synchronization of delimit attribute
-- Curves: exceptions when loading empty curve
-- Metaballs: misc error messages
-- Logging: More focused messages in warning mode
+- Object parenting: synchronization of child object location
+- Decimate modifier: synchronization of delimit attribute
+- Curves: exception when loading empty curve
+- Metaballs: error messages
+- Material assignment: synchronization with multiple materials
+- Logging: more focused messages in warning mode
 
 
 # 0.18.0 (2020-11-18)
