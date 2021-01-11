@@ -37,7 +37,7 @@ from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Uuid
 from mixer.blender_data.misc_proxies import CustomPropertiesProxy
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.type_helpers import sub_id_type
-from mixer.local_data import get_source_file_path
+from mixer.local_data import get_cache_file_path, get_source_file_path
 
 if TYPE_CHECKING:
     from mixer.blender_data.aos_soa_proxy import SoaElement
@@ -219,6 +219,21 @@ class DatablockProxy(StructProxy):
                     resolved_path = None
                     break
         return resolved_path
+
+    def resolved_filepath(self, context: Context) -> Optional[str]:
+        """Returns the local filepath for the datablock.
+
+        This references a file in "shared files" or a temporary file"""
+        if self._filepath_raw is None:
+            return None
+
+        if not self._is_in_shared_folder:
+            resolved_filepath = get_cache_file_path(self._filepath_raw)
+        else:
+            resolved_filepath = self.resolve_shared_folder_file(self._filepath_raw, context)
+            if resolved_filepath is None:
+                logger.warning(f'"{self._filepath_raw}" not in shared_folder')
+        return resolved_filepath
 
     def attach_media_descriptor(self, datablock: T.ID, context: Context):
         # if Image, Sound, Library, MovieClip, Text, VectorFont, Volume
