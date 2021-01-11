@@ -45,6 +45,8 @@ class LibraryProxy(DatablockProxy):
 
         self._unregistered_datablocks: Dict[str, Uuid] = {}
         """Uuids to assign to indirect link datablocks after their creation."""
+
+        self._created = False
         # TODO update this for reload
 
     def __eq__(self, other):
@@ -101,21 +103,30 @@ class LibraryProxy(DatablockProxy):
         """Load a direct link datablock."""
 
         library_path = self.resolved_filepath(context)
+        if library_path is None:
+            logger.error(f"load_library_item(): no file for {library_path} check Shared Folders")
+            return
+
         logger.warning(f"load_library_item(): from {library_path} : {collection_name}[{datablock_name}]")
 
         # this creates the Library datablock on first load.
         with bpy.data.libraries.load(library_path, link=True) as (data_from, data_to):
             setattr(data_to, collection_name, [datablock_name])
 
-        self.register(context)
-        return getattr(data_to, collection_name)[0]
+        linked_datablock = getattr(data_to, collection_name)[0]
+        library_datablock = linked_datablock.library
+        if not self._created:
+            # The received datablock name might not match the library name
+            library_datablock.name = self.data("name")
+            self._created = True
 
-    def register(self, context: Context):
+        self.register(library_datablock, context)
+        return linked_datablock
+
+    def register(self, library_datablock: T.Library, context: Context):
         """Recursively register the Library managed by this proxy, its children and all the datablocks they provide."""
 
         # register the library datablock
-        library_name = self._data["name"]
-        library_datablock = bpy.data.libraries[library_name]
         if not library_datablock.mixer_uuid:
             library_datablock.mixer_uuid = self.mixer_uuid
             context.proxy_state.datablocks[self.mixer_uuid] = library_datablock
@@ -136,7 +147,7 @@ class LibraryProxy(DatablockProxy):
             child_library = bpy.data.libraries.get(child_name)
             if child_library and child_library.parent == library_datablock:
                 context.proxy_state.unregistered_libraries.remove(unregistered_child_proxy)
-                unregistered_child_proxy.register(context)
+                unregistered_child_proxy.register(child_library, context)
 
     def load(self, datablock: T.ID, context: Context) -> LibraryProxy:
         logger.warning(f"load(): {datablock}")
