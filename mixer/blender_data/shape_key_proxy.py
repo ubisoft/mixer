@@ -63,10 +63,11 @@ class ShapeKeyProxy(DatablockProxy):
 
         # update the Key datablock using the Object API
         key_blocks_proxy = self.data("key_blocks")
-        object_datablock.shape_key_clear()  # removes the Key datablock
-
         shape_key_uuid = self.mixer_uuid
-        context.proxy_state.remove_datablock(shape_key_uuid)
+        if object_datablock.data.shape_keys:
+            object_datablock.shape_key_clear()  # removes the Key datablock
+            context.proxy_state.remove_datablock(shape_key_uuid)
+
         for _ in range(len(key_blocks_proxy)):
             object_datablock.shape_key_add()
 
