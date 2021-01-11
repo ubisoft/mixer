@@ -89,7 +89,7 @@ class ProxyState:
     objects: Dict[Uuid, Set[Uuid]] = field(default_factory=lambda: defaultdict(set))
     """Object.data uuid : (set of uuids of Object using object.data). Mostly used for shape keys"""
 
-    unresolved_refs: UnresolvedRefs = UnresolvedRefs()
+    unresolved_refs: UnresolvedRefs = field(default_factory=UnresolvedRefs)
 
     shared_folders: List = field(default_factory=list)
 
