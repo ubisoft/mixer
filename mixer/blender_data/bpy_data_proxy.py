@@ -49,6 +49,7 @@ from mixer.blender_data.proxy import (
 
 if TYPE_CHECKING:
     from mixer.blender_data.changeset import Removal
+    from mixer.blender_data.library_proxies import LibraryProxy
     from mixer.blender_data.types import Path, SoaMember
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,10 @@ class ProxyState:
         """Object.data uuid : (set of uuids of Object using object.data). Mostly used for shape keys"""
 
         self.unresolved_refs: UnresolvedRefs = UnresolvedRefs()
+
+        self.unregistered_libraries: Set[LibraryProxy] = set()
+        """indirect libraries that were received but not yet registered because no datablock
+        they provide were processed yet"""
 
     def register_object(self, datablock: T.Object):
         if datablock.data is not None:
