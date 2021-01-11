@@ -95,9 +95,9 @@ class BpyDataCollectionDiff:
                 # duplicate uuid, from an object duplication
                 duplicate_name, duplicate_collection_name = blender_items[uuid]
                 logger.info(
-                    f"Duplicate uuid {uuid} in bpy.data.{duplicate_collection_name} for {duplicate_name} and bpy.data.{collection_name} for {datablock.name_full}..."
+                    f"Duplicate uuid {uuid} in bpy.data.{duplicate_collection_name} for {duplicate_name} and bpy.data.{collection_name} for {datablock.name_full!r}..."
                 )
-                logger.info("... assuming object was duplicated. Resetting (not an error)")
+                logger.info(f"... assuming object was duplicated. Resetting {datablock.name_full!r} (not an error)")
                 # reset the uuid, ensure will regenerate
                 datablock.mixer_uuid = ""
 

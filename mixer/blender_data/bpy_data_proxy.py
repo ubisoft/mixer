@@ -500,3 +500,20 @@ class BpyDataProxy(Proxy):
 
     def append_delayed_updates(self, delayed_updates: Set[T.ID]):
         self._delayed_updates |= delayed_updates
+
+    def sanity_check(self):
+        state = self.state
+        datablock_keys = set(state.datablocks.keys())
+        proxy_keys = set(state.proxies.keys())
+        if datablock_keys != proxy_keys:
+            logger.warning("sanity_check: different keys for datablocks and proxies")
+
+        none_datablocks = [k for k, v in state.datablocks.items() if v is None]
+        if none_datablocks:
+            logger.warning(f"sanity_check: None datablocks for {none_datablocks}")
+
+        if state.unregistered_libraries:
+            logger.warning(f"sanity_check: unregistered_libraries not empty: {state.unregistered_libraries}")
+
+        if state.unresolved_refs:
+            logger.warning(f"sanity_check: unresolved_refs not empty: {state.unresolved_refs}")

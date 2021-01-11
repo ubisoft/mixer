@@ -64,6 +64,9 @@ class UnresolvedRefs:
     def __init__(self):
         self._refs: Dict[Uuid, List[self.Func]] = defaultdict(list)
 
+    def __bool__(self):
+        return bool(self._refs)
+
     def append(self, dst_uuid: Uuid, src_link: SrcLink):
         self._refs[dst_uuid].append(src_link)
 

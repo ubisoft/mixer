@@ -944,6 +944,7 @@ class BlenderClient(Client):
                     elapse = time.monotonic() - groups.pop()
                     group_id = len(groups)
                     logger.warning(f"Command group {group_id} processed in {elapse:.1f} seconds")
+                    share_data.receive_sanity_check()
                     continue
 
                 if self.has_default_handler(command.type):
