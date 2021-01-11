@@ -145,6 +145,10 @@ class StructCollectionProxy(Proxy):
         try:
             sequence = self._sequence
             specifics.truncate_collection(collection, len(self._sequence))
+
+            # For collections like `IDMaterials`, the creation API (`.new(datablock_ref)`) also writes the value.
+            # For collections like `Nodes`, the creation API (`.new(name)`) does not write the item value.
+            # So the value must always be written for all collection types.
             for i in range(len(collection), len(sequence)):
                 item_proxy = sequence[i]
                 specifics.add_element(collection, item_proxy, context)
