@@ -24,7 +24,6 @@ from __future__ import annotations
 import logging
 from typing import Optional, TYPE_CHECKING, Union
 
-import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data.attributes import read_attribute
