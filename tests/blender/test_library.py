@@ -65,7 +65,35 @@ bpy.data.scenes[0].camera = bpy.data.objects[0]
         self.assert_matches()
 
 
-class TestIndirect(TestCase):
+class TestIndirect_1(TestCase):
+    # Loading the the "Camera" object causes loading of "Camera" camera as "indirect"
+    _create_link = f"""
+import bpy
+lib_file = r"{TestCase._lib_file}"
+with bpy.data.libraries.load(lib_file, link=True) as (data_from, data_to):
+    data_to.cameras = ["Camera"]
+    data_to.objects = ["Camera"]
+
+bpy.data.scenes[0].collection.objects.link(bpy.data.objects["Camera"])
+"""
+
+    def test_create_link(self):
+        self.send_string(self._create_link, to=0)
+        self.assert_matches()
+
+    def test_remove_data_datablock(self):
+        self.send_string(self._create_link, to=0)
+
+        # Remove the camera datablock. This is not allowed from the UI but works in a script
+        remove_camera_data = """
+import bpy
+bpy.data.cameras.remove(bpy.data.cameras["Camera"])
+"""
+        self.send_string(remove_camera_data, to=0)
+        self.assert_matches()
+
+
+class TestIndirect_2(TestCase):
     # Loading the the "Collection" collection causes loading of "Camera" object as "indirect"
     _create_link = f"""
 import bpy
@@ -79,16 +107,6 @@ bpy.data.scenes[0].collection.children.link(data_to.collections[0])
 
     def test_create_link(self):
         self.send_string(self._create_link, to=0)
-        self.assert_matches()
-
-    def test_reference_direct_datablock(self):
-        self.send_string(self._create_link, to=0)
-
-        ref_camera = """
-import bpy
-bpy.data.scenes[0].camera = bpy.data.objects["Camera"]
-"""
-        self.send_string(ref_camera, to=0)
         self.assert_matches()
 
 

@@ -53,14 +53,15 @@ class LibraryProxy(DatablockProxy):
 
         library_datablock = bpy.data.libraries.get(self._data["name"])
         if library_datablock:
-            # library already loaded, update the linked datablock at once
+            # the library is already loaded: update the linked datablock at once
             for linked_datablock in library_datablock.users_id:
                 if repr(linked_datablock) == identifier:
                     logger.warning(f"register indirect for {identifier} {uuid}")
                     linked_datablock.mixer_uuid = uuid
                     return linked_datablock
 
-        # library not loaded, register the indirect datablock for update after the library is loaded
+        # the library is not already loaded, register the indirect datablock for update after the library is loaded.
+        # this occurs when the indirect datablock (e.g. a Camera) is received before the Object that references it
         logger.warning(f"register indirect: delayed for {identifier} {uuid}")
         self._indirect_datablocks[identifier] = uuid
         return None
@@ -70,7 +71,7 @@ class LibraryProxy(DatablockProxy):
         # The Library datablock will be created when the linked datablock is loaded (see load_library_item)
         return None, None
 
-    def load_library_item(self, collection_name, datablock_name) -> T.ID:
+    def load_library_item(self, collection_name: str, datablock_name: str, context: Context) -> T.ID:
         # TODO LIB check relative path
         library_path = bpy.path.abspath(self._data["filepath"])
         logger.warning(f"load_library_item(): {library_path} {collection_name} {datablock_name}")
@@ -90,6 +91,7 @@ class LibraryProxy(DatablockProxy):
             if uuid:
                 logger.warning(f"register indirect at load {identifier} {uuid}")
                 linked_datablock.mixer_uuid = uuid
+                context.proxy_state.datablocks[uuid] = linked_datablock
                 del self._indirect_datablocks[identifier]
 
         return getattr(data_to, collection_name)[0]
@@ -185,7 +187,7 @@ class DatablockLinkProxy(DatablockProxy):
             return link_datablock, None
         else:
             try:
-                link_datablock = library_proxy.load_library_item(self._bpy_data_collection, self._name)
+                link_datablock = library_proxy.load_library_item(self._bpy_data_collection, self._name, context)
             except Exception as e:
                 logger.error(
                     f"load_library {library_proxy.data('name')} failed for {self._bpy_data_collection}[{self._name}]..."
@@ -194,6 +196,8 @@ class DatablockLinkProxy(DatablockProxy):
                 return None, None
 
             link_datablock.mixer_uuid = self.mixer_uuid
+            if isinstance(link_datablock, T.Object):
+                context.proxy_state.register_object(link_datablock)
             return link_datablock, None
 
     def load(self, datablock: T.ID, context: Context) -> DatablockLinkProxy:
@@ -210,6 +214,10 @@ class DatablockLinkProxy(DatablockProxy):
         self._is_library_indirect = datablock.is_library_indirect
         self._name = datablock.name
         self._identifier = repr(datablock)
+
+        if isinstance(datablock, T.Object):
+            context.proxy_state.register_object(datablock)
+
         logger.warning(f"load(): {datablock}")
         return self
 
