@@ -605,12 +605,6 @@ class BlenderClient(Client):
         self.add_command(common.Command(MessageType.MESH, binary_buffer, 0))
 
     def build_mesh(self, command_data):
-        if not share_data.use_vrtist_protocol():
-            return self.build_mesh_generic(command_data)
-        else:
-            return self.build_mesh_vrtist(command_data)
-
-    def build_mesh_vrtist(self, command_data):
         index = 0
 
         path, index = common.decode_string(command_data, index)
@@ -638,24 +632,6 @@ class BlenderClient(Client):
             material_name, index = common.decode_string(command_data, index)
             if slot.link == "OBJECT" and material_name != "":
                 slot.material = material_api.get_or_create_material(material_name)
-
-    def build_mesh_generic(self, command_data):
-        index = 0
-
-        uuid, index = common.decode_string(command_data, index)
-        mesh_name, index = common.decode_string(command_data, index)
-        logger.info("build_mesh_generic %s", mesh_name)
-
-        meshes_proxy = share_data.bpy_data_proxy.data("meshes")
-        mesh_proxy = meshes_proxy.data(uuid)
-        if mesh_proxy is None:
-            # should not happen because a minimal generic Mesh BLENDER_DATA_CREATE is send before sending MESH
-            logger.warning(f"build_mesh for unregistered datablock {mesh_name} {uuid}. Ignored")
-            return
-        else:
-            mesh = share_data.bpy_data_proxy.context().proxy_state.datablocks[uuid]
-
-        index = mesh_api.decode_mesh_generic(self, mesh, command_data, index)
 
     def send_set_current_scene(self, name):
         buffer = common.encode_string(name)

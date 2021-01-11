@@ -108,22 +108,16 @@ class DatablockRefProxy(Proxy):
         if isinstance(parent, T.bpy_prop_collection):
             # reference stored in a collection
             # is there a case for this is is always link() in DatablockCollectionProxy ?
-            if isinstance(key, str):
-                try:
-                    if ref_target is None:
-                        context.proxy_state.unresolved_refs.append(
-                            self.mixer_uuid, lambda datablock: parent.__setitem__(key, datablock)
-                        )
-                    else:
-                        parent[key] = ref_target
-                except TypeError as e:
-                    logger.warning(
-                        f"DatablockRefProxy.save() exception while saving {ref_target} into {parent}[{key}]..."
+            try:
+                if ref_target is None:
+                    context.proxy_state.unresolved_refs.append(
+                        self.mixer_uuid, lambda datablock: parent.__setitem__(key, datablock)
                     )
-                    logger.warning(f"...{e!r}")
-            else:
-                # is there a case for this ?
-                logger.warning(f"Not implemented: DatablockRefProxy.save() for IDRef into collection {parent}[{key}]")
+                else:
+                    parent[key] = ref_target
+            except TypeError as e:
+                logger.warning(f"DatablockRefProxy.save() exception while saving {ref_target} into {parent}[{key}]...")
+                logger.warning(f"...{e!r}")
         else:
             assert isinstance(key, str)
             # reference stored in a struct (e.g. Object.parent)
