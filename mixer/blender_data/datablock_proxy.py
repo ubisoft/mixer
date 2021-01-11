@@ -176,19 +176,6 @@ class DatablockProxy(StructProxy):
                 # master collection will conflicting writes with Master Collection
                 self._data[name] = attr_value
 
-        uuid = datablock.get("mixer_uuid")
-        if uuid:
-            # It is a bpy.data ID, not an ID "embedded" inside another ID, like scene.collection
-            id_ = context.proxy_state.datablocks.get(uuid)
-            if id_ is not datablock:
-                # this occurs when
-                # - when we find a reference to a BlendData ID that was not loaded
-                # - the ID are not properly ordred at creation time, for instance (objects, meshes)
-                # instead of (meshes, objects) : a bug
-                logger.debug("DatablockProxy.load(): %s not in context.proxy_state.datablocks[uuid]", datablock)
-            self._datablock_uuid = datablock.mixer_uuid
-            context.proxy_state.proxies[uuid] = self
-
         self.attach_filepath_raw(datablock)
         self.attach_media_descriptor(datablock, context)
         self._custom_properties.load(datablock)
