@@ -229,10 +229,14 @@ class DatablockProxy(StructProxy):
 
         if not self._is_in_shared_folder:
             resolved_filepath = get_resolved_file_path(self._filepath_raw)
+            logger.info(f"resolved_filepath: for {self} not in shared folder ...")
+            logger.info(f"... resolve {self._filepath_raw!r} to {resolved_filepath}")
         else:
             resolved_filepath = self.resolve_shared_folder_file(self._filepath_raw, context)
             if resolved_filepath is None:
                 logger.warning(f'"{self._filepath_raw}" not in shared_folder')
+            logger.info(f"resolved_filepath: for {self} in shared folder ...")
+            logger.info(f"... resolve {self._filepath_raw!r} to {resolved_filepath}")
         return resolved_filepath
 
     def attach_media_descriptor(self, datablock: T.ID, context: Context):
