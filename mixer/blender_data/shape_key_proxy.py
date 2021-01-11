@@ -50,15 +50,16 @@ class ShapeKeyProxy(DatablockProxy):
 
     def create_shape_key_datablock(self, data_proxy: DatablockProxy, context: Context) -> T.Key:
         # find any Object using the datablock manages by this Proxy
-        datablocks = context.proxy_state.datablocks
         data_uuid = data_proxy.mixer_uuid
         objects = context.proxy_state.objects[data_uuid]
         if not objects:
-            logger.error(f"update_shape_key_datablock: received an update for {datablocks[self.mixer_uuid]}...")
-            logger.error(f"... user {datablocks[data_uuid]} not linked to an object. Update skipped")
+            logger.error(
+                f"update_shape_key_datablock: received an update for {context.proxy_state.datablock(self.mixer_uuid)}..."
+            )
+            logger.error(f"... user {context.proxy_state.datablock(data_uuid)} not linked to an object. Update skipped")
             return None
         object_uuid = next(iter(objects))
-        object_datablock = datablocks[object_uuid]
+        object_datablock = context.proxy_state.datablock(object_uuid)
 
         # update the Key datablock using the Object API
         key_blocks_proxy = self.data("key_blocks")
@@ -71,7 +72,7 @@ class ShapeKeyProxy(DatablockProxy):
 
         shape_key_uuid = self.mixer_uuid
         new_shape_key_datablock.mixer_uuid = shape_key_uuid
-        context.proxy_state.datablocks[shape_key_uuid] = new_shape_key_datablock
+        context.proxy_state.add_datablock(shape_key_uuid, new_shape_key_datablock)
 
         return new_shape_key_datablock
 

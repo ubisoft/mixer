@@ -99,7 +99,7 @@ class NonePtrProxy(Proxy):
 
         if isinstance(update, DatablockRefProxy):
             if to_blender:
-                datablock = context.proxy_state.datablocks.get(update._datablock_uuid)
+                datablock = context.proxy_state.datablock(update._datablock_uuid)
                 if isinstance(key, int):
                     parent[key] = datablock
                 else:

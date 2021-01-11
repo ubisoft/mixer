@@ -284,7 +284,7 @@ class DatablockProxy(StructProxy):
 
     def target(self, context: Context) -> T.ID:
         """Returns the datablock proxified by this proxy"""
-        return context.proxy_state.datablocks.get(self.mixer_uuid)
+        return context.proxy_state.datablock(self.mixer_uuid)
 
     def create_standalone_datablock(self, context: Context) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """

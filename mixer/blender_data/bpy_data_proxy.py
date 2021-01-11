@@ -84,7 +84,7 @@ class ProxyState:
         self.proxies: Dict[Uuid, DatablockProxy] = {}
         """Known proxies"""
 
-        self.datablocks: Dict[Uuid, T.ID] = {}
+        self._datablocks: Dict[Uuid, T.ID] = {}
         """Known datablocks"""
 
         self.objects: Dict[Uuid, Set[Uuid]] = defaultdict(set)
@@ -104,7 +104,15 @@ class ProxyState:
             object_uuid = datablock.mixer_uuid
             self.objects[data_uuid].add(object_uuid)
 
-    shared_folders: List = field(default_factory=list)
+    def datablock(self, uuid: Uuid) -> Optional[T.ID]:
+        return self._datablocks.get(uuid)
+
+    def add_datablock(self, uuid: Uuid, datablock: T.ID):
+        assert self.datablock(uuid) in [datablock, None]
+        self._datablocks[uuid] = datablock
+
+    def remove_datablock(self, uuid: Uuid):
+        del self._datablocks[uuid]
 
 
 class VisitState:
@@ -243,10 +251,10 @@ class BpyDataProxy(Proxy):
     def clear(self):
         self._data.clear()
         self.state.proxies.clear()
-        self.state.datablocks.clear()
+        self.state._datablocks.clear()
 
     def reload_datablocks(self):
-        datablocks = self.state.datablocks
+        datablocks = self.state._datablocks
         datablocks.clear()
 
         for collection_proxy in self._data.values():
@@ -404,7 +412,7 @@ class BpyDataProxy(Proxy):
             logger.warning(f"remove_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
             return None
 
-        datablock = self.state.datablocks[uuid]
+        datablock = self.state.datablock(uuid)
 
         if isinstance(datablock, T.Object) and datablock.data is not None:
             data_uuid = datablock.data.mixer_uuid
@@ -423,7 +431,7 @@ class BpyDataProxy(Proxy):
             except KeyError:
                 pass
         del self.state.proxies[uuid]
-        del self.state.datablocks[uuid]
+        del self.state._datablocks[uuid]
 
     def rename_datablocks(self, items: List[Tuple[str, str, str]]) -> RenameChangeset:
         """
@@ -443,7 +451,7 @@ class BpyDataProxy(Proxy):
                 logger.warning(f"rename_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
                 continue
 
-            datablock = self.state.datablocks[uuid]
+            datablock = self.state.datablock(uuid)
             tmp_name = f"_mixer_tmp_{uuid}"
             if datablock.name != new_name and datablock.name != old_name:
                 # local receives a rename, but its datablock name does not match the remote datablock name before
@@ -497,7 +505,7 @@ class BpyDataProxy(Proxy):
 
     def update_soa(self, uuid: Uuid, path: Path, soa_members: List[SoaMember]):
         datablock_proxy = self.state.proxies[uuid]
-        datablock = self.state.datablocks[uuid]
+        datablock = self.state.datablock(uuid)
         datablock_proxy.update_soa(datablock, path, soa_members)
 
     def append_delayed_updates(self, delayed_updates: Set[T.ID]):
@@ -505,12 +513,12 @@ class BpyDataProxy(Proxy):
 
     def sanity_check(self):
         state = self.state
-        datablock_keys = set(state.datablocks.keys())
+        datablock_keys = set(state._datablocks.keys())
         proxy_keys = set(state.proxies.keys())
         if datablock_keys != proxy_keys:
             logger.warning("sanity_check: different keys for datablocks and proxies")
 
-        none_datablocks = [k for k, v in state.datablocks.items() if v is None]
+        none_datablocks = [k for k, v in state._datablocks.items() if v is None]
         if none_datablocks:
             logger.warning(f"sanity_check: None datablocks for {none_datablocks}")
 

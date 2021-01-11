@@ -138,7 +138,7 @@ class DatablockRefProxy(Proxy):
         """
         The datablock referenced by this proxy
         """
-        datablock = context.proxy_state.datablocks.get(self._datablock_uuid)
+        datablock = context.proxy_state.datablock(self._datablock_uuid)
         if datablock is None:
             # HACK
             # We are trying to find the target of a datablock reference like Object.mesh and the datablock
@@ -186,7 +186,7 @@ class DatablockRefProxy(Proxy):
             else:
                 assert type(update) == type(self), "type(update) == type(self)"
 
-                value = context.proxy_state.datablocks.get(update._datablock_uuid)
+                value = context.proxy_state.datablock(update._datablock_uuid)
 
             if isinstance(key, int):
                 parent[key] = value

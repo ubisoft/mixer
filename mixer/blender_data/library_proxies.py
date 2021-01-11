@@ -64,7 +64,7 @@ class LibraryProxy(DatablockProxy):
         if library_datablock:
             if not library_datablock.mixer_uuid:
                 library_datablock.mixer_uuid = self.mixer_uuid
-                context.proxy_state.datablocks[self.mixer_uuid] = library_datablock
+                context.proxy_state.add_datablock(self.mixer_uuid, library_datablock)
 
             # The library is already loaded. Register the linked datablock at once.
             # Registration in ProxyState.datablocks is performed by a caller during datablock creation
@@ -129,7 +129,7 @@ class LibraryProxy(DatablockProxy):
         # register the library datablock
         if not library_datablock.mixer_uuid:
             library_datablock.mixer_uuid = self.mixer_uuid
-            context.proxy_state.datablocks[self.mixer_uuid] = library_datablock
+            context.proxy_state.add_datablock(self.mixer_uuid, library_datablock)
 
         # Register the link datablocks provided by this library
         for linked_datablock in library_datablock.users_id:
@@ -138,7 +138,7 @@ class LibraryProxy(DatablockProxy):
             if uuid:
                 logger.warning(f"register indirect at load {identifier} {uuid}")
                 linked_datablock.mixer_uuid = uuid
-                context.proxy_state.datablocks[uuid] = linked_datablock
+                context.proxy_state.add_datablock(uuid, linked_datablock)
                 del self._unregistered_datablocks[identifier]
 
         # Recursively register pending child libraries and their datablocks
