@@ -5,6 +5,7 @@ import array
 from dataclasses import dataclass
 import json
 import logging
+from pathlib import Path
 import sys
 import time
 from typing import Any, Iterable, List, Optional, Tuple
@@ -183,37 +184,33 @@ class MixerTestCase(unittest.TestCase):
             vscode_debug_delay = 2
             scene_upload_delay += vscode_debug_delay
 
-            # sender upload the room
-            self._sender.connect_mixer()
-            self._sender.create_room("mixer_grab_sender", keep_room_open=True, vrtist_protocol=self.vrtist_protocol)
-            time.sleep(scene_upload_delay)
-            self._sender.disconnect_mixer()
+            grabbers = []
+            for i, blender in enumerate(self._blenders):
+                # blender upload room
+                blender.connect_mixer()
+                shared_folders = self.shared_folders[i] if i < len(self.shared_folders) else []
+                blender.create_room(
+                    f"mixer_grab_{i}",
+                    keep_room_open=True,
+                    vrtist_protocol=self.vrtist_protocol,
+                    shared_folders=shared_folders,
+                )
+                time.sleep(scene_upload_delay)
+                blender.disconnect_mixer()
 
-            # download the room from sender
-            sender_grabber = Grabber()
-            try:
-                sender_grabber.grab(host, port, "mixer_grab_sender")
-            except Exception as e:
-                raise self.failureException("Sender grab: ", *e.args) from None
-
-            # receiver upload the room
-            self._receiver.connect_mixer()
-            self._receiver.create_room("mixer_grab_receiver", keep_room_open=True, vrtist_protocol=self.vrtist_protocol)
-            time.sleep(scene_upload_delay)
-            self._receiver.disconnect_mixer()
-
-            # download the room from receiver
-            receiver_grabber = Grabber()
-            try:
-                receiver_grabber.grab(host, port, "mixer_grab_receiver")
-            except Exception as e:
-                raise self.failureException("Receiver grab: ", *e.args) from None
+                # download the room
+                grabber = Grabber()
+                grabbers.append(grabber)
+                try:
+                    grabber.grab(host, port, f"mixer_grab_{i}")
+                except Exception as e:
+                    raise self.failureException(f"Grab {i}: ", *e.args) from None
 
         finally:
             server_process.kill()
 
-        s = sender_grabber.streams
-        r = receiver_grabber.streams
+        s = grabbers[0].streams
+        r = grabbers[1].streams
         self.assert_stream_equals(s, r, ignore=ignore)
 
     def assert_any_almost_equal(self, a: Any, b: Any, msg: str = "", ignore: Iterable[str] = ()):
@@ -342,9 +339,31 @@ class MixerTestCase(unittest.TestCase):
                             message.proxy_string["_data"].get("name"),
                         )
 
-                    short_a = [identifier(message) for message in decoded_stream_a]
-                    short_b = [identifier(message) for message in decoded_stream_b]
+                    def patch(message):
+                        # remove folder part, that differs when workspace folders differ
+                        # process only create since room grabbing only generates CREATE messages
+                        proxy = message.proxy_string
+                        if "_filepath_raw" in proxy:
+                            filename = Path(proxy["_filepath_raw"]).name
+                            proxy["_filepath_raw"] = filename
+                            proxy["_data"]["filepath"] = filename
+                            proxy["_data"]["filepath_raw"] = filename
+
+                    short_a, short_b = [], []
+                    for a, b in zip(decoded_stream_a, decoded_stream_b):
+                        short_a.append(identifier(a))
+                        short_b.append(identifier(b))
+                        patch(a)
+                        patch(b)
+
                     self.assertListEqual(short_a, short_b, f"Mismatch for {message_name} at index {i}")
+                elif message_type == MessageType.BLENDER_DATA_MEDIA:
+                    # workspaces are not set for room grabbing and BLENDER_DATA_MEDIA are always received
+                    # although they were not part of the test operation with workspaces
+                    for a, b in zip(decoded_stream_a, decoded_stream_b):
+                        # remove folder part, that differs when workspace folders differ
+                        a.path = Path(a.path).name
+                        b.path = Path(b.path).name
 
                 for i, (decoded_a, decoded_b) in enumerate(zip(decoded_stream_a, decoded_stream_b)):
                     self.assert_any_almost_equal(

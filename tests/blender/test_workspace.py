@@ -43,13 +43,15 @@ def _get_class_name(cls, num, params_dict):
     ],
     class_name_func=_get_class_name,
 )
-@unittest.skip("")
 class TestImageOneFolder(TestCase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def setUp(self):
-        self.shared_folders = [[str(self.ws0)], [str(self.ws1)]]
+        self.shared_folders = [
+            [str(self.ws0)],
+            [str(self.ws1)],
+        ]
         super().setUp()
 
     def test_create_one_file(self):
@@ -83,14 +85,16 @@ bpy.data.images.load(r"{path_b}")
     ],
     class_name_func=_get_class_name,
 )
-@unittest.skip("")
 class TestImageTwoFolders(TestCase):
     def __init__(self, *args, **kwargs):
 
         super().__init__(*args, **kwargs)
 
     def setUp(self):
-        self.shared_folders = [[str(self.ws0)], [str(self.ws1)]]
+        self.shared_folders = [
+            [str(ws) for ws in self.ws0],
+            [str(ws) for ws in self.ws1],
+        ]
         super().setUp()
 
     def test_create(self):
