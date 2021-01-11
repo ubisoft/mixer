@@ -278,40 +278,36 @@ def users_selection_draw_iteration(per_user_callback, per_object_callback, colle
         if not per_user_callback(user_dict):
             continue
 
-        for scene_name, scene_dict in scenes.items():
-            if scene_name != bpy.context.scene.name_full:
-                continue
+        scene_dict = scenes.get(bpy.context.scene.name_full)
+        if scene_dict is None:
+            return
 
-            selected_objects = scene_dict.get(ClientAttributes.USERSCENES_SELECTED_OBJECTS, None)
-            if selected_objects is None:
-                continue
+        selected_names = scene_dict.get(ClientAttributes.USERSCENES_SELECTED_OBJECTS, None)
+        if selected_names is None:
+            return
 
-            for object_full_name in selected_objects:
-                if object_full_name not in bpy.data.objects:
-                    logger.info(f"{object_full_name} not in bpy.data")
-                    continue
+        selected_objects = (obj for obj in bpy.data.objects if obj.name_full in set(selected_names))
+        for obj in selected_objects:
+            objects = [obj]
+            parent_matrix = IDENTITY_MATRIX
 
-                obj = bpy.data.objects[object_full_name]
-                objects = [obj]
-                parent_matrix = IDENTITY_MATRIX
+            if obj.type == "EMPTY" and obj.instance_collection is not None:
+                if collection_detail:
+                    objects = obj.instance_collection.objects
+                else:
+                    objects = []
+                parent_matrix = obj.matrix_world
 
-                if obj.type == "EMPTY" and obj.instance_collection is not None:
-                    if collection_detail:
-                        objects = obj.instance_collection.objects
-                    else:
-                        objects = []
-                    parent_matrix = obj.matrix_world
+                per_object_callback(user_dict, obj, obj.matrix_world @ BBOX_SCALE_MATRIX, DEFAULT_BBOX)
 
-                    per_object_callback(user_dict, obj, obj.matrix_world @ BBOX_SCALE_MATRIX, DEFAULT_BBOX)
+            for obj in objects:
+                bbox = obj.bound_box
 
-                for obj in objects:
-                    bbox = obj.bound_box
+                diag = Vector(bbox[2]) - Vector(bbox[4])
+                if diag.length_squared == 0:
+                    bbox = DEFAULT_BBOX
 
-                    diag = Vector(bbox[2]) - Vector(bbox[4])
-                    if diag.length_squared == 0:
-                        bbox = DEFAULT_BBOX
-
-                    per_object_callback(user_dict, obj, parent_matrix @ obj.matrix_world @ BBOX_SCALE_MATRIX, bbox)
+                per_object_callback(user_dict, obj, parent_matrix @ obj.matrix_world @ BBOX_SCALE_MATRIX, bbox)
 
 
 def draw_user_name(user_dict, coord_3d):
