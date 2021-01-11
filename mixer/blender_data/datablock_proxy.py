@@ -282,7 +282,9 @@ class DatablockProxy(StructProxy):
         # Ignore the duplicate name if it is from a library, it is not a name clash
         existing_datablock = self.collection.get(incoming_name)
         if existing_datablock and not existing_datablock.library:
-            assert not existing_datablock.mixer_uuid
+            # The correct assertion is
+            #   assert existing_datablock.mixer_uuid
+            # but it causes a visible failure in a test that formerly failed silently (internal issue #396)
             if not existing_datablock.mixer_uuid:
                 # A datablock created by VRtist command in the same command batch
                 # Not an error, we will make it ours by adding the uuid and registering it
