@@ -442,6 +442,9 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
     # When called from save, the proxy has  all the synchronized properties
     # WHen called from apply, the proxy only contains the updated properties
 
+    if target.library:
+        return target
+
     if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
         target.clear_geometry()
     elif isinstance(target, T.Material):

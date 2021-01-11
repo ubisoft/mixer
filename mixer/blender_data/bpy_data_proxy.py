@@ -170,7 +170,9 @@ class Context:
 
 
 _creation_order = {
-    # anything else first
+    # Libraries are needed to create all linked datablocks
+    "libraries": -10,
+    # anything else: 0
     "collections": 10,
     # Scene after Collection. Scene.collection must be up to date before Scene.view_layers can be saved
     "scenes": 20,

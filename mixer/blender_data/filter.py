@@ -350,6 +350,15 @@ default_exclusions: FilterSet = {
             ]
         )
     ],
+    T.Library: [
+        NameFilterOut(
+            [
+                "parent",
+                "version",
+                # "users_id",
+            ]
+        )
+    ],
     T.MaterialSlot: [
         NameFilterOut(
             [
@@ -566,6 +575,7 @@ safe_depsgraph_updates = (
     T.Image,
     T.GreasePencil,
     T.Key,
+    T.Library,
     T.Light,
     T.Material,
     T.Mesh,
@@ -590,6 +600,7 @@ safe_blenddata_collections = [
     "curves",
     "grease_pencils",
     "images",
+    "libraries",
     "lights",
     "materials",
     "meshes",

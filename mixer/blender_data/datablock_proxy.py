@@ -55,7 +55,7 @@ class DatablockProxy(StructProxy):
     Proxy to a standalone datablock (e.g. bpy.data.cameras['Camera']).
     """
 
-    _serialize = (
+    _serialize: Tuple[str, ...] = (
         "_bpy_data_collection",
         "_datablock_uuid",
         "_custom_properties",
@@ -117,7 +117,16 @@ class DatablockProxy(StructProxy):
     @classmethod
     def make(cls, datablock: T.ID) -> DatablockProxy:
         proxy: DatablockProxy
-        if isinstance(datablock, T.Object):
+        if datablock.library:
+            from mixer.blender_data.library_proxies import DatablockLinkProxy
+
+            proxy = DatablockLinkProxy()
+
+        elif isinstance(datablock, T.Library):
+            from mixer.blender_data.library_proxies import LibraryProxy
+
+            proxy = LibraryProxy()
+        elif isinstance(datablock, T.Object):
             from mixer.blender_data.object_proxy import ObjectProxy
 
             proxy = ObjectProxy()
@@ -146,7 +155,7 @@ class DatablockProxy(StructProxy):
         self._data["name"] = new_name
 
     def __str__(self) -> str:
-        return f"DatablockProxy {self.mixer_uuid} for bpy.data.{self.collection_name}[{self.data('name')}]"
+        return f"{self.__class__.__name__} {self.mixer_uuid} for bpy.data.{self.collection_name}[{self.data('name')}]"
 
     def load(
         self,
@@ -218,7 +227,7 @@ class DatablockProxy(StructProxy):
         # - reference to the packed data if packed
         #
         #
-        if isinstance(datablock, T.Image):
+        if isinstance(datablock, (T.Image, T.Library)):
             self._is_in_shared_folder = False
             packed_file = datablock.packed_file
             data = None
@@ -269,9 +278,11 @@ class DatablockProxy(StructProxy):
         renames: RenameChangeset = []
         incoming_name = self.data("name")
 
-        # Detect a conflicting creation
+        # Detect a conflicting creation by look for a datablock with the wanted name.
+        # Ignore the duplicate name if it is from a library, it is not a name clash
         existing_datablock = self.collection.get(incoming_name)
-        if existing_datablock:
+        if existing_datablock and not existing_datablock.library:
+            assert not existing_datablock.mixer_uuid
             if not existing_datablock.mixer_uuid:
                 # A datablock created by VRtist command in the same command batch
                 # Not an error, we will make it ours by adding the uuid and registering it
@@ -324,7 +335,8 @@ class DatablockProxy(StructProxy):
                 logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
         datablock.mixer_uuid = self.mixer_uuid
-        return self._save(datablock, context), renames
+        datablock = self._save(datablock, context)
+        return datablock, renames
 
     def _save(self, datablock: T.ID, context: Context) -> T.ID:
         datablock = self._pre_save(datablock, context)

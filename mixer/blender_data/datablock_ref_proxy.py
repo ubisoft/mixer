@@ -154,7 +154,7 @@ class DatablockRefProxy(Proxy):
             if datablock is None:
                 return None
 
-            if datablock.mixer_uuid != "":
+            if datablock.mixer_uuid != "" and not datablock.library:
                 logger.error(f"{self}: found datablock with uuid in bpy.data.{self._bpy_data_collection}")
                 logger.error(f'... "{self._bpy_data_collection}" may be missing from clear_scene_contents()')
                 return None

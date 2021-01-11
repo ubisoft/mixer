@@ -91,7 +91,9 @@ class DatablockCollectionProxy(Proxy):
         """
 
         datablock, renames = incoming_proxy.create_standalone_datablock(context)
-        # returned datablock is None for a ShapeKey. The datablock creation is defered until Object update
+        # returned datablock is None for ShapeKey and Library. Datablock creation is deferred until :
+        # - ShapeKey : Object update
+        # - Library : creation of a link datablock
 
         if incoming_proxy.collection_name == "scenes":
             logger.warning(f"Creating scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}'")

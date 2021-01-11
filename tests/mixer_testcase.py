@@ -335,11 +335,11 @@ class MixerTestCase(unittest.TestCase):
 
                 if message_type == MessageType.BLENDER_DATA_CREATE:
                     short_a = [
-                        (message.proxy_string["_data"]["name"], message.proxy_string["_bpy_data_collection"])
+                        (message.proxy_string["_data"].get("name"), message.proxy_string["_bpy_data_collection"])
                         for message in decoded_stream_a
                     ]
                     short_b = [
-                        (message.proxy_string["_data"]["name"], message.proxy_string["_bpy_data_collection"])
+                        (message.proxy_string["_data"].get("name"), message.proxy_string["_bpy_data_collection"])
                         for message in decoded_stream_b
                     ]
                     self.assertListEqual(short_a, short_b, f"Mismatch for {message_name} at index {i}")
