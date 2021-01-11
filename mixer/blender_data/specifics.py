@@ -289,12 +289,7 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
         logger.warning("... loaded as Empty")
         data_datablock = None
 
-    object_datablock = collection.new(name, data_datablock)
-
-    if data_datablock is not None:
-        context.proxy_state.objects[data_datablock.mixer_uuid].add(proxy.mixer_uuid)
-
-    return object_datablock
+    return collection.new(name, data_datablock)
 
 
 @bpy_data_ctor.register("lights")

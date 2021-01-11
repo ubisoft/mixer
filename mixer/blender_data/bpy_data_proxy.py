@@ -74,22 +74,28 @@ class RecursionGuard:
         self._property_stack.pop()
 
 
-@dataclass
 class ProxyState:
     """
     State of a BpyDataProxy
     """
 
-    proxies: Dict[Uuid, DatablockProxy] = field(default_factory=dict)
-    """Known proxies"""
+    def __init__(self):
+        self.proxies: Dict[Uuid, DatablockProxy] = {}
+        """Known proxies"""
 
-    datablocks: Dict[Uuid, T.ID] = field(default_factory=dict)
-    """Known datablocks"""
+        self.datablocks: Dict[Uuid, T.ID] = {}
+        """Known datablocks"""
 
-    objects: Dict[Uuid, Set[Uuid]] = field(default_factory=lambda: defaultdict(set))
-    """Object.data uuid : (set of uuids of Object using object.data). Mostly used for shape keys"""
+        self.objects: Dict[Uuid, Set[Uuid]] = defaultdict(set)
+        """Object.data uuid : (set of uuids of Object using object.data). Mostly used for shape keys"""
 
-    unresolved_refs: UnresolvedRefs = field(default_factory=UnresolvedRefs)
+        self.unresolved_refs: UnresolvedRefs = UnresolvedRefs()
+
+    def register_object(self, datablock: T.Object):
+        if datablock.data is not None:
+            data_uuid = datablock.data.mixer_uuid
+            object_uuid = datablock.mixer_uuid
+            self.objects[data_uuid].add(object_uuid)
 
     shared_folders: List = field(default_factory=list)
 

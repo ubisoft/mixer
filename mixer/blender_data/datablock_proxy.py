@@ -337,6 +337,8 @@ class DatablockProxy(StructProxy):
                 logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
         datablock.mixer_uuid = self.mixer_uuid
+        if isinstance(datablock, T.Object):
+            context.proxy_state.register_object(datablock)
         datablock = self._save(datablock, context)
         return datablock, renames
 
