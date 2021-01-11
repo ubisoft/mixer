@@ -166,6 +166,9 @@ class DatablockLinkProxy(DatablockProxy):
 
         self._is_library_indirect = False
 
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__} {self.mixer_uuid} for {self._identifier}"
+
     @property
     def is_library_indirect(self):
         return self._is_library_indirect
