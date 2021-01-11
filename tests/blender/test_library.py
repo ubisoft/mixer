@@ -9,6 +9,12 @@ class TestCase(BlenderTestCase):
     _lib_1_1_file = str(files_folder() / "lib_1_1.blend")
     _lib_3_1_file = str(files_folder() / "lib_3_1.blend")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # import logging
+
+        # self.log_level = logging.INFO
+
     def setUp(self):
         sender_blendfile = files_folder() / "empty.blend"
         receiver_blendfile = files_folder() / "empty.blend"
@@ -171,6 +177,49 @@ obj = bpy.data.objects[1]
 obj.material_slots[0].material = bpy.data.materials[1]
 """
         self.send_string(use_linked_materials, to=0)
+        self.assert_matches()
+
+
+class TestNestedSharedFolders(TestNested):
+    def setUp(self):
+        shader_folders = str(files_folder())
+        self.shared_folders = [
+            [shader_folders],
+            [shader_folders],
+        ]
+        super().setUp()
+
+
+class TestCollectionNested(TestCase):
+    # Loading the the "Collection 1" object causes loading of
+    # - "Material" from lib_1_1 (on the cube)
+
+    _create_link = f"""
+import bpy
+lib_file = r"{TestCase._lib_3_1_file}"
+with bpy.data.libraries.load(lib_file, link=True) as (data_from, data_to):
+    data_to.objects = ["Collection 1"]
+
+bpy.data.scenes[0].collection.objects.link(data_to.objects[0])
+"""
+
+    def test_create_link(self):
+        self.send_string(self._create_link, to=0)
+        self.assert_matches()
+
+    def test_add_link(self):
+        self.send_string(self._create_link, to=0)
+
+        # Triggers indirect load from already loaded library (Material from lib_3_1, on the sphere)
+        link_another = f"""
+import bpy
+lib_file = r"{TestCase._lib_3_1_file}"
+with bpy.data.libraries.load(lib_file, link=True) as (data_from, data_to):
+    data_to.objects = ["Icosphere"]
+
+bpy.data.scenes[0].collection.objects.link(data_to.objects[0])
+"""
+        self.send_string(link_another, to=0)
         self.assert_matches()
 
 
