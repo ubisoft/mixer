@@ -64,13 +64,15 @@ class ShapeKeyProxy(DatablockProxy):
         # update the Key datablock using the Object API
         key_blocks_proxy = self.data("key_blocks")
         object_datablock.shape_key_clear()  # removes the Key datablock
+
+        shape_key_uuid = self.mixer_uuid
+        context.proxy_state.remove_datablock(shape_key_uuid)
         for _ in range(len(key_blocks_proxy)):
             object_datablock.shape_key_add()
 
         new_shape_key_datablock = object_datablock.data.shape_keys
         self.save(new_shape_key_datablock, bpy.data.shape_keys, new_shape_key_datablock.name, context)
 
-        shape_key_uuid = self.mixer_uuid
         new_shape_key_datablock.mixer_uuid = shape_key_uuid
         context.proxy_state.add_datablock(shape_key_uuid, new_shape_key_datablock)
 
