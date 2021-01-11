@@ -84,7 +84,9 @@ class LibraryProxy(DatablockProxy):
 
         library_name = self._data["name"]
         library = bpy.data.libraries[library_name]
-        library.mixer_uuid = self.mixer_uuid
+        uuid = self.mixer_uuid
+        library.mixer_uuid = uuid
+        context.proxy_state.datablocks[uuid] = library
 
         # update the uuids of indirect link datablocks that may have been created during the load step
         for linked_datablock in library.users_id:

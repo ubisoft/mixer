@@ -862,5 +862,8 @@ def remove_datablock(collection: T.bpy_prop_collection, datablock: T.ID):
     elif isinstance(datablock, T.Key):
         # the doc labels it unsafe, use sparingly
         bpy.data.batch_remove([datablock])
+    elif isinstance(datablock, T.Library):
+        # TODO 2.91 has BlendDatalibraries.remove()
+        logger.warning(f"remove_datablock({datablock}): ignored (library)")
     else:
         collection.remove(datablock)
