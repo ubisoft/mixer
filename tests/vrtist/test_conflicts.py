@@ -90,16 +90,23 @@ class TestSimultaneousCreate(ThrottledTestCase):
             self.expected_counts = {MessageType.LIGHT: lights}
             raise unittest.SkipTest("FAILS: Only one point light remains")
 
-        location = "0.0, -3.0, 0.0"
-        self.send_strings([bl.active_layer_master_collection() + bl.ops_objects_light_add(location=location)], to=0)
+        command = """
+import bpy
+viewlayer = bpy.data.scenes["Scene"].view_layers["View Layer"]
+viewlayer.active_layer_collection = viewlayer.layer_collection
+bpy.ops.object.light_add(type="POINT", location=({location}))
+"""
+
+        command_0 = command.format(location="0.0, -3.0, 0.0")
+        self.send_string(command_0, to=0)
 
         # with a delay > latency all the messages are transmitted and the problem does not occur
         # delay = 2.0
 
         time.sleep(0.0)
 
-        location = "0.0, 3.0, 0.0"
-        self.send_strings([bl.active_layer_master_collection() + bl.ops_objects_light_add(location=location)], to=1)
+        command_1 = command.format(location="0.0, 3.0, 0.0")
+        self.send_string(command_1, to=1)
 
         self.assert_matches()
 
