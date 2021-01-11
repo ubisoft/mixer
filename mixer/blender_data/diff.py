@@ -34,6 +34,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.filter import SynchronizedProperties, skip_bpy_data_item
 from mixer.blender_data.proxy import ensure_uuid
+from mixer.blender_data.library_proxies import DatablockLinkProxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import BpyDataProxy
@@ -110,9 +111,12 @@ class BpyDataCollectionDiff:
         proxy_uuids = set(proxies.keys())
         blender_uuids = set(blender_items.keys())
 
-        # TODO LIB
+        # Ignore linked datablocks to find renamed datablocks, as they cannot be renamed locally
         renamed_uuids = {
-            uuid for uuid in blender_uuids & proxy_uuids if proxies[uuid].data("name") != blender_items[uuid][0].name
+            uuid
+            for uuid in blender_uuids & proxy_uuids
+            if not isinstance(proxies[uuid], DatablockLinkProxy)
+            and proxies[uuid].data("name") != blender_items[uuid][0].name
         }
         added_uuids = blender_uuids - proxy_uuids - renamed_uuids
         removed_uuids = proxy_uuids - blender_uuids - renamed_uuids

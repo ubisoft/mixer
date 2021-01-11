@@ -17,15 +17,15 @@ class TestCase(BlenderTestCase):
         super().setUp(blenderdescs=blenderdescs)
 
 
-class TestEmptyDirect(TestCase):
+class TestDirect(TestCase):
     _create_link = f"""
 import bpy
 lib_file = r"{TestCase._lib_file}"
 with bpy.data.libraries.load(lib_file, link=True) as (data_from, data_to):
-    data_to.objects = ["Empty"]
+    data_to.objects = ["Empty", "Camera"]
 
-empty = bpy.data.objects["Empty"]
-bpy.data.scenes[0].collection.objects.link(empty)
+bpy.data.scenes[0].collection.objects.link(bpy.data.objects["Empty"])
+bpy.data.scenes[0].collection.objects.link(bpy.data.objects["Camera"])
 """
 
     _remove_link = """
@@ -47,6 +47,16 @@ bpy.data.libraries.remove(bpy.data.library[0])
         self.send_string(self._remove_link, to=0)
         self.assert_matches()
 
+    def test_reference_direct_datablock(self):
+        self.send_string(self._create_link, to=0)
+
+        ref_camera = """
+import bpy
+bpy.data.scenes[0].camera = bpy.data.objects[0]
+"""
+        self.send_string(ref_camera, to=0)
+        self.assert_matches()
+
     @unittest.skip("Waiting for BlenddataLibraries.remove in 2.91")
     def test_remove_link_and_library(self):
         self.send_string(self._create_link, to=0)
@@ -55,31 +65,30 @@ bpy.data.libraries.remove(bpy.data.library[0])
         self.assert_matches()
 
 
-class TestCameraIndirect(TestCase):
-    # Loading the the "Camera" objects causes loading of "Camera" camera as "indirect"
+class TestIndirect(TestCase):
+    # Loading the the "Collection" collection causes loading of "Camera" object as "indirect"
     _create_link = f"""
 import bpy
 lib_file = r"{TestCase._lib_file}"
 with bpy.data.libraries.load(lib_file, link=True) as (data_from, data_to):
-    data_to.objects = ["Camera"]
+    data_to.collections = ["Collection"]
 
-for item in data_to.objects:
-    bpy.data.scenes[0].collection.objects.link(item)
+bpy.data.scenes[0].collection.children.link(data_to.collections[0])
 
-"""
-
-    _remove_link = """
-import bpy
-bpy.data.objects.remove(bpy.data.objects["Camera"])
 """
 
     def test_create_link(self):
         self.send_string(self._create_link, to=0)
         self.assert_matches()
 
-    def test_remove_link(self):
+    def test_reference_direct_datablock(self):
         self.send_string(self._create_link, to=0)
-        self.send_string(self._remove_link, to=0)
+
+        ref_camera = """
+import bpy
+bpy.data.scenes[0].camera = bpy.data.objects["Camera"]
+"""
+        self.send_string(ref_camera, to=0)
         self.assert_matches()
 
 
@@ -111,11 +120,6 @@ bpy.data.libraries.remove(bpy.data.library[0])
 
     def test_create_link(self):
         self.send_string(self._create_link, to=0)
-        self.assert_matches()
-
-    def test_remove_link(self):
-        self.send_string(self._create_link, to=0)
-        self.send_string(self._remove_link, to=0)
         self.assert_matches()
 
     @unittest.skip("Waiting for BlenddataLibraries.remove in 2.91")

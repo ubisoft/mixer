@@ -22,7 +22,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import cast, Optional, Tuple, TYPE_CHECKING, Union
+from typing import cast, Dict, Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy
 import bpy.path
@@ -40,20 +40,57 @@ logger = logging.getLogger(__name__)
 class LibraryProxy(DatablockProxy):
     """Proxy for Library datablocks."""
 
+    def __init__(self):
+        super().__init__()
+
+        self._indirect_datablocks: Dict[str, Uuid] = {}
+        """Uuids to assign to indirect link datablocks after their creation."""
+        # TODO update this for reload
+
+    def register_indirect(self, identifier: str, uuid: Uuid) -> Optional[T.ID]:
+        """Registers an indirect link datablock with its uuid."""
+        assert identifier not in self._indirect_datablocks or self._indirect_datablocks[identifier] == uuid
+
+        library_datablock = bpy.data.libraries.get(self._data["name"])
+        if library_datablock:
+            # library already loaded, update the linked datablock at once
+            for linked_datablock in library_datablock.users_id:
+                if repr(linked_datablock) == identifier:
+                    logger.warning(f"register indirect for {identifier} {uuid}")
+                    linked_datablock.mixer_uuid = uuid
+                    return linked_datablock
+
+        # library not loaded, register the indirect datablock for update after the library is loaded
+        logger.warning(f"register indirect: delayed for {identifier} {uuid}")
+        self._indirect_datablocks[identifier] = uuid
+        return None
+
     def create_standalone_datablock(self, context: Context):
         # No datablock is created at this point.
         # The Library datablock will be created when the linked datablock is loaded (see load_library_item)
         return None, None
 
     def load_library_item(self, collection_name, datablock_name) -> T.ID:
+        # TODO LIB check relative path
         library_path = bpy.path.abspath(self._data["filepath"])
         logger.warning(f"load_library_item(): {library_path} {collection_name} {datablock_name}")
+
+        # this creates the Library datablock on first load.
         with bpy.data.libraries.load(library_path, link=True) as (data_from, data_to):
             setattr(data_to, collection_name, [datablock_name])
 
-        # this creates the Library datablock on first load.
         library_name = self._data["name"]
-        bpy.data.libraries[library_name].mixer_uuid = self.mixer_uuid
+        library = bpy.data.libraries[library_name]
+        library.mixer_uuid = self.mixer_uuid
+
+        # update the uuids of indirect link datablocks that may have been created during the load step
+        for linked_datablock in library.users_id:
+            identifier = repr(linked_datablock)
+            uuid = self._indirect_datablocks.get(identifier)
+            if uuid:
+                logger.warning(f"register indirect at load {identifier} {uuid}")
+                linked_datablock.mixer_uuid = uuid
+                del self._indirect_datablocks[identifier]
 
         return getattr(data_to, collection_name)[0]
 
@@ -109,7 +146,7 @@ class DatablockLinkProxy(DatablockProxy):
     """Proxy for direct or indirect linked datablock"""
 
     # TODO or use mro in serialization ?
-    _serialize = DatablockProxy._serialize + ("_library_uuid", "_is_library_indirect", "_name")
+    _serialize = DatablockProxy._serialize + ("_library_uuid", "_is_library_indirect", "_name", "_identifier")
 
     def __init__(self):
         super().__init__()
@@ -119,6 +156,9 @@ class DatablockLinkProxy(DatablockProxy):
 
         self._name = ""
         """Name of the datablock in the library"""
+
+        self._identifier = ""
+        """repr() value for the datablock, used as identifier to """
 
         self._is_library_indirect = False
 
@@ -136,20 +176,25 @@ class DatablockLinkProxy(DatablockProxy):
         logger.warning(
             f"_create(): {self} library: {library_proxy.data('name')}, indirect: {self._is_library_indirect}"
         )
+
         if self._is_library_indirect:
-            return None, None
+            # Indirect linked datablock are created implicitely during the load() of their parent. Keep track of
+            # them in order to assign them a uuid after their creation. A uuid is required because they can be
+            # referenced by non linked datablocks after load (e.g. a linked Camera referenced by the main Scene)
+            link_datablock = library_proxy.register_indirect(self._identifier, self.mixer_uuid)
+            return link_datablock, None
+        else:
+            try:
+                link_datablock = library_proxy.load_library_item(self._bpy_data_collection, self._name)
+            except Exception as e:
+                logger.error(
+                    f"load_library {library_proxy.data('name')} failed for {self._bpy_data_collection}[{self._name}]..."
+                )
+                logger.error(f"... {e!r}")
+                return None, None
 
-        try:
-            datablock = library_proxy.load_library_item(self._bpy_data_collection, self._name)
-        except Exception as e:
-            logger.error(
-                f"load_library {library_proxy.data('name')} failed for {self._bpy_data_collection}[{self._name}]..."
-            )
-            logger.error(f"... {e!r}")
-            return None, None
-
-        datablock.mixer_uuid = self.mixer_uuid
-        return datablock, None
+            link_datablock.mixer_uuid = self.mixer_uuid
+            return link_datablock, None
 
     def load(self, datablock: T.ID, context: Context) -> DatablockLinkProxy:
         """
@@ -164,6 +209,7 @@ class DatablockLinkProxy(DatablockProxy):
         self._library_uuid = datablock.library.mixer_uuid
         self._is_library_indirect = datablock.is_library_indirect
         self._name = datablock.name
+        self._identifier = repr(datablock)
         logger.warning(f"load(): {datablock}")
         return self
 
@@ -187,7 +233,6 @@ class DatablockLinkProxy(DatablockProxy):
             context: proxy and visit state
             to_blender: update the managed Blender attribute in addition to this Proxy
         """
-
         return self
 
     def diff(
