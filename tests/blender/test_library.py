@@ -65,7 +65,7 @@ bpy.data.scenes[0].camera = bpy.data.objects[0]
         self.assert_matches()
 
 
-class TestIndirect_1(TestCase):
+class TestIndirect1(TestCase):
     # Loading the the "Camera" object causes loading of "Camera" camera as "indirect"
     _create_link = f"""
 import bpy
@@ -93,7 +93,7 @@ bpy.data.cameras.remove(bpy.data.cameras["Camera"])
         self.assert_matches()
 
 
-class TestIndirect_2(TestCase):
+class TestIndirect2(TestCase):
     # Loading the the "Collection" collection causes loading of "Camera" object as "indirect"
     _create_link = f"""
 import bpy
