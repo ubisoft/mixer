@@ -37,7 +37,7 @@ from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Uuid
 from mixer.blender_data.misc_proxies import CustomPropertiesProxy
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.type_helpers import sub_id_type
-from mixer.local_data import get_cache_file_path, get_source_file_path
+from mixer.local_data import get_resolved_file_path, get_source_file_path
 
 if TYPE_CHECKING:
     from mixer.blender_data.aos_soa_proxy import SoaElement
@@ -228,7 +228,7 @@ class DatablockProxy(StructProxy):
             return None
 
         if not self._is_in_shared_folder:
-            resolved_filepath = get_cache_file_path(self._filepath_raw)
+            resolved_filepath = get_resolved_file_path(self._filepath_raw)
         else:
             resolved_filepath = self.resolve_shared_folder_file(self._filepath_raw, context)
             if resolved_filepath is None:
