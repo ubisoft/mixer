@@ -47,7 +47,7 @@ class LibraryProxy(DatablockProxy):
         """Uuids to assign to indirect link datablocks after their creation."""
         # TODO update this for reload
 
-    def register_indirect(self, identifier: str, uuid: Uuid) -> Optional[T.ID]:
+    def register_indirect(self, identifier: str, uuid: Uuid, context: Context) -> Optional[T.ID]:
         """Registers an indirect link datablock with its uuid."""
         assert identifier not in self._indirect_datablocks or self._indirect_datablocks[identifier] == uuid
 
@@ -58,6 +58,8 @@ class LibraryProxy(DatablockProxy):
                 if repr(linked_datablock) == identifier:
                     logger.warning(f"register indirect for {identifier} {uuid}")
                     linked_datablock.mixer_uuid = uuid
+                    if isinstance(linked_datablock, T.Object):
+                        context.proxy_state.register_object(linked_datablock)
                     return linked_datablock
 
         # the library is not already loaded, register the indirect datablock for update after the library is loaded.
@@ -183,7 +185,7 @@ class DatablockLinkProxy(DatablockProxy):
             # Indirect linked datablock are created implicitely during the load() of their parent. Keep track of
             # them in order to assign them a uuid after their creation. A uuid is required because they can be
             # referenced by non linked datablocks after load (e.g. a linked Camera referenced by the main Scene)
-            link_datablock = library_proxy.register_indirect(self._identifier, self.mixer_uuid)
+            link_datablock = library_proxy.register_indirect(self._identifier, self.mixer_uuid, context)
             return link_datablock, None
         else:
             try:

@@ -109,6 +109,28 @@ bpy.data.scenes[0].collection.children.link(data_to.collections[0])
         self.send_string(self._create_link, to=0)
         self.assert_matches()
 
+    def test_remove_object(self):
+        self.send_string(self._create_link, to=0)
+
+        # Remove the camera datablock. This is not allowed from the UI but works in a script
+        remove_object = """
+import bpy
+bpy.data.objects.remove(bpy.data.objects["Camera"])
+"""
+        self.send_string(remove_object, to=0)
+        self.assert_matches()
+
+    def test_remove_object_data(self):
+        self.send_string(self._create_link, to=0)
+
+        # Remove the camera datablock. This is not allowed from the UI but works in a script
+        remove_object_data = """
+import bpy
+bpy.data.cameras.remove(bpy.data.cameras["Camera"])
+"""
+        self.send_string(remove_object_data, to=0)
+        self.assert_matches()
+
 
 class TestLinkAll(TestCase):
     _create_link = f"""
