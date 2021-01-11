@@ -85,14 +85,16 @@ class LibraryProxy(DatablockProxy):
     def create_standalone_datablock(self, context: Context):
         # No datablock is created at this point.
         # The Library datablock will be created when the linked datablock is loaded (see load_library_item)
+        resolved_filepath = self.resolved_filepath(context)
+        self._data["filepath"] = resolved_filepath
+        self._data["filepath_raw"] = resolved_filepath
         return None, None
 
     def load_library_item(self, collection_name: str, datablock_name: str, context: Context) -> T.ID:
         """Load a direct link datablock."""
 
-        # TODO LIB check relative path
-        library_path = bpy.path.abspath(self._data["filepath"])
-        logger.warning(f"load_library_item(): {library_path} {collection_name} {datablock_name}")
+        library_path = self.resolved_filepath(context)
+        logger.warning(f"load_library_item(): from {library_path} : {collection_name}[{datablock_name}]")
 
         # this creates the Library datablock on first load.
         with bpy.data.libraries.load(library_path, link=True) as (data_from, data_to):

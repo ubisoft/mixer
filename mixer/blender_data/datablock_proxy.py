@@ -191,7 +191,7 @@ class DatablockProxy(StructProxy):
         return self
 
     def attach_filepath_raw(self, datablock: T.ID):
-        if isinstance(datablock, T.Image):
+        if hasattr(datablock, "filepath"):
             if len(datablock.filepath) == 0:
                 return
             path = get_source_file_path(bpy.path.abspath(datablock.filepath))
@@ -242,7 +242,7 @@ class DatablockProxy(StructProxy):
         # - reference to the packed data if packed
         #
         #
-        if isinstance(datablock, (T.Image, T.Library)):
+        if hasattr(datablock, "packed_file"):
             self._is_in_shared_folder = False
             packed_file = datablock.packed_file
             data = None
