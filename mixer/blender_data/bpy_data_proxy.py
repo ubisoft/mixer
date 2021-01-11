@@ -202,13 +202,13 @@ def _updates_order_predicate(datablock: T.ID) -> int:
 _removal_order = {
     # remove Object before its data otherwise data is removed at the time the Object is removed
     # and the data removal fails
-    T.Object: 10,
+    "objects": 10,
     # anything else last
 }
 
 
 def _remove_order_predicate(removal: Removal) -> int:
-    return _updates_order.get(removal[1], sys.maxsize)
+    return _removal_order.get(removal[1], sys.maxsize)
 
 
 class BpyDataProxy(Proxy):
