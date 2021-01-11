@@ -57,7 +57,6 @@ class DatablockProxy(StructProxy):
 
     _serialize = (
         "_bpy_data_collection",
-        "_class_name",
         "_datablock_uuid",
         "_custom_properties",
         "_is_in_shared_folder",
@@ -70,7 +69,6 @@ class DatablockProxy(StructProxy):
         self._bpy_data_collection: str = ""
         """name of the bpy.data collection this datablock belongs to, None if embedded in another datablock"""
 
-        self._class_name: str = ""
         self._datablock_uuid: str = ""
 
         self._soas: Dict[VisitState.Path, List[Tuple[str, SoaElement]]] = defaultdict(list)
@@ -110,7 +108,6 @@ class DatablockProxy(StructProxy):
                 type_name = sub_id_type(type(datablock)).bl_rna.identifier
                 self._bpy_data_collection = rna_identifier_to_collection_name[type_name]
                 self._datablock_uuid = datablock.mixer_uuid
-            self._class_name = datablock.__class__.__name__
             self._initialized = True
 
     @property
@@ -188,7 +185,6 @@ class DatablockProxy(StructProxy):
                 self._bpy_data_collection = bpy_data_collection_name
             self._initialized = True
 
-        self._class_name = datablock.__class__.__name__
         self.clear_data()
         properties = context.synchronized_properties.properties(datablock)
         # this assumes that specifics.py apply only to ID, not Struct

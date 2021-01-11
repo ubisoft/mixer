@@ -127,7 +127,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
             return NonePtrProxy()
 
         logger.error(
-            f"Unsupported attribute {attr_type} {attr_property} at {context.visit_state.datablock_proxy._class_name}.{context.visit_state.path}.{attr_property.identifier}"
+            f"Unsupported attribute {attr_type} {attr_property} at {context.visit_state.datablock_proxy.collection_name}.{context.visit_state.path}.{attr_property.identifier}"
         )
     finally:
         context.visit_state.recursion_guard.pop()
