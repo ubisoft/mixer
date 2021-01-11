@@ -110,7 +110,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
                 # TODO probably better to use a StructProxy : all DatablockProxy would be standalone
                 from mixer.blender_data.datablock_proxy import DatablockProxy
 
-                return DatablockProxy.make(attr_property).load(attr, context)
+                return DatablockProxy.make(attr).load(attr, context)
             else:
                 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
