@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-Utility proxy classes
+Proxy classes for library-related items, i.e. libraries and link datablocks
 
 See synchronization.md
 """
@@ -64,7 +64,7 @@ class LibraryProxy(DatablockProxy):
                 library_datablock.mixer_uuid = self.mixer_uuid
                 context.proxy_state.datablocks[self.mixer_uuid] = library_datablock
 
-            # The library is already loaded: register the linked datablock at once.
+            # The library is already loaded. Register the linked datablock at once.
             # Registration in ProxyState.datablocks is performed by a caller during datablock creation
             for linked_datablock in library_datablock.users_id:
                 if repr(linked_datablock) == identifier:
@@ -74,13 +74,20 @@ class LibraryProxy(DatablockProxy):
                         context.proxy_state.register_object(linked_datablock)
                     return linked_datablock
 
-        else:
-            # the library is not already loaded, register the indirect datablock for update after the library is loaded.
-            # this occurs when the indirect datablock (e.g. a Camera) is received before the Object that references it
-            logger.warning(f"register indirect: delayed for {identifier} {uuid}")
-            context.proxy_state.unregistered_libraries.add(self)
-            self._unregistered_datablocks[identifier] = uuid
-            return None
+        #   The library is not already loaded:
+        #       when processing an indirect link datablock (e.g. Mesh) _before_ the first direct link datablock
+        #       that references it (e.g. Object) has been processed.
+        # or
+        #   The library is loaded but the datablock is not yet in Library.users_id.
+        #       when processing an additional indirect link datablock (e.g. an additional Mesh) _after_
+        #       the library is loaded by the processing of a previous direct link datablock.
+        #       This occurs when linking an additional object
+
+        # Register the indirect datablock for update after the library is loaded.
+        logger.warning(f"register indirect: delayed for {identifier} {uuid}")
+        context.proxy_state.unregistered_libraries.add(self)
+        self._unregistered_datablocks[identifier] = uuid
+        return None
 
     def create_standalone_datablock(self, context: Context):
         # No datablock is created at this point.
@@ -182,7 +189,6 @@ class LibraryProxy(DatablockProxy):
 class DatablockLinkProxy(DatablockProxy):
     """Proxy for direct or indirect linked datablock"""
 
-    # TODO or use mro in serialization ?
     _serialize = DatablockProxy._serialize + ("_library_uuid", "_is_library_indirect", "_name", "_identifier")
 
     def __init__(self):
@@ -207,9 +213,7 @@ class DatablockLinkProxy(DatablockProxy):
         return self._is_library_indirect
 
     def create_standalone_datablock(self, context: Context) -> Tuple[Optional[T.ID], None]:
-        """
-        Save this proxy into its target standalone datablock
-        """
+        """Save this proxy into its target standalone datablock."""
         from mixer.blender_data.library_proxies import LibraryProxy
 
         library_proxy = cast(LibraryProxy, context.proxy_state.proxies[self._library_uuid])
@@ -239,12 +243,7 @@ class DatablockLinkProxy(DatablockProxy):
             return link_datablock, None
 
     def load(self, datablock: T.ID, context: Context) -> DatablockLinkProxy:
-        """
-        Load the attribute Blender struct into this proxy
-
-        Args:
-            attribute: the Blender set to load into this proxy
-        """
+        """Load datablock into this proxy."""
         assert datablock.library is not None
 
         # Do not load the attributes
