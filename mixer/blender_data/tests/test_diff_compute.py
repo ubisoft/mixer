@@ -164,13 +164,11 @@ class Collection(DifferentialCompute):
         self.assertIsInstance(scene_delta, DeltaUpdate)
         scene_update = scene_delta.value
         self.assertIsInstance(scene_update, DatablockProxy)
-        self.assertTrue(scene_update.is_standalone_datablock)
 
         collection_delta = scene_update.data("collection", resolve_delta=False)
         self.assertIsInstance(scene_delta, DeltaUpdate)
         collection_update = collection_delta.value
-        self.assertIsInstance(collection_update, DatablockProxy)
-        self.assertTrue(collection_update.is_embedded_data)
+        self.assertIsInstance(collection_update, StructProxy)
 
         objects_delta = collection_update.data("objects", resolve_delta=False)
         self.assertIsInstance(objects_delta, DeltaUpdate)
@@ -219,7 +217,6 @@ class Collection(DifferentialCompute):
         self.assertIsInstance(collection_delta, DeltaUpdate)
         collection_update = collection_delta.value
         self.assertIsInstance(collection_update, DatablockProxy)
-        self.assertTrue(collection_update.is_standalone_datablock)
 
         objects_delta = collection_update.data("objects", resolve_delta=False)
         self.assertIsInstance(objects_delta, DeltaUpdate)
@@ -269,7 +266,6 @@ class Aos(DifferentialCompute):
         self.assertIsInstance(mesh_delta, DeltaUpdate)
         mesh_update = mesh_delta.value
         self.assertIsInstance(mesh_update, DatablockProxy)
-        self.assertTrue(mesh_update.is_standalone_datablock)
 
         vertices_delta = mesh_update.data("vertices", resolve_delta=False)
         self.assertIsInstance(vertices_delta, DeltaUpdate)

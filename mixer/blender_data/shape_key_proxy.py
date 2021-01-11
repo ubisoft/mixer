@@ -79,9 +79,8 @@ class ShapeKeyProxy(DatablockProxy):
         self,
         datablock: T.ID,
         context: Context,
-        bpy_data_collection_name: str = None,
     ) -> DatablockProxy:
-        super().load(datablock, context, bpy_data_collection_name)
+        super().load(datablock, context)
 
         # ShapeKey.relative_key is a reference into Key.key_blocks. The default synchronization would
         # load save its whole contents for each reference.

@@ -33,7 +33,7 @@ from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 
 from mixer.blender_data.attributes import read_attribute, write_attribute
-from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate
+from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Uuid
 from mixer.blender_data.misc_proxies import CustomPropertiesProxy
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.type_helpers import sub_id_type
@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 class DatablockProxy(StructProxy):
     """
-    Proxy to a datablock, standalone (bpy.data.cameras['Camera']) or embedded.
+    Proxy to a standalone datablock (e.g. bpy.data.cameras['Camera']).
     """
 
     _serialize = (
@@ -64,30 +64,34 @@ class DatablockProxy(StructProxy):
     )
 
     def __init__(self):
+        # deserialization call the ctor with no arguments
+
         super().__init__()
 
         self._bpy_data_collection: str = ""
         """name of the bpy.data collection this datablock belongs to, None if embedded in another datablock"""
 
-        self._datablock_uuid: str = ""
+        self._datablock_uuid: Uuid = ""
+
+        self._custom_properties = CustomPropertiesProxy()
 
         self._soas: Dict[VisitState.Path, List[Tuple[str, SoaElement]]] = defaultdict(list)
         """e.g. {
             ("vertices"): [("co", co_soa), ("normals", normals_soa)]
             ("edges"): ...
-        }"""
+        }
+        Serialized as array"""
 
         # TODO move into _arrays
         self._media: Optional[Tuple[str, bytes]] = None
+        """Media file data.
+        Serialized as array"""
         self._is_in_shared_folder: Optional[bool] = None
         self._filepath_raw: Optional[str] = None
 
         self._arrays: ArrayGroups = {}
-        """arrays that must not be serialized as json because of their size"""
-
-        self._initialized = False
-
-        self._custom_properties = CustomPropertiesProxy()
+        """arrays that must not be serialized as json because of their size.
+        Serialized as array"""
 
     def copy_data(self, other: DatablockProxy):
         super().copy_data(other)
@@ -102,14 +106,6 @@ class DatablockProxy(StructProxy):
         if self._media:
             self._media.clear()
 
-    def init(self, datablock: T.ID):
-        if datablock is not None:
-            if not datablock.is_embedded_data:
-                type_name = sub_id_type(type(datablock)).bl_rna.identifier
-                self._bpy_data_collection = rna_identifier_to_collection_name[type_name]
-                self._datablock_uuid = datablock.mixer_uuid
-            self._initialized = True
-
     @property
     def arrays(self):
         return self._arrays
@@ -119,30 +115,28 @@ class DatablockProxy(StructProxy):
         self._arrays = arrays
 
     @classmethod
-    def make(cls, datablock: T.ID):
-
+    def make(cls, datablock: T.ID) -> DatablockProxy:
+        proxy: DatablockProxy
         if isinstance(datablock, T.Object):
             from mixer.blender_data.object_proxy import ObjectProxy
 
-            return ObjectProxy()
-        if isinstance(datablock, T.Mesh):
+            proxy = ObjectProxy()
+        elif isinstance(datablock, T.Mesh):
             from mixer.blender_data.mesh_proxy import MeshProxy
 
-            return MeshProxy()
+            proxy = MeshProxy()
 
-        if isinstance(datablock, T.Key):
+        elif isinstance(datablock, T.Key):
             from mixer.blender_data.shape_key_proxy import ShapeKeyProxy
 
-            return ShapeKeyProxy()
-        return DatablockProxy()
+            proxy = ShapeKeyProxy()
+        else:
+            proxy = DatablockProxy()
 
-    @property
-    def is_standalone_datablock(self):
-        return bool(self._bpy_data_collection)
-
-    @property
-    def is_embedded_data(self):
-        return not self.is_standalone_datablock
+        type_name = sub_id_type(type(datablock)).bl_rna.identifier
+        proxy._bpy_data_collection = rna_identifier_to_collection_name[type_name]
+        proxy._datablock_uuid = datablock.mixer_uuid
+        return proxy
 
     @property
     def mixer_uuid(self) -> str:
@@ -158,32 +152,16 @@ class DatablockProxy(StructProxy):
         self,
         datablock: T.ID,
         context: Context,
-        bpy_data_collection_name: str = None,
     ) -> DatablockProxy:
-        """Load a datablock into this proxy
+        """Load a datablock into this proxy.
 
         Args:
-            datablock: the datablock to load into this proxy, may be standalone or embedded
+            datablock: the embedded datablock to load into this proxy
             context: visit and proxy state
-            bpy_data_collection_name: if datablock is standalone, name of the bpy.data collection that owns datablock,
-            otherwise None
 
         Returns:
             this DatablockProxy
         """
-
-        if not self._initialized:
-            if bpy_data_collection_name is None:
-                # TODO would be better to load embedded datablocks into StructProxy and use DatablockProxy
-                # only for standalone datablocks
-                assert datablock.is_embedded_data, f"load: {datablock} is not embedded and collection_name is None"
-                self._bpy_data_collection = ""
-            else:
-                assert (
-                    not datablock.is_embedded_data
-                ), f"load: {datablock} is embedded and collection_name is {bpy_data_collection_name}"
-                self._bpy_data_collection = bpy_data_collection_name
-            self._initialized = True
 
         self.clear_data()
         properties = context.synchronized_properties.properties(datablock)
@@ -346,7 +324,6 @@ class DatablockProxy(StructProxy):
         else:
             datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
 
-        self._initialized = True
         if datablock is None:
             if self.collection_name != "shape_keys":
                 logger.warning(f"Cannot create bpy.data.{self.collection_name}[{self.data('name')}]")
@@ -402,9 +379,6 @@ class DatablockProxy(StructProxy):
         Returns:
             The saved datablock
         """
-
-        # TODO it might be better to load embedded datablocks as StructProxy and remove this method
-        # assert self.is_embedded_data, f"save: called {parent}[{key}], which is not standalone"
 
         datablock = self._pre_save(attribute, context)
         if datablock is None:
@@ -493,8 +467,7 @@ class DatablockProxy(StructProxy):
         """
 
         # Create a proxy that will be populated with attributes differences.
-        diff = self.__class__()
-        diff.init(attribute)
+        diff = DatablockProxy.make(attribute)
 
         with context.visit_state.enter_datablock(diff, attribute):
             delta = self._diff(attribute, key, prop, context, diff)

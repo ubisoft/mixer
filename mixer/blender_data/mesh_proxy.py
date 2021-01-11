@@ -158,13 +158,8 @@ class MeshProxy(DatablockProxy):
                     return True
         return False
 
-    def load(
-        self,
-        datablock: T.ID,
-        context: Context,
-        bpy_data_collection_name: str = None,
-    ) -> MeshProxy:
-        super().load(datablock, context, bpy_data_collection_name)
+    def load(self, datablock: T.ID, context: Context) -> MeshProxy:
+        super().load(datablock, context)
         self._arrays["vertex_groups"] = VertexGroups.from_mesh(datablock).to_array_sequence()
         return self
 

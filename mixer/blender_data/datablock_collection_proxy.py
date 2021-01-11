@@ -195,11 +195,7 @@ class DatablockCollectionProxy(Proxy):
             try:
                 uuid = ensure_uuid(datablock)
                 context.proxy_state.datablocks[uuid] = datablock
-
-                # TODO LIB update DatablockProxy.make() to create standalone, link or override datablock
-                proxy = DatablockProxy.make(datablock).load(
-                    datablock, context, bpy_data_collection_name=collection_name
-                )
+                proxy = DatablockProxy.make(datablock).load(datablock, context)
                 context.proxy_state.proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
