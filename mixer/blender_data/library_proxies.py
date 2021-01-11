@@ -49,6 +49,7 @@ class LibraryProxy(DatablockProxy):
 
     def register_indirect(self, identifier: str, uuid: Uuid, context: Context) -> Optional[T.ID]:
         """Registers an indirect link datablock with its uuid."""
+
         assert identifier not in self._indirect_datablocks or self._indirect_datablocks[identifier] == uuid
 
         library_datablock = bpy.data.libraries.get(self._data["name"])
@@ -56,17 +57,18 @@ class LibraryProxy(DatablockProxy):
             # the library is already loaded: update the linked datablock at once
             for linked_datablock in library_datablock.users_id:
                 if repr(linked_datablock) == identifier:
-                    logger.warning(f"register indirect for {identifier} {uuid}")
+                    logger.warning(f"register indirect for {library_datablock}: {identifier} {uuid}")
                     linked_datablock.mixer_uuid = uuid
                     if isinstance(linked_datablock, T.Object):
                         context.proxy_state.register_object(linked_datablock)
                     return linked_datablock
 
-        # the library is not already loaded, register the indirect datablock for update after the library is loaded.
-        # this occurs when the indirect datablock (e.g. a Camera) is received before the Object that references it
-        logger.warning(f"register indirect: delayed for {identifier} {uuid}")
-        self._indirect_datablocks[identifier] = uuid
-        return None
+        else:
+            # the library is not already loaded, register the indirect datablock for update after the library is loaded.
+            # this occurs when the indirect datablock (e.g. a Camera) is received before the Object that references it
+            logger.warning(f"register indirect: delayed for {identifier} {uuid}")
+            self._indirect_datablocks[identifier] = uuid
+            return None
 
     def create_standalone_datablock(self, context: Context):
         # No datablock is created at this point.
@@ -74,6 +76,8 @@ class LibraryProxy(DatablockProxy):
         return None, None
 
     def load_library_item(self, collection_name: str, datablock_name: str, context: Context) -> T.ID:
+        """Load a direct link datablock."""
+
         # TODO LIB check relative path
         library_path = bpy.path.abspath(self._data["filepath"])
         logger.warning(f"load_library_item(): {library_path} {collection_name} {datablock_name}")
@@ -82,14 +86,15 @@ class LibraryProxy(DatablockProxy):
         with bpy.data.libraries.load(library_path, link=True) as (data_from, data_to):
             setattr(data_to, collection_name, [datablock_name])
 
+        # register the library datablock if it has just been created by load() above
         library_name = self._data["name"]
-        library = bpy.data.libraries[library_name]
-        uuid = self.mixer_uuid
-        library.mixer_uuid = uuid
-        context.proxy_state.datablocks[uuid] = library
+        library_datablock = bpy.data.libraries[library_name]
+        if not library_datablock.mixer_uuid:
+            library_datablock.mixer_uuid = self.mixer_uuid
+            context.proxy_state.datablocks[self.mixer_uuid] = library_datablock
 
         # update the uuids of indirect link datablocks that may have been created during the load step
-        for linked_datablock in library.users_id:
+        for linked_datablock in library_datablock.users_id:
             identifier = repr(linked_datablock)
             uuid = self._indirect_datablocks.get(identifier)
             if uuid:
