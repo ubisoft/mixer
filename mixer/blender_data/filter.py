@@ -286,6 +286,7 @@ default_exclusions: FilterSet = {
     # TODO temporary ?
     T.Collection: [NameFilterOut(["all_objects"])],
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
+    T.Curve: [NameFilterOut(["shape_keys"])],
     T.CurveMapPoint: [NameFilterOut(["select"])],
     # TODO this avoids the recursion path Node.socket , NodeSocker.Node
     # can probably be included in the readonly filter
