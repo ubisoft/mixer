@@ -96,6 +96,8 @@ class ProxyState:
         """indirect libraries that were received but not yet registered because no datablock
         they provide were processed yet"""
 
+        self.shared_folders: List[str] = []
+
     def register_object(self, datablock: T.Object):
         if datablock.data is not None:
             data_uuid = datablock.data.mixer_uuid
