@@ -143,9 +143,16 @@ class LibraryProxy(DatablockProxy):
 
         # Recursively register pending child libraries and their datablocks
         for unregistered_child_proxy in list(context.proxy_state.unregistered_libraries):
-            child_name = unregistered_child_proxy.data("name")
-            child_library = bpy.data.libraries.get(child_name)
-            if child_library and child_library.parent == library_datablock:
+            filepath = unregistered_child_proxy.data("filepath")
+            children = [datablock for datablock in bpy.data.libraries if datablock.filepath == filepath]
+            if not children:
+                continue
+
+            if len(children) > 1:
+                continue
+
+            child_library = children[0]
+            if child_library.parent == library_datablock:
                 context.proxy_state.unregistered_libraries.remove(unregistered_child_proxy)
                 unregistered_child_proxy.register(child_library, context)
 
