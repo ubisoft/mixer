@@ -1,3 +1,20 @@
+# 0.20.0 (wip)
+
+## Features
+
+- Shared folders
+- Libraries: synchronization (without overrides, make local, reload, duplicate linked)
+
+## Fixes
+
+- UI: display user name on a single item when a collection is selected
+- Mesh: crash when receiving a mesh in a mixed Linux/windows room
+
+## Breaking changes
+
+- require Blender 2.83.9
+
+
 # 0.19.0 (18-12-2020)
 
 ## Features

@@ -115,6 +115,13 @@ class LibraryProxy(DatablockProxy):
 
         linked_datablock = getattr(data_to, collection_name)[0]
         library_datablock = linked_datablock.library
+        if library_datablock is None:
+            # May be None for a Collection in 2.83.4, when all collection items are in sub libraries.
+            # Fixed in 2.83.9
+            logger.warning(f"load_library_item: library is None for {collection_name} {datablock_name} ...")
+            logger.warning(f"... linked item {linked_datablock}")
+            return None
+
         if not self._created:
             # The received datablock name might not match the library name
             library_datablock.name = self.data("name")
