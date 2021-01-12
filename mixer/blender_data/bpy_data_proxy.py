@@ -519,11 +519,19 @@ class BpyDataProxy(Proxy):
             logger.warning("sanity_check: different keys for datablocks and proxies")
 
         none_datablocks = [k for k, v in state._datablocks.items() if v is None]
-        if none_datablocks:
-            logger.warning(f"sanity_check: None datablocks for {none_datablocks}")
-
         if state.unregistered_libraries:
-            logger.warning(f"sanity_check: unregistered_libraries not empty: {state.unregistered_libraries}")
+            logger.warning("sanity_check: unregistered_libraries not empty ...")
+            for lib in state.unregistered_libraries:
+                logger.warning(f"... {lib}. Library file may be missing.")
+
+        if none_datablocks:
+            logger.warning("sanity_check: no datablock for ...")
+            for uuid in none_datablocks:
+                logger.warning(f"... {state.proxies[uuid]}")
+            logger.warning("... check for missing libraries")
+            logger.warning("... datablocks referencing broken libraries will be removed from peers !")
 
         if state.unresolved_refs:
-            logger.warning(f"sanity_check: unresolved_refs not empty: {state.unresolved_refs}")
+            logger.warning("sanity_check: unresolved_refs not empty ...")
+            for ref in state.unresolved_refs._refs.keys():
+                logger.warning(f"... {ref}")

@@ -96,7 +96,7 @@ class DatablockCollectionProxy(Proxy):
         # - Library : creation of a link datablock
 
         if incoming_proxy.collection_name == "scenes":
-            logger.warning(f"Creating scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}'")
+            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}'")
 
             # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
             # Remove it now

@@ -70,7 +70,7 @@ class LibraryProxy(DatablockProxy):
             # Registration in ProxyState.datablocks is performed by a caller during datablock creation
             for linked_datablock in library_datablock.users_id:
                 if repr(linked_datablock) == identifier:
-                    logger.warning(f"register indirect for {library_datablock}: {identifier} {uuid}")
+                    # logger.warning(f"register indirect for {library_datablock}: {identifier} {uuid}")
                     linked_datablock.mixer_uuid = uuid
                     if isinstance(linked_datablock, T.Object):
                         context.proxy_state.register_object(linked_datablock)
@@ -86,7 +86,7 @@ class LibraryProxy(DatablockProxy):
         #       This occurs when linking an additional object
 
         # Register the indirect datablock for update after the library is loaded.
-        logger.warning(f"register indirect: delayed for {identifier} {uuid}")
+        # logger.warning(f"register indirect: delayed for {identifier} {uuid}")
         context.proxy_state.unregistered_libraries.add(self)
         self._unregistered_datablocks[identifier] = uuid
         return None
@@ -136,7 +136,7 @@ class LibraryProxy(DatablockProxy):
             identifier = repr(linked_datablock)
             uuid = self._unregistered_datablocks.get(identifier)
             if uuid:
-                logger.warning(f"register indirect at load {identifier} {uuid}")
+                # logger.warning(f"register indirect at load {identifier} {uuid}")
                 linked_datablock.mixer_uuid = uuid
                 context.proxy_state.add_datablock(uuid, linked_datablock)
                 del self._unregistered_datablocks[identifier]
@@ -149,7 +149,8 @@ class LibraryProxy(DatablockProxy):
                 continue
 
             if len(children) > 1:
-                continue
+                logger.warning(f"register: more than one library found with path {filepath} ...")
+                logger.warning(f"... {children}")
 
             child_library = children[0]
             if child_library.parent == library_datablock:
@@ -235,9 +236,9 @@ class DatablockLinkProxy(DatablockProxy):
         from mixer.blender_data.library_proxies import LibraryProxy
 
         library_proxy = cast(LibraryProxy, context.proxy_state.proxies[self._library_uuid])
-        logger.warning(
-            f"_create(): {self} library: {library_proxy.data('name')}, indirect: {self._is_library_indirect}"
-        )
+        # logger.warning(
+        #     f"_create(): {self} library: {library_proxy.data('name')}, indirect: {self._is_library_indirect}"
+        # )
 
         if self._is_library_indirect:
             # Indirect linked datablock are created implicitely during the load() of their parent. Keep track of
@@ -273,7 +274,6 @@ class DatablockLinkProxy(DatablockProxy):
         if isinstance(datablock, T.Object):
             context.proxy_state.register_object(datablock)
 
-        logger.warning(f"load(): {datablock}")
         return self
 
     def apply(
