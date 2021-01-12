@@ -153,17 +153,19 @@ class LibraryProxy(DatablockProxy):
 
         # Recursively register pending child libraries and their datablocks
         for unregistered_child_proxy in list(context.proxy_state.unregistered_libraries):
-            filepath = unregistered_child_proxy.data("filepath")
-            children = [datablock for datablock in bpy.data.libraries if datablock.filepath == filepath]
+            child_name = unregistered_child_proxy.data("name")
+            children = [datablock for datablock in bpy.data.libraries if datablock.name == child_name]
             if not children:
                 continue
 
             if len(children) > 1:
-                logger.warning(f"register: more than one library found with path {filepath} ...")
+                logger.warning(f"register: more than one library found with name {child_name!r} ...")
                 logger.warning(f"... {children}")
+                continue
 
             child_library = children[0]
             if child_library.parent == library_datablock:
+                context.proxy_state.unregistered_libraries.remove(unregistered_child_proxy)
                 unregistered_child_proxy.register(child_library, context)
 
     def load(self, datablock: T.ID, context: Context) -> LibraryProxy:
