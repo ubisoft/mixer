@@ -69,7 +69,7 @@ release:
   tags:
     - blender
   variables:
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.83.4-windows64
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.83.9-windows64
     MIXER_BLENDER_VERSION_BASE: "2.83"
     MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
     VRTIST_PORT: 25600 # In case a server is already running on our default port on the test computer
