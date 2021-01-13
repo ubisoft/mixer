@@ -133,7 +133,7 @@ class LibraryProxy(DatablockProxy):
     def register(self, library_datablock: T.Library, context: Context):
         """Recursively register the Library managed by this proxy, its children and all the datablocks they provide."""
 
-        if self in context.proxy_state.unregistered_libraries:
+        if self in context.proxy_state.unregistered_libraries and not self._unregistered_datablocks:
             context.proxy_state.unregistered_libraries.remove(self)
 
         # register the library datablock
@@ -165,7 +165,6 @@ class LibraryProxy(DatablockProxy):
 
             child_library = children[0]
             if child_library.parent == library_datablock:
-                context.proxy_state.unregistered_libraries.remove(unregistered_child_proxy)
                 unregistered_child_proxy.register(child_library, context)
 
     def load(self, datablock: T.ID, context: Context) -> LibraryProxy:
