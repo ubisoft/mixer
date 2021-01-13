@@ -1,4 +1,4 @@
-# 0.20.0 (wip)
+# 0.20.0-alpha1 (13-01-2020)
 
 ## Features
 
@@ -8,7 +8,7 @@
 ## Fixes
 
 - UI: display user name on a single item when a collection is selected
-- Mesh: crash when receiving a mesh in a mixed Linux/windows room
+- Mesh: fix crash when receiving a mesh in a mixed Linux/windows room
 
 ## Breaking changes
 
