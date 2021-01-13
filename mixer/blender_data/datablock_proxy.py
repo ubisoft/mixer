@@ -266,9 +266,17 @@ class DatablockProxy(StructProxy):
                 return
 
             path = get_source_file_path(self._filepath_raw)
-            with open(bpy.path.abspath(path), "rb") as data_file:
-                data = data_file.read()
-            self._media = (path, data)
+            try:
+                abspath = bpy.path.abspath(path)
+                with open(abspath, "rb") as data_file:
+                    data = data_file.read()
+            except Exception as e:
+                logger.error(f"Error while loading {abspath!r} ...")
+                logger.error(f"... for {datablock!r}. Check shared folders ...")
+                logger.error(f"... {e!r}")
+                self._media = None
+            else:
+                self._media = (path, data)
 
     @property
     def collection_name(self) -> str:
