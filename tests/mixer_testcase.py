@@ -265,6 +265,11 @@ class MixerTestCase(unittest.TestCase):
     ):
         self.assertEqual(streams_a.commands.keys(), streams_b.commands.keys())
 
+        for k in streams_a.commands.keys():
+            len_a = len(streams_a.commands[k])
+            len_b = len(streams_b.commands[k])
+            self.assertEqual(len_a, len_b, f"Command count mismatch for {MessageType(k)!r}: {len_a} vs {len_b}")
+
         def decode_and_sort_messages(commands: List[Command]) -> List[mixer.codec.Message]:
             stream = [mixer.codec.decode(c) for c in commands]
             stream.sort()
