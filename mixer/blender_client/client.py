@@ -1289,12 +1289,12 @@ def send_scene_content():
 
         share_data.clear_before_state()
         share_data.client.send_group_begin()
-        share_data.client.send_set_current_scene(bpy.context.scene.name_full)
 
         timer = time.monotonic()
         if not share_data.use_vrtist_protocol():
             generic.send_scene_data_to_server(None, None)
         else:
+            share_data.client.send_set_current_scene(bpy.context.scene.name_full)
             # Temporary waiting for material sync. Should move to send_scene_data_to_server
             for material in bpy.data.materials:
                 share_data.client.send_material(material)
