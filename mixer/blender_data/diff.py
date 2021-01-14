@@ -34,6 +34,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.filter import SynchronizedProperties, skip_bpy_data_item
 from mixer.blender_data.proxy import ensure_uuid
+from mixer.blender_data.library_proxies import DatablockLinkProxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import BpyDataProxy
@@ -94,9 +95,9 @@ class BpyDataCollectionDiff:
                 # duplicate uuid, from an object duplication
                 duplicate_name, duplicate_collection_name = blender_items[uuid]
                 logger.info(
-                    f"Duplicate uuid {uuid} in bpy.data.{duplicate_collection_name} for {duplicate_name} and bpy.data.{collection_name} for {datablock.name_full}..."
+                    f"Duplicate uuid {uuid} in bpy.data.{duplicate_collection_name} for {duplicate_name} and bpy.data.{collection_name} for {datablock.name_full!r}..."
                 )
-                logger.info("... assuming object was duplicated. Resetting (not an error)")
+                logger.info(f"... assuming object was duplicated. Resetting {datablock.name_full!r} (not an error)")
                 # reset the uuid, ensure will regenerate
                 datablock.mixer_uuid = ""
 
@@ -110,9 +111,12 @@ class BpyDataCollectionDiff:
         proxy_uuids = set(proxies.keys())
         blender_uuids = set(blender_items.keys())
 
-        # TODO LIB
+        # Ignore linked datablocks to find renamed datablocks, as they cannot be renamed locally
         renamed_uuids = {
-            uuid for uuid in blender_uuids & proxy_uuids if proxies[uuid].data("name") != blender_items[uuid][0].name
+            uuid
+            for uuid in blender_uuids & proxy_uuids
+            if not isinstance(proxies[uuid], DatablockLinkProxy)
+            and proxies[uuid].data("name") != blender_items[uuid][0].name
         }
         added_uuids = blender_uuids - proxy_uuids - renamed_uuids
         removed_uuids = proxy_uuids - blender_uuids - renamed_uuids

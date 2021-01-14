@@ -91,10 +91,12 @@ class DatablockCollectionProxy(Proxy):
         """
 
         datablock, renames = incoming_proxy.create_standalone_datablock(context)
-        # returned datablock is None for a ShapeKey. The datablock creation is defered until Object update
+        # returned datablock is None for ShapeKey and Library. Datablock creation is deferred until :
+        # - ShapeKey : Object update
+        # - Library : creation of a link datablock
 
         if incoming_proxy.collection_name == "scenes":
-            logger.warning(f"Creating scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}'")
+            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}'")
 
             # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
             # Remove it now
@@ -113,7 +115,7 @@ class DatablockCollectionProxy(Proxy):
         self._data[uuid] = incoming_proxy
 
         # TODO code placement is inconsistent with BpyDataProxy.remove_datablock()
-        context.proxy_state.datablocks[uuid] = datablock
+        context.proxy_state.add_datablock(uuid, datablock)
         context.proxy_state.proxies[uuid] = incoming_proxy
         if datablock is not None:
             context.proxy_state.unresolved_refs.resolve(uuid, datablock)
@@ -139,7 +141,7 @@ class DatablockCollectionProxy(Proxy):
             return
 
         # the ID will have changed if the object has been morphed (change light type, for instance)
-        existing_id = context.proxy_state.datablocks.get(uuid)
+        existing_id = context.proxy_state.datablock(uuid)
         if existing_id is None:
             logger.warning(f"Non existent uuid {uuid} while updating {proxy.collection_name}[{proxy.data('name')}]")
             return None
@@ -148,7 +150,7 @@ class DatablockCollectionProxy(Proxy):
         if existing_id != id_:
             # Not a problem for light morphing
             logger.warning(f"Update_datablock changes datablock {existing_id} to {id_}")
-            context.proxy_state.datablocks[uuid] = id_
+            context.proxy_state.add_datablock(uuid, id_)
 
         return id_
 
@@ -194,12 +196,8 @@ class DatablockCollectionProxy(Proxy):
             logger.info("Perform update/creation for %s[%s]", collection_name, name_full)
             try:
                 uuid = ensure_uuid(datablock)
-                context.proxy_state.datablocks[uuid] = datablock
-
-                # TODO LIB update DatablockProxy.make() to create standalone, link or override datablock
-                proxy = DatablockProxy.make(datablock).load(
-                    datablock, context, bpy_data_collection_name=collection_name
-                )
+                context.proxy_state.add_datablock(uuid, datablock)
+                proxy = DatablockProxy.make(datablock).load(datablock, context)
                 context.proxy_state.proxies[uuid] = proxy
                 self._data[uuid] = proxy
                 changeset.creations.append(proxy)
@@ -219,7 +217,7 @@ class DatablockCollectionProxy(Proxy):
                 changeset.removals.append((uuid, proxy.collection_name, str(proxy)))
                 del self._data[uuid]
                 del context.proxy_state.proxies[uuid]
-                del context.proxy_state.datablocks[uuid]
+                context.proxy_state.remove_datablock(uuid)
             except Exception:
                 logger.error(f"Exception during update/removed for proxy {proxy})  :")
                 for line in traceback.format_exc().splitlines():
@@ -311,7 +309,9 @@ class DatablockRefCollectionProxy(Proxy):
             if datablock:
                 collection.link(datablock)
             else:
-                logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy.display_string()}")
+                logger.info(
+                    f"unresolved reference {parent}.{key} -> {ref_proxy.display_string()} {ref_proxy.mixer_uuid}"
+                )
                 add_element = collection.link
                 context.proxy_state.unresolved_refs.append(ref_proxy.mixer_uuid, add_element)
 
@@ -352,7 +352,7 @@ class DatablockRefCollectionProxy(Proxy):
                 assert isinstance(ref_update, DatablockRefProxy)
                 if to_blender:
                     uuid = ref_update._datablock_uuid
-                    datablock = context.proxy_state.datablocks.get(uuid)
+                    datablock = context.proxy_state.datablock(uuid)
                     if isinstance(ref_delta, DeltaAddition):
                         if datablock is not None:
                             collection.link(datablock)

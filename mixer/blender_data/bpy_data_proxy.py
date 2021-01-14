@@ -49,6 +49,7 @@ from mixer.blender_data.proxy import (
 
 if TYPE_CHECKING:
     from mixer.blender_data.changeset import Removal
+    from mixer.blender_data.library_proxies import LibraryProxy
     from mixer.blender_data.types import Path, SoaMember
 
 logger = logging.getLogger(__name__)
@@ -74,24 +75,44 @@ class RecursionGuard:
         self._property_stack.pop()
 
 
-@dataclass
 class ProxyState:
     """
     State of a BpyDataProxy
     """
 
-    proxies: Dict[Uuid, DatablockProxy] = field(default_factory=dict)
-    """Known proxies"""
+    def __init__(self):
+        self.proxies: Dict[Uuid, DatablockProxy] = {}
+        """Known proxies"""
 
-    datablocks: Dict[Uuid, T.ID] = field(default_factory=dict)
-    """Known datablocks"""
+        self._datablocks: Dict[Uuid, T.ID] = {}
+        """Known datablocks"""
 
-    objects: Dict[Uuid, Set[Uuid]] = field(default_factory=lambda: defaultdict(set))
-    """Object.data uuid : (set of uuids of Object using object.data). Mostly used for shape keys"""
+        self.objects: Dict[Uuid, Set[Uuid]] = defaultdict(set)
+        """Object.data uuid : (set of uuids of Object using object.data). Mostly used for shape keys"""
 
-    unresolved_refs: UnresolvedRefs = UnresolvedRefs()
+        self.unresolved_refs: UnresolvedRefs = UnresolvedRefs()
 
-    shared_folders: List = field(default_factory=list)
+        self.unregistered_libraries: Set[LibraryProxy] = set()
+        """indirect libraries that were received but not yet registered because no datablock
+        they provide were processed yet"""
+
+        self.shared_folders: List[str] = []
+
+    def register_object(self, datablock: T.Object):
+        if datablock.data is not None:
+            data_uuid = datablock.data.mixer_uuid
+            object_uuid = datablock.mixer_uuid
+            self.objects[data_uuid].add(object_uuid)
+
+    def datablock(self, uuid: Uuid) -> Optional[T.ID]:
+        return self._datablocks.get(uuid)
+
+    def add_datablock(self, uuid: Uuid, datablock: T.ID):
+        assert self.datablock(uuid) in [datablock, None]
+        self._datablocks[uuid] = datablock
+
+    def remove_datablock(self, uuid: Uuid):
+        del self._datablocks[uuid]
 
 
 class VisitState:
@@ -170,7 +191,9 @@ class Context:
 
 
 _creation_order = {
-    # anything else first
+    # Libraries are needed to create all linked datablocks
+    "libraries": -10,
+    # anything else: 0
     "collections": 10,
     # Scene after Collection. Scene.collection must be up to date before Scene.view_layers can be saved
     "scenes": 20,
@@ -200,13 +223,13 @@ def _updates_order_predicate(datablock: T.ID) -> int:
 _removal_order = {
     # remove Object before its data otherwise data is removed at the time the Object is removed
     # and the data removal fails
-    T.Object: 10,
+    "objects": 10,
     # anything else last
 }
 
 
 def _remove_order_predicate(removal: Removal) -> int:
-    return _updates_order.get(removal[1], sys.maxsize)
+    return _removal_order.get(removal[1], sys.maxsize)
 
 
 class BpyDataProxy(Proxy):
@@ -228,10 +251,10 @@ class BpyDataProxy(Proxy):
     def clear(self):
         self._data.clear()
         self.state.proxies.clear()
-        self.state.datablocks.clear()
+        self.state._datablocks.clear()
 
     def reload_datablocks(self):
-        datablocks = self.state.datablocks
+        datablocks = self.state._datablocks
         datablocks.clear()
 
         for collection_proxy in self._data.values():
@@ -389,7 +412,7 @@ class BpyDataProxy(Proxy):
             logger.warning(f"remove_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
             return None
 
-        datablock = self.state.datablocks[uuid]
+        datablock = self.state.datablock(uuid)
 
         if isinstance(datablock, T.Object) and datablock.data is not None:
             data_uuid = datablock.data.mixer_uuid
@@ -408,7 +431,7 @@ class BpyDataProxy(Proxy):
             except KeyError:
                 pass
         del self.state.proxies[uuid]
-        del self.state.datablocks[uuid]
+        del self.state._datablocks[uuid]
 
     def rename_datablocks(self, items: List[Tuple[str, str, str]]) -> RenameChangeset:
         """
@@ -428,7 +451,7 @@ class BpyDataProxy(Proxy):
                 logger.warning(f"rename_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
                 continue
 
-            datablock = self.state.datablocks[uuid]
+            datablock = self.state.datablock(uuid)
             tmp_name = f"_mixer_tmp_{uuid}"
             if datablock.name != new_name and datablock.name != old_name:
                 # local receives a rename, but its datablock name does not match the remote datablock name before
@@ -482,8 +505,33 @@ class BpyDataProxy(Proxy):
 
     def update_soa(self, uuid: Uuid, path: Path, soa_members: List[SoaMember]):
         datablock_proxy = self.state.proxies[uuid]
-        datablock = self.state.datablocks[uuid]
+        datablock = self.state.datablock(uuid)
         datablock_proxy.update_soa(datablock, path, soa_members)
 
     def append_delayed_updates(self, delayed_updates: Set[T.ID]):
         self._delayed_updates |= delayed_updates
+
+    def sanity_check(self):
+        state = self.state
+        datablock_keys = set(state._datablocks.keys())
+        proxy_keys = set(state.proxies.keys())
+        if datablock_keys != proxy_keys:
+            logger.warning("sanity_check: different keys for datablocks and proxies")
+
+        none_datablocks = [k for k, v in state._datablocks.items() if v is None]
+        if state.unregistered_libraries:
+            logger.warning("sanity_check: unregistered_libraries not empty ...")
+            for lib in state.unregistered_libraries:
+                logger.warning(f"... {lib}. Library file may be missing.")
+
+        if none_datablocks:
+            logger.warning("sanity_check: no datablock for ...")
+            for uuid in none_datablocks:
+                logger.warning(f"... {state.proxies[uuid]}")
+            logger.warning("... check for missing libraries")
+            logger.warning("... datablocks referencing broken libraries will be removed from peers !")
+
+        if state.unresolved_refs:
+            logger.warning("sanity_check: unresolved_refs not empty ...")
+            for ref in state.unresolved_refs._refs.keys():
+                logger.warning(f"... {ref}")

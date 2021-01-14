@@ -36,7 +36,6 @@ class TestGeneric(BlenderTestCase):
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
         blenderdescs = [sender, receiver]
-        self.log_level = logging.DEBUG
         super().setUp(blenderdescs=blenderdescs, join=join)
 
 

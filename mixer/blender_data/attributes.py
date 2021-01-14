@@ -107,11 +107,14 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
 
         if issubclass(attr_type, T.ID):
             if attr.is_embedded_data:
-                # TODO probably better to use a StructProxy : all DatablockProxy would be standalone
-                from mixer.blender_data.datablock_proxy import DatablockProxy
+                # Embedded datablocks are loaded as StructProxy and DatablockProxy is reserved
+                # for standalone datablocks
+                from mixer.blender_data.struct_proxy import StructProxy
 
-                return DatablockProxy.make(attr_property).load(attr, context)
+                return StructProxy().load(attr, key, context)
             else:
+                # Stadalone databocks are loaded from DatablockCollectionProxy, so we can only encounter
+                # datablock references here
                 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
                 return DatablockRefProxy().load(attr, key, context)
@@ -127,7 +130,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
             return NonePtrProxy()
 
         logger.error(
-            f"Unsupported attribute {attr_type} {attr_property} at {context.visit_state.datablock_proxy._class_name}.{context.visit_state.path}.{attr_property.identifier}"
+            f"Unsupported attribute {attr_type} {attr_property} at {context.visit_state.datablock_proxy.collection_name}.{context.visit_state.path}.{attr_property.identifier}"
         )
     finally:
         context.visit_state.recursion_guard.pop()

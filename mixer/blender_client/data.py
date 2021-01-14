@@ -33,7 +33,7 @@ from mixer.blender_data.messages import (
     BlenderRenamesMessage,
 )
 from mixer.broadcaster.common import Command, MessageType
-from mixer.local_data import get_or_create_cache_file
+from mixer.local_data import get_local_or_create_cache_file
 from mixer.share_data import share_data
 
 if TYPE_CHECKING:
@@ -48,7 +48,8 @@ logger = logging.getLogger(__name__)
 
 def send_media_creations(proxy: DatablockProxy):
     bytes_ = BlenderMediaMessage.encode(proxy)
-    if bytes_:
+    if bytes_ and proxy._media:
+        logger.info("send_media_creations %s: %d bytes", proxy._media[0], len(bytes_))
         command = Command(MessageType.BLENDER_DATA_MEDIA, bytes_, 0)
         share_data.client.add_command(command)
 
@@ -58,8 +59,9 @@ def build_data_media(buffer: bytes):
     # The packed data with be saved to file, not a problem
     message = BlenderMediaMessage()
     message.decode(buffer)
+    logger.info("build_data_media %s: %d bytes", message.path, len(message.bytes_))
     # TODO this does not overwrite outdated local files
-    get_or_create_cache_file(message.path, message.bytes_)
+    get_local_or_create_cache_file(message.path, message.bytes_)
 
 
 def send_data_creations(proxies: CreationChangeset):

@@ -1,4 +1,3 @@
-import logging
 import unittest
 
 from parameterized import parameterized_class
@@ -29,7 +28,6 @@ class TestSceneEmptyDoc(VRtistTestCase):
         sender_blendfile = files_folder() / "empty.blend"
         receiver_blendfile = files_folder() / "empty.blend"
         blenderdescs = [BlenderDesc(load_file=sender_blendfile), BlenderDesc(load_file=receiver_blendfile)]
-        self._log_level = logging.INFO
         super().setUp(blenderdescs=blenderdescs)
 
     def test_create_scene(self):

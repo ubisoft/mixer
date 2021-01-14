@@ -24,7 +24,6 @@ from __future__ import annotations
 import logging
 from typing import Optional, TYPE_CHECKING, Union
 
-import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data.attributes import read_attribute
@@ -138,32 +137,7 @@ class DatablockRefProxy(Proxy):
         """
         The datablock referenced by this proxy
         """
-        datablock = context.proxy_state.datablocks.get(self._datablock_uuid)
-        if datablock is None:
-            # HACK
-            # We are trying to find the target of a datablock reference like Object.mesh and the datablock
-            # is not known to the proxy state (context). This occurs when the target datablock is of
-            # un unsynchronized type (Mesh, currently). If the datablock can be found by name, consider
-            # it was created under the hood by a VRtist command and register it.
-            collection = getattr(bpy.data, self._bpy_data_collection, None)
-            if collection is None:
-                logger.warning(f"{self}: reference to unknown collection bpy.data.{self._bpy_data_collection}")
-                return None
-
-            datablock = collection.get(self._initial_name)
-            if datablock is None:
-                return None
-
-            if datablock.mixer_uuid != "":
-                logger.error(f"{self}: found datablock with uuid in bpy.data.{self._bpy_data_collection}")
-                logger.error(f'... "{self._bpy_data_collection}" may be missing from clear_scene_contents()')
-                return None
-
-            datablock.mixer_uuid = self._datablock_uuid
-            context.proxy_state.datablocks[self._datablock_uuid] = datablock
-            logger.warning(f"{self}: registering {datablock}")
-
-        return datablock
+        return context.proxy_state.datablock(self._datablock_uuid)
 
     def apply(
         self,
@@ -186,7 +160,7 @@ class DatablockRefProxy(Proxy):
             else:
                 assert type(update) == type(self), "type(update) == type(self)"
 
-                value = context.proxy_state.datablocks.get(update._datablock_uuid)
+                value = context.proxy_state.datablock(update._datablock_uuid)
 
             if isinstance(key, int):
                 parent[key] = value

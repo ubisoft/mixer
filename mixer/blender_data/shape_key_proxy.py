@@ -50,28 +50,32 @@ class ShapeKeyProxy(DatablockProxy):
 
     def create_shape_key_datablock(self, data_proxy: DatablockProxy, context: Context) -> T.Key:
         # find any Object using the datablock manages by this Proxy
-        datablocks = context.proxy_state.datablocks
         data_uuid = data_proxy.mixer_uuid
         objects = context.proxy_state.objects[data_uuid]
         if not objects:
-            logger.error(f"update_shape_key_datablock: received an update for {datablocks[self.mixer_uuid]}...")
-            logger.error(f"... user {datablocks[data_uuid]} not linked to an object. Update skipped")
+            logger.error(
+                f"update_shape_key_datablock: received an update for {context.proxy_state.datablock(self.mixer_uuid)}..."
+            )
+            logger.error(f"... user {context.proxy_state.datablock(data_uuid)} not linked to an object. Update skipped")
             return None
         object_uuid = next(iter(objects))
-        object_datablock = datablocks[object_uuid]
+        object_datablock = context.proxy_state.datablock(object_uuid)
 
         # update the Key datablock using the Object API
         key_blocks_proxy = self.data("key_blocks")
-        object_datablock.shape_key_clear()  # removes the Key datablock
+        shape_key_uuid = self.mixer_uuid
+        if object_datablock.data.shape_keys:
+            object_datablock.shape_key_clear()  # removes the Key datablock
+            context.proxy_state.remove_datablock(shape_key_uuid)
+
         for _ in range(len(key_blocks_proxy)):
             object_datablock.shape_key_add()
 
         new_shape_key_datablock = object_datablock.data.shape_keys
         self.save(new_shape_key_datablock, bpy.data.shape_keys, new_shape_key_datablock.name, context)
 
-        shape_key_uuid = self.mixer_uuid
         new_shape_key_datablock.mixer_uuid = shape_key_uuid
-        context.proxy_state.datablocks[shape_key_uuid] = new_shape_key_datablock
+        context.proxy_state.add_datablock(shape_key_uuid, new_shape_key_datablock)
 
         return new_shape_key_datablock
 
@@ -79,9 +83,8 @@ class ShapeKeyProxy(DatablockProxy):
         self,
         datablock: T.ID,
         context: Context,
-        bpy_data_collection_name: str = None,
     ) -> DatablockProxy:
-        super().load(datablock, context, bpy_data_collection_name)
+        super().load(datablock, context)
 
         # ShapeKey.relative_key is a reference into Key.key_blocks. The default synchronization would
         # load save its whole contents for each reference.

@@ -438,5 +438,9 @@ class ShareData:
     def use_vrtist_protocol(self):
         return self.bpy_data_proxy is None
 
+    def receive_sanity_check(self):
+        if self.bpy_data_proxy:
+            self.bpy_data_proxy.sanity_check()
+
 
 share_data = ShareData()  # Instance storing addon state, is used by most of the sub-modules.

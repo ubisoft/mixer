@@ -32,7 +32,6 @@ from pathlib import Path
 import traceback
 from typing import Any, Callable, Dict, ItemsView, List, Optional, TYPE_CHECKING, Union
 
-from mixer.local_data import get_cache_file_path
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -226,17 +225,9 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
     image_name = proxy.data("name")
     filepath = proxy.data("filepath")
 
-    resolved_filepath = proxy._filepath_raw
+    resolved_filepath = proxy.resolved_filepath(context)
     if resolved_filepath is None:
         return None
-
-    if not proxy._is_in_shared_folder:
-        resolved_filepath = get_cache_file_path(proxy._filepath_raw)
-    else:
-        resolved_filepath = proxy.resolve_shared_folder_file(proxy._filepath_raw, context)
-        if resolved_filepath is None:
-            logger.warning(f'"{proxy._filepath_raw}" not in shared_folder')
-            return None
 
     packed_files = proxy.data("packed_files")
     if packed_files is not None and packed_files.length:
@@ -289,12 +280,7 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
         logger.warning("... loaded as Empty")
         data_datablock = None
 
-    object_datablock = collection.new(name, data_datablock)
-
-    if data_datablock is not None:
-        context.proxy_state.objects[data_datablock.mixer_uuid].add(proxy.mixer_uuid)
-
-    return object_datablock
+    return collection.new(name, data_datablock)
 
 
 @bpy_data_ctor.register("lights")
@@ -441,6 +427,9 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
     # WARNING this is called from save() and from apply()
     # When called from save, the proxy has  all the synchronized properties
     # WHen called from apply, the proxy only contains the updated properties
+
+    if target.library:
+        return target
 
     if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
         target.clear_geometry()
@@ -864,5 +853,8 @@ def remove_datablock(collection: T.bpy_prop_collection, datablock: T.ID):
     elif isinstance(datablock, T.Key):
         # the doc labels it unsafe, use sparingly
         bpy.data.batch_remove([datablock])
+    elif isinstance(datablock, T.Library):
+        # TODO 2.91 has BlendDatalibraries.remove()
+        logger.warning(f"remove_datablock({datablock}): ignored (library)")
     else:
         collection.remove(datablock)

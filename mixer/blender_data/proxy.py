@@ -64,6 +64,9 @@ class UnresolvedRefs:
     def __init__(self):
         self._refs: Dict[Uuid, List[self.Func]] = defaultdict(list)
 
+    def __bool__(self):
+        return bool(self._refs)
+
     def append(self, dst_uuid: Uuid, src_link: SrcLink):
         self._refs[dst_uuid].append(src_link)
 
@@ -71,7 +74,7 @@ class UnresolvedRefs:
         if dst_uuid in self._refs:
             for src_link in self._refs[dst_uuid]:
                 src_link(dst_datablock)
-                logger.info(f"resolving reference to {dst_datablock}")
+                logger.info(f"resolving reference to {dst_datablock} {dst_uuid}")
             del self._refs[dst_uuid]
 
 

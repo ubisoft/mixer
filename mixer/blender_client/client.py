@@ -944,6 +944,7 @@ class BlenderClient(Client):
                     elapse = time.monotonic() - groups.pop()
                     group_id = len(groups)
                     logger.warning(f"Command group {group_id} processed in {elapse:.1f} seconds")
+                    share_data.receive_sanity_check()
                     continue
 
                 if self.has_default_handler(command.type):
@@ -1253,6 +1254,7 @@ def clear_scene_content():
                 collection.remove(datablock)
 
         bpy.data.batch_remove(bpy.data.shape_keys.values())
+        bpy.data.batch_remove(bpy.data.libraries.values())
 
         # Cannot remove the last scene at this point, treat it differently
         for scene in bpy.data.scenes[:-1]:
@@ -1287,12 +1289,12 @@ def send_scene_content():
 
         share_data.clear_before_state()
         share_data.client.send_group_begin()
-        share_data.client.send_set_current_scene(bpy.context.scene.name_full)
 
         timer = time.monotonic()
         if not share_data.use_vrtist_protocol():
             generic.send_scene_data_to_server(None, None)
         else:
+            share_data.client.send_set_current_scene(bpy.context.scene.name_full)
             # Temporary waiting for material sync. Should move to send_scene_data_to_server
             for material in bpy.data.materials:
                 share_data.client.send_material(material)
