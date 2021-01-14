@@ -1,4 +1,3 @@
-import logging
 import unittest
 
 from parameterized import parameterized_class
