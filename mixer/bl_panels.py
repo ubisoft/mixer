@@ -144,7 +144,10 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         split.label(text="Name")
         split.label(text="Users")
         split.label(text="Keep Open")
+        split.label(text="Blender Version")
+        split.label(text="Mixer Version")
         if get_mixer_props().display_rooms_details:
+            split.label(text="No Version Check")
             split.label(text="Command Count")
             split.label(text="Size (MB)")
             split.label(text="Joinable")
@@ -154,7 +157,10 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         split.label(text=item.name)  # avoids renaming the item by accident
         split.label(text=f"{item.users_count if item.users_count >= 0 else '?'} users")
         split.prop(item, "keep_open", text="")
+        split.label(text=item.blender_version)
+        split.label(text=item.mixer_version)
         if get_mixer_props().display_rooms_details:
+            split.prop(item, "ignore_version_check", text="")
             split.prop(item, "command_count", text="")
             split.prop(item, "mega_byte_size", text="")
             split.prop(item, "joinable", text="")
@@ -192,6 +198,7 @@ def draw_shared_folders_settings_ui(layout: bpy.types.UILayout):
 def draw_advanced_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
     layout.prop(mixer_prefs, "data_directory", text="Data Directory")
+    layout.prop(mixer_prefs, "ignore_version_check")
     layout.prop(mixer_prefs, "log_level")
     layout.prop(mixer_prefs, "show_server_console")
     layout.prop(mixer_prefs, "vrtist_protocol")

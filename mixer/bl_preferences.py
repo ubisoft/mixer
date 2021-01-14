@@ -118,6 +118,8 @@ class MixerPreferences(bpy.types.AddonPreferences):
         name="VRtist Protocol", default=os.environ.get("MIXER_VRTIST_PROTOCOL") == "0"
     )
 
+    ignore_version_check: bpy.props.BoolProperty(default=False, name="Ignore Room Version Check")
+
     show_server_console: bpy.props.BoolProperty(name="Show Server Console", default=False)
 
     VRtist: bpy.props.StringProperty(

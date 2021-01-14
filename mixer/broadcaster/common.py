@@ -217,6 +217,13 @@ class RoomAttributes:
     """
 
     NAME = "name"  # Sent by server only, type = str, the name of the room which is unique for each room
+    BLENDER_VERSION = (
+        "blender_version"  # Sent by server only, type = str, the version of blender which created the room
+    )
+    MIXER_VERSION = "mixer_version"  # Sent by server only, type = str, the version of mixer which created the room
+    IGNORE_VERSION_CHECK = (
+        "ignore_version_check"  # Sent by server only, type = str, to ignore blender and mixer versions
+    )
     KEEP_OPEN = (
         "keep_open"  # Sent by server only, type = bool, indicate if the room should be kept open after all clients left
     )

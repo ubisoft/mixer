@@ -93,9 +93,12 @@ class Connection:
             if self.room is not None:
                 _send_error(f"Received join_room but room {self.room.name} is already joined")
                 return
-            room_name = command.data.decode()
+            room_name, index = common.decode_string(command.data, 0)
+            blender_version, index = common.decode_string(command.data, index)
+            mixer_version, index = common.decode_string(command.data, index)
+            ignore_version_check, _ = common.decode_bool(command.data, index)
             try:
-                self._server.join_room(self, room_name)
+                self._server.join_room(self, room_name, blender_version, mixer_version, ignore_version_check)
             except Exception as e:
                 _send_error(f"{e!r}")
 
@@ -247,8 +250,19 @@ class Room:
     - dispatch added commands to clients already in the room
     """
 
-    def __init__(self, server: Server, room_name: str, creator: Connection):
+    def __init__(
+        self,
+        server: Server,
+        room_name: str,
+        blender_version: str,
+        mixer_version: str,
+        ignore_version_check: bool,
+        creator: Connection,
+    ):
         self.name = room_name
+        self.blender_version = blender_version
+        self.mixer_version = mixer_version
+        self.ignore_version_check = ignore_version_check
         self.keep_open = False  # Should the room remain open when no more clients are inside ?
         self.byte_size = 0
         self.joinable = False  # A room becomes joinable when its first client has send all the initial content
@@ -320,6 +334,9 @@ class Room:
         return {
             **self.custom_attributes,
             common.RoomAttributes.KEEP_OPEN: self.keep_open,
+            common.RoomAttributes.BLENDER_VERSION: self.blender_version,
+            common.RoomAttributes.MIXER_VERSION: self.mixer_version,
+            common.RoomAttributes.IGNORE_VERSION_CHECK: self.ignore_version_check,
             common.RoomAttributes.COMMAND_COUNT: self.command_count(),
             common.RoomAttributes.BYTE_SIZE: self.byte_size,
             common.RoomAttributes.JOINABLE: self.joinable,
@@ -395,15 +412,24 @@ class Server:
                 common.Command(common.MessageType.ROOM_DELETED, common.encode_string(room_name))
             )
 
-    def join_room(self, connection: Connection, room_name: str):
+    def join_room(
+        self,
+        connection: Connection,
+        room_name: str,
+        blender_version: str,
+        mixer_version: str,
+        ignore_version_check: bool,
+    ):
         assert connection.room is None
 
         def _create_room():
             logger.info(f"Room {room_name} does not exist. Creating it.")
-            room = Room(self, room_name, connection)
+            room = Room(self, room_name, blender_version, mixer_version, ignore_version_check, connection)
             self._rooms[room_name] = room
             # room is now visible to others, but not joinable until the client has sent CONTENT
-            logger.info(f"Room {room_name} added")
+            logger.info(
+                f"Room {room_name} added with blender version {blender_version} and mixer version {mixer_version} (ignore version check: {ignore_version_check})"
+            )
 
             self.broadcast_room_update(room, room.attributes_dict())  # Inform new room
             self.broadcast_client_update(connection, {common.ClientAttributes.ROOM: connection.room.name})
@@ -416,6 +442,17 @@ class Server:
 
             if not room.joinable:
                 raise Exception(f"Room {room_name} not joinable yet.")
+
+            if not room.ignore_version_check:
+                if room.blender_version != blender_version:
+                    raise Exception(
+                        f"Blender version mismatch with room {room_name}: client version is {blender_version}, room version is {room.blender_version}"
+                    )
+
+                if room.mixer_version != mixer_version:
+                    raise Exception(
+                        f"Mixer version mismatch with room {room_name}: client version is {mixer_version}, room version is {room.mixer_version}"
+                    )
 
             # Do this before releasing the global mutex
             # Ensure the room will not be deleted because it now has at least one client

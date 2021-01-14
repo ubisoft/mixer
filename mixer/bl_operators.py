@@ -29,6 +29,7 @@ from pathlib import Path
 import bpy
 from bpy_extras.io_utils import ImportHelper
 
+import mixer
 from mixer.share_data import share_data
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
 from mixer.broadcaster.common import RoomAttributes, ClientAttributes
@@ -187,6 +188,16 @@ class JoinRoomOperator(bpy.types.Operator):
             (
                 lambda: get_selected_room_dict().get(RoomAttributes.JOINABLE, False),
                 "Room is not joinable, first client has not finished sending initial content.",
+            ),
+            (
+                lambda: get_selected_room_dict().get(RoomAttributes.IGNORE_VERSION_CHECK, False)
+                or get_selected_room_dict().get(RoomAttributes.BLENDER_VERSION, "") == bpy.app.version_string,
+                "Room is not joinable, blender version mismatch.",
+            ),
+            (
+                lambda: get_selected_room_dict().get(RoomAttributes.IGNORE_VERSION_CHECK, False)
+                or get_selected_room_dict().get(RoomAttributes.MIXER_VERSION, "") == mixer.display_version,
+                "Room is not joinable, mixer version mismatch.",
             ),
         ]
 
@@ -394,7 +405,6 @@ class LaunchVRtistOperator(bpy.types.Operator):
         return os.path.isfile(get_mixer_prefs().VRtist)
 
     def execute(self, context):
-        bpy.data.window_managers["WinMan"].mixer.send_base_meshes = False
         bpy.data.window_managers["WinMan"].mixer.send_bake_meshes = True
 
         mixer_prefs = get_mixer_prefs()
@@ -418,6 +428,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
             shared_folders = []
             for item in mixer_prefs.shared_folders:
                 shared_folders.append(item.shared_folder)
+            mixer_prefs.ignore_version_check = True
             join_room(mixer_prefs.room, True, shared_folders)
 
             # Wait for room creation/join

@@ -31,6 +31,33 @@ logger = logging.getLogger(__name__)
 
 
 class RoomItem(bpy.types.PropertyGroup):
+    def get_room_blender_version(self):
+        if (
+            share_data.client is not None
+            and self.name in share_data.client.rooms_attributes
+            and "blender_version" in share_data.client.rooms_attributes[self.name]
+        ):
+            return share_data.client.rooms_attributes[self.name]["blender_version"]
+        return ""
+
+    def get_room_mixer_version(self):
+        if (
+            share_data.client is not None
+            and self.name in share_data.client.rooms_attributes
+            and "mixer_version" in share_data.client.rooms_attributes[self.name]
+        ):
+            return share_data.client.rooms_attributes[self.name]["mixer_version"]
+        return ""
+
+    def is_ignore_version_check(self):
+        if (
+            share_data.client is not None
+            and self.name in share_data.client.rooms_attributes
+            and "ignore_version_check" in share_data.client.rooms_attributes[self.name]
+        ):
+            return share_data.client.rooms_attributes[self.name]["ignore_version_check"]
+        return False
+
     def is_room_vrtist_protocol(self):
         if (
             share_data.client is not None
@@ -81,6 +108,9 @@ class RoomItem(bpy.types.PropertyGroup):
         return False
 
     name: bpy.props.StringProperty(name="Name")
+    blender_version: bpy.props.StringProperty(name="Blender Version", get=get_room_blender_version)
+    mixer_version: bpy.props.StringProperty(name="Mixer Version", get=get_room_mixer_version)
+    ignore_version_check: bpy.props.BoolProperty(name="Ignore Version Check", get=is_ignore_version_check)
     users_count: bpy.props.IntProperty(name="Users Count")
     vrtist_protocol: bpy.props.BoolProperty(name="VRtist Protocol", get=is_room_vrtist_protocol)
     keep_open: bpy.props.BoolProperty(name="Keep Open", default=False, get=is_kept_open, set=on_keep_open_changed)
