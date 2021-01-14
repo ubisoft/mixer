@@ -49,6 +49,13 @@ def set_client_attributes():
     )
 
 
+def create_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None):
+    prefs = get_mixer_prefs()
+    if prefs.ignore_version_check:
+        logger.warning("Ignoring version check")
+    join_room(room_name, vrtist_protocol, shared_folders)
+
+
 def join_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None):
     prefs = get_mixer_prefs()
     logger.warning(f"join: room: {room_name}, user: {prefs.user}")

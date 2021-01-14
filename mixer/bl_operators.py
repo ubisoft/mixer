@@ -36,6 +36,7 @@ from mixer.broadcaster.common import RoomAttributes, ClientAttributes
 from mixer.connection import (
     is_client_connected,
     connect,
+    create_room,
     join_room,
     leave_current_room,
     disconnect,
@@ -151,7 +152,7 @@ class CreateRoomOperator(bpy.types.Operator):
         shared_folders = []
         for item in mixer_prefs.shared_folders:
             shared_folders.append(item.shared_folder)
-        join_room(room, mixer_prefs.vrtist_protocol, shared_folders)
+        create_room(room, mixer_prefs.vrtist_protocol, shared_folders)
 
         return {"FINISHED"}
 
@@ -217,6 +218,9 @@ class JoinRoomOperator(bpy.types.Operator):
         room_index = props.room_index
         room = props.rooms[room_index].name
         logger.warning(f"JoinRoomOperator.execute({room})")
+        room_attributes = get_selected_room_dict()
+        logger.warning(f"Client Blender version: {room_attributes.get(RoomAttributes.BLENDER_VERSION, '')}")
+        logger.warning(f"Client Mixer version: {room_attributes.get(RoomAttributes.MIXER_VERSION, '')}")
 
         mixer_prefs = get_mixer_prefs()
         shared_folders = []
@@ -281,7 +285,9 @@ class DownloadRoomOperator(bpy.types.Operator):
         props = get_mixer_props()
         room_index = props.room_index
         room = props.rooms[room_index].name
-        attributes, commands = download_room(prefs.host, prefs.port, room)
+        attributes, commands = download_room(
+            prefs.host, prefs.port, room, bpy.app.version_string, mixer.display_version
+        )
         save_room(attributes, commands, self.filepath)
 
         return {"FINISHED"}
