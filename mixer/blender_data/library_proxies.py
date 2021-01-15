@@ -104,7 +104,9 @@ class LibraryProxy(DatablockProxy):
 
         library_path = self.resolved_filepath(context)
         if library_path is None:
-            logger.error(f"load_library_item(): no file for {library_path} check Shared Folders")
+            logger.error(f"load_library_item(): no file for {self._filepath_raw!r} ...")
+            logger.error(f"... referenced by bpy.data.{collection_name}[{datablock_name}]")
+            logger.error("... check Shared Folders")
             return
 
         logger.warning(f"load_library_item(): from {library_path} : {collection_name}[{datablock_name}]")
@@ -261,7 +263,7 @@ class DatablockLinkProxy(DatablockProxy):
                 link_datablock = library_proxy.load_library_item(self._bpy_data_collection, self._name, context)
             except Exception as e:
                 logger.error(
-                    f"load_library {library_proxy.data('name')} failed for {self._bpy_data_collection}[{self._name}]..."
+                    f"load_library {library_proxy.data('name')!r} failed for bpy.data.{self._bpy_data_collection}[{self._name}] ..."
                 )
                 logger.error(f"... {e!r}")
                 return None, None

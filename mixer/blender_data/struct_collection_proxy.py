@@ -219,11 +219,9 @@ class StructCollectionProxy(Proxy):
                     sequence.append(delta_addition.value)
 
             except Exception as e:
-                logger.warning(f"StructCollectionProxy.apply(). Processing {delta}")
-                logger.warning(f"... for {collection}")
-                logger.warning(f"... Exception: {e!r}")
-                logger.warning("... Update ignored")
-
+                logger.warning("apply: Exception while processing attribute ...")
+                logger.warning(f"... {context.visit_state.display_path()}.{key}")
+                logger.warning(f"... {e!r}")
             finally:
                 context.visit_state.path.pop()
 

@@ -104,34 +104,38 @@ class DatablockRefProxy(Proxy):
         if ref_target is None:
             logger.info(f"Unresolved reference {parent}.{key} -> {self.display_string()}]")
 
-        if isinstance(parent, T.bpy_prop_collection):
-            # reference stored in a collection
-            # is there a case for this is is always link() in DatablockCollectionProxy ?
-            try:
+        try:
+            if isinstance(parent, T.bpy_prop_collection):
+                # reference stored in a collection
+                # is there a case for this is is always link() in DatablockCollectionProxy ?
                 if ref_target is None:
                     context.proxy_state.unresolved_refs.append(
                         self.mixer_uuid, lambda datablock: parent.__setitem__(key, datablock)
                     )
                 else:
                     parent[key] = ref_target
-            except TypeError as e:
-                logger.warning(f"DatablockRefProxy.save() exception while saving {ref_target} into {parent}[{key}]...")
-                logger.warning(f"...{e!r}")
-        else:
-            assert isinstance(key, str)
-            # reference stored in a struct (e.g. Object.parent)
-            if not parent.bl_rna.properties[key].is_readonly:
-                try:
-                    # This is what saves Camera.dof.focus_object
-                    if ref_target is None:
-                        context.proxy_state.unresolved_refs.append(
-                            self.mixer_uuid, lambda datablock: setattr(parent, key, datablock)
-                        )
-                    else:
-                        setattr(parent, key, ref_target)
-                except Exception as e:
-                    logger.warning(f"write attribute skipped {key} for {parent}...")
-                    logger.warning(f" ...Error: {repr(e)}")
+            else:
+                # reference stored in a struct (e.g. Object.parent)
+                # This is what saves Camera.dof.focus_object
+                if ref_target is None:
+                    context.proxy_state.unresolved_refs.append(
+                        self.mixer_uuid, lambda datablock: setattr(parent, key, datablock)
+                    )
+                else:
+                    setattr(parent, key, ref_target)
+        except AttributeError as e:
+            # Most often not an error
+            # - read_only property
+            # - read-only attribute in corner case :
+            #   - write Object.material_slots[i].material when Object.material_slots[i].link=="DATA" and the mesh is
+            #     from a library
+            logger.info("Save: exception during ...")
+            logger.info(f"... {context.visit_state.display_path()}.{key} = {ref_target!r}...")
+            logger.info(f"... {e!r}")
+        except Exception as e:
+            logger.warning("Save: exception during ...")
+            logger.warning(f"... {context.visit_state.display_path()}.{key} = {ref_target!r}...")
+            logger.warning(f"... {e!r}")
 
     def target(self, context: Context) -> Optional[T.ID]:
         """

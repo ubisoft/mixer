@@ -70,8 +70,9 @@ class NonePtrProxy(Proxy):
                 #   AttributeError: bpy_struct: attribute "node_tree" from "Material" is read-only
                 # Avoiding them would require filtering attrivutes on save in order not to set
                 # Material.node_tree if Material.use_nodes is False
-                logger.debug("NonePtrProxy.save() exception for {parent}[{key}]...")
-                logger.debug(f"... {repr(e)}")
+                logger.debug("NonePtrProxy.save(): exception for attribute ...")
+                logger.debug(f"... {context.visit_state.display_path()}.{key}...")
+                logger.debug(f"... {e!r}")
 
     def apply(
         self,
@@ -108,7 +109,8 @@ class NonePtrProxy(Proxy):
 
         # A none PointerProperty that can point to something that is not a datablock.
         # Can this happen ?
-        logger.error(f"apply({parent}, {key}) called with a {type(update)} at {context.visit_state.path}")
+        logger.error(f"NonePtrProxy.apply(): not implemented update type {type(update)} for attribute ...")
+        logger.error(f"... {context.visit_state.display_path()}.{key}...")
         return self
 
     def diff(
@@ -174,7 +176,8 @@ class SetProxy(Proxy):
             else:
                 setattr(parent, key, set(self.items))
         except Exception as e:
-            logger.error(f"SetProxy.save() at {parent}.{key}. Exception ...")
+            logger.error("SetProxy.save(): exception for attribute ...")
+            logger.error(f"... {context.visit_state.display_path()}.{key}...")
             logger.error(f"... {e!r}")
 
     def apply(

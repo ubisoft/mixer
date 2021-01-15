@@ -174,7 +174,6 @@ class MeshProxy(DatablockProxy):
             diff.load(struct, context)
 
             # force ObjectProxy._diff to resend the Vertex groups
-            logger.debug(f"_diff: {struct} requires clear_geometry: replace")
             context.visit_state.dirty_vertex_groups.add(struct.mixer_uuid)
             return DeltaReplace(diff)
         else:
@@ -185,7 +184,6 @@ class MeshProxy(DatablockProxy):
                 mesh_vertex_groups = VertexGroups.from_mesh(struct).to_array_sequence()
                 proxy_vertex_groups: ArrayGroup = self._arrays.get("vertex_groups", [])
                 if mesh_vertex_groups != proxy_vertex_groups:
-                    logger.debug(f"_diff: {struct} dirty vertex groups")
                     diff._arrays["vertex_groups"] = mesh_vertex_groups
 
                     # force Object update. This requires that Object updates are processed later, which seems to be
@@ -198,7 +196,8 @@ class MeshProxy(DatablockProxy):
                     try:
                         member = getattr(struct, k)
                     except AttributeError:
-                        logger.warning(f"diff: unknown attribute {k} in {struct}")
+                        logger.warning("diff: unknown attribute ...")
+                        logger.warning(f"... {context.visit_state.display_path()}.{k}")
                         continue
 
                     proxy_data = self._data.get(k)
