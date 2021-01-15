@@ -152,7 +152,7 @@ class CreateRoomOperator(bpy.types.Operator):
         shared_folders = []
         for item in mixer_prefs.shared_folders:
             shared_folders.append(item.shared_folder)
-        create_room(room, mixer_prefs.vrtist_protocol, shared_folders)
+        create_room(room, mixer_prefs.vrtist_protocol, shared_folders, mixer_prefs.ignore_version_check)
 
         return {"FINISHED"}
 
@@ -226,7 +226,7 @@ class JoinRoomOperator(bpy.types.Operator):
         shared_folders = []
         for item in mixer_prefs.shared_folders:
             shared_folders.append(item.shared_folder)
-        join_room(room, mixer_prefs.vrtist_protocol, shared_folders)
+        join_room(room, mixer_prefs.vrtist_protocol, shared_folders, mixer_prefs.ignore_version_check)
 
         return {"FINISHED"}
 
@@ -435,7 +435,7 @@ class LaunchVRtistOperator(bpy.types.Operator):
             for item in mixer_prefs.shared_folders:
                 shared_folders.append(item.shared_folder)
             mixer_prefs.ignore_version_check = True
-            join_room(mixer_prefs.room, True, shared_folders)
+            join_room(mixer_prefs.room, True, shared_folders, mixer_prefs.ignore_version_check)
 
             # Wait for room creation/join
             timeout = 10

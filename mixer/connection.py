@@ -49,14 +49,13 @@ def set_client_attributes():
     )
 
 
-def create_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None):
-    prefs = get_mixer_prefs()
-    if prefs.ignore_version_check:
+def create_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None, ignore_version_check: bool = False):
+    if ignore_version_check:
         logger.warning("Ignoring version check")
-    join_room(room_name, vrtist_protocol, shared_folders)
+    join_room(room_name, vrtist_protocol, shared_folders, ignore_version_check)
 
 
-def join_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None):
+def join_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None, ignore_version_check: bool = False):
     prefs = get_mixer_prefs()
     logger.warning(f"join: room: {room_name}, user: {prefs.user}")
 
@@ -72,7 +71,7 @@ def join_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None
     set_client_attributes()
     blender_version = bpy.app.version_string
     mixer_version = mixer.display_version
-    share_data.client.join_room(room_name, blender_version, mixer_version, prefs.ignore_version_check)
+    share_data.client.join_room(room_name, blender_version, mixer_version, ignore_version_check)
 
     if shared_folders is None:
         shared_folders = []
