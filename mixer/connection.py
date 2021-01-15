@@ -23,6 +23,7 @@ It updates the addon state according to this connection.
 import logging
 
 import bpy
+import mixer
 from mixer.bl_utils import get_mixer_prefs
 from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientAttributes, ClientDisconnectedException
@@ -48,7 +49,13 @@ def set_client_attributes():
     )
 
 
-def join_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None):
+def create_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None, ignore_version_check: bool = False):
+    if ignore_version_check:
+        logger.warning("Ignoring version check")
+    join_room(room_name, vrtist_protocol, shared_folders, ignore_version_check)
+
+
+def join_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None, ignore_version_check: bool = False):
     prefs = get_mixer_prefs()
     logger.warning(f"join: room: {room_name}, user: {prefs.user}")
 
@@ -62,7 +69,9 @@ def join_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None
     share_data.client.current_room = room_name
     share_data.client._joining_room_name = room_name
     set_client_attributes()
-    share_data.client.join_room(room_name)
+    blender_version = bpy.app.version_string
+    mixer_version = mixer.display_version
+    share_data.client.join_room(room_name, blender_version, mixer_version, ignore_version_check)
 
     if shared_folders is None:
         shared_folders = []

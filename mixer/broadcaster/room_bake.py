@@ -37,7 +37,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def download_room(host: str, port: int, room_name: str) -> Tuple[Dict[str, Any], List[Command]]:
+def download_room(
+    host: str, port: int, room_name: str, blender_version: str, mixer_version: str
+) -> Tuple[Dict[str, Any], List[Command]]:
     from mixer.broadcaster.common import decode_json, RoomAttributes
 
     logger.info("Downloading room %s", room_name)
@@ -45,7 +47,7 @@ def download_room(host: str, port: int, room_name: str) -> Tuple[Dict[str, Any],
     commands = []
 
     with Client(host, port) as client:
-        client.join_room(room_name)
+        client.join_room(room_name, blender_version, mixer_version, False)
 
         room_attributes = None
 
@@ -90,8 +92,15 @@ def upload_room(host: str, port: int, room_name: str, room_attributes: dict, com
     room updates that will be processed later.
     Todo: Write a non blocking version of this function to be used inside Blender, some kind of UploadClient that can exist side by side with BlenderClient.
     """
+    from mixer.broadcaster.common import RoomAttributes
+
     with Client(host, port) as client:
-        client.join_room(room_name)
+        client.join_room(
+            room_name,
+            room_attributes.get(RoomAttributes.BLENDER_VERSION, ""),
+            room_attributes.get(RoomAttributes.MIXER_VERSION, ""),
+            False,
+        )
         client.set_room_attributes(room_name, room_attributes)
         client.set_room_keep_open(room_name, True)
 
