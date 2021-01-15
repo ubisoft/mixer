@@ -96,7 +96,7 @@ class DatablockCollectionProxy(Proxy):
         # - Library : creation of a link datablock
 
         if incoming_proxy.collection_name == "scenes":
-            logger.warning(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}'")
+            logger.info(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}'")
 
             # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
             # Remove it now
@@ -105,10 +105,10 @@ class DatablockCollectionProxy(Proxy):
                 from mixer.blender_client.scene import delete_scene
 
                 scene_to_remove = scenes["_mixer_to_be_removed_"]
-                logger.warning(
+                logger.info(
                     f"After create scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}''"
                 )
-                logger.warning(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
+                logger.info(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
                 delete_scene(scene_to_remove)
 
         uuid = incoming_proxy.mixer_uuid
