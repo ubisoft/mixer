@@ -127,15 +127,18 @@ class VisitState:
         def __init__(self, visit_state: VisitState, proxy: DatablockProxy, datablock: T.ID):
             self._visit_state = visit_state
             self._is_embedded_data = datablock.is_embedded_data
+            self._datablock_string = repr(datablock)
             self._proxy = proxy
 
         def __enter__(self):
             if not self._is_embedded_data:
                 self._visit_state.datablock_proxy = self._proxy
+                self._visit_state.datablock_string = self._datablock_string
 
         def __exit__(self, exc_type, exc_value, traceback):
             if not self._is_embedded_data:
                 self._visit_state.datablock_proxy = None
+                self._visit_state.datablock_string = None
 
     Path = List[Union[str, int]]
     """The current visit path relative to the datablock, for instance in a GreasePencil datablock
@@ -174,8 +177,20 @@ class VisitState:
         Global state
         """
 
+        self.datablock_string: Optional[str] = None
+        """"Current datablock display string, for logging"""
+
     def enter_datablock(self, proxy: DatablockProxy, datablock: T.ID) -> VisitState.CurrentDatablockContext:
         return VisitState.CurrentDatablockContext(self, proxy, datablock)
+
+    def display_path(self) -> str:
+        """Path to the attribute currently visited ("bpy.data.objects['Cube'].modifiers.0.name"), for logging"""
+        if self.path:
+            component = "." + ".".join([str(x) for x in self.path])
+        else:
+            component = ""
+
+        return str(self.datablock_string) + component
 
 
 @dataclass

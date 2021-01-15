@@ -55,7 +55,9 @@ class NodeLinksProxy(StructCollectionProxy):
     def save(self, unused_attribute, node_tree: T.NodeTree, unused_key: str, context: Context):
         """Saves this proxy into node_tree.links"""
         if not isinstance(node_tree, T.NodeTree):
-            logger.error(f"NodeLinksProxy.save() called with {node_tree}. Expected a bpy.types.NodeTree")
+            logger.error(f"save(): attribute {context.visit_state.display_path()} ...")
+            logger.error(f"... has type {type(node_tree)}")
+            logger.error("... expected a bpy.types.NodeTree")
             return
 
         node_tree.links.clear()
@@ -67,22 +69,28 @@ class NodeLinksProxy(StructCollectionProxy):
 
             from_node = node_tree.nodes.get(from_node_name)
             if from_node is None:
-                logger.error(f"save(): from_node {node_tree}.nodes[{from_node_name}] is None")
+                logger.error(
+                    f"save(): from_node is None for {context.visit_state.display_path()}.nodes[{from_node_name}]"
+                )
                 return
 
             from_socket = from_node.outputs.get(from_socket_name)
             if from_socket is None:
-                logger.error(f"save(): from_socket {node_tree}.nodes[{from_socket_name}] is None")
+                logger.error(
+                    f"save(): from_socket is None for {context.visit_state.display_path()}.nodes[{from_socket_name}]"
+                )
                 return
 
             to_node = node_tree.nodes.get(to_node_name)
             if to_node is None:
-                logger.error(f"save(): to_node {node_tree}.nodes[{to_node_name}] is None")
+                logger.error(f"save(): to_node is None for {context.visit_state.display_path()}.nodes[{to_node_name}]")
                 return
 
             to_socket = to_node.inputs.get(to_socket_name)
             if to_socket is None:
-                logger.error(f"save(): to_socket {node_tree}.nodes[{to_socket_name}] is None")
+                logger.error(
+                    f"save(): to_socket is None for {context.visit_state.display_path()}.nodes[{to_socket_name}]"
+                )
                 return
 
             node_tree.links.new(from_socket, to_socket)

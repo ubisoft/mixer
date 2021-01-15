@@ -97,7 +97,8 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
 
         bl_rna = attr_property.bl_rna
         if bl_rna is None:
-            logger.warning("Not implemented: attribute %s", attr)
+            logger.error("read_attribute: no implementation for ...")
+            logger.error(f"... {context.visit_state.display_path()}.{key} (type: {type(attr)})")
             return None
 
         if issubclass(attr_type, T.PropertyGroup):
@@ -129,9 +130,8 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
 
             return NonePtrProxy()
 
-        logger.error(
-            f"Unsupported attribute {attr_type} {attr_property} at {context.visit_state.datablock_proxy.collection_name}.{context.visit_state.path}.{attr_property.identifier}"
-        )
+        logger.error("read_attribute: no implementation for ...")
+        logger.error(f"... {context.visit_state.display_path()}.{key} (type: {type(attr)})")
     finally:
         context.visit_state.recursion_guard.pop()
 
@@ -178,25 +178,21 @@ def write_attribute(
                     # common for enum that have unsupported default values, such as FFmpegSettings.ffmpeg_preset,
                     # which seems initialized at "" and triggers :
                     #   TypeError('bpy_struct: item.attr = val: enum "" not found in (\'BEST\', \'GOOD\', \'REALTIME\')')
-                    logger.info(f"write attribute skipped {parent}.{key}...")
-                    logger.info(f" ...Exception: {repr(e)}")
+                    logger.info("write_attribute: exception for ...")
+                    logger.info(f"... attribute: {context.visit_state.display_path()}.{key}, value: {value}")
+                    logger.info(f" ...{e!r}")
 
-    except TypeError:
-        # common for enum that have unsupported default values, such as FFmpegSettings.ffmpeg_preset,
-        # which seems initialized at "" and triggers :
-        #   TypeError('bpy_struct: item.attr = val: enum "" not found in (\'BEST\', \'GOOD\', \'REALTIME\')')
-        logger.warning(f"write attribute skipped {parent}.{key}...")
-        for line in traceback.format_exc().splitlines():
-            logger.warning(f" ... {line}")
     except AttributeError as e:
         if isinstance(parent, bpy.types.Collection) and parent.name == "Master Collection" and key == "name":
             pass
         else:
-            logger.warning(f"write attribute skipped {parent}.{key}...")
-            logger.warning(f" ...Exception: {repr(e)}")
+            logger.warning("write_attribute: exception for ...")
+            logger.warning(f"... attribute: {context.visit_state.display_path()}.{key}, value: {value}")
+            logger.warning(f" ...{e!r}")
 
     except Exception:
-        logger.warning(f"write attribute skipped {parent}.{key}...")
+        logger.warning("write_attribute: exception for ...")
+        logger.warning(f"... attribute: {context.visit_state.display_path()}.{key}, value: {value}")
         for line in traceback.format_exc().splitlines():
             logger.warning(f" ... {line}")
 
@@ -251,14 +247,16 @@ def apply_attribute(
                         # most likely an addon (runtime) attribute that exists on the sender but no on this
                         # receiver or a readonbly attribute that should be filtered out
                         # Do not be too verbose
-                        logger.info(f"apply_attribute: exception for {parent} {key}")
-                        logger.info(f"... exception {e!r})")
+                        logger.info("apply_attribute: exception for ...")
+                        logger.info(f"... attribute: {context.visit_state.display_path()}.{key}, value: {delta_value}")
+                        logger.info(f" ...{e!r}")
 
             return delta_value
 
     except Exception as e:
-        logger.warning(f"apply_attribute: exception for {parent} {key}")
-        logger.warning(f"... exception {e!r})")
+        logger.warning("apply_attribute: exception for ...")
+        logger.warning(f"... attribute: {context.visit_state.display_path()}.{key}, value: {delta_value}")
+        logger.warning(f" ...{e!r}")
 
 
 def diff_attribute(
@@ -285,7 +283,9 @@ def diff_attribute(
             return DeltaUpdate(blender_value)
 
     except Exception as e:
-        logger.warning(f"diff exception for attr {item} : {e!r}")
+        logger.warning("diff_attribute: exception for ...")
+        logger.warning(f"... attribute: {context.visit_state.display_path()}.{key}")
+        logger.warning(f" ...{e!r}")
         return None
 
     return None

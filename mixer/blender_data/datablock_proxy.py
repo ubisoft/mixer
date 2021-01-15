@@ -215,7 +215,7 @@ class DatablockProxy(StructProxy):
                 if resolved_path is None:
                     resolved_path = str(shared_folder_file)
                 else:
-                    logger.warning("Unable to resolve shared_folder file: multiple matches found")
+                    logger.error("Unable to resolve shared_folder file: multiple matches found")
                     resolved_path = None
                     break
         return resolved_path
