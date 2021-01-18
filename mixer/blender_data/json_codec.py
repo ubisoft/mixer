@@ -110,8 +110,11 @@ def default(obj):
         if issubclass(class_, Delta):
             d.update({"value": obj.value})
         else:
+            # if hasattr(obj, "_data"):
+            #     # Must be order preserving, which is ensured by json module
+            #     d.update({"_data": obj._data})
             _data = getattr(obj, "_data", None)
-            if _data:
+            if _data is not None:
                 # Must be order preserving, which is ensured by json module
                 d.update({"_data": _data})
 
