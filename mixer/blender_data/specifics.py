@@ -803,7 +803,7 @@ def _clear_from_name(collection: T.bpy_prop_collection, sequence: List[Datablock
 @clear_from.register(T.Nodes)
 def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
     """clear_from() implementation for collections with items types are named "bl_idname".
-    
+
     Nodes items cannot be morphed in place, so an update can keep the head of sequence for items
     with types unchanged, and must replace the end of the sequence from the first item with a
     changed type.
