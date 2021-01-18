@@ -144,7 +144,13 @@ class StructCollectionProxy(Proxy):
         context.visit_state.path.append(key)
         try:
             sequence = self._sequence
-            specifics.truncate_collection(collection, len(self._sequence))
+
+            # Using clear_from ensures that sequence data is compatible with remaining elements after
+            # truncate_collection. This addresses an issue with Nodes, for which the order of default nodes (material
+            # output and principled in collection) may not match the order of incoming nodes. Saving node data into a
+            # node of the wrong type can lead to a crash.
+            clear_from = specifics.clear_from(collection, sequence)
+            specifics.truncate_collection(collection, clear_from)
 
             # For collections like `IDMaterials`, the creation API (`.new(datablock_ref)`) also writes the value.
             # For collections like `Nodes`, the creation API (`.new(name)`) does not write the item value.

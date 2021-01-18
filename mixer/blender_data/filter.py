@@ -550,6 +550,10 @@ property_order: PropertiesOrder = {
     T.Material: {
         "use_nodes",
     },
+    T.NodeTree: {
+        # must exist before links are saved
+        "nodes"
+    },
     T.Scene: {
         # Required to save view_layers
         # LayerCollection.children is a view into the corresponding Collection with additional visibility

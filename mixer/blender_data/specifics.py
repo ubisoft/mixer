@@ -802,7 +802,12 @@ def _clear_from_name(collection: T.bpy_prop_collection, sequence: List[Datablock
 
 @clear_from.register(T.Nodes)
 def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
-    """clear_from() implementation for collections with items types are named "bl_idname" """
+    """clear_from() implementation for collections with items types are named "bl_idname".
+    
+    Nodes items cannot be morphed in place, so an update can keep the head of sequence for items
+    with types unchanged, and must replace the end of the sequence from the first item with a
+    changed type.
+    """
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         if proxy.data("bl_idname") != item.bl_idname:
             return i
@@ -815,7 +820,7 @@ def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[Data
 #
 @dispatch_rna
 def truncate_collection(collection: T.bpy_prop_collection, size: int):
-    """Truncates collection to _at most_ size elements, ensuring that items can safely be saved into
+    """Truncates collection to size elements, ensuring that items can safely be saved into
     the collection. This might clear the collection if its elements cannot be updated.
 
     This method is useful for bpy _prop_collections that cannot be safely be overwritten in place,
@@ -831,11 +836,6 @@ def _truncate_collection_remove(collection: T.bpy_prop_collection, size: int):
     except Exception as e:
         logger.error(f"truncate_collection {collection}: exception ...")
         logger.error(f"... {e!r}")
-
-
-@truncate_collection.register(T.Nodes)
-def _truncate_collection_clear(collection: T.bpy_prop_collection, size: int):
-    collection.clear()
 
 
 @truncate_collection.register(T.IDMaterials)

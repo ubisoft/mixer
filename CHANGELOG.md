@@ -8,7 +8,9 @@
 ## Fixes
 
 - UI: display user name on a single item when a collection is selected
-- Mesh: fix crash when receiving a mesh in a mixed Linux/windows room
+- Mesh: fix crash when receiving a mesh in a mixed Linux/windows room [#17](https://gitlab.com/ubisoft-animation-studio/mixer/-/issues/17)
+- Material: fix synchronization failure after removing a shading node
+- Material: fix a crash after receiving a Material node_tree update
 
 ## Breaking changes
 
