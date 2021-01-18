@@ -110,18 +110,16 @@ def default(obj):
         if issubclass(class_, Delta):
             d.update({"value": obj.value})
         else:
-            try:
-                _data = obj._data
-            except AttributeError:
-                pass
-            else:
+            # if hasattr(obj, "_data"):
+            #     # Must be order preserving, which is ensured by json module
+            #     d.update({"_data": obj._data})
+            _data = getattr(obj, "_data", None)
+            if _data is not None:
+                # Must be order preserving, which is ensured by json module
                 d.update({"_data": _data})
 
-        try:
-            _serialize = class_._serialize
-        except AttributeError:
-            pass
-        else:
+        _serialize = getattr(class_, "_serialize", None)
+        if _serialize:
             if not isinstance(_serialize, (tuple, list)):
                 raise EncodeError(f"Expected tuple or list for _serialize, got {type(_serialize)} for {obj}")
             for option in _serialize:
@@ -152,11 +150,9 @@ def decode_hook(x):
         obj = class_(x["value"])
     else:
         obj = class_()
-        try:
-            _data = x["_data"]
-        except KeyError:
-            pass
-        else:
+        _data = x.get("_data")
+        if _data:
+            # Must be order preserving, which is ensured by json module
             obj._data.update(_data)
 
         try:
