@@ -159,7 +159,13 @@ def write_attribute(
             elif isinstance(parent, T.bpy_prop_collection):
                 target = parent.get(key)
             else:
-                target = getattr(parent, key, None)
+                if not hasattr(parent, key):
+                    # probably from an addon loaded in the sender and not in the receiver
+                    logger.warning(
+                        f"write attribute: ignoring missing attribute from {context.visit_state.display_path()}: {key!r}"
+                    )
+                    return
+                target = getattr(parent, key)
 
             value.save(target, parent, key, context)
         else:
