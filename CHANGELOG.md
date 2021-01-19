@@ -13,6 +13,7 @@
 - Material: fix synchronization failure after removing a shading node
 - Material: fix a crash after receiving a Material node_tree update
 - Logging: cleanup
+- LayerCollection: fix synchronization failure
 
 ## Breaking changes
 
