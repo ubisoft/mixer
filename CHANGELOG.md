@@ -1,9 +1,11 @@
-# 0.20.0-alpha2 (13-01-2020)
+# 0.20.0-beta1 (19-01-2020)
 
 ## Features
 
 - Shared folders
 - Libraries: synchronization (without overrides, make local, reload, duplicate linked)
+- Enforce identical Blender and Mixer version within a room
+- UI: display user name on a single object when several are selected
 
 ## Fixes
 
