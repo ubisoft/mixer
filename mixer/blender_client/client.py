@@ -735,23 +735,6 @@ class BlenderClient(Client):
         self.send_animation_buffer(obj.name_full, obj.animation_data, "rotation_euler", 2)
         self.send_animation_buffer(obj.name_full, obj.data.animation_data, "lens")
 
-    def send_camera_attributes(self, obj):
-        buffer = (
-            common.encode_string(obj.name_full)
-            + common.encode_float(obj.data.lens)
-            + common.encode_float(obj.data.dof.aperture_fstop)
-            + common.encode_float(obj.data.dof.focus_distance)
-        )
-        self.add_command(common.Command(MessageType.CAMERA_ATTRIBUTES, buffer, 0))
-
-    def send_light_attributes(self, obj):
-        buffer = (
-            common.encode_string(obj.name_full)
-            + common.encode_float(obj.data.energy)
-            + common.encode_color(obj.data.color)
-        )
-        self.add_command(common.Command(MessageType.LIGHT_ATTRIBUTES, buffer, 0))
-
     def send_current_camera(self, camera_name):
         buffer = common.encode_string(camera_name)
         self.add_command(common.Command(MessageType.CURRENT_CAMERA, buffer, 0))

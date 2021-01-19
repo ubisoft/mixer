@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import logging
-from mixer.blender_client.misc import get_or_create_object_data, get_object_path
+from mixer.blender_client.misc import get_or_create_object_data, get_object_path, get_or_create_path
 from mixer.broadcaster import common
 from mixer.broadcaster.client import Client
 from mixer.share_data import share_data
@@ -30,7 +30,9 @@ def get_camera_buffer(obj):
     focal = cam.lens
     front_clip_plane = cam.clip_start
     far_clip_plane = cam.clip_end
+    dof_enabled = cam.dof.use_dof
     aperture = cam.dof.aperture_fstop
+    colimator_name = cam.dof.focus_object.name_full if cam.dof.focus_object is not None else ""
     sensor_fit_name = cam.sensor_fit
     sensor_fit = common.SensorFitMode.AUTO
     if sensor_fit_name == "AUTO":
@@ -49,7 +51,9 @@ def get_camera_buffer(obj):
         + common.encode_float(focal)
         + common.encode_float(front_clip_plane)
         + common.encode_float(far_clip_plane)
+        + common.encode_bool(dof_enabled)
         + common.encode_float(aperture)
+        + common.encode_string(colimator_name)
         + common.encode_int(sensor_fit.value)
         + common.encode_float(sensor_width)
         + common.encode_float(sensor_height)
@@ -71,7 +75,9 @@ def build_camera(data):
     camera.lens, start = common.decode_float(data, start)
     camera.clip_start, start = common.decode_float(data, start)
     camera.clip_end, start = common.decode_float(data, start)
+    camera.dof.use_dof, start = common.decode_bool(data, start)
     camera.dof.aperture_fstop, start = common.decode_float(data, start)
+    colimator_name, start = common.decode_string(data, start)
     sensor_fit, start = common.decode_int(data, start)
     camera.sensor_width, start = common.decode_float(data, start)
     camera.sensor_height, start = common.decode_float(data, start)
@@ -84,6 +90,11 @@ def build_camera(data):
         camera.sensor_fit = "HORIZONTAL"
 
     get_or_create_object_data(camera_path, camera)
+
+    # colimator
+    if len(colimator_name) > 0:
+        camera.dof.use_dof = True
+        camera.dof.focus_object = get_or_create_path(colimator_name)
 
 
 def get_or_create_camera(camera_name):
