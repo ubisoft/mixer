@@ -148,6 +148,7 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         split.label(text="Mixer Version")
         if get_mixer_props().display_rooms_details:
             split.label(text="No Version Check")
+            split.label(text="Protocol")
             split.label(text="Command Count")
             split.label(text="Size (MB)")
             split.label(text="Joinable")
@@ -161,6 +162,7 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         split.label(text=item.mixer_version)
         if get_mixer_props().display_rooms_details:
             split.prop(item, "ignore_version_check", text="")
+            split.label(text=item.protocol)
             split.prop(item, "command_count", text="")
             split.prop(item, "mega_byte_size", text="")
             split.prop(item, "joinable", text="")

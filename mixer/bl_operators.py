@@ -177,16 +177,6 @@ class JoinRoomOperator(bpy.types.Operator):
             poll_already_in_a_room,
             (lambda: get_mixer_props().room_index < len(get_mixer_props().rooms), "Invalid room selection"),
             (
-                lambda: (
-                    ("vrtist_protocol" not in get_selected_room_dict() and not get_mixer_prefs().vrtist_protocol)
-                    or (
-                        "vrtist_protocol" in get_selected_room_dict()
-                        and get_mixer_prefs().vrtist_protocol == get_selected_room_dict()["vrtist_protocol"]
-                    )
-                ),
-                "vrtist_protocol flag does not match selected room",
-            ),
-            (
                 lambda: get_selected_room_dict().get(RoomAttributes.JOINABLE, False),
                 "Room is not joinable, first client has not finished sending initial content.",
             ),
@@ -226,7 +216,12 @@ class JoinRoomOperator(bpy.types.Operator):
         shared_folders = []
         for item in mixer_prefs.shared_folders:
             shared_folders.append(item.shared_folder)
-        join_room(room, mixer_prefs.vrtist_protocol, shared_folders, mixer_prefs.ignore_version_check)
+        join_room(
+            room,
+            not room_attributes.get(RoomAttributes.GENERIC_PROTOCOL, True),
+            shared_folders,
+            mixer_prefs.ignore_version_check,
+        )
 
         return {"FINISHED"}
 
@@ -285,8 +280,9 @@ class DownloadRoomOperator(bpy.types.Operator):
         props = get_mixer_props()
         room_index = props.room_index
         room = props.rooms[room_index].name
+        protocol = props.rooms[room_index].protocol
         attributes, commands = download_room(
-            prefs.host, prefs.port, room, bpy.app.version_string, mixer.display_version
+            prefs.host, prefs.port, room, bpy.app.version_string, mixer.display_version, protocol == "Generic"
         )
         save_room(attributes, commands, self.filepath)
 

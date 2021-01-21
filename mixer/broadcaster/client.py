@@ -135,13 +135,21 @@ class Client:
             self.handle_connection_lost()
             return False
 
-    def join_room(self, room_name: str, blender_version: str, mixer_version: str, ignore_version_check: bool):
+    def join_room(
+        self,
+        room_name: str,
+        blender_version: str,
+        mixer_version: str,
+        ignore_version_check: bool,
+        generic_protocol: bool,
+    ):
         name = common.encode_string(room_name)
         bl_version = common.encode_string(blender_version)
         mix_version = common.encode_string(mixer_version)
         version_check = common.encode_bool(ignore_version_check)
+        protocol = common.encode_bool(generic_protocol)
         return self.send_command(
-            common.Command(common.MessageType.JOIN_ROOM, name + bl_version + mix_version + version_check, 0)
+            common.Command(common.MessageType.JOIN_ROOM, name + bl_version + mix_version + version_check + protocol, 0)
         )
 
     def leave_room(self, room_name: str):

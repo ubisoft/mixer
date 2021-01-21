@@ -71,7 +71,7 @@ def join_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None
     set_client_attributes()
     blender_version = bpy.app.version_string
     mixer_version = mixer.display_version
-    share_data.client.join_room(room_name, blender_version, mixer_version, ignore_version_check)
+    share_data.client.join_room(room_name, blender_version, mixer_version, ignore_version_check, not vrtist_protocol)
 
     if shared_folders is None:
         shared_folders = []

@@ -96,9 +96,12 @@ class Connection:
             room_name, index = common.decode_string(command.data, 0)
             blender_version, index = common.decode_string(command.data, index)
             mixer_version, index = common.decode_string(command.data, index)
-            ignore_version_check, _ = common.decode_bool(command.data, index)
+            ignore_version_check, index = common.decode_bool(command.data, index)
+            generic_protocol, _ = common.decode_bool(command.data, index)
             try:
-                self._server.join_room(self, room_name, blender_version, mixer_version, ignore_version_check)
+                self._server.join_room(
+                    self, room_name, blender_version, mixer_version, ignore_version_check, generic_protocol
+                )
             except Exception as e:
                 _send_error(f"{e!r}")
 
@@ -257,12 +260,14 @@ class Room:
         blender_version: str,
         mixer_version: str,
         ignore_version_check: bool,
+        generic_protocol: bool,
         creator: Connection,
     ):
         self.name = room_name
         self.blender_version = blender_version
         self.mixer_version = mixer_version
         self.ignore_version_check = ignore_version_check
+        self.generic_protocol = generic_protocol
         self.keep_open = False  # Should the room remain open when no more clients are inside ?
         self.byte_size = 0
         self.joinable = False  # A room becomes joinable when its first client has send all the initial content
@@ -337,6 +342,7 @@ class Room:
             common.RoomAttributes.BLENDER_VERSION: self.blender_version,
             common.RoomAttributes.MIXER_VERSION: self.mixer_version,
             common.RoomAttributes.IGNORE_VERSION_CHECK: self.ignore_version_check,
+            common.RoomAttributes.GENERIC_PROTOCOL: self.generic_protocol,
             common.RoomAttributes.COMMAND_COUNT: self.command_count(),
             common.RoomAttributes.BYTE_SIZE: self.byte_size,
             common.RoomAttributes.JOINABLE: self.joinable,
@@ -419,12 +425,15 @@ class Server:
         blender_version: str,
         mixer_version: str,
         ignore_version_check: bool,
+        generic_protocol: bool,
     ):
         assert connection.room is None
 
         def _create_room():
             logger.info(f"Room {room_name} does not exist. Creating it.")
-            room = Room(self, room_name, blender_version, mixer_version, ignore_version_check, connection)
+            room = Room(
+                self, room_name, blender_version, mixer_version, ignore_version_check, generic_protocol, connection
+            )
             self._rooms[room_name] = room
             # room is now visible to others, but not joinable until the client has sent CONTENT
             logger.info(
