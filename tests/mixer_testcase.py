@@ -423,7 +423,7 @@ class MixerTestCase(unittest.TestCase):
         for i, blender in enumerate(self._blenders):
             blender.connect_mixer()
             if i == 0:
-                blender.create_room_mixer(vrtist_protocol=self.vrtist_protocol)
+                blender.create_room(vrtist_protocol=self.vrtist_protocol)
             else:
                 blender.join_room(vrtist_protocol=self.vrtist_protocol)
 
