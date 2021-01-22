@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+from itertools import islice
 import logging
 import sys
 from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
@@ -532,22 +533,38 @@ class BpyDataProxy(Proxy):
         datablock_keys = set(state._datablocks.keys())
         proxy_keys = set(state.proxies.keys())
         if datablock_keys != proxy_keys:
-            logger.warning("sanity_check: different keys for datablocks and proxies")
+            logger.error(f"sanity_check: {len(datablock_keys ^ proxy_keys)} different keys for datablocks and proxies")
 
-        none_datablocks = [k for k, v in state._datablocks.items() if v is None]
-        if state.unregistered_libraries:
-            logger.warning("sanity_check: unregistered_libraries not empty ...")
-            for lib in state.unregistered_libraries:
+        # avoid logging large number of error messages with very large scenes
+        max_items = 5
+        unregistered_libraries = state.unregistered_libraries
+        unregistered_libraries_count = len(unregistered_libraries)
+        if unregistered_libraries:
+            logger.warning(f"sanity_check: {unregistered_libraries_count} unregistered libraries ...")
+            for lib in islice(unregistered_libraries, max_items):
                 logger.warning(f"... {lib}. Library file may be missing.")
+            if len(unregistered_libraries) > max_items:
+                logger.warning(f"... {unregistered_libraries_count - max_items} more.")
 
+        none_datablocks = [k for k, v in state._datablocks.items() if v is None and not state.proxies[k].has_datablock]
         if none_datablocks:
             logger.warning("sanity_check: no datablock for ...")
-            for uuid in none_datablocks:
-                logger.warning(f"... {state.proxies[uuid]}")
-            logger.warning("... check for missing libraries")
-            logger.warning("... datablocks referencing broken libraries will be removed from peers !")
+            for uuid in none_datablocks[:max_items]:
+                logger.warning(f"... {state.proxies[uuid]}.")
+            hidden_count = len(none_datablocks) - max_items
+            if hidden_count > 0:
+                logger.warning(f"... {hidden_count} more.")
+            logger.warning("... check for missing libraries or other files")
+            logger.warning("... datablocks referencing broken files may be removed from peers !")
 
-        if state.unresolved_refs:
+        # given that none_datablocks are missing because of missing files, so it not an error per se that references to
+        # the are left unresolved
+        unresolved_uuids = set(state.unresolved_refs._refs.keys()) - set(none_datablocks)
+        if unresolved_uuids:
             logger.warning("sanity_check: unresolved_refs not empty ...")
-            for ref in state.unresolved_refs._refs.keys():
-                logger.warning(f"... {ref}")
+            for uuid in islice(unresolved_uuids, max_items):
+                logger.warning(f"... {uuid} : {state.unresolved_refs._refs[uuid][0][1]}")
+            hidden_count = len(unresolved_uuids) > max_items
+            if hidden_count > 0:
+                logger.warning(f"... {hidden_count} more.")
+            logger.warning("... check for unsupported datablock types")

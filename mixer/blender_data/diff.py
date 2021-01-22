@@ -80,7 +80,16 @@ class BpyDataCollectionDiff:
         self._items_added.clear()
         self._items_removed.clear()
         self._items_renamed.clear()
-        proxies = {datablock_proxy.mixer_uuid: datablock_proxy for datablock_proxy in proxy._data.values()}
+
+        # Proxies for received image datablocks that failed to load because of a locally misconfigured shared folders do
+        # not have a datablock (they have one when loading the .blend file). Do not consider the proxies without
+        # datablock otherwise they would be found as deleted and removals would be sent to peers that may have
+        # them.
+        proxies = {
+            datablock_proxy.mixer_uuid: datablock_proxy
+            for datablock_proxy in proxy._data.values()
+            if datablock_proxy.has_datablock
+        }
         bl_collection = getattr(bpy.data, collection_name)
 
         # (item name, collection name)

@@ -33,7 +33,7 @@ from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 
 from mixer.blender_data.attributes import read_attribute, write_attribute
-from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Uuid
+from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, ExternalFileFailed, Uuid
 from mixer.blender_data.misc_proxies import CustomPropertiesProxy
 from mixer.blender_data.struct_proxy import StructProxy
 from mixer.blender_data.type_helpers import sub_id_type
@@ -93,6 +93,11 @@ class DatablockProxy(StructProxy):
         """arrays that must not be serialized as json because of their size.
         Serialized as array"""
 
+        self._has_datablock = False
+        """False for local (non link) datablocks received if they cannot be created (file error for images), for a
+        library before the first link datalock is loaded, for an indirect link datablock before the direct link
+        datablock is loaded. Always True on the sender side."""
+
     def copy_data(self, other: DatablockProxy):
         super().copy_data(other)
         self._soas = other._soas
@@ -113,6 +118,10 @@ class DatablockProxy(StructProxy):
     @arrays.setter
     def arrays(self, arrays: ArrayGroups):
         self._arrays = arrays
+
+    @property
+    def has_datablock(self):
+        return self._has_datablock
 
     @classmethod
     def make(cls, datablock: T.ID) -> DatablockProxy:
@@ -173,6 +182,7 @@ class DatablockProxy(StructProxy):
         """
 
         self.clear_data()
+        self._has_datablock = True
         properties = context.synchronized_properties.properties(datablock)
         # this assumes that specifics.py apply only to ID, not Struct
         properties = specifics.conditional_properties(datablock, properties)
@@ -194,8 +204,14 @@ class DatablockProxy(StructProxy):
         if hasattr(datablock, "filepath"):
             if len(datablock.filepath) == 0:
                 return
-            path = get_source_file_path(bpy.path.abspath(datablock.filepath))
-            self._filepath_raw = str(pathlib.Path(path))
+            path_string = get_source_file_path(bpy.path.abspath(datablock.filepath))
+            path = pathlib.Path(path_string)
+            if not path.exists():
+                logger.warning(f"{datablock!r}: file with computed source path does not exist ...")
+                logger.warning(f"... filepath: '{datablock.filepath}'")
+                logger.warning(f"... abspath:  '{bpy.path.abspath(datablock.filepath)}'")
+                logger.warning(f"... source:   '{path_string}'")
+            self._filepath_raw = str(path)
 
     def matches_shared_folder(self, filepath: str, context: Context):
         filepath = pathlib.Path(filepath)
@@ -349,7 +365,10 @@ class DatablockProxy(StructProxy):
                     logger.error("... update ignored")
                     return None, None
         else:
-            datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
+            try:
+                datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
+            except ExternalFileFailed:
+                return None, None
 
         if datablock is None:
             if self.collection_name != "shape_keys":
@@ -363,9 +382,11 @@ class DatablockProxy(StructProxy):
             if self.collection.get(name).name != datablock.name:
                 logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
+        self._has_datablock = True
         datablock.mixer_uuid = self.mixer_uuid
         if isinstance(datablock, T.Object):
             context.proxy_state.register_object(datablock)
+
         datablock = self._save(datablock, context)
         return datablock, renames
 

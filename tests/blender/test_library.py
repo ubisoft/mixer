@@ -15,8 +15,7 @@ class TestCase(BlenderTestCase):
 
         # self.log_level = logging.INFO
 
-    def setUp(self):
-        sender_blendfile = files_folder() / "empty.blend"
+    def setUp(self, sender_blendfile=files_folder() / "empty.blend"):
         receiver_blendfile = files_folder() / "empty.blend"
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
@@ -258,6 +257,30 @@ bpy.data.libraries.remove(bpy.data.library[0])
         self.send_string(self._create_link, to=0)
         self.send_string(self._remove_link, to=0)
         self.send_string(self._remove_library, to=0)
+        self.assert_matches()
+
+
+@unittest.skip("for manual testing")
+class TestMissingDirectLibrary(TestCase):
+    # Since there are not the same datablocks on both sides, the usual comparison is not possible. It might be possible
+    # to sompare the proxy contents, that should be the same
+    def setUp(self):
+        broken_file = files_folder() / "lib_2_1_broken.blend"
+        super().setUp(broken_file)
+
+    def test_missing_lib(self):
+        self.assert_matches()
+
+
+@unittest.skip("for manual testing")
+class TestMissingIndirectLibrary(TestCase):
+    # Since there are not the same datablocks on both sides, the usual comparison is not possible. It might be possible
+    # to sompare the proxy contents, that should be the same
+    def setUp(self):
+        broken_file = files_folder() / "lib_3_1_broken.blend"
+        super().setUp(broken_file)
+
+    def test_missing_lib(self):
         self.assert_matches()
 
 

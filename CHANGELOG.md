@@ -5,7 +5,6 @@
 - Shared folders
 - Libraries: synchronization (without overrides, make local, reload, duplicate linked)
 - Enforce identical Blender and Mixer version within a room
-- UI: display user name on a single object when several are selected
 
 ## Fixes
 

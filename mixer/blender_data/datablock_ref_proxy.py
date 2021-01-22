@@ -59,6 +59,7 @@ class DatablockRefProxy(Proxy):
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({self._datablock_uuid}, bpy.data.{self._bpy_data_collection}, name at creation: {self._initial_name})"
 
+    @property
     def display_string(self) -> str:
         return f"bpy.data.{self._bpy_data_collection}[{self._initial_name}]"
 
@@ -102,7 +103,7 @@ class DatablockRefProxy(Proxy):
         """
         ref_target = self.target(context)
         if ref_target is None:
-            logger.info(f"Unresolved reference {parent}.{key} -> {self.display_string()}]")
+            logger.info(f"Unresolved reference {parent}.{key} -> {self.display_string}]")
 
         try:
             if isinstance(parent, T.bpy_prop_collection):
@@ -110,7 +111,9 @@ class DatablockRefProxy(Proxy):
                 # is there a case for this is is always link() in DatablockCollectionProxy ?
                 if ref_target is None:
                     context.proxy_state.unresolved_refs.append(
-                        self.mixer_uuid, lambda datablock: parent.__setitem__(key, datablock)
+                        self.mixer_uuid,
+                        lambda datablock: parent.__setitem__(key, datablock),
+                        f"{context.visit_state.display_path()}[{key}] = {self.display_string}",
                     )
                 else:
                     parent[key] = ref_target
@@ -119,7 +122,9 @@ class DatablockRefProxy(Proxy):
                 # This is what saves Camera.dof.focus_object
                 if ref_target is None:
                     context.proxy_state.unresolved_refs.append(
-                        self.mixer_uuid, lambda datablock: setattr(parent, key, datablock)
+                        self.mixer_uuid,
+                        lambda datablock: setattr(parent, key, datablock),
+                        f"{context.visit_state.display_path()}.{key} = {self.display_string}",
                     )
                 else:
                     setattr(parent, key, ref_target)

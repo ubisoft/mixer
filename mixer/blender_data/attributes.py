@@ -188,12 +188,17 @@ def write_attribute(
                     logger.info(f"... attribute: {context.visit_state.display_path()}.{key}, value: {value}")
                     logger.info(f" ...{e!r}")
 
-    except AttributeError as e:
-        if isinstance(parent, bpy.types.Collection) and parent.name == "Master Collection" and key == "name":
+    except (IndexError, AttributeError) as e:
+        if (
+            isinstance(e, AttributeError)
+            and isinstance(parent, bpy.types.Collection)
+            and parent.name == "Master Collection"
+            and key == "name"
+        ):
             pass
         else:
-            logger.warning("write_attribute: exception for ...")
-            logger.warning(f"... attribute: {context.visit_state.display_path()}.{key}, value: {value}")
+            logger.warning("write_attribute: exception while accessing ...")
+            logger.warning(f"... attribute: {context.visit_state.display_path()}.{key}")
             logger.warning(f" ...{e!r}")
 
     except Exception:
