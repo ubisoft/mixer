@@ -32,6 +32,7 @@ from pathlib import Path
 import traceback
 from typing import Any, Callable, Dict, ItemsView, List, Optional, TYPE_CHECKING, Union
 
+from mixer.blender_data.proxy import ExternalFileFailed
 
 import bpy
 import bpy.types as T  # noqa N812
@@ -234,25 +235,25 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
         name = proxy.data("name")
         width, height = proxy.data("size")
         try:
-            with open(resolved_filepath, "rb") as image_file:
-                buffer = image_file.read()
+            with open(resolved_filepath, "rb") as file_:
+                buffer = file_.read()
             image = collection.new(name, width, height)
             image.pack(data=buffer, data_len=len(buffer))
         except RuntimeError as e:
             logger.warning(
-                f'Cannot load packed image original "{filepath}"", resolved "{resolved_filepath}". Exception: '
+                f'Cannot load packed file original "{filepath}"", resolved "{resolved_filepath}". Exception: '
             )
             logger.warning(f"... {e}")
-            return None
+            raise ExternalFileFailed from e
 
     else:
         try:
             image = collection.load(resolved_filepath)
             image.name = image_name
         except RuntimeError as e:
-            logger.warning(f'Cannot load image original "{filepath}"", resolved "{resolved_filepath}". Exception: ')
+            logger.warning(f'Cannot load file original "{filepath}"", resolved "{resolved_filepath}". Exception: ')
             logger.warning(f"... {e}")
-            return None
+            raise ExternalFileFailed from e
 
     # prevent filepath to be overwritten by the incoming proxy value as it would attempt to reload the file
     # from the incoming path that may not exist

@@ -119,6 +119,18 @@ class DeltaReplace(Delta):
     pass
 
 
+class MixerException(Exception):
+    """Base class for Mixer specific exceptions."""
+
+    pass
+
+
+class ExternalFileFailed(MixerException):
+    """Datablock creation failed because of a file related issue"""
+
+    pass
+
+
 class Proxy:
     """
     Base class for all proxies.

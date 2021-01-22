@@ -404,8 +404,10 @@ class DatablockRefCollectionProxy(Proxy):
         item_property = collection_property.fixed_type
 
         # keys are uuids
-        proxy_keys = self._data.keys()
-        blender_items = {item.mixer_uuid: item for item in collection.values()}
+        # BpyDataCollectionDiff.diff() for why proxies without datablocks are ignores
+        proxy_keys = {k for k, v in self._data.items() if v.target(context)}
+
+        blender_items = {datablock.mixer_uuid: datablock for datablock in collection.values()}
         blender_keys = blender_items.keys()
         added_keys = blender_keys - proxy_keys
         deleted_keys = proxy_keys - blender_keys

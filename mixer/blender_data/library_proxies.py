@@ -28,7 +28,7 @@ import bpy
 import bpy.path
 import bpy.types as T  # noqa
 
-from mixer.blender_data.proxy import Delta, DeltaUpdate
+from mixer.blender_data.proxy import Delta, DeltaUpdate, ExternalFileFailed
 from mixer.blender_data.datablock_proxy import DatablockProxy
 
 if TYPE_CHECKING:
@@ -46,9 +46,6 @@ class LibraryProxy(DatablockProxy):
         self._unregistered_datablocks: Dict[str, Uuid] = {}
         """Uuids to assign to indirect link datablocks after their creation."""
 
-        self._created = False
-        # TODO update this for reload
-
     def __eq__(self, other):
         return self is other
 
@@ -56,16 +53,22 @@ class LibraryProxy(DatablockProxy):
         return hash(self.mixer_uuid)
 
     def register_indirect(self, identifier: str, uuid: Uuid, context: Context) -> Optional[T.ID]:
-        """Registers an indirect link datablock with its uuid."""
+        """Registers an indirect link datablock provided by the Library managed by this proxy.
+
+        Args:
+            identifier : the datablock name_full
+            uuid : the uuid of the link datablock
+            context : proxy and visit state
+
+        Returns:
+            The link datablock if is is already loaded or None if it has not yet been loaded (because the direct link
+            datablock that references it is not yet loaded)
+        """
 
         assert identifier not in self._unregistered_datablocks or self._unregistered_datablocks[identifier] == uuid
 
         library_datablock = bpy.data.libraries.get(self._data["name"])
         if library_datablock:
-            if not library_datablock.mixer_uuid:
-                library_datablock.mixer_uuid = self.mixer_uuid
-                context.proxy_state.add_datablock(self.mixer_uuid, library_datablock)
-
             # The library is already loaded. Register the linked datablock at once.
             # Registration in ProxyState.datablocks is performed by a caller during datablock creation
             for linked_datablock in library_datablock.users_id:
@@ -94,54 +97,65 @@ class LibraryProxy(DatablockProxy):
     def create_standalone_datablock(self, context: Context):
         # No datablock is created at this point.
         # The Library datablock will be created when the linked datablock is loaded (see load_library_item)
+
         resolved_filepath = self.resolved_filepath(context)
         self._data["filepath"] = resolved_filepath
         self._data["filepath_raw"] = resolved_filepath
         return None, None
 
     def load_library_item(self, collection_name: str, datablock_name: str, context: Context) -> T.ID:
-        """Load a direct link datablock."""
+        """Load a direct link datablock.
+
+        Args:
+            collection_name: the name of the bpy.data collection ("objects", "cameras", ...) in which the datablock must
+            be created.
+            datablock_name: the  name of the datablock in the library
+            context: proxy and visit_state
+        Raises:
+            ExternalFileFailed: [description]
+
+        Returns:
+            The link datablock.
+        """
 
         library_path = self.resolved_filepath(context)
         if library_path is None:
             logger.error(f"load_library_item(): no file for {self._filepath_raw!r} ...")
             logger.error(f"... referenced by bpy.data.{collection_name}[{datablock_name}]")
             logger.error("... check Shared Folders")
-            return
+            # TODO not the best exception type
+            raise ExternalFileFailed
 
         logger.warning(f"load_library_item(): from {library_path} : {collection_name}[{datablock_name}]")
 
-        # this creates the Library datablock on first load.
-        with bpy.data.libraries.load(library_path, link=True) as (data_from, data_to):
-            setattr(data_to, collection_name, [datablock_name])
+        try:
+            # this creates the Library datablock on first load.
+            with bpy.data.libraries.load(library_path, link=True) as (data_from, data_to):
+                setattr(data_to, collection_name, [datablock_name])
+        except OSError as e:
+            raise ExternalFileFailed from e
 
-        linked_datablock = getattr(data_to, collection_name)[0]
+        try:
+            linked_datablock = getattr(data_to, collection_name)[0]
+        except IndexError:
+            # TODO not the best exception type
+            raise ExternalFileFailed
+
         library_datablock = linked_datablock.library
-        if library_datablock is None:
-            # May be None for a Collection in 2.83.4, when all collection items are in sub libraries.
-            # Fixed in 2.83.9
-            logger.warning(f"load_library_item: library is None for {collection_name} {datablock_name} ...")
-            logger.warning(f"... linked item {linked_datablock}")
-            return None
-
-        if not self._created:
-            # The received datablock name might not match the library name
-            library_datablock.name = self.data("name")
-            self._created = True
-
         self.register(library_datablock, context)
         return linked_datablock
 
     def register(self, library_datablock: T.Library, context: Context):
         """Recursively register the Library managed by this proxy, its children and all the datablocks they provide."""
 
-        if self in context.proxy_state.unregistered_libraries and not self._unregistered_datablocks:
-            context.proxy_state.unregistered_libraries.remove(self)
+        proxy_state = context.proxy_state
 
-        # register the library datablock
-        if not library_datablock.mixer_uuid:
+        if not self._has_datablock:
+            self._has_datablock = True
+            # The received datablock name might not match the library name
+            library_datablock.name = self.data("name")
             library_datablock.mixer_uuid = self.mixer_uuid
-            context.proxy_state.add_datablock(self.mixer_uuid, library_datablock)
+            proxy_state.add_datablock(self.mixer_uuid, library_datablock)
 
         # Register the link datablocks provided by this library
         for linked_datablock in library_datablock.users_id:
@@ -150,11 +164,15 @@ class LibraryProxy(DatablockProxy):
             if uuid:
                 # logger.warning(f"register indirect at load {identifier} {uuid}")
                 linked_datablock.mixer_uuid = uuid
-                context.proxy_state.add_datablock(uuid, linked_datablock)
+                proxy_state.proxies[uuid]._has_datablock = True
+                proxy_state.add_datablock(uuid, linked_datablock)
                 del self._unregistered_datablocks[identifier]
 
+        if self in proxy_state.unregistered_libraries and not self._unregistered_datablocks:
+            proxy_state.unregistered_libraries.remove(self)
+
         # Recursively register pending child libraries and their datablocks
-        for unregistered_child_proxy in list(context.proxy_state.unregistered_libraries):
+        for unregistered_child_proxy in list(proxy_state.unregistered_libraries):
             child_name = unregistered_child_proxy.data("name")
             children = [datablock for datablock in bpy.data.libraries if datablock.name == child_name]
             if not children:
@@ -245,33 +263,35 @@ class DatablockLinkProxy(DatablockProxy):
 
     def create_standalone_datablock(self, context: Context) -> Tuple[Optional[T.ID], None]:
         """Save this proxy into its target standalone datablock."""
+
+        # Some parts must be kept in sync with DatablockProxy.create_standalone_datablock()
+
         from mixer.blender_data.library_proxies import LibraryProxy
 
         library_proxy = cast(LibraryProxy, context.proxy_state.proxies[self._library_uuid])
-        # logger.warning(
-        #     f"_create(): {self} library: {library_proxy.data('name')}, indirect: {self._is_library_indirect}"
-        # )
 
         if self._is_library_indirect:
             # Indirect linked datablock are created implicitely during the load() of their parent. Keep track of
             # them in order to assign them a uuid after their creation. A uuid is required because they can be
             # referenced by non linked datablocks after load (e.g. a linked Camera referenced by the main Scene)
-            link_datablock = library_proxy.register_indirect(self._identifier, self.mixer_uuid, context)
-            return link_datablock, None
-        else:
-            try:
-                link_datablock = library_proxy.load_library_item(self._bpy_data_collection, self._name, context)
-            except Exception as e:
-                logger.error(
-                    f"load_library {library_proxy.data('name')!r} failed for bpy.data.{self._bpy_data_collection}[{self._name}] ..."
-                )
-                logger.error(f"... {e!r}")
-                return None, None
+            datablock = library_proxy.register_indirect(self._identifier, self.mixer_uuid, context)
+            self._has_datablock = datablock is not None
+            return datablock, None
 
-            link_datablock.mixer_uuid = self.mixer_uuid
-            if isinstance(link_datablock, T.Object):
-                context.proxy_state.register_object(link_datablock)
-            return link_datablock, None
+        try:
+            datablock = library_proxy.load_library_item(self._bpy_data_collection, self._name, context)
+        except Exception as e:
+            logger.error(
+                f"load_library {library_proxy.data('name')!r} failed for bpy.data.{self._bpy_data_collection}[{self._name}] ..."
+            )
+            logger.error(f"... {e!r}")
+            return None, None
+
+        datablock.mixer_uuid = self.mixer_uuid
+        if isinstance(datablock, T.Object):
+            context.proxy_state.register_object(datablock)
+
+        return datablock, None
 
     def load(self, datablock: T.ID, context: Context) -> DatablockLinkProxy:
         """Load datablock into this proxy."""
@@ -282,6 +302,7 @@ class DatablockLinkProxy(DatablockProxy):
         self._is_library_indirect = datablock.is_library_indirect
         self._name = datablock.name
         self._identifier = repr(datablock)
+        self._has_datablock = True
 
         if isinstance(datablock, T.Object):
             context.proxy_state.register_object(datablock)
