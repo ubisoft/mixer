@@ -447,6 +447,18 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
     if target.library:
         return target
 
+    if hasattr(target, "animation_data"):
+        animation_data = proxy.data("animation_data")
+        if animation_data is not None:
+            from mixer.blender_data.misc_proxies import NonePtrProxy
+
+            if not isinstance(animation_data, NonePtrProxy):
+                if target.animation_data is None:
+                    target.animation_data_create()
+            else:
+                if target.animation_data is not None:
+                    target.animation_data_clear()
+
     if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
         target.clear_geometry()
     elif isinstance(target, T.Material):
@@ -478,17 +490,6 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
         groups = proxy.data("groups")
         if groups:
             groups.save(target.groups, target, "groups", context)
-    elif isinstance(target, T.Object):
-        animation_data = proxy.data("animation_data")
-        if animation_data is not None:
-            from mixer.blender_data.misc_proxies import NonePtrProxy
-
-            if not isinstance(animation_data, NonePtrProxy):
-                if target.animation_data is None:
-                    target.animation_data_create()
-            else:
-                if target.animation_data is not None:
-                    target.animation_data_clear()
 
     return target
 
