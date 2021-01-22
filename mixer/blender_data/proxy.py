@@ -62,19 +62,19 @@ class UnresolvedRefs:
     SrcLink = Callable[[T.ID], None]
 
     def __init__(self):
-        self._refs: Dict[Uuid, List[self.Func]] = defaultdict(list)
+        self._refs: Dict[Uuid, List[Tuple[self.Func, str]]] = defaultdict(list)
 
     def __bool__(self):
         return bool(self._refs)
 
-    def append(self, dst_uuid: Uuid, src_link: SrcLink):
-        self._refs[dst_uuid].append(src_link)
+    def append(self, dst_uuid: Uuid, src_link: SrcLink, display_string: str = ""):
+        self._refs[dst_uuid].append((src_link, display_string))
 
     def resolve(self, dst_uuid: Uuid, dst_datablock: T.ID):
         if dst_uuid in self._refs:
-            for src_link in self._refs[dst_uuid]:
+            for src_link, display_string in self._refs[dst_uuid]:
                 src_link(dst_datablock)
-                logger.info(f"resolving reference to {dst_datablock} {dst_uuid}")
+                logger.info(f"resolving reference to {dst_datablock} {dst_uuid}: {display_string}")
             del self._refs[dst_uuid]
 
 

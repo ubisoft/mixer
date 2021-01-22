@@ -309,11 +309,11 @@ class DatablockRefCollectionProxy(Proxy):
             if datablock:
                 collection.link(datablock)
             else:
-                logger.info(
-                    f"unresolved reference {parent}.{key} -> {ref_proxy.display_string()} {ref_proxy.mixer_uuid}"
-                )
+                logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy.display_string} {ref_proxy.mixer_uuid}")
                 add_element = collection.link
-                context.proxy_state.unresolved_refs.append(ref_proxy.mixer_uuid, add_element)
+                context.proxy_state.unresolved_refs.append(
+                    ref_proxy.mixer_uuid, add_element, f"{collection!r}.link({ref_proxy.display_string})"
+                )
 
     def apply(
         self,
@@ -357,8 +357,9 @@ class DatablockRefCollectionProxy(Proxy):
                         if datablock is not None:
                             collection.link(datablock)
                         else:
+                            # unloaded datablock
                             logger.warning(
-                                f"delta apply add for {parent}[{key}]: unregistered uuid {uuid} for {ref_update._debug_name}"
+                                f"delta apply add for {parent!r}.{key}: no datablock for {ref_update.display_string} ({uuid})"
                             )
 
                     else:

@@ -926,8 +926,8 @@ class BlenderClient(Client):
                 if command.type == MessageType.GROUP_END:
                     elapse = time.monotonic() - groups.pop()
                     group_id = len(groups)
-                    logger.warning(f"Command group {group_id} processed in {elapse:.1f} seconds")
                     share_data.receive_sanity_check()
+                    logger.warning(f"Command group {group_id} processed in {elapse:.1f} seconds")
                     continue
 
                 if self.has_default_handler(command.type):

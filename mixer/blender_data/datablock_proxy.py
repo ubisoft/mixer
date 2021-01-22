@@ -204,8 +204,14 @@ class DatablockProxy(StructProxy):
         if hasattr(datablock, "filepath"):
             if len(datablock.filepath) == 0:
                 return
-            path = get_source_file_path(bpy.path.abspath(datablock.filepath))
-            self._filepath_raw = str(pathlib.Path(path))
+            path_string = get_source_file_path(bpy.path.abspath(datablock.filepath))
+            path = pathlib.Path(path_string)
+            if not path.exists():
+                logger.warning(f"{datablock!r}: file with computed source path does not exist ...")
+                logger.warning(f"... filepath: '{datablock.filepath}'")
+                logger.warning(f"... abspath:  '{bpy.path.abspath(datablock.filepath)}'")
+                logger.warning(f"... source:   '{path_string}'")
+            self._filepath_raw = str(path)
 
     def matches_shared_folder(self, filepath: str, context: Context):
         filepath = pathlib.Path(filepath)
