@@ -288,6 +288,7 @@ class DatablockLinkProxy(DatablockProxy):
             return None, None
 
         datablock.mixer_uuid = self.mixer_uuid
+        self._has_datablock = True
         if isinstance(datablock, T.Object):
             context.proxy_state.register_object(datablock)
 
