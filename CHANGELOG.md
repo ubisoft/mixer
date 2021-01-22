@@ -1,25 +1,27 @@
-# 0.20.0-beta1 (19-01-2020)
+# 0.20.0 (22-01-2020)
 
 ## Features
 
-- Shared folders
-- Libraries: synchronization (without overrides, make local, reload, duplicate linked)
-- Enforce identical Blender and Mixer version within a room
+- Shared folders: contents of shared folders are not synchronized by Mixer, but must be synchronized by a user-provided
+  mechanism like a network share or a file synchronization tool.
+- Libraries: synchronization, including nested libraries. Overrides, make local, reload, duplicate linked, self linking are not supported.
+- Require identical Blender and Mixer versions among all users of a room.
 
 ## Fixes
 
 - UI: display user name on a single item when a collection is selected
+- Room join: fix impossible join because of incompatible VRtist protocol setting
+([#15](https://gitlab.com/ubisoft-animation-studio/mixer/-/issues/15))
 - Mesh: fix crash when receiving a mesh in a mixed Linux/windows room
 ([#17](https://gitlab.com/ubisoft-animation-studio/mixer/-/issues/17))
 - Material: fix synchronization failure after removing a shading node
 - Material: fix a crash after receiving a Material node_tree update
-- Logging: cleanup
 - LayerCollection: fix synchronization failure
+- Logging: cleanup
 
 ## Breaking changes
 
 - require Blender 2.83.9
-
 
 # 0.19.0 (18-12-2020)
 
