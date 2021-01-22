@@ -459,6 +459,23 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
                 if target.animation_data is not None:
                     target.animation_data_clear()
 
+
+def pre_save_struct(proxy: StructProxy, target: T.bpy_struct):
+    create_clear_animation_data(target, proxy)
+
+
+def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
+    """Process attributes that must be saved first and return a possibly updated reference to the target"""
+
+    # WARNING this is called from save() and from apply()
+    # When called from save, the proxy has  all the synchronized properties
+    # WHen called from apply, the proxy only contains the updated properties
+
+    if target.library:
+        return target
+
+    create_clear_animation_data(target, proxy)
+
     if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
         target.clear_geometry()
     elif isinstance(target, T.Material):

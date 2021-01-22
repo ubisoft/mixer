@@ -117,6 +117,7 @@ class StructProxy(Proxy):
 
             return
 
+        specifics.pre_save_struct(self, attribute)
         context.visit_state.path.append(key)
         try:
             for k, v in self._data.items():
