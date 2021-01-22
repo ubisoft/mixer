@@ -58,14 +58,14 @@ class RoomItem(bpy.types.PropertyGroup):
             return share_data.client.rooms_attributes[self.name]["ignore_version_check"]
         return False
 
-    def is_room_vrtist_protocol(self):
+    def get_protocol(self):
         if (
             share_data.client is not None
             and self.name in share_data.client.rooms_attributes
-            and "vrtist_protocol" in share_data.client.rooms_attributes[self.name]
+            and "generic_protocol" in share_data.client.rooms_attributes[self.name]
         ):
-            return share_data.client.rooms_attributes[self.name]["vrtist_protocol"]
-        return False
+            return "Generic" if share_data.client.rooms_attributes[self.name]["generic_protocol"] else "VRtist"
+        return ""
 
     def is_kept_open(self):
         if (
@@ -112,7 +112,7 @@ class RoomItem(bpy.types.PropertyGroup):
     mixer_version: bpy.props.StringProperty(name="Mixer Version", get=get_room_mixer_version)
     ignore_version_check: bpy.props.BoolProperty(name="Ignore Version Check", get=is_ignore_version_check)
     users_count: bpy.props.IntProperty(name="Users Count")
-    vrtist_protocol: bpy.props.BoolProperty(name="VRtist Protocol", get=is_room_vrtist_protocol)
+    protocol: bpy.props.StringProperty(name="Protocol", get=get_protocol)
     keep_open: bpy.props.BoolProperty(name="Keep Open", default=False, get=is_kept_open, set=on_keep_open_changed)
     command_count: bpy.props.IntProperty(name="Command Count", get=get_command_count)
     mega_byte_size: bpy.props.FloatProperty(name="Mega Byte Size", get=get_mega_byte_size)

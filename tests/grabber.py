@@ -27,7 +27,7 @@ class Grabber:
 
     def grab(self, host, port, room_name: str):
         with Client(host, port) as client:
-            client.join_room(room_name, "ignored", "ignored", True)
+            client.join_room(room_name, "ignored", "ignored", True, True)
 
             attempts_max = 20
             attempts = 0

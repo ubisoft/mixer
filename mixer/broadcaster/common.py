@@ -224,6 +224,7 @@ class RoomAttributes:
     IGNORE_VERSION_CHECK = (
         "ignore_version_check"  # Sent by server only, type = str, to ignore blender and mixer versions
     )
+    GENERIC_PROTOCOL = "generic_protocol"  # Sent by server only, type = bool
     KEEP_OPEN = (
         "keep_open"  # Sent by server only, type = bool, indicate if the room should be kept open after all clients left
     )

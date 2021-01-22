@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 def download_room(
-    host: str, port: int, room_name: str, blender_version: str, mixer_version: str
+    host: str, port: int, room_name: str, blender_version: str, mixer_version: str, generic_protocol: bool
 ) -> Tuple[Dict[str, Any], List[Command]]:
     from mixer.broadcaster.common import decode_json, RoomAttributes
 
@@ -47,7 +47,7 @@ def download_room(
     commands = []
 
     with Client(host, port) as client:
-        client.join_room(room_name, blender_version, mixer_version, False)
+        client.join_room(room_name, blender_version, mixer_version, False, generic_protocol)
 
         room_attributes = None
 
@@ -100,6 +100,7 @@ def upload_room(host: str, port: int, room_name: str, room_attributes: dict, com
             room_attributes.get(RoomAttributes.BLENDER_VERSION, ""),
             room_attributes.get(RoomAttributes.MIXER_VERSION, ""),
             False,
+            room_attributes.get(RoomAttributes.GENERIC_PROTOCOL, True),
         )
         client.set_room_attributes(room_name, room_attributes)
         client.set_room_keep_open(room_name, True)
