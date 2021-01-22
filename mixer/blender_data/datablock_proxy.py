@@ -391,10 +391,9 @@ class DatablockProxy(StructProxy):
         self._has_datablock = True
         uuid = self.mixer_uuid
         datablock.mixer_uuid = uuid
+        context.proxy_state.add_datablock(uuid, datablock)
         if isinstance(datablock, T.Object):
             context.proxy_state.register_object(datablock)
-        context.proxy_state.add_datablock(uuid, datablock)
-        context.proxy_state.proxies[uuid] = self
 
         datablock = self._save(datablock, context)
         return datablock, renames

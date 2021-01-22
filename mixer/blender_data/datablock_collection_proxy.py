@@ -153,6 +153,7 @@ class DatablockCollectionProxy(Proxy):
 
         uuid = incoming_proxy.mixer_uuid
         self._data[uuid] = incoming_proxy
+        context.proxy_state.proxies[uuid] = incoming_proxy
 
         if datablock is not None:
             context.proxy_state.unresolved_refs.resolve(uuid, datablock)
