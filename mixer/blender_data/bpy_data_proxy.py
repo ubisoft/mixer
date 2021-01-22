@@ -551,7 +551,7 @@ class BpyDataProxy(Proxy):
             logger.warning("sanity_check: no datablock for ...")
             for uuid in none_datablocks[:max_items]:
                 logger.warning(f"... {state.proxies[uuid]}.")
-            hidden_count = len(none_datablocks) > max_items
+            hidden_count = len(none_datablocks) - max_items
             if hidden_count > 0:
                 logger.warning(f"... {hidden_count} more.")
             logger.warning("... check for missing libraries or other files")
@@ -567,3 +567,4 @@ class BpyDataProxy(Proxy):
             hidden_count = len(unresolved_uuids) > max_items
             if hidden_count > 0:
                 logger.warning(f"... {hidden_count} more.")
+            logger.warning("... check for unsupported datablock types")
