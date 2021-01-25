@@ -30,6 +30,8 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data.proxy import Delta, DeltaUpdate, ExternalFileFailed
 from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.json_codec import serialize
+
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context, Uuid
@@ -37,6 +39,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@serialize
 class LibraryProxy(DatablockProxy):
     """Proxy for Library datablocks."""
 
@@ -235,6 +238,7 @@ class LibraryProxy(DatablockProxy):
         return None
 
 
+@serialize
 class DatablockLinkProxy(DatablockProxy):
     """Proxy for direct or indirect linked datablock"""
 

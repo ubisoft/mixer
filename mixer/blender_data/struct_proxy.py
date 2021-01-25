@@ -29,6 +29,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
@@ -37,10 +38,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@serialize
 class StructProxy(Proxy):
     """
     Holds a copy of a Blender bpy_struct
     """
+
+    _serialize = ("_data",)
 
     def __init__(self):
         self._data = {}

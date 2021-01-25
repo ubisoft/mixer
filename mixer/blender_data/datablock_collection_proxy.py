@@ -34,6 +34,7 @@ from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.diff import BpyDataCollectionDiff
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaUpdate, DeltaAddition, DeltaDeletion, MaxDepthExceeded
 from mixer.blender_data.proxy import ensure_uuid, Proxy
 
@@ -44,6 +45,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@serialize
 class DatablockCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of standalone datablocks, i.e. of bpy.data collections
@@ -51,6 +53,8 @@ class DatablockCollectionProxy(Proxy):
     This proxy keeps track of the state of the whole collection. The proxy contents are be instances
     of DatablockProxy.
     """
+
+    _serialize = ("_data",)
 
     def __init__(self, name: str):
         self._name: str = name
@@ -264,11 +268,14 @@ class DatablockCollectionProxy(Proxy):
         return None if not results else results[0]
 
 
+@serialize
 class DatablockRefCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of datablock references (CollectionObjects and CollectionChildren only,
     with link/unlink API
     """
+
+    _serialize = ("_data",)
 
     def __init__(self):
         # One item per datablock. The key is the uuid, which eases rename management

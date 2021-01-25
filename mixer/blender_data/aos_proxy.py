@@ -28,6 +28,7 @@ from typing import Dict, Iterable, Optional, Union, TYPE_CHECKING
 import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.aos_soa_proxy import SoaElement, AosElement
 from mixer.blender_data.specifics import is_soable_property
 from mixer.blender_data.attributes import diff_attribute, write_attribute
@@ -42,13 +43,14 @@ _unknown_type_attributes = {"__doc__", "__module__", "__slots__", "bl_rna", "rna
 """Attributes of bpy.types.UnknownType to not synchronize"""
 
 
+@serialize
 class AosProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of structure with at least a member that can be handled
     by foreach_get()/foreach_set(), such as MeshVertices
     """
 
-    _serialize = ("_aos_length",)
+    _serialize = ("_aos_length", "_data")
 
     def __init__(self):
         self._data: Dict[str, Union[AosElement, SoaElement, Delta]] = {}

@@ -26,7 +26,7 @@ from typing import Any, Optional, TYPE_CHECKING, List, Set, Union
 
 import bpy.types as T  # noqa
 
-from mixer.blender_data.attributes import read_attribute
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Proxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@serialize
 class NonePtrProxy(Proxy):
     """Proxy for a None PointerProperty value.
 
@@ -127,6 +128,7 @@ class NonePtrProxy(Proxy):
         return DeltaUpdate(attr)
 
 
+@serialize
 class SetProxy(Proxy):
     """Proxy for sets of primitive types
 
@@ -227,6 +229,7 @@ class SetProxy(Proxy):
         return DeltaReplace(new_set)
 
 
+@serialize
 class CustomPropertiesProxy:
     """Proxy-like for datablock Custom Properties"""
 

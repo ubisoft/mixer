@@ -28,6 +28,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data.attributes import read_attribute
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
 from mixer.blender_data.type_helpers import bases_of
 
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@serialize
 class DatablockRefProxy(Proxy):
     """
     A reference to a standalone datablock

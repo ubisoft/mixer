@@ -29,6 +29,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
 from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaReplace
 
 if TYPE_CHECKING:
@@ -41,6 +42,7 @@ DEBUG = True
 logger = logging.getLogger(__name__)
 
 
+@serialize
 class ShapeKeyProxy(DatablockProxy):
     """
     Proxy for a ShapeKey datablock.

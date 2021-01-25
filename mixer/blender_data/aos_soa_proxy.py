@@ -31,11 +31,11 @@ from typing import List, Dict, Optional, Tuple, TYPE_CHECKING
 import bpy
 import bpy.types as T  # noqa
 
-
-from mixer.blender_data.proxy import DeltaUpdate, Proxy
-from mixer.blender_data.type_helpers import is_vector
-from mixer.blender_data.specifics import soa_initializers
 from mixer.blender_data.attributes import read_attribute, write_attribute
+from mixer.blender_data.json_codec import serialize
+from mixer.blender_data.proxy import DeltaUpdate, Proxy
+from mixer.blender_data.specifics import soa_initializers
+from mixer.blender_data.type_helpers import is_vector
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
@@ -56,11 +56,14 @@ def soa_initializer(attr_type, length):
         return element_init * length
 
 
+@serialize
 class AosElement(Proxy):
     """
     Proxy for a member of an soable collection that is not supported by foreach_get()/foreach_set(),
     like SplineBezierPoints[x].handle_left_type
     """
+
+    _serialize = ("_data",)
 
     def __init__(self):
         self._data: Dict[str, List] = {}
@@ -101,6 +104,7 @@ class AosElement(Proxy):
             write_attribute(parent[int(index)], key, item, context)
 
 
+@serialize
 class SoaElement(Proxy):
     """
     A structure member inside a bpy_prop_collection loaded as a structure of array element
