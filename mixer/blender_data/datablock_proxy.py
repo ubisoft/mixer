@@ -33,6 +33,7 @@ from mixer.blender_data import specifics
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 
 from mixer.blender_data.attributes import read_attribute, write_attribute
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, ExternalFileFailed, Uuid
 from mixer.blender_data.misc_proxies import CustomPropertiesProxy
 from mixer.blender_data.struct_proxy import StructProxy
@@ -50,6 +51,7 @@ DEBUG = True
 logger = logging.getLogger(__name__)
 
 
+@serialize
 class DatablockProxy(StructProxy):
     """
     Proxy to a standalone datablock (e.g. bpy.data.cameras['Camera']).
@@ -57,6 +59,7 @@ class DatablockProxy(StructProxy):
 
     _serialize: Tuple[str, ...] = (
         "_bpy_data_collection",
+        "_data",
         "_datablock_uuid",
         "_custom_properties",
         "_is_in_shared_folder",

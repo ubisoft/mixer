@@ -23,6 +23,7 @@ import logging
 from typing import Dict, List, Optional, TYPE_CHECKING, Union
 import bpy.types as T  # noqa
 
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaUpdate
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@serialize
 class NodeLinksProxy(StructCollectionProxy):
     """Proxy for bpy.types.NodeLinks"""
 

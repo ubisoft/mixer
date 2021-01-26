@@ -30,6 +30,8 @@ from uuid import uuid4
 import bpy
 import bpy.types as T  # noqa
 
+from mixer.blender_data.json_codec import serialize
+
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
@@ -84,6 +86,7 @@ class MaxDepthExceeded(Exception):
     pass
 
 
+@serialize
 class Delta:
     """
     A Delta records the difference between the proxy state and Blender state.
@@ -96,6 +99,8 @@ class Delta:
     add, remove or update operation
     """
 
+    _serialize = ("value",)
+
     def __init__(self, value: Any):
         self.value = value
 
@@ -103,18 +108,22 @@ class Delta:
         return f"<{self.__class__.__name__}({self.value})>"
 
 
+@serialize(ctor_args=("value",))
 class DeltaAddition(Delta):
     pass
 
 
+@serialize(ctor_args=("value",))
 class DeltaDeletion(Delta):
     pass
 
 
+@serialize(ctor_args=("value",))
 class DeltaUpdate(Delta):
     pass
 
 
+@serialize(ctor_args=("value",))
 class DeltaReplace(Delta):
     pass
 
