@@ -743,9 +743,6 @@ def diff_must_replace(
         for bl_item, proxy in zip(collection, sequence):
             if bl_item.name != proxy.data("name"):
                 return True
-            if bl_item.relative_key.name != proxy.data("relative_key"):
-                # see ShapeKeyProxy.load()
-                return True
 
     return False
 

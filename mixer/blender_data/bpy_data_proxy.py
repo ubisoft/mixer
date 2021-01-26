@@ -389,9 +389,7 @@ class BpyDataProxy(Proxy):
         """
         bpy_data_collection_proxy = self._data.get(incoming_proxy.collection_name)
         if bpy_data_collection_proxy is None:
-            logger.warning(
-                f"create_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} "
-            )
+            logger.error(f"create_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} ")
             return None, None
 
         context = self.context(synchronized_properties)
