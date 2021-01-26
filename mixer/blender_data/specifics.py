@@ -587,8 +587,9 @@ def _add_element_name_type(collection: T.bpy_prop_collection, proxy: Proxy, inde
     return collection.new(name, type_)
 
 
-@add_element.register(T.ObjectConstraints)
 @add_element.register(T.CurveSplines)
+@add_element.register(T.FCurveModifiers)
+@add_element.register(T.ObjectConstraints)
 def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     type_ = proxy.data("type")
     return collection.new(type_)
@@ -618,11 +619,12 @@ def _add_element_idname(collection: T.bpy_prop_collection, proxy: Proxy, index: 
     return collection.new(node_type)
 
 
-@add_element.register(T.UVLoopLayers)
-@add_element.register(T.LoopColors)
-@add_element.register(T.FaceMaps)
-@add_element.register(T.VertexGroups)
 @add_element.register(T.ActionGroups)
+@add_element.register(T.FaceMaps)
+@add_element.register(T.LoopColors)
+@add_element.register(T.TimelineMarkers)
+@add_element.register(T.UVLoopLayers)
+@add_element.register(T.VertexGroups)
 def _add_element_name_eq(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     name = proxy.data("name")
     return collection.new(name=name)
