@@ -28,7 +28,7 @@ import logging
 from typing import Dict, Tuple, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import Proxy
+    from mixer.blender_data.proxy import Delta, Proxy
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +39,14 @@ logger = logging.getLogger(__name__)
 MIXER_CLASS = "__mixer_class__"
 
 _registry: Dict[str, Tuple[type, Tuple[str]]] = {}
+"""Proxy class registry
+
+{ class_name: (class, tuple of constructor arguments)}
+"""
 
 
 def serialize(_cls=None, *, ctor_args: Tuple[str] = ()):
+    """Class decorator to register a Proxy class for serialization"""
 
     global _registry
 
@@ -85,8 +90,12 @@ def default(obj):
 
         return dict_
 
-    logger.warning(f"Unknown class {class_} for {obj}")
-    # No exception as it would cancel the whole datablock
+    logger.error(f"Unregistered class {class_} for {obj}. Possible causes ...")
+    logger.error(f"... no implemention for synchronization of {class_}")
+    logger.error(f"... proxy class {class_} not loaded in mixer.blender_data.__init__.py")
+
+    # returning None omits the data chunk from the serialization, but keeps the supported elements. An exception would
+    # the whole update.
     return None
 
 

@@ -26,9 +26,10 @@ from typing import Any, Optional, TYPE_CHECKING, List, Set, Union
 
 import bpy.types as T  # noqa
 
+from mixer.blender_data.attributes import read_attribute
+from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Proxy
-from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
