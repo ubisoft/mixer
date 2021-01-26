@@ -215,7 +215,7 @@ class PtrToCollectionItemProxy(Proxy):
     _serialize = ("_path", "_index")
 
     _ctors = {(T.ShapeKey, "relative_key"): ("key_blocks",), (T.FCurve, "group"): ("groups",)}
-    """ { struct member: path to the enclosing datablock connection}"""
+    """ { struct member: path to the enclosing datablock collection}"""
 
     @classmethod
     def make(cls, attr_type: type, key: str) -> Optional[PtrToCollectionItemProxy]:

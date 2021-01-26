@@ -50,14 +50,6 @@ class StructProxy(Proxy):
         self._data = {}
         pass
 
-    @classmethod
-    def make(cls, struct: T.bpy_struct):
-        if isinstance(struct, T.FCurve):
-            from mixer.blender_data.misc_proxies import FCurveProxy
-
-            return FCurveProxy()
-        return StructProxy()
-
     def copy_data(self, other: StructProxy):
         self._data = other._data
 
