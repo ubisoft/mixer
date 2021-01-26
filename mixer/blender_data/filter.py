@@ -278,6 +278,7 @@ default_exclusions: FilterSet = {
                 # a view into FCurve.group
                 "channels",
                 # UI
+                "select",
                 "show_expanded",
                 "show_expanded_graph",
             ]
@@ -302,6 +303,8 @@ default_exclusions: FilterSet = {
     T.CurveMapPoint: [NameFilterOut(["select"])],
     T.DecimateModifier: [NameFilterOut(["face_count"])],
     T.FaceMap: [NameFilterOut(["index"])],
+    T.FCurve: [NameFilterOut(["select"])],
+    T.Keyframe: [NameFilterOut(["select", "select_right_handle", "select_left_handle"])],
     T.Image: [
         NameFilterOut(
             [
