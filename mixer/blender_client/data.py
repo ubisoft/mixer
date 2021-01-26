@@ -174,8 +174,9 @@ def build_data_update(buffer: bytes):
             _build_soas(datablock_proxy.mixer_uuid, message.soas)
 
     except DecodeError as e:
-        logger.error(f"Decode error for {str(e.args[1])[:100]} ...")
-        logger.error("... possible version mismatch")
+        logger.error(f"Decode error for {str(e.args[1])[:100]} . Possible causes...")
+        logger.error("... user error: version mismatch")
+        logger.error("... internal error: Proxy class not registered. Import it in blender_data.__init__.py")
     except Exception:
         logger.error("Exception during build_data_update")
         for line in traceback.format_exc().splitlines():
