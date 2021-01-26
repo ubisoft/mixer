@@ -514,7 +514,6 @@ default_exclusions: FilterSet = {
         NameFilterOut(
             [
                 "frame",
-                "relative_key",
             ]
         )
     ],
@@ -568,6 +567,7 @@ property_order: PropertiesOrder = {
     },
 }
 """Properties to deliver first because their value enables the possibility to write other attributes."""
+
 
 test_filter.append(default_exclusions)
 test_properties = SynchronizedProperties(test_filter, property_order)
