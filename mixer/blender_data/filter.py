@@ -276,7 +276,10 @@ default_exclusions: FilterSet = {
         NameFilterOut(
             [
                 # a view into FCurve.group
-                "channels"
+                "channels",
+                # UI
+                "show_expanded",
+                "show_expanded_graph",
             ]
         )
     ],
