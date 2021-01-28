@@ -824,10 +824,10 @@ def send_scene_data_to_server(scene, dummy):
 
 @persistent
 def handler_on_undo_redo_pre(scene):
-    logger.error(f"Undo/redo pre on {scene}")
-    share_data.client.send_error(f"Undo/redo pre from {get_mixer_prefs().user}")
     if share_data.use_vrtist_protocol():
         send_scene_data_to_server(scene, None)
+    else:
+        share_data.bpy_data_proxy.snapshot_undo_pre()
 
 
 def remap_objects_info():
@@ -868,63 +868,63 @@ def handler_on_undo_redo_post(scene, dummy):
 
     if not share_data.use_vrtist_protocol():
         # Generic sync: reload all datablocks
+        undone = share_data.bpy_data_proxy.snapshot_undo_post()
+        logger.warning(f"undone uuids : {undone}")
         share_data.bpy_data_proxy.reload_datablocks()
-        # generic.send_scene_data_to_server(scene, None)
-        return
+    else:
+        share_data.set_dirty()
+        share_data.clear_lists()
+        # apply only in object mode
+        if not is_in_object_mode():
+            return
 
-    share_data.set_dirty()
-    share_data.clear_lists()
-    # apply only in object mode
-    if not is_in_object_mode():
-        return
+        old_objects_name = dict([(k, None) for k in share_data.old_objects.keys()])  # value not needed
+        remap_objects_info()
+        for k, v in share_data.old_objects.items():
+            if k in old_objects_name:
+                old_objects_name[k] = v
 
-    old_objects_name = dict([(k, None) for k in share_data.old_objects.keys()])  # value not needed
-    remap_objects_info()
-    for k, v in share_data.old_objects.items():
-        if k in old_objects_name:
-            old_objects_name[k] = v
+        update_object_state(old_objects_name, share_data.old_objects)
 
-    update_object_state(old_objects_name, share_data.old_objects)
+        update_collections_state()
+        update_scenes_state()
 
-    update_collections_state()
-    update_scenes_state()
+        remove_objects_from_scenes()
+        remove_objects_from_collections()
+        remove_collections_from_scenes()
+        remove_collections_from_collections()
 
-    remove_objects_from_scenes()
-    remove_objects_from_collections()
-    remove_collections_from_scenes()
-    remove_collections_from_collections()
+        remove_collections()
+        add_scenes()
+        add_objects()
+        add_collections()
 
-    remove_collections()
-    add_scenes()
-    add_objects()
-    add_collections()
+        add_collections_to_scenes()
+        add_collections_to_collections()
 
-    add_collections_to_scenes()
-    add_collections_to_collections()
+        add_objects_to_collections()
+        add_objects_to_scenes()
 
-    add_objects_to_collections()
-    add_objects_to_scenes()
+        update_collections_parameters()
+        create_vrtist_objects()
+        delete_scene_objects()
+        rename_objects()
+        update_objects_visibility()
+        update_objects_constraints()
+        update_objects_transforms()
+        reparent_objects()
 
-    update_collections_parameters()
-    create_vrtist_objects()
-    delete_scene_objects()
-    rename_objects()
-    update_objects_visibility()
-    update_objects_constraints()
-    update_objects_transforms()
-    reparent_objects()
+        # send selection content (including data)
+        materials = set()
+        for obj in bpy.context.selected_objects:
+            update_transform(obj)
+            if hasattr(obj, "data"):
+                update_params(obj)
+            if hasattr(obj, "material_slots"):
+                for slot in obj.material_slots[:]:
+                    materials.add(slot.material)
 
-    # send selection content (including data)
-    materials = set()
-    for obj in bpy.context.selected_objects:
-        update_transform(obj)
-        if hasattr(obj, "data"):
-            update_params(obj)
-        if hasattr(obj, "material_slots"):
-            for slot in obj.material_slots[:]:
-                materials.add(slot.material)
+        for material in materials:
+            share_data.client.send_material(material)
 
-    for material in materials:
-        share_data.client.send_material(material)
-
-    share_data.update_current_data()
+        share_data.update_current_data()

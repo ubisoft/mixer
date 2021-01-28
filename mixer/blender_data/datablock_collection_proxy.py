@@ -39,7 +39,7 @@ from mixer.blender_data.proxy import Delta, DeltaUpdate, DeltaAddition, DeltaDel
 from mixer.blender_data.proxy import ensure_uuid, Proxy
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import Context
+    from mixer.blender_data.proxy import Context, Uuid
 
 
 logger = logging.getLogger(__name__)
@@ -63,12 +63,48 @@ class DatablockCollectionProxy(Proxy):
         self._data: Dict[str, DatablockProxy] = {}
         """One item per datablock. The key is the uuid, which eases rename management"""
 
+        self._snapshot_undo_pre: Dict[str, Uuid] = {}
+        """{name_full: uuid_before_undo} for all datablocks of the collection managed by this proxy at time of undo_pre"""
+
+        self._snapshot_undo_post: Dict[str, Uuid] = {}
+        """{name_full: uuid_before_undo} for datablocks with no uuid after undo"""
+
     def __len__(self):
         return len(self._data)
 
     def reload_datablocks(self, datablocks: Dict[str, T.ID]):
+        """Reload datablock references after undo, fixing undone uuids"""
         collection = getattr(bpy.data, self._name)
-        datablocks.update({datablock.mixer_uuid: datablock for datablock in collection})
+        datablocks.update({datablock.mixer_uuid: datablock for datablock in collection if datablock.mixer_uuid != ""})
+        if self._snapshot_undo_post:
+            # Restore uuids for datablocks that had a uuid before undo but have none after undo. Expected to be rare.
+            updates = {
+                self._snapshot_undo_post[datablock.name_full]: datablock
+                for datablock in collection
+                if datablock.name_full in self._snapshot_undo_post
+            }
+            for uuid, datablock in updates.items():
+                datablock.mixer_uuid = uuid
+            datablocks.update(updates)
+
+    def snapshot_undo_pre(self):
+        """Record pre undo state to recover undone uuids."""
+        collection = getattr(bpy.data, self._name)
+        self._snapshot_undo_pre = {datablock.name_full: datablock.mixer_uuid for datablock in collection}
+
+    def snapshot_undo_post(self) -> Dict[str, Uuid]:
+        """Compare post undo uuid state to recover undone uuids."""
+        collection = getattr(bpy.data, self._name)
+        undo_post = {datablock.name_full for datablock in collection if datablock.mixer_uuid == ""}
+        self._snapshot_undo_post = {
+            name: self._snapshot_undo_pre[name] for name in undo_post if name in self._snapshot_undo_pre
+        }
+
+        # temporary for logging
+        if self._snapshot_undo_post:
+            return (self._name, self._snapshot_undo_post)
+
+        return None
 
     def save(self, attribute: bpy.type.Collection, parent: Any, key: str, context: Context):
         """
@@ -221,7 +257,10 @@ class DatablockCollectionProxy(Proxy):
                 changeset.removals.append((uuid, proxy.collection_name, str(proxy)))
                 del self._data[uuid]
                 del context.proxy_state.proxies[uuid]
-                context.proxy_state.remove_datablock(uuid)
+                try:
+                    context.proxy_state.remove_datablock(uuid)
+                except KeyError:
+                    logger.warning(f"remove_datablock: n,o entry for {uuid}. Assuming removed by undo")
             except Exception:
                 logger.error(f"Exception during update/removed for proxy {proxy})  :")
                 for line in traceback.format_exc().splitlines():
