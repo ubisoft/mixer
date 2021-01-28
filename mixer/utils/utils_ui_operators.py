@@ -26,7 +26,42 @@ class Mixer_OT_Open_Documentation_Url(Operator):
         return {"FINISHED"}
 
 
-_classes = (Mixer_OT_Open_Documentation_Url,)
+class Mixer_OT_Open_Explorer(Operator):
+    bl_idname = "mixer.open_explorer"
+    bl_label = "Open Explorer"
+    bl_description = "Open an Explorer window located at the render output directory.\nShift + Click: Copy the path into the clipboard"
+
+    path: StringProperty()
+
+    def invoke(self, context, event):
+        abs_path = bpy.path.abspath(self.path)
+        head, tail = os.path.split(abs_path)
+        abs_path = head + "\\"
+
+        if event.shift:
+
+            def _copy_to_clipboard(txt):
+                cmd = "echo " + txt.strip() + "|clip"
+                return subprocess.check_call(cmd, shell=True)
+
+            _copy_to_clipboard(abs_path)
+
+        else:
+            if Path(abs_path).exists():
+                subprocess.Popen(f'explorer "{Path(abs_path)}"')
+            else:
+                print(f"Open Explorer failed: Path not found: {Path(abs_path)}")
+                from ..utils.utils import ShowMessageBox
+
+                ShowMessageBox(f"{abs_path} not found", "Open Explorer - Directory not found", "ERROR")
+
+        return {"FINISHED"}
+
+
+_classes = (
+    Mixer_OT_Open_Documentation_Url,
+    Mixer_OT_Open_Explorer,
+)
 
 
 def register():
