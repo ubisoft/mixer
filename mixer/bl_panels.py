@@ -32,6 +32,8 @@ from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientAttributes
 from mixer.blender_data.debug_addon import DebugDataPanel, use_debug_addon
 from mixer import display_version
+from mixer import config
+from mixer.ui import about, prefs
 
 if TYPE_CHECKING:
     from mixer.bl_preferences import MixerPreferences
@@ -322,6 +324,18 @@ class MixerSettingsPanel(bpy.types.Panel):
     def connected(self):
         return share_data.client is not None and share_data.client.is_connected()
 
+    def draw_header(self, context):
+        self.layout.emboss = "NONE"
+        icon = config.icons_col["Mixer_32"]
+        row = self.layout.row(align=True)
+        row.operator("mixer.about", text="", icon_value=icon.icon_id)
+
+    def draw_header_preset(self, context):
+        self.layout.emboss = "NONE"
+        row = self.layout.row(align=True)
+        row.menu("MIXER_MT_prefs_main_menu", icon="PREFERENCES", text="")
+        row.separator(factor=1.0)
+
     def draw(self, context):
         layout = self.layout.column()
 
@@ -455,6 +469,11 @@ def register():
     register_factory()
     update_panels_category(None, None)
 
+    about.register()
+    prefs.register()
+
 
 def unregister():
+    prefs.unregister()
+    about.unregister()
     unregister_factory()
