@@ -25,7 +25,6 @@ from typing import TYPE_CHECKING
 import bpy
 
 import os
-from pathlib import Path
 
 import logging
 from mixer import bl_operators
@@ -195,6 +194,7 @@ def draw_user_settings_ui(layout: bpy.types.UILayout):
     row.prop(mixer_prefs, "color", text="")
     icon = config.icons_col["General_Explorer_32"]
     user_data_path = os.environ.get("MIXER_DATA_DIR", get_data_directory())
+    #   from pathlib import Path
     #   user_data_path = Path(user_data_path).parent
     row.operator("mixer.open_explorer", text="", icon_value=icon.icon_id).path = str(user_data_path)
 
