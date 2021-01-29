@@ -163,6 +163,16 @@ def get_selected_room_dict():
     return share_data.client.rooms_attributes[get_mixer_props().rooms[room_index].name]
 
 
+def clear_undo_history():
+    # A horrible way to clear the undo stack since we can't do it normally in Blender :(
+    count = bpy.context.preferences.edit.undo_steps + 1
+    try:
+        for _ in range(count):
+            bpy.ops.ed.undo_push(message="Mixer clear history")
+    except RuntimeError:
+        logging.error("Clear history failed")
+
+
 class JoinRoomOperator(bpy.types.Operator):
     """Join a room"""
 
@@ -211,6 +221,8 @@ class JoinRoomOperator(bpy.types.Operator):
         room_attributes = get_selected_room_dict()
         logger.warning(f"Client Blender version: {room_attributes.get(RoomAttributes.BLENDER_VERSION, '')}")
         logger.warning(f"Client Mixer version: {room_attributes.get(RoomAttributes.MIXER_VERSION, '')}")
+
+        clear_undo_history()
 
         mixer_prefs = get_mixer_prefs()
         shared_folders = []
