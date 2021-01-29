@@ -28,6 +28,7 @@ import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.mesh_proxy import VertexGroups
 from mixer.blender_data.proxy import Delta, DeltaReplace
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
@@ -52,6 +53,7 @@ def _window_area():
     return None, None
 
 
+@serialize
 class ObjectProxy(DatablockProxy):
     """
     Proxy for a Object datablock. This specialization is required to handle properties with that are accessible

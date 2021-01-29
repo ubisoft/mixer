@@ -73,6 +73,8 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
 
     context.visit_state.recursion_guard.push(attr_property.identifier)
     try:
+        from mixer.blender_data.misc_proxies import PtrToCollectionItemProxy
+
         if attr_type == T.bpy_prop_collection:
             if hasattr(attr, "bl_rna") and isinstance(
                 attr.bl_rna, (type(T.CollectionObjects.bl_rna), type(T.CollectionChildren.bl_rna))
@@ -114,11 +116,15 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
 
                 return StructProxy().load(attr, key, context)
             else:
-                # Stadalone databocks are loaded from DatablockCollectionProxy, so we can only encounter
+                # Standalone databocks are loaded from DatablockCollectionProxy, so we can only encounter
                 # datablock references here
                 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
                 return DatablockRefProxy().load(attr, key, context)
+
+        proxy = PtrToCollectionItemProxy.make(attr_type, key)
+        if proxy:
+            return proxy.load(attr)
 
         if issubclass(attr_type, T.bpy_struct):
             from mixer.blender_data.struct_proxy import StructProxy

@@ -29,6 +29,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
 from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaReplace
 
 if TYPE_CHECKING:
@@ -41,6 +42,7 @@ DEBUG = True
 logger = logging.getLogger(__name__)
 
 
+@serialize
 class ShapeKeyProxy(DatablockProxy):
     """
     Proxy for a ShapeKey datablock.
@@ -78,37 +80,6 @@ class ShapeKeyProxy(DatablockProxy):
         context.proxy_state.add_datablock(shape_key_uuid, new_shape_key_datablock)
 
         return new_shape_key_datablock
-
-    def load(
-        self,
-        datablock: T.ID,
-        context: Context,
-    ) -> DatablockProxy:
-        super().load(datablock, context)
-
-        # ShapeKey.relative_key is a reference into Key.key_blocks. The default synchronization would
-        # load save its whole contents for each reference.
-        # So relative_key is skipped in the default synchronization, and the Blender reference is translated
-        # into a reference by name in Key.key_blocks.
-        # diff_must_replace() forces full replacement if any relative_key changes
-        key_blocks = datablock.key_blocks
-        for key_block_proxy in self._data["key_blocks"]:
-            key_block_name = key_block_proxy._data["name"]
-            key_block_proxy._data["relative_key"] = key_blocks.get(key_block_name).relative_key.name
-
-        return self
-
-    def save(self, datablock: T.ID, unused_parent: T.bpy_struct, unused_key: Union[int, str], context: Context) -> T.ID:
-        super().save(datablock, unused_parent, unused_key, context)
-
-        # see load()
-        key_blocks = datablock.key_blocks
-        for key_block_proxy in self._data["key_blocks"]:
-            key_block_name = key_block_proxy._data["name"]
-            relative_key_name = key_block_proxy._data["relative_key"]
-            key_blocks[key_block_name].relative_key = key_blocks[relative_key_name]
-
-        return datablock
 
     def apply(
         self,

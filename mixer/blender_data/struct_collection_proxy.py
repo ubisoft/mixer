@@ -30,6 +30,7 @@ import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaReplace, DeltaUpdate
 from mixer.blender_data.proxy import Proxy
 from mixer.blender_data.struct_proxy import StructProxy
@@ -54,6 +55,7 @@ def _proxy_factory(attr):
         return StructProxy()
 
 
+@serialize
 class StructCollectionProxy(Proxy):
     """
     Proxy to a bpy_prop_collection of non-datablock Struct.
@@ -65,8 +67,6 @@ class StructCollectionProxy(Proxy):
     _serialize = ("_sequence", "_diff_additions", "_diff_deletions", "_diff_updates")
 
     def __init__(self):
-        # TODO remove _data, just here to make JsonCodec happy
-        self._data = {}
         self._diff_updates: List[Tuple[int, DeltaUpdate]] = []
         self._diff_deletions: int = 0
         self._diff_additions: List[DeltaAddition] = []

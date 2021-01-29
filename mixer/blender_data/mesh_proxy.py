@@ -31,6 +31,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute
 from mixer.blender_data.datablock_proxy import DatablockProxy
+from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate
 
 if TYPE_CHECKING:
@@ -133,6 +134,7 @@ class VertexGroups:
         return array_sequence
 
 
+@serialize
 class MeshProxy(DatablockProxy):
     """
     Proxy for a Mesh datablock. This specialization is required to handle geometry resize processing, that

@@ -277,6 +277,27 @@ class BpyDataProxy(Proxy):
         for collection_proxy in self._data.values():
             collection_proxy.reload_datablocks(datablocks)
 
+        try:
+            del datablocks[""]
+        except KeyError:
+            pass
+
+    def snapshot_undo_pre(self):
+        """Record pre undo state to recover undone uuids."""
+        for collection_proxy in self._data.values():
+            collection_proxy.snapshot_undo_pre()
+
+    def snapshot_undo_post(self):
+        """Compare post undo uuid state to recover undone uuids."""
+        all_undone: List[Tuple[str, Dict[str, Uuid]]] = []
+        for collection_proxy in self._data.values():
+            undone = collection_proxy.snapshot_undo_post()
+            if undone:
+                all_undone.append(undone)
+
+        # only for logging
+        return all_undone
+
     def context(self, synchronized_properties: SynchronizedProperties = safe_properties) -> Context:
         return Context(self.state, synchronized_properties)
 
@@ -389,9 +410,7 @@ class BpyDataProxy(Proxy):
         """
         bpy_data_collection_proxy = self._data.get(incoming_proxy.collection_name)
         if bpy_data_collection_proxy is None:
-            logger.warning(
-                f"create_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} "
-            )
+            logger.error(f"create_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} ")
             return None, None
 
         context = self.context(synchronized_properties)
