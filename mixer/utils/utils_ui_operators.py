@@ -47,7 +47,7 @@ class Mixer_OT_Open_Documentation_Url(Operator):  # noqa 801
         return {"FINISHED"}
 
 
-class Mixer_OT_Open_Explorer(Operator):
+class Mixer_OT_Open_Explorer(Operator):  # noqa 801
     bl_idname = "mixer.open_explorer"
     bl_label = "Open Explorer"
     bl_description = "Open an Explorer window located at the render output directory.\nShift + Click: Copy the path into the clipboard"

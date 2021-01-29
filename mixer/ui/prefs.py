@@ -28,7 +28,7 @@ from bpy.types import Menu
 #############
 
 
-class MIXER_MT_prefs_main_menu(Menu):
+class MIXER_MT_prefs_main_menu(Menu):  # noqa 801
     bl_idname = "MIXER_MT_prefs_main_menu"
     bl_label = "Mixer Settings"
 

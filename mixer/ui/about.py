@@ -25,7 +25,7 @@ from bpy.types import Operator
 from mixer import display_version
 
 
-class Mixer_OT_About(Operator):
+class Mixer_OT_About(Operator):  # noqa 801
     bl_idname = "mixer.about"
     bl_label = "About UAS Mixer..."
     bl_description = "More information about UAS Mixer..."
