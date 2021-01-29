@@ -93,9 +93,9 @@ class HandlerManager:
                 bpy.app.handlers.redo_pre.append(handler_on_undo_redo_pre)
                 bpy.app.handlers.undo_post.append(handler_on_undo_redo_post)
                 bpy.app.handlers.redo_post.append(handler_on_undo_redo_post)
-                bpy.app.handlers.load_post.append(handler_on_load)
+                bpy.app.handlers.load_pre.append(handler_on_load)
             else:
-                bpy.app.handlers.load_post.remove(handler_on_load)
+                bpy.app.handlers.load_pre.remove(handler_on_load)
                 # bpy.app.handlers.frame_change_post.remove(handler_send_frame_changed)
                 bpy.app.handlers.depsgraph_update_post.remove(handler_send_scene_data_to_server)
                 bpy.app.handlers.undo_pre.remove(handler_on_undo_redo_pre)
@@ -180,7 +180,8 @@ def update_frame_start_end():
 @persistent
 def handler_on_load(scene):
     logger.info("handler_on_load")
-    pass
+    if share_data.client is not None:
+        bpy.ops.mixer.disconnect()
 
 
 def get_scene(scene_name):
