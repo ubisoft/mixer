@@ -39,7 +39,7 @@ bl_info = {
     "blender": (2, 83, 9),
     "location": "",
     "warning": "Experimental addon, can break your scenes",
-    "wiki_url": "https://github.com/ubisoft/mixer",
+    "wiki_url": "https://gitlab.com/ubisoft-animation-studio/mixer",
     "tracker_url": "",
     "category": "Collaboration",
 }
@@ -69,10 +69,9 @@ def register():
     from mixer import bl_properties, bl_preferences
     from mixer.blender_data import debug_addon
     from mixer.log_utils import Formatter, get_log_file
-    from mixer import config
+    from mixer import icons
     from mixer.utils import utils_ui_operators
-
-    config.init_global_variables()
+    from mixer import ui
 
     if len(logger.handlers) == 0:
         # Add the pid to the log. Just enough for the tests, that merge the logs and need to distinguish
@@ -104,11 +103,13 @@ def register():
 
     debug_addon.register()
 
+    icons.register()
     bl_preferences.register()
     bl_properties.register()
     bl_panels.register()
     bl_operators.register()
     utils_ui_operators.register()
+    ui.register()
 
     atexit.register(cleanup)
 
@@ -118,19 +119,19 @@ def unregister():
     from mixer import bl_operators
     from mixer import bl_properties, bl_preferences
     from mixer.blender_data import debug_addon
-    from mixer import config
     from mixer.utils import utils_ui_operators
+    from mixer import ui
 
     cleanup()
 
     atexit.unregister(cleanup)
 
+    ui.unregister()
     utils_ui_operators.unregister()
     bl_operators.unregister()
     bl_panels.unregister()
     bl_properties.unregister()
     bl_preferences.unregister()
+    icons.unregister()
 
     debug_addon.unregister()
-
-    config.release_global_variables()

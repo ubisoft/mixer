@@ -78,7 +78,7 @@ class Mixer_OT_About(Operator):  # noqa 801
         row.separator()
         row.operator(
             "mixer.open_documentation_url", text="Documentation, Download, Feedback..."
-        ).path = "https://github.com/ubisoft/mixer#mixer"
+        ).path = "https://gitlab.com/ubisoft-animation-studio/mixer#mixer"
 
         box.separator()
 

@@ -72,9 +72,6 @@ class Mixer_OT_Open_Explorer(Operator):  # noqa 801
                 subprocess.Popen(f'explorer "{Path(abs_path)}"')
             else:
                 print(f"Open Explorer failed: Path not found: {Path(abs_path)}")
-                from ..utils.utils import ShowMessageBox
-
-                ShowMessageBox(f"{abs_path} not found", "Open Explorer - Directory not found", "ERROR")
 
         return {"FINISHED"}
 

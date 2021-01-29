@@ -34,8 +34,7 @@ from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientAttributes
 from mixer.blender_data.debug_addon import DebugDataPanel, use_debug_addon
 from mixer import display_version
-from mixer import config
-from mixer.ui import about, prefs
+from mixer import icons
 from mixer.local_data import get_data_directory
 
 if TYPE_CHECKING:
@@ -192,7 +191,7 @@ def draw_user_settings_ui(layout: bpy.types.UILayout):
     row.prop(mixer_prefs, "user", text="")
     row = grid.row()
     row.prop(mixer_prefs, "color", text="")
-    icon = config.icons_col["General_Explorer_32"]
+    icon = icons.icons_col["General_Explorer_32"]
     user_data_path = os.environ.get("MIXER_DATA_DIR", get_data_directory())
     #   from pathlib import Path
     #   user_data_path = Path(user_data_path).parent
@@ -358,7 +357,7 @@ class MixerSettingsPanel(bpy.types.Panel):
 
     def draw_header(self, context):
         self.layout.emboss = "NONE"
-        icon = config.icons_col["Mixer_32"]
+        icon = icons.icons_col["Mixer_32"]
         row = self.layout.row(align=True)
         row.operator("mixer.about", text="", icon_value=icon.icon_id)
 
@@ -515,11 +514,6 @@ def register():
     register_factory()
     update_panels_category(None, None)
 
-    about.register()
-    prefs.register()
-
 
 def unregister():
-    prefs.unregister()
-    about.unregister()
     unregister_factory()

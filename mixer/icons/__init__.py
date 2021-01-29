@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-This module defines the global variables used in the addon.
+This module defines the list of the custom icons used by the add-on.
 """
 
 import bpy
@@ -26,20 +26,19 @@ from pathlib import Path
 import bpy.utils.previews
 
 
-def init_global_variables():
+def register():
 
-    # icons ############
     global icons_col
 
     pcoll = bpy.utils.previews.new()
-    my_icons_dir = os.path.join(os.path.dirname(__file__), "./icons")
+    my_icons_dir = os.path.join(os.path.dirname(__file__), ".")
     for png in Path(my_icons_dir).rglob("*.png"):
         pcoll.load(png.stem, str(png), "IMAGE")
 
     icons_col = pcoll
 
 
-def release_global_variables():
+def unregister():
 
     global icons_col
 

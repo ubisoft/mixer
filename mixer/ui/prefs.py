@@ -48,7 +48,7 @@ class MIXER_MT_prefs_main_menu(Menu):  # noqa 801
         row = layout.row(align=True)
         row.operator(
             "mixer.open_documentation_url", text="Documentation"
-        ).path = "https://github.com/ubisoft/mixer#mixer"
+        ).path = "https://gitlab.com/ubisoft-animation-studio/mixer#mixer"
 
         layout.separator()
         row = layout.row(align=True)
