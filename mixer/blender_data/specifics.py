@@ -42,7 +42,6 @@ import mathutils
 if TYPE_CHECKING:
     from mixer.blender_data.aos_proxy import AosProxy
     from mixer.blender_data.datablock_proxy import DatablockProxy
-    from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
     from mixer.blender_data.proxy import Context, Proxy
     from mixer.blender_data.struct_proxy import StructProxy
 
@@ -733,6 +732,7 @@ def diff_must_replace(
 
     if collection_property == _object_material_slots_property:
         from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+
         # Object.material_slots has no bl_rna, so rely on the property to identify it
         # TODO should we change to a dispatch on the property value ?
 
