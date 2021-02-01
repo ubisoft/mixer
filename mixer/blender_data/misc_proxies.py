@@ -250,6 +250,8 @@ class PtrToCollectionItemProxy(Proxy):
     def _compute_index(self, attribute: T.bpy_struct):
         """Returns the index in the pointee bpy_prop_collection (e.g Key.key_blocks) that contains the item referenced
         by the attribute managed by this proxy (e.g ShapeKey.relative_key)."""
+        if attribute is None:
+            return -1
         collection = self._collection(attribute.id_data)
         for index, item in enumerate(collection):
             if item == attribute:
@@ -282,8 +284,12 @@ class PtrToCollectionItemProxy(Proxy):
             key: the string or index that identifies attribute in parent
             context: proxy and visit state
         """
-        collection = self._collection(attribute.id_data)
-        pointee = collection[self._index]
+
+        if self._index == -1:
+            pointee = None
+        else:
+            collection = self._collection(parent.id_data)
+            pointee = collection[self._index]
         write_attribute(parent, key, pointee, context)
 
     def apply(
