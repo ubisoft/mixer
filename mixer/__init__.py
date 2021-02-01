@@ -119,6 +119,7 @@ def unregister():
     from mixer import bl_operators
     from mixer import bl_properties, bl_preferences
     from mixer.blender_data import debug_addon
+    from mixer import icons
     from mixer.utils import utils_ui_operators
     from mixer import ui
 
