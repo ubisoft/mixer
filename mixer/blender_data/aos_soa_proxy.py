@@ -81,7 +81,7 @@ class AosElement(Proxy):
         """
 
         for index, item in enumerate(bl_collection):
-            self._data[index] = read_attribute(getattr(item, attr_name), index, attr_property, context)
+            self._data[index] = read_attribute(getattr(item, attr_name), index, attr_property, bl_collection, context)
 
         try:
             if not isinstance(self._data[0], str):

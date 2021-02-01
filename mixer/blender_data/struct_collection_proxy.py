@@ -271,7 +271,7 @@ class StructCollectionProxy(Proxy):
                 diff._diff_deletions = len(sequence) - clear_from
 
                 for i, item in enumerate(collection[clear_from:], clear_from):
-                    value = read_attribute(item, i, item_property, context)
+                    value = read_attribute(item, i, item_property, collection, context)
                     diff._diff_additions.append(DeltaAddition(value))
             finally:
                 context.visit_state.path.pop()

@@ -47,11 +47,11 @@ MAX_DEPTH = 30
 _builtin_types = (float, int, bool, str, bytes)
 
 
-def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, context: Context):
-    """
-    Load a property into a python object of the appropriate type, be it a Proxy or a native python object
-    """
+class _NotBuiltin(Exception):
+    pass
 
+
+def _read_builtin(attr):
     if isinstance(attr, _builtin_types):
         return attr
 
@@ -60,21 +60,34 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
         return list(attr)
     if is_matrix(attr_type):
         return [list(col) for col in attr.col]
+
+    # TODO flatten
+    if attr_type == T.bpy_prop_array:
+        return list(attr)
+
+    raise _NotBuiltin
+
+
+def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, parent: T.bpy_struct, context: Context):
+    """
+    Load a property into a python object of the appropriate type, be it a Proxy or a native python object
+    """
+
+    try:
+        return _read_builtin(attr)
+    except _NotBuiltin:
+        pass
+
     if isinstance(attr, set):
         from mixer.blender_data.misc_proxies import SetProxy
 
         return SetProxy().load(attr)
 
-    # We have tested the types that are usefully reported by the python binding, now harder work.
-    # These were implemented first and may be better implemented with the bl_rna property of the parent struct
-    # TODO flatten
-    if attr_type == T.bpy_prop_array:
-        return list(attr)
-
     context.visit_state.recursion_guard.push(attr_property.identifier)
     try:
         from mixer.blender_data.misc_proxies import PtrToCollectionItemProxy
 
+        attr_type = type(attr)
         if attr_type == T.bpy_prop_collection:
             if hasattr(attr, "bl_rna") and isinstance(
                 attr.bl_rna, (type(T.CollectionObjects.bl_rna), type(T.CollectionChildren.bl_rna))
@@ -122,7 +135,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
 
                 return DatablockRefProxy().load(attr, key, context)
 
-        proxy = PtrToCollectionItemProxy.make(attr_type, key)
+        proxy = PtrToCollectionItemProxy.make(type(parent), key)
         if proxy:
             return proxy.load(attr)
 
@@ -294,10 +307,8 @@ def diff_attribute(
             return value.diff(item, key, item_property, context)
 
         # An attribute mappable on a python builtin type
-        # TODO overkill to call read_attribute because it is not a proxy type
-        blender_value = read_attribute(item, key, item_property, context)
+        blender_value = _read_builtin(item)
         if blender_value != value:
-            # TODO This is too coarse (whole lists)
             return DeltaUpdate(blender_value)
 
     except Exception as e:

@@ -21,6 +21,7 @@ See synchronization.md
 """
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Optional, TYPE_CHECKING, Union
 

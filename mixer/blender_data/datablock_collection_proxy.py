@@ -459,7 +459,7 @@ class DatablockRefCollectionProxy(Proxy):
         maybe_updated_keys = proxy_keys & blender_keys
 
         for k in added_keys:
-            value = read_attribute(blender_items[k], k, item_property, context)
+            value = read_attribute(blender_items[k], k, item_property, collection, context)
             assert isinstance(value, (DatablockProxy, DatablockRefProxy))
             diff._data[k] = DeltaAddition(value)
 

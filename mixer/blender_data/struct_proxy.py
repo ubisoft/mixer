@@ -74,7 +74,7 @@ class StructProxy(Proxy):
         try:
             for name, bl_rna_property in properties:
                 attr = getattr(attribute, name)
-                attr_value = read_attribute(attr, name, bl_rna_property, context)
+                attr_value = read_attribute(attr, name, bl_rna_property, attribute, context)
                 self._data[name] = attr_value
         finally:
             context.visit_state.path.pop()

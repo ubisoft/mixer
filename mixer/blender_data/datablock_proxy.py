@@ -195,7 +195,7 @@ class DatablockProxy(StructProxy):
         with context.visit_state.enter_datablock(self, datablock):
             for name, bl_rna_property in properties:
                 attr = getattr(datablock, name)
-                attr_value = read_attribute(attr, name, bl_rna_property, context)
+                attr_value = read_attribute(attr, name, bl_rna_property, datablock, context)
                 # Also write None values to reset attributes like Camera.dof.focus_object
                 # TODO for scene, test difference, only send update if dirty as continuous updates to scene
                 # master collection will conflicting writes with Master Collection
