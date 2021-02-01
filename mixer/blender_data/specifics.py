@@ -30,7 +30,7 @@ import array
 import logging
 from pathlib import Path
 import traceback
-from typing import Any, Callable, Dict, ItemsView, List, Optional, TYPE_CHECKING, Union
+from typing import Any, Callable, cast, Dict, ItemsView, List, Optional, TYPE_CHECKING, Union
 
 from mixer.blender_data.proxy import ExternalFileFailed
 
@@ -44,6 +44,7 @@ if TYPE_CHECKING:
     from mixer.blender_data.datablock_proxy import DatablockProxy
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
     from mixer.blender_data.proxy import Context, Proxy
+    from mixer.blender_data.struct_proxy import StructProxy
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +266,6 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
 @bpy_data_ctor.register("objects")
 def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
-    from mixer.blender_data.misc_proxies import NonePtrProxy
 
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
@@ -273,8 +273,6 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
     data_proxy = proxy.data("data")
     if isinstance(data_proxy, DatablockRefProxy):
         data_datablock = data_proxy.target(context)
-    elif isinstance(data_proxy, NonePtrProxy):
-        data_datablock = None
     else:
         # error on the sender side
         logger.warning(f"bpy.data.objects[{name}].data proxy is a {data_proxy.__class__}.")
@@ -422,6 +420,24 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
     return filtered.items()
 
 
+def create_clear_animation_data(target: T.bpy_struct, proxy: Union[StructProxy, DatablockProxy]):
+    if hasattr(target, "animation_data"):
+        from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+
+        animation_data = cast(Optional[DatablockRefProxy], proxy.data("animation_data"))
+        if animation_data is not None:
+            if animation_data:
+                if target.animation_data is None:
+                    target.animation_data_create()
+            else:
+                if target.animation_data is not None:
+                    target.animation_data_clear()
+
+
+def pre_save_struct(proxy: StructProxy, target: T.bpy_struct):
+    create_clear_animation_data(target, proxy)
+
+
 def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
     """Process attributes that must be saved first and return a possibly updated reference to the target"""
 
@@ -444,15 +460,15 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
             elif not is_grease_pencil and target.grease_pencil:
                 bpy.data.materials.remove_gpencil_data(target)
     elif isinstance(target, T.Scene):
-        from mixer.blender_data.misc_proxies import NonePtrProxy
-
         sequence_editor = proxy.data("sequence_editor")
         if sequence_editor is not None:
             # NonePtrProxy or StructProxy
-            if not isinstance(sequence_editor, NonePtrProxy) and target.sequence_editor is None:
-                target.sequence_editor_create()
-            elif isinstance(sequence_editor, NonePtrProxy) and target.sequence_editor is not None:
-                target.sequence_editor_clear()
+            if sequence_editor:
+                if target.sequence_editor is None:
+                    target.sequence_editor_create()
+            else:
+                if target.sequence_editor is not None:
+                    target.sequence_editor_clear()
     elif isinstance(target, T.Light):
         # required first to have access to new light type attributes
         light_type = proxy.data("type")
@@ -716,9 +732,9 @@ def diff_must_replace(
     """
 
     if collection_property == _object_material_slots_property:
+        from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
         # Object.material_slots has no bl_rna, so rely on the property to identify it
         # TODO should we change to a dispatch on the property value ?
-        from mixer.blender_data.misc_proxies import NonePtrProxy
 
         if len(collection) != len(sequence):
             return True
@@ -729,8 +745,8 @@ def diff_must_replace(
         # As diff yields a complete DiffReplace or nothing, all the attributes are present in the proxy
         for bl_item, proxy in zip(collection, sequence):
             bl_material = bl_item.material
-            material_proxy: Union[DatablockRefProxy, NonePtrProxy] = proxy.data("material")
-            if (bl_material is None) != isinstance(material_proxy, NonePtrProxy):
+            material_proxy = cast(Optional[DatablockRefProxy], proxy.data("material"))
+            if (bl_material is None) != bool(material_proxy):
                 return True
             if bl_material is not None and bl_material.mixer_uuid != material_proxy.mixer_uuid:
                 return True

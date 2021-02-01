@@ -26,8 +26,7 @@ from typing import Any, Optional, TYPE_CHECKING, List, Set, Tuple, Union
 
 import bpy.types as T  # noqa
 
-from mixer.blender_data.attributes import read_attribute, write_attribute
-from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+from mixer.blender_data.attributes import write_attribute
 from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Proxy
 
@@ -35,98 +34,6 @@ if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
 
 logger = logging.getLogger(__name__)
-
-
-@serialize
-class NonePtrProxy(Proxy):
-    """Proxy for a None PointerProperty value.
-
-    When setting a PointerProperty from None to a valid reference, apply_attributs requires that
-    the proxyfied value implements apply().
-
-    This is used for Pointers to standalone datablocks like Scene.camera.
-
-    TODO Check it it is meaningfull for anything else ?
-    """
-
-    def target(self, context: Context) -> None:
-        return None
-
-    @property
-    def mixer_uuid(self) -> str:
-        return "00000000-0000-0000-0000-000000000000"
-
-    def load(self, *_):
-        return self
-
-    def save(self, unused_attribute, parent: T.bpy_struct, key: Union[int, str], context: Context):
-        """Save None into parent.key or parent[key]"""
-
-        if isinstance(key, int):
-            parent[key] = None
-        else:
-            try:
-                setattr(parent, key, None)
-            except AttributeError as e:
-                # Motsly errors like
-                #   AttributeError: bpy_struct: attribute "node_tree" from "Material" is read-only
-                # Avoiding them would require filtering attributes on save in order not to set
-                # Material.node_tree if Material.use_nodes is False
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug("NonePtrProxy.save(): exception for attribute ...")
-                    logger.debug(f"... {context.visit_state.display_path()}.{key}...")
-                    logger.debug(f"... {e!r}")
-
-    def apply(
-        self,
-        attribute: Union[T.bpy_struct, T.bpy_prop_collection],
-        parent: Union[T.bpy_struct, T.bpy_prop_collection],
-        key: Union[int, str],
-        delta: Delta,
-        context: Context,
-        to_blender: bool = True,
-    ) -> Union[DatablockRefProxy, NonePtrProxy]:
-        """
-        Apply delta to an attribute with None value.
-
-        This is used for instance Scene.camera is None and updatde to hold a valid Camera reference
-
-        Args:
-            attribute: the Blender attribute to update (e.g a_scene.camera)
-            parent: the attribute that contains attribute (e.g. a Scene instance)
-            key: the key that identifies attribute in parent (e.g; "camera").
-            delta: the delta to apply
-            context: proxy and visit state
-            to_blender: update attribute in addition to this Proxy
-        """
-        update = delta.value
-
-        if isinstance(update, DatablockRefProxy):
-            if to_blender:
-                datablock = context.proxy_state.datablock(update._datablock_uuid)
-                if isinstance(key, int):
-                    parent[key] = datablock
-                else:
-                    setattr(parent, key, datablock)
-            return update
-
-        # A none PointerProperty that can point to something that is not a datablock.
-        # Can this happen ?
-        logger.error(f"NonePtrProxy.apply(): not implemented update type {type(update)} for attribute ...")
-        logger.error(f"... {context.visit_state.display_path()}.{key}...")
-        return self
-
-    def diff(
-        self,
-        container: Union[T.bpy_prop_collection, T.Struct],
-        key: Union[str, int],
-        prop: T.Property,
-        context: Context,
-    ) -> Optional[DeltaUpdate]:
-        attr = read_attribute(container, key, prop, context)
-        if isinstance(attr, NonePtrProxy):
-            return None
-        return DeltaUpdate(attr)
 
 
 @serialize
@@ -323,6 +230,9 @@ class PtrToCollectionItemProxy(Proxy):
 
         self._index: int = -1
         """Index in the collection identified by _path, -1 if ot present"""
+
+    def __bool__(self):
+        return self._index != -1
 
     def _collection(self, datablock) -> T.bpy_prop_collection:
         """Returns the bpy_prop_collection that contains the pointees referenced by the attribute managed by this proxy
