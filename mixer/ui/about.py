@@ -50,7 +50,7 @@ class Mixer_OT_About(Operator):  # noqa 801
         ###############
         row = box.row()
         row.separator()
-        row.label(text="Written by Philippe Crassous, Laurent Noel")
+        row.label(text="Written by the R&D team of Ubisoft Animation Studio")
 
         # Purpose
         ###############

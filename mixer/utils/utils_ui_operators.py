@@ -22,6 +22,7 @@ This module define Blender Operators types used in the ui of the addon.
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 
 import bpy
@@ -42,7 +43,12 @@ class Mixer_OT_Open_Documentation_Url(Operator):  # noqa 801
             cmd = "echo " + (self.path).strip() + "|clip"
             subprocess.check_call(cmd, shell=True)
         else:
-            subprocess.Popen(f'explorer "{self.path}"')
+            if sys.platform == "darwin":
+                subprocess.check_call(["open", "--", self.path])
+            elif sys.platform == "linux2":
+                subprocess.check_call(["xdg-open", "--", self.path])
+            elif sys.platform == "win32":
+                subprocess.Popen(f'explorer "{self.path}"')
 
         return {"FINISHED"}
 
@@ -57,7 +63,7 @@ class Mixer_OT_Open_Explorer(Operator):  # noqa 801
     def invoke(self, context, event):
         abs_path = bpy.path.abspath(self.path)
         head, tail = os.path.split(abs_path)
-        abs_path = head + "\\"
+        abs_path = head + os.sep
 
         if event.shift:
 
@@ -68,8 +74,25 @@ class Mixer_OT_Open_Explorer(Operator):  # noqa 801
             _copy_to_clipboard(abs_path)
 
         else:
+            if sys.platform == "darwin":
+
+                def open_folder(path):
+                    subprocess.check_call(["open", "--", path])
+
+            elif sys.platform == "linux2":
+
+                def open_folder(path):
+                    subprocess.check_call(["xdg-open", "--", path])
+
+            elif sys.platform == "win32":
+
+                def open_folder(path):
+                    subprocess.Popen(f'explorer "{Path(abs_path)}"')
+
             if Path(abs_path).exists():
-                subprocess.Popen(f'explorer "{Path(abs_path)}"')
+                abs_path = abs_path.replace(os.sep, "/")
+                open_folder(abs_path)
+
             else:
                 print(f"Open Explorer failed: Path not found: {Path(abs_path)}")
 
