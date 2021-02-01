@@ -406,6 +406,17 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
 
+    if isinstance(bpy_struct, T.FCurve):
+        # HACK Fcurve.group cannot be set from None. Attempt to do so trigger a Blender log "Error". So dso not save
+        # group if it is None. Anyhow, new Fcurve are created with group set to None. If any Fcurve.group is changed to
+        # None, The ActionFCurves collection will be rewritten (see clear_from())
+        if bpy_struct.group is not None:
+            return properties
+
+        filter_props = ["group"]
+        filtered = {k: v for k, v in properties if k not in filter_props}
+        return filtered.items()
+
     filter_props = []
     if any(isinstance(bpy_struct, t) for t in filter_crop_transform):
         if not bpy_struct.use_crop:
@@ -851,7 +862,7 @@ def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]
 @clear_from.register(T.ObjectModifiers)
 @clear_from.register(T.ObjectGpencilModifiers)
 @clear_from.register(T.SequenceModifiers)
-def _clear_from_name(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
     """clear_from() implementation for collections with items types are named "type" """
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         if proxy.data("type") != item.type:
@@ -859,8 +870,8 @@ def _clear_from_name(collection: T.bpy_prop_collection, sequence: List[Datablock
     return min(len(sequence), len(collection))
 
 
-@clear_from.register(T.Nodes)
-def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+@clear_from.register(T.Nodes)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
     """clear_from() implementation for collections with items types are named "bl_idname".
 
     Nodes items cannot be morphed in place, so an update can keep the head of sequence for items
@@ -869,6 +880,22 @@ def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[Data
     """
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         if proxy.data("bl_idname") != item.bl_idname:
+            return i
+
+    return min(len(sequence), len(collection))
+
+
+@clear_from.register(T.ActionFCurves)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+    """clear_from() implementation for ActionFCurves.
+
+    The API can set a FCurve.group to a non None value but cannot set FCurve.group to a None value. So we clear the
+    collection from the first item that has a not None to None change
+    """
+    from mixer.blender_data.misc_proxies import NonePtrProxy
+
+    for i, (proxy, item) in enumerate(zip(sequence, collection)):
+        if not isinstance(proxy.data("group"), NonePtrProxy) and item.group is None:
             return i
 
     return min(len(sequence), len(collection))

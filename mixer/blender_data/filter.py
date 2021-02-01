@@ -549,6 +549,10 @@ Per-type property exclusions
 
 
 property_order: PropertiesOrder = {
+    T.Action: {
+        # before fcurves
+        "groups",
+    },
     T.ColorManagedViewSettings: {
         "use_curve_mapping",
     },
