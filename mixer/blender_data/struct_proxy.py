@@ -220,6 +220,11 @@ class StructProxy(Proxy):
             properties = context.synchronized_properties.properties(attribute)
             properties = specifics.conditional_properties(attribute, properties)
             for k, member_property in properties:
+                # TODO in test_differential.StructDatablockRef.test_remove
+                # target et a scene, k is world and v (current world value) is None
+                # so diff fails. v should be a BpyIDRefNoneProxy
+
+                # make a difference between None value and no member
                 try:
                     member = getattr(attribute, k)
                 except AttributeError:

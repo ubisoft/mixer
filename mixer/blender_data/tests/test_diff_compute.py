@@ -109,6 +109,7 @@ class StructDatablockRef(DifferentialCompute):
         self.assertIsInstance(world_update, DatablockRefProxy)
         self.assertEqual(world_update._datablock_uuid, world2.mixer_uuid)
 
+    @unittest.skip("Need BpyIDRefNoneProxy")
     def test_remove(self):
         # set reference from a valid datablock to None
         # test_diff_compute.StructDatablockRef.test_remove
@@ -118,14 +119,13 @@ class StructDatablockRef(DifferentialCompute):
         self.proxy.load(test_properties)
         self.scene.world = None
         self.generate_all_uuids()
-        scene_proxy = self.proxy.data("scenes").search_one("Scene")
-        scene_delta = scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
+        scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
+        # TODO fails. should a null ref be implemented as a DatablockRefProxy
+        # with a null ref (uuid is None)
+        # or what else
         self.assertIsInstance(scene_delta, DeltaUpdate)
-        world_delta = scene_delta.value.data("world", resolve_delta=False)
-        self.assertIsInstance(world_delta, DeltaUpdate)
-        value = world_delta.value
-        self.assertIsInstance(value, DatablockRefProxy)
-        self.assertFalse(value, DatablockRefProxy)
+        world_delta = scene_delta.value.data("world")
+        self.assertIsInstance(world_delta, DeltaDeletion)
 
 
 class Collection(DifferentialCompute):

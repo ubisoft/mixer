@@ -43,10 +43,14 @@ logger = logging.getLogger(__name__)
 
 
 def _proxy_factory(attr):
-    if attr is None or (isinstance(attr, T.ID) and not attr.is_embedded_data):
+    if isinstance(attr, T.ID) and not attr.is_embedded_data:
         from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
         return DatablockRefProxy()
+    elif attr is None:
+        from mixer.blender_data.misc_proxies import NonePtrProxy
+
+        return NonePtrProxy()
     else:
         return StructProxy()
 
@@ -262,14 +266,21 @@ class StructCollectionProxy(Proxy):
             context.visit_state.path.append(key)
             try:
                 diff = self.__class__()
+
+                # items from clear_from index cannot be updated, most often because eir type has changed (e.g
+                # ObjectModifier)
                 clear_from = specifics.clear_from(collection, sequence)
+
+                # run a diff for the head, that can be updated in-place
                 for i in range(clear_from):
                     delta = diff_attribute(collection[i], i, item_property, sequence[i], context)
                     if delta is not None:
                         diff._diff_updates.append((i, delta))
 
+                # delete the existing tail that cannot be modified
                 diff._diff_deletions = len(sequence) - clear_from
 
+                # add the new tail
                 for i, item in enumerate(collection[clear_from:], clear_from):
                     value = read_attribute(item, i, item_property, collection, context)
                     diff._diff_additions.append(DeltaAddition(value))

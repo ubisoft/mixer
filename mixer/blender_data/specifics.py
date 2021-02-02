@@ -265,6 +265,7 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
 @bpy_data_ctor.register("objects")
 def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+    from mixer.blender_data.misc_proxies import NonePtrProxy
 
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
@@ -272,6 +273,8 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
     data_proxy = proxy.data("data")
     if isinstance(data_proxy, DatablockRefProxy):
         data_datablock = data_proxy.target(context)
+    elif isinstance(data_proxy, NonePtrProxy):
+        data_datablock = None
     else:
         # error on the sender side
         logger.warning(f"bpy.data.objects[{name}].data proxy is a {data_proxy.__class__}.")
@@ -421,36 +424,11 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
 
 def create_clear_animation_data(target: T.bpy_struct, proxy: Union[StructProxy, DatablockProxy]):
     if hasattr(target, "animation_data"):
-        from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+        from mixer.blender_data.struct_proxy import StructProxy
 
-        animation_data = cast(Optional[DatablockRefProxy], proxy.data("animation_data"))
+        animation_data = cast(Optional[StructProxy], proxy.data("animation_data"))
         if animation_data is not None:
             if animation_data:
-                if target.animation_data is None:
-                    target.animation_data_create()
-            else:
-                if target.animation_data is not None:
-                    target.animation_data_clear()
-
-
-def pre_save_struct(proxy: StructProxy, target: T.bpy_struct):
-    create_clear_animation_data(target, proxy)
-
-
-def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
-    """Process attributes that must be saved first and return a possibly updated reference to the target"""
-
-    # WARNING this is called from save() and from apply()
-    # When called from save, the proxy has  all the synchronized properties
-    # WHen called from apply, the proxy only contains the updated properties
-
-    if target.library:
-        return target
-
-    if hasattr(target, "animation_data"):
-        animation_data = proxy.data("animation_data")
-        if animation_data is not None:
-            if not animation_data:
                 if target.animation_data is None:
                     target.animation_data_create()
             else:
@@ -486,14 +464,15 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
             elif not is_grease_pencil and target.grease_pencil:
                 bpy.data.materials.remove_gpencil_data(target)
     elif isinstance(target, T.Scene):
+        from mixer.blender_data.misc_proxies import NonePtrProxy
+
         sequence_editor = proxy.data("sequence_editor")
         if sequence_editor is not None:
-            if sequence_editor:
-                if target.sequence_editor is None:
-                    target.sequence_editor_create()
-            else:
-                if target.sequence_editor is not None:
-                    target.sequence_editor_clear()
+            # NonePtrProxy or StructProxy
+            if not isinstance(sequence_editor, NonePtrProxy) and target.sequence_editor is None:
+                target.sequence_editor_create()
+            elif isinstance(sequence_editor, NonePtrProxy) and target.sequence_editor is not None:
+                target.sequence_editor_clear()
     elif isinstance(target, T.Light):
         # required first to have access to new light type attributes
         light_type = proxy.data("type")
@@ -781,6 +760,7 @@ def diff_must_replace(
 
         # Object.material_slots has no bl_rna, so rely on the property to identify it
         # TODO should we change to a dispatch on the property value ?
+        from mixer.blender_data.misc_proxies import NonePtrProxy
 
         if len(collection) != len(sequence):
             return True
@@ -791,8 +771,8 @@ def diff_must_replace(
         # As diff yields a complete DiffReplace or nothing, all the attributes are present in the proxy
         for bl_item, proxy in zip(collection, sequence):
             bl_material = bl_item.material
-            material_proxy = cast(Optional[DatablockRefProxy], proxy.data("material"))
-            if (bl_material is None) != bool(material_proxy):
+            material_proxy: Union[DatablockRefProxy, NonePtrProxy] = proxy.data("material")
+            if (bl_material is None) != isinstance(material_proxy, NonePtrProxy):
                 return True
             if bl_material is not None and bl_material.mixer_uuid != material_proxy.mixer_uuid:
                 return True
@@ -809,17 +789,13 @@ def diff_must_replace(
     return False
 
 
-@diff_must_replace.register(T.CurveSplines)
-def _diff_must_replace_always(
-    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
-) -> bool:
+@diff_must_replace.register(T.CurveSplines)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
     return True
 
 
-@diff_must_replace.register(T.VertexGroups)
-def _diff_must_replace_vertex_groups(
-    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
-) -> bool:
+@diff_must_replace.register(T.VertexGroups)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
     # Full replace if anything has changed is easier to cope with in ObjectProxy._update_vertex_groups()
     return (
         any((bl_item.name != proxy.data("name") for bl_item, proxy in zip(collection, sequence)))
@@ -829,12 +805,48 @@ def _diff_must_replace_vertex_groups(
 
 
 @diff_must_replace.register(T.GreasePencilLayers)
-def _diff_must_replace_info_mismatch(
-    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
-) -> bool:
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
     # Name mismatch (in info property). This may happen during layer swap and cause unsolicited rename
     # Easier to solve with full replace
     return any((bl_item.info != proxy.data("info") for bl_item, proxy in zip(collection, sequence)))
+
+
+@diff_must_replace.register(T.ActionFCurves)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
+    # The FCurve API has two caveats (seen in 2.83.9):
+    # - it is not possible to set FCurve.group from a valid group to None (but the inverse is possible)
+    # - setting group sometimes changes array_index, like in (no groups initially)
+    #       >>> a=D.actions[0]
+    #       >>> g=a.groups.new('plop')
+    #       >>> a.fcurves[1].color[0] = 0.1
+    #       >>> a.fcurves[2].color[0] = 0.2
+    #       >>> [(i.data_path, i.array_index, i.color[0]) for i in a.fcurves]
+    #       [('location', 0, 0.0), ('location', 1, 0.10000000149011612), ('location', 2, 0.20000000298023224)]
+    #       >>>
+    #       >>> a.fcurves[2].group = g
+    #       >>> [(i.data_path, i.array_index, i.color[0]) for i in a.fcurves]
+    #       [('location', 2, 0.20000000298023224), ('location', 0, 0.0), ('location', 1, 0.10000000149011612)]
+
+    # So overwrite the whole Action.fcurves array as soon as any group changes
+
+    from mixer.blender_data.misc_proxies import PtrToCollectionItemProxy
+
+    for proxy, item in zip(sequence, collection):
+        group_proxy = cast(PtrToCollectionItemProxy, proxy.data("group"))
+        assert group_proxy is not None
+        if item.group is None:
+            if group_proxy:
+                # not None -> None
+                return True
+        else:
+            if not group_proxy:
+                # None -> not None
+                return True
+            same_group = group_proxy == PtrToCollectionItemProxy.make(T.FCurve, "group").load(item)
+            if not same_group:
+                return True
+
+    return False
 
 
 #
@@ -871,24 +883,6 @@ def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         if proxy.data("bl_idname") != item.bl_idname:
             return i
-
-    return min(len(sequence), len(collection))
-
-
-@clear_from.register(T.ActionFCurves)  # type: ignore[no-redef]
-def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
-    """clear_from() implementation for ActionFCurves.
-
-    The API can set a FCurve.group to a non None value but cannot set FCurve.group to a None value. So we clear the
-    collection from the first item that has a not None to None change
-    """
-    for i, (proxy, item) in enumerate(zip(sequence, collection)):
-        from mixer.blender_data.misc_proxies import PtrToCollectionItemProxy
-
-        group_proxy = cast(PtrToCollectionItemProxy, proxy.data("group"))
-        if group_proxy is not None:
-            if group_proxy and item.group is None:
-                return i
 
     return min(len(sequence), len(collection))
 
