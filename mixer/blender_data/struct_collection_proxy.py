@@ -43,14 +43,10 @@ logger = logging.getLogger(__name__)
 
 
 def _proxy_factory(attr):
-    if isinstance(attr, T.ID) and not attr.is_embedded_data:
+    if attr is None or (isinstance(attr, T.ID) and not attr.is_embedded_data):
         from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
         return DatablockRefProxy()
-    elif attr is None:
-        from mixer.blender_data.misc_proxies import NonePtrProxy
-
-        return NonePtrProxy()
     else:
         return StructProxy()
 

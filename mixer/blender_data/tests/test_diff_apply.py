@@ -75,18 +75,16 @@ class StructDatablockRef(DifferentialApply):
     # datablock reference in a struct
     # Scene.world
 
-    @unittest.skip("Need BpyIDRefNoneProxy")
     def test_add(self):
         # set reference from None to a valid datablock
         # test_diff_apply.StructDatablockRef.test_add
 
-        # TODO needs a BpyIDNoneRefProxy
+        world = bpy.data.worlds.new("W")
         self.scene.world = None
         self.proxy = BpyDataProxy()
         self.proxy.load(test_properties)
         self.scene_proxy: DatablockProxy = self.proxy.data("scenes").search_one("Scene")
 
-        world = bpy.data.worlds.new("W")
         self.scene.world = world
         self.generate_all_uuids()
         delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
@@ -98,7 +96,7 @@ class StructDatablockRef(DifferentialApply):
         # apply the diff
         scene = bpy.data.scenes[self.scene.name]
         self.scene_proxy.apply(scene, bpy.data.scenes, self.scene.name, delta, self.proxy.context())
-        self.assertEqual(self.scene.eevee.use_bloom, True)
+        self.assertEqual(self.scene.world, world)
 
     def test_update(self):
         # set reference from None to a valid datablock
@@ -123,7 +121,6 @@ class StructDatablockRef(DifferentialApply):
         self.scene_proxy.apply(scene, bpy.data.scenes, self.scene.name, delta, self.proxy.context())
         self.assertEqual(self.scene.world, world2)
 
-    @unittest.skip("Need BpyIDRefNoneProxy")
     def test_remove(self):
         # set reference from a valid datablock to None
         # test_diff_apply.StructDatablockRef.test_remove
