@@ -51,7 +51,7 @@ def skip_bpy_data_item(collection_name, item):
 
 class Filter:
     def apply(self, properties):
-        return properties
+        return properties, ""
 
     def is_active(self):
         return True
@@ -74,12 +74,12 @@ class TypeFilter(Filter):
 
 class TypeFilterIn(TypeFilter):
     def apply(self, properties):
-        return [p for p in properties if self.matches(p)]
+        return [p for p in properties if self.matches(p)], ""
 
 
 class TypeFilterOut(TypeFilter):
     def apply(self, properties):
-        return [p for p in properties if not self.matches(p)]
+        return [p for p in properties if not self.matches(p)], ""
 
 
 class CollectionFilterOut(TypeFilter):
@@ -89,7 +89,7 @@ class CollectionFilterOut(TypeFilter):
             p
             for p in properties
             if p.bl_rna is not T.CollectionProperty.bl_rna or p.srna and p.srna.bl_rna not in self._types
-        ]
+        ], ""
 
 
 class FuncFilterOut(Filter):
@@ -101,25 +101,24 @@ class NameFilter(Filter):
         self._names = names
 
     def check_unknown(self, properties):
+        if not DEBUG:
+            return None
         identifiers = [p.identifier for p in properties]
         local_exclusions = set(self._names) - set(_exclude_names)
-        unknowns = [name for name in local_exclusions if name not in identifiers]
-        for unknown in unknowns:
-            logger.warning(f"Internal error: Filtering unknown property {unknown}. Check spelling")
+        unknowns = [repr(name) for name in local_exclusions if name not in identifiers]
+        if unknowns:
+            return f"Unknown properties: {', '.join(unknowns)}. Check spelling"
+        return ""
 
 
 class NameFilterOut(NameFilter):
     def apply(self, properties):
-        if DEBUG:
-            self.check_unknown(properties)
-        return [p for p in properties if p.identifier not in self._names]
+        return [p for p in properties if p.identifier not in self._names], self.check_unknown(properties)
 
 
 class NameFilterIn(NameFilter):
     def apply(self, properties):
-        if DEBUG:
-            self.check_unknown(properties)
-        return [p for p in properties if p.identifier in self._names]
+        return [p for p in properties if p.identifier in self._names], self.check_unknown(properties)
 
 
 # true class with isactive()
@@ -145,7 +144,12 @@ class FilterStack:
             for filter_set in self._filter_stack:
                 filters = filter_set.get(bl_rna, [])
                 for filter_ in filters:
-                    properties = filter_.apply(properties)
+                    properties, error = filter_.apply(properties)
+                    if error:
+                        logger.error(
+                            f"Error while applying filter {filter_.__class__.__name__!r} on {bl_rna.identifier!r} ..."
+                        )
+                        logger.error(f"... {error}")
         return properties
 
     def append(self, filter_set: FilterSet):
