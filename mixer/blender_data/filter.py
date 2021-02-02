@@ -308,7 +308,16 @@ default_exclusions: FilterSet = {
     T.DecimateModifier: [NameFilterOut(["face_count"])],
     T.FaceMap: [NameFilterOut(["index"])],
     T.FCurve: [NameFilterOut(["select"])],
-    T.Keyframe: [NameFilterOut(["select", "select_right_handle", "select_left_handle"])],
+    T.Keyframe: [
+        NameFilterOut(
+            [
+                # UI
+                "select_control_point",
+                "select_right_handle",
+                "select_left_handle",
+            ]
+        )
+    ],
     T.Image: [
         NameFilterOut(
             [

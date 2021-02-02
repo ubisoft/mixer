@@ -136,7 +136,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
                 return DatablockRefProxy().load(attr, key, context)
 
         proxy = PtrToCollectionItemProxy.make(type(parent), key)
-        if proxy:
+        if proxy is not None:
             return proxy.load(attr)
 
         if issubclass(attr_type, T.bpy_struct):

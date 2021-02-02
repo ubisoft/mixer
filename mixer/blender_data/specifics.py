@@ -406,17 +406,6 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
         filtered = {k: v for k, v in properties if k not in filter_props}
         return filtered.items()
 
-    if isinstance(bpy_struct, T.FCurve):
-        # HACK Fcurve.group cannot be set from None. Attempt to do so trigger a Blender log "Error". So dso not save
-        # group if it is None. Anyhow, new Fcurve are created with group set to None. If any Fcurve.group is changed to
-        # None, The ActionFCurves collection will be rewritten (see clear_from())
-        if bpy_struct.group is not None:
-            return properties
-
-        filter_props = ["group"]
-        filtered = {k: v for k, v in properties if k not in filter_props}
-        return filtered.items()
-
     filter_props = []
     if any(isinstance(bpy_struct, t) for t in filter_crop_transform):
         if not bpy_struct.use_crop:
@@ -669,7 +658,8 @@ def _add_element_keyingset(collection: T.bpy_prop_collection, proxy: Proxy, inde
 @add_element.register(T.ActionFCurves)
 def _add_element_action_curve(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     data_path = proxy.data("data_path")
-    return collection.new(data_path, index=index)
+    array_index = proxy.data("array_index")
+    return collection.new(data_path, index=array_index)
 
 
 @add_element.register(T.FCurveKeyframePoints)
@@ -894,9 +884,11 @@ def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
     """
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         from mixer.blender_data.misc_proxies import PtrToCollectionItemProxy
+
         group_proxy = cast(PtrToCollectionItemProxy, proxy.data("group"))
-        if not group_proxy and item.group is None:
-            return i
+        if group_proxy is not None:
+            if group_proxy and item.group is None:
+                return i
 
     return min(len(sequence), len(collection))
 
