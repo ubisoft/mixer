@@ -29,7 +29,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data.attributes import read_attribute
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 from mixer.blender_data.json_codec import serialize
-from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
+from mixer.blender_data.proxy import Delta, DeltaReplace, Proxy
 from mixer.blender_data.type_helpers import bases_of
 
 if TYPE_CHECKING:
@@ -182,19 +182,17 @@ class DatablockRefProxy(Proxy):
 
     def diff(
         self, datablock: T.ID, key: Union[int, str], datablock_property: T.Property, context: Context
-    ) -> Optional[DeltaUpdate]:
+    ) -> Optional[DeltaReplace]:
         """
         Computes the difference between this proxy and its Blender state.
         """
 
         if datablock is None:
-            from mixer.blender_data.misc_proxies import NonePtrProxy
+            return DeltaReplace(DatablockRefProxy())
 
-            return DeltaUpdate(NonePtrProxy())
-
-        value = read_attribute(datablock, key, datablock_property, context)
+        value = read_attribute(datablock, key, datablock_property, None, context)
         assert isinstance(value, DatablockRefProxy)
         if value._datablock_uuid != self._datablock_uuid:
-            return DeltaUpdate(value)
+            return DeltaReplace(value)
         else:
             return None

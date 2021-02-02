@@ -10,7 +10,7 @@ from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.datablock_collection_proxy import DatablockRefCollectionProxy
-from mixer.blender_data.proxy import DeltaAddition, DeltaDeletion, DeltaUpdate
+from mixer.blender_data.proxy import DeltaAddition, DeltaDeletion, DeltaReplace, DeltaUpdate
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.struct_proxy import StructProxy
 
@@ -86,7 +86,7 @@ class StructDatablockRef(DifferentialCompute):
         scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         self.assertIsInstance(scene_delta, DeltaUpdate)
         world_delta = scene_delta.value.data("world", resolve_delta=False)
-        self.assertIsInstance(world_delta, DeltaUpdate)
+        self.assertIsInstance(world_delta, DeltaReplace)
         world_update = world_delta.value
         self.assertIsInstance(world_update, DatablockRefProxy)
         self.assertEqual(world_update._datablock_uuid, world.mixer_uuid)
@@ -104,7 +104,7 @@ class StructDatablockRef(DifferentialCompute):
         scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
         self.assertIsInstance(scene_delta, DeltaUpdate)
         world_delta = scene_delta.value.data("world", resolve_delta=False)
-        self.assertIsInstance(world_delta, DeltaUpdate)
+        self.assertIsInstance(world_delta, DeltaReplace)
         world_update = world_delta.value
         self.assertIsInstance(world_update, DatablockRefProxy)
         self.assertEqual(world_update._datablock_uuid, world2.mixer_uuid)

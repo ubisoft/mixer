@@ -41,13 +41,17 @@ logger = logging.getLogger(__name__)
 class NonePtrProxy(Proxy):
     """Proxy for a None PointerProperty value.
 
-    When setting a PointerProperty from None to a valid reference, apply_attributs requires that
-    the proxyfied value implements apply().
+    This is used for pointers to standalone datablocks (e.g. Scene.camera, AnimData.action), pointers to embedded
+    datablocks (e.g. Scene.node_tree) and pointers to other structs (Scene.sequence_editor). A null DatablockRefProxy
+    can also be used for null pointers to standalone datablocks if its is clearly known that the target is a
+    standalone reference. Usually, this is not known in readçattribute and a NonePtrProxy is created.
 
-    This is used for Pointers to standalone datablocks like Scene.camera.
-
-    TODO Check it it is meaningfull for anything else ?
+    Note: when setting a PointerProperty from None to a valid reference, apply_attributs requires that the managed
+    value implements apply().
     """
+
+    def __bool__(self):
+        return False
 
     def target(self, context: Context) -> None:
         return None
@@ -89,7 +93,7 @@ class NonePtrProxy(Proxy):
         """
         Apply delta to an attribute with None value.
 
-        This is used for instance Scene.camera is None and updatde to hold a valid Camera reference
+        This is used for instance Scene.camera is None and update to hold a valid Camera reference
 
         Args:
             attribute: the Blender attribute to update (e.g a_scene.camera)
@@ -99,22 +103,19 @@ class NonePtrProxy(Proxy):
             context: proxy and visit state
             to_blender: update attribute in addition to this Proxy
         """
-        update = delta.value
+        replace = delta.value
 
-        if isinstance(update, DatablockRefProxy):
+        if isinstance(replace, DatablockRefProxy):
             if to_blender:
-                datablock = context.proxy_state.datablock(update._datablock_uuid)
+                datablock = context.proxy_state.datablock(replace._datablock_uuid)
                 if isinstance(key, int):
                     parent[key] = datablock
                 else:
                     setattr(parent, key, datablock)
-            return update
+            return replace
 
-        # A none PointerProperty that can point to something that is not a datablock.
-        # Can this happen ?
-        logger.error(f"NonePtrProxy.apply(): not implemented update type {type(update)} for attribute ...")
-        logger.error(f"... {context.visit_state.display_path()}.{key}...")
-        return self
+        # for instance animation_data set from None to a valid value, after animation_data_create() has been called
+        return replace
 
     def diff(
         self,
@@ -123,10 +124,10 @@ class NonePtrProxy(Proxy):
         prop: T.Property,
         context: Context,
     ) -> Optional[DeltaUpdate]:
-        attr = read_attribute(container, key, prop, context)
+        attr = read_attribute(container, key, prop, None, context)
         if isinstance(attr, NonePtrProxy):
             return None
-        return DeltaUpdate(attr)
+        return DeltaReplace(attr)
 
 
 @serialize

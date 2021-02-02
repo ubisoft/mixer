@@ -424,15 +424,18 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
 
 def create_clear_animation_data(target: T.bpy_struct, proxy: Union[StructProxy, DatablockProxy]):
     if hasattr(target, "animation_data"):
+        from mixer.blender_data.misc_proxies import NonePtrProxy
         from mixer.blender_data.struct_proxy import StructProxy
 
-        animation_data = cast(Optional[StructProxy], proxy.data("animation_data"))
+        animation_data = cast(Optional[Union[StructProxy, NonePtrProxy]], proxy.data("animation_data"))
         if animation_data is not None:
             if animation_data:
                 if target.animation_data is None:
+                    # None -> not None
                     target.animation_data_create()
             else:
                 if target.animation_data is not None:
+                    # not None -> None
                     target.animation_data_clear()
 
 

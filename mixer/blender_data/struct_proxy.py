@@ -148,6 +148,7 @@ class StructProxy(Proxy):
         else:
 
             assert type(update) == type(self)
+            specifics.pre_save_struct(self, attribute)
 
             context.visit_state.path.append(key)
             try:
