@@ -22,9 +22,9 @@ This module define Blender Operators types used in the ui of the addon.
 import os
 from pathlib import Path
 import subprocess
-import sys
 
 
+from mixer.os_utils import open_folder
 import bpy
 from bpy.types import Operator
 from bpy.props import StringProperty
@@ -43,12 +43,7 @@ class Mixer_OT_Open_Documentation_Url(Operator):  # noqa 801
             cmd = "echo " + (self.path).strip() + "|clip"
             subprocess.check_call(cmd, shell=True)
         else:
-            if sys.platform == "darwin":
-                subprocess.check_call(["open", "--", self.path])
-            elif sys.platform == "linux2":
-                subprocess.check_call(["xdg-open", "--", self.path])
-            elif sys.platform == "win32":
-                subprocess.Popen(f'explorer "{self.path}"')
+            open_folder(self.path)
 
         return {"FINISHED"}
 
@@ -66,29 +61,11 @@ class Mixer_OT_Open_Explorer(Operator):  # noqa 801
         abs_path = head + os.sep
 
         if event.shift:
-
-            def _copy_to_clipboard(txt):
-                cmd = "echo " + txt.strip() + "|clip"
-                return subprocess.check_call(cmd, shell=True)
-
-            _copy_to_clipboard(abs_path)
+            # copy path to clipboard
+            cmd = "echo " + (abs_path).strip() + "|clip"
+            subprocess.check_call(cmd, shell=True)
 
         else:
-            if sys.platform == "darwin":
-
-                def open_folder(path):
-                    subprocess.check_call(["open", "--", path])
-
-            elif sys.platform == "linux2":
-
-                def open_folder(path):
-                    subprocess.check_call(["xdg-open", "--", path])
-
-            elif sys.platform == "win32":
-
-                def open_folder(path):
-                    subprocess.Popen(f'explorer "{Path(abs_path)}"')
-
             if Path(abs_path).exists():
                 abs_path = abs_path.replace(os.sep, "/")
                 open_folder(abs_path)
