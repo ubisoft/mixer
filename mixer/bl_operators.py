@@ -487,6 +487,8 @@ class LaunchVRtistOperator(bpy.types.Operator):
             color,
             "--username",
             name,
+            "--startScene",
+            os.path.split(bpy.data.filepath)[1],
         ]
         LaunchVRtistOperator.vrtist_process = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False
