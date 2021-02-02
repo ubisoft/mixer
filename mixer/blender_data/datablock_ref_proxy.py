@@ -26,7 +26,6 @@ from typing import Optional, TYPE_CHECKING, Union
 
 import bpy.types as T  # noqa
 
-from mixer.blender_data.attributes import read_attribute
 from mixer.blender_data.blenddata import rna_identifier_to_collection_name
 from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
@@ -34,7 +33,6 @@ from mixer.blender_data.type_helpers import bases_of
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Uuid, Context
-    from mixer.blender_data.misc_proxies import NonePtrProxy
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +41,7 @@ logger = logging.getLogger(__name__)
 @serialize
 class DatablockRefProxy(Proxy):
     """
-    A reference to a standalone datablock
+    A reference to a standalone datablock, possibly null.
 
     Examples of such references are :
     - Camera.dof.focus_object
@@ -51,12 +49,17 @@ class DatablockRefProxy(Proxy):
 
     _serialize = ("_bpy_data_collection", "_datablock_uuid", "_initial_name")
 
+    _none_uuid = "00000000-0000-0000-0000-000000000000"
+
     def __init__(self):
-        self._datablock_uuid: str = None
+        self._datablock_uuid: str = self._none_uuid
         self._bpy_data_collection: str = ""
         self._initial_name: str = None
 
         self._debug_name = None
+
+    def __bool__(self):
+        return self._datablock_uuid != self._none_uuid
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({self._datablock_uuid}, bpy.data.{self._bpy_data_collection}, name at creation: {self._initial_name})"
@@ -73,18 +76,15 @@ class DatablockRefProxy(Proxy):
         """
         Load a reference to a standalone datablock into this proxy
         """
-        assert not datablock.is_embedded_data
+        if datablock:
+            # Base type closest to ID (e.g. Light for Point)
+            type_ = bases_of(type(datablock).bl_rna)[-2]
+            type_name = type_.bl_rna.identifier
+            self._bpy_data_collection = rna_identifier_to_collection_name[type_name]
+            self._initial_name = datablock.name
+            self._datablock_uuid = datablock.mixer_uuid
+            self._debug_name = str(datablock)
 
-        # see HACK in target()
-        # Base type closest to ID (e.g. Light for Point)
-        type_ = bases_of(type(datablock).bl_rna)[-2]
-        type_name = type_.bl_rna.identifier
-        self._bpy_data_collection = rna_identifier_to_collection_name[type_name]
-        self._initial_name = datablock.name
-
-        self._datablock_uuid = datablock.mixer_uuid
-
-        self._debug_name = str(datablock)
         return self
 
     def save(
@@ -111,25 +111,29 @@ class DatablockRefProxy(Proxy):
             if isinstance(parent, T.bpy_prop_collection):
                 # reference stored in a collection
                 # is there a case for this is is always link() in DatablockCollectionProxy ?
-                if ref_target is None:
-                    context.proxy_state.unresolved_refs.append(
-                        self.mixer_uuid,
-                        lambda datablock: parent.__setitem__(key, datablock),
-                        f"{context.visit_state.display_path()}[{key}] = {self.display_string}",
-                    )
-                else:
-                    parent[key] = ref_target
+
+                def set_func(datablock):
+                    parent.__setitem__(key, datablock)
+
             else:
                 # reference stored in a struct (e.g. Object.parent)
                 # This is what saves Camera.dof.focus_object
-                if ref_target is None:
-                    context.proxy_state.unresolved_refs.append(
-                        self.mixer_uuid,
-                        lambda datablock: setattr(parent, key, datablock),
-                        f"{context.visit_state.display_path()}.{key} = {self.display_string}",
-                    )
-                else:
-                    setattr(parent, key, ref_target)
+
+                def set_func(datablock):
+                    setattr(parent, key, datablock),
+
+            if self and ref_target is None:
+                # The reference is not None but no target datablock is loaded yet. Defer call
+                context.proxy_state.unresolved_refs.append(
+                    self.mixer_uuid,
+                    set_func,
+                    f"{context.visit_state.display_path()}.{key} = {self.display_string}",
+                )
+            else:
+                # The reference is None or the target datablock exists. Immediate call
+                # (all calls could be deferred, this should work as well)
+                set_func(ref_target)
+
         except AttributeError as e:
             # Most often not an error
             # - read_only property
@@ -148,7 +152,10 @@ class DatablockRefProxy(Proxy):
         """
         The datablock referenced by this proxy
         """
-        return context.proxy_state.datablock(self._datablock_uuid)
+        if self:
+            return context.proxy_state.datablock(self._datablock_uuid)
+        else:
+            return None
 
     def apply(
         self,
@@ -158,15 +165,14 @@ class DatablockRefProxy(Proxy):
         delta: Delta,
         context: Context,
         to_blender: bool = True,
-    ) -> Union[NonePtrProxy, DatablockRefProxy]:
+    ) -> DatablockRefProxy:
         """
         Apply a delta to this proxy, which occurs when Scene.camera changes, for instance
         """
         update = delta.value
         if to_blender:
-            from mixer.blender_data.misc_proxies import NonePtrProxy
 
-            if isinstance(update, NonePtrProxy):
+            if not update:
                 value = None
             else:
                 assert type(update) == type(self), "type(update) == type(self)"
@@ -186,15 +192,14 @@ class DatablockRefProxy(Proxy):
         """
         Computes the difference between this proxy and its Blender state.
         """
+        if datablock is None and self:
+            # change from valid ref to None
+            return DeltaUpdate(DatablockRefProxy())
 
-        if datablock is None:
-            from mixer.blender_data.misc_proxies import NonePtrProxy
-
-            return DeltaUpdate(NonePtrProxy())
-
-        value = read_attribute(datablock, key, datablock_property, context)
-        assert isinstance(value, DatablockRefProxy)
-        if value._datablock_uuid != self._datablock_uuid:
-            return DeltaUpdate(value)
-        else:
+        if datablock is None and not self or datablock.mixer_uuid == self._datablock_uuid:
+            # unchanged ref (None to None or valid to same)
             return None
+
+        # change from None to valid
+        value = DatablockRefProxy().load(datablock, key, context)
+        return DeltaUpdate(value)

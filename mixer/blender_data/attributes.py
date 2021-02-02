@@ -132,9 +132,10 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
             return StructProxy().load(attr, key, context)
 
         if attr is None:
-            from mixer.blender_data.misc_proxies import NonePtrProxy
+            from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
-            return NonePtrProxy()
+            # Assume it is a null reference to a DatablockProxy
+            return DatablockRefProxy()
 
         logger.error("read_attribute: no implementation for ...")
         logger.error(f"... {context.visit_state.display_path()}.{key} (type: {type(attr)})")
