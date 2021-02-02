@@ -461,9 +461,7 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
     if hasattr(target, "animation_data"):
         animation_data = proxy.data("animation_data")
         if animation_data is not None:
-            from mixer.blender_data.misc_proxies import NonePtrProxy
-
-            if not isinstance(animation_data, NonePtrProxy):
+            if not animation_data:
                 if target.animation_data is None:
                     target.animation_data_create()
             else:
@@ -894,10 +892,10 @@ def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
     The API can set a FCurve.group to a non None value but cannot set FCurve.group to a None value. So we clear the
     collection from the first item that has a not None to None change
     """
-    from mixer.blender_data.misc_proxies import NonePtrProxy
-
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
-        if not isinstance(proxy.data("group"), NonePtrProxy) and item.group is None:
+        from mixer.blender_data.misc_proxies import PtrToCollectionItemProxy
+        group_proxy = cast(PtrToCollectionItemProxy, proxy.data("group"))
+        if not group_proxy and item.group is None:
             return i
 
     return min(len(sequence), len(collection))
