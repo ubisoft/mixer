@@ -2,7 +2,7 @@
 
 ## Breaking changes
 
-- require Blender 2.91.2
+- require Blender 2.91.0
 
 # 0.20.0 (22-01-2020)
 
