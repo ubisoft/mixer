@@ -22,6 +22,8 @@ Utility functions that may require os/platform specific adjustments
 import getpass
 import os
 import platform
+import subprocess
+from pathlib import Path
 import sys
 from typing import List
 
@@ -57,3 +59,15 @@ def tech_infos() -> List[str]:
             lines.append(f"Addon    : {name} {version}")
 
     return lines
+
+
+def open_folder(path):
+    """
+    Open a path or an URL with the application specified by the os
+    """
+    if sys.platform == "darwin":
+        subprocess.check_call(["open", "--", path])
+    elif sys.platform == "linux":
+        subprocess.check_call(["xdg-open", path])
+    elif sys.platform == "win32":
+        subprocess.Popen(f'explorer "{Path(path)}"')

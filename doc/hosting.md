@@ -10,7 +10,7 @@ Follow the [Zerotier](https://www.zerotier.com/) documentation to [setup a netwo
 
 ### On the machine that hosts the server
 - start Zerotier and connect to your Zerotier network
-- start Blender, open the Mixer tray, leave `host` as `localhost`, leave `port` to the default value (12800), in `Advanced options` check `Show server console` and click `Connect`. This starts the server with a console.
+- start Blender, open the Mixer tray, leave `host` as `localhost`, leave `port` to the default value (12800), in `Advanced Options` check `Show server console` and click `Connect`. This starts the server with a console.
 
 ### On client machines
 - start Zerotier and connect to your Zerotier network.

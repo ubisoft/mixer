@@ -23,7 +23,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import bpy
+
 import os
+
 import logging
 from mixer import bl_operators
 from mixer.bl_utils import get_mixer_props, get_mixer_prefs
@@ -32,6 +34,8 @@ from mixer.share_data import share_data
 from mixer.broadcaster.common import ClientAttributes
 from mixer.blender_data.debug_addon import DebugDataPanel, use_debug_addon
 from mixer import display_version
+from mixer import icons
+from mixer.local_data import get_data_directory
 
 if TYPE_CHECKING:
     from mixer.bl_preferences import MixerPreferences
@@ -175,14 +179,43 @@ class SHAREDFOLDER_UL_ItemRenderer(bpy.types.UIList):  # noqa
 
 def draw_user_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "user")
-    layout.prop(mixer_prefs, "color", text="")
+
+    col = layout.column()
+    col.separator(factor=0.5)
+
+    grid = col.column_flow(columns=2)
+    row = grid.row()
+    sub_row = row.row()
+    sub_row.scale_x = 0.4
+    sub_row.label(text="User:")
+    row.prop(mixer_prefs, "user", text="")
+    row = grid.row()
+    row.prop(mixer_prefs, "color", text="")
+    icon = icons.icons_col["General_Explorer_32"]
+    user_data_path = os.environ.get("MIXER_DATA_DIR", get_data_directory())
+    #   from pathlib import Path
+    #   user_data_path = Path(user_data_path).parent
+    row.operator("mixer.open_explorer", text="", icon_value=icon.icon_id).path = str(user_data_path)
+
+    col.separator(factor=1.0)
 
 
 def draw_connection_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "host")
-    layout.prop(mixer_prefs, "port")
+
+    col = layout.column()
+    col.separator(factor=0.5)
+
+    grid = col.column_flow(columns=2)
+    row = grid.row()
+    sub_row = row.row()
+    sub_row.scale_x = 0.4
+    sub_row.label(text="Host:")
+    row.prop(mixer_prefs, "host", text="")
+    row = grid.row()
+    row.prop(mixer_prefs, "port")
+
+    col.separator(factor=0.5)
 
 
 def draw_shared_folders_settings_ui(layout: bpy.types.UILayout):
@@ -322,6 +355,18 @@ class MixerSettingsPanel(bpy.types.Panel):
     def connected(self):
         return share_data.client is not None and share_data.client.is_connected()
 
+    def draw_header(self, context):
+        self.layout.emboss = "NONE"
+        icon = icons.icons_col["Mixer_32"]
+        row = self.layout.row(align=True)
+        row.operator("mixer.about", text="", icon_value=icon.icon_id)
+
+    def draw_header_preset(self, context):
+        self.layout.emboss = "NONE"
+        row = self.layout.row(align=True)
+        row.menu("MIXER_MT_prefs_main_menu", icon="PREFERENCES", text="")
+        row.separator(factor=1.0)
+
     def draw(self, context):
         layout = self.layout.column()
 
@@ -331,22 +376,36 @@ class MixerSettingsPanel(bpy.types.Panel):
 
         if not self.connected():
             draw_connection_settings_ui(layout.row())
-            layout.operator(bl_operators.ConnectOperator.bl_idname, text="Connect")
+            row = layout.row()
+            row.scale_y = 1.5
+            row.operator(bl_operators.ConnectOperator.bl_idname, text="Connect")
+            layout.separator(factor=1.0)
         else:
+            layout.separator(factor=0.5)
             layout.label(
-                text=f"Connected to {mixer_prefs.host}:{mixer_prefs.port} with ID {share_data.client.client_id}"
+                text=f"Connected to  {mixer_prefs.host}:{mixer_prefs.port}  with ID  {share_data.client.client_id}"
             )
-            layout.operator(bl_operators.DisconnectOperator.bl_idname, text="Disconnect")
+
+            row = layout.row()
+            row.scale_y = 1.5
+            row.operator(bl_operators.DisconnectOperator.bl_idname, text="Disconnect", depress=True)
+            layout.separator(factor=2.0)
 
             if not share_data.client.current_room:
-                split = layout.split(factor=0.6)
-                split.prop(mixer_prefs, "room", text="Room")
-                split.operator(bl_operators.CreateRoomOperator.bl_idname)
+
+                grid = layout.column_flow(columns=2)
+                row = grid.row()
+                sub_row = row.row()
+                sub_row.scale_x = 0.5
+                sub_row.label(text="Room:")
+                row.prop(mixer_prefs, "room", text="")
+                row = grid.row()
+                row.operator(bl_operators.CreateRoomOperator.bl_idname)
             else:
                 split = layout.split(factor=0.6)
                 split.label(text=f"Room: {share_data.client.current_room}")
                 split.label(text=f"Join: {get_mixer_props().joining_percentage * 100:.2f} %")
-                split.operator(bl_operators.LeaveRoomOperator.bl_idname, text="Leave Room")
+                split.operator(bl_operators.LeaveRoomOperator.bl_idname, text="Leave Room", depress=True)
 
             self.draw_rooms(layout)
             self.draw_users(layout)
@@ -365,7 +424,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                 layout.operator(bl_operators.JoinRoomOperator.bl_idname)
             else:
                 layout.operator(bl_operators.LeaveRoomOperator.bl_idname)
-            if collapsable_panel(layout, mixer_props, "display_advanced_room_control", text="Advanced room controls"):
+            if collapsable_panel(layout, mixer_props, "display_advanced_room_control", text="Advanced Room Controls"):
                 box = layout.box()
                 col = box.column()
                 col.operator(bl_operators.DeleteRoomOperator.bl_idname)
@@ -389,13 +448,13 @@ class MixerSettingsPanel(bpy.types.Panel):
 
     def draw_advanced_options(self, layout):
         mixer_props = get_mixer_props()
-        collapsable_panel(layout, mixer_props, "display_advanced_options", text="Advanced options")
+        collapsable_panel(layout, mixer_props, "display_advanced_options", text="Advanced Options")
         if mixer_props.display_advanced_options:
             draw_advanced_settings_ui(layout.box().column())
 
     def draw_developer_options(self, layout):
         mixer_props = get_mixer_props()
-        if collapsable_panel(layout, mixer_props, "display_developer_options", text="Developer options"):
+        if collapsable_panel(layout, mixer_props, "display_developer_options", text="Developer Options"):
             draw_developer_settings_ui(layout.box().column())
 
 
