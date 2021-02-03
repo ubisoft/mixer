@@ -263,7 +263,8 @@ class BpyDataProxy(Proxy):
             name: DatablockCollectionProxy(name) for name in BlendData.instance().collection_names()
         }
 
-        self._delayed_updates: Set[T.ID] = set()
+        self._delayed_updates: Set[Uuid] = set()
+        """Datablock updates delayed until returning to Object mode."""
 
     def clear(self):
         self._data.clear()
@@ -332,7 +333,7 @@ class BpyDataProxy(Proxy):
     def update(
         self,
         diff: BpyBlendDiff,
-        updates: Set[T.ID],
+        updates: Set[Uuid],
         process_delayed_updates: bool,
         synchronized_properties: SynchronizedProperties = safe_properties,
     ) -> Changeset:
@@ -341,8 +342,12 @@ class BpyDataProxy(Proxy):
 
         This updates the local proxy state and return a Changeset to send to the server. This method is also
         used to send the initial scene contents, which is seen as datablock creations.
-        """
 
+        Args:
+            update: the updates datablock from the last depsgraph_update handler call
+            process_delayed_updates: the updates that were delayed from previous depsgraph handler call
+            (mainly because not in edit mode) must now be procesed
+        """
         # Update the bpy.data collections status and get the list of newly created bpy.data entries.
         # Updated proxies will contain the IDs to send as an initial transfer.
         # There is no difference between a creation and a subsequent update
@@ -366,7 +371,7 @@ class BpyDataProxy(Proxy):
 
         all_updates = updates
         if process_delayed_updates:
-            all_updates |= self._delayed_updates
+            all_updates |= {self.state.datablock(uuid) for uuid in self._delayed_updates}
             self._delayed_updates.clear()
 
         sorted_updates = sorted(all_updates, key=_updates_order_predicate)
@@ -545,7 +550,7 @@ class BpyDataProxy(Proxy):
         datablock_proxy.update_soa(datablock, path, soa_members)
 
     def append_delayed_updates(self, delayed_updates: Set[T.ID]):
-        self._delayed_updates |= delayed_updates
+        self._delayed_updates |= {update.mixer_uuid for update in delayed_updates}
 
     def sanity_check(self):
         state = self.state
