@@ -25,9 +25,15 @@ class DifferentialCompute(unittest.TestCase):
         bpy.ops.wm.open_mainfile(filepath=file)
         self.proxy = BpyDataProxy()
         self.proxy.load(test_properties)
-        self.scene_proxy: DatablockProxy = self.proxy.data("scenes").search_one("Scene")
-        self.scene = bpy.data.scenes["Scene"]
         self.scenes_property = bpy.data.bl_rna.properties["scenes"]
+
+    @property
+    def scene_proxy(self):
+        return self.proxy.data("scenes").search_one("Scene")
+
+    @property
+    def scene(self):
+        return bpy.data.scenes["Scene"]
 
     def generate_all_uuids(self):
         # as a side effect, BpyBlendDiff generates the uuids
@@ -109,7 +115,6 @@ class StructDatablockRef(DifferentialCompute):
         self.assertIsInstance(world_update, DatablockRefProxy)
         self.assertEqual(world_update._datablock_uuid, world2.mixer_uuid)
 
-    @unittest.skip("Need BpyIDRefNoneProxy")
     def test_remove(self):
         # set reference from a valid datablock to None
         # test_diff_compute.StructDatablockRef.test_remove
@@ -119,13 +124,14 @@ class StructDatablockRef(DifferentialCompute):
         self.proxy.load(test_properties)
         self.scene.world = None
         self.generate_all_uuids()
+        # delta contains valid ref to None
         scene_delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
-        # TODO fails. should a null ref be implemented as a DatablockRefProxy
-        # with a null ref (uuid is None)
-        # or what else
         self.assertIsInstance(scene_delta, DeltaUpdate)
-        world_delta = scene_delta.value.data("world")
-        self.assertIsInstance(world_delta, DeltaDeletion)
+        world_delta = scene_delta.value.data("world", resolve_delta=False)
+        self.assertIsInstance(world_delta, DeltaReplace)
+        world_update = world_delta.value
+        self.assertIsInstance(world_update, DatablockRefProxy)
+        self.assertFalse(world_update)
 
 
 class Collection(DifferentialCompute):
@@ -148,8 +154,6 @@ class Collection(DifferentialCompute):
 
         self.proxy = BpyDataProxy()
         self.proxy.load(test_properties)
-        self.scene_proxy = self.proxy.data("scenes").search_one("Scene")
-        self.scene = bpy.data.scenes["Scene"]
         for i in range(2):
             name = f"Added{i}"
             empty = bpy.data.objects.new(name, None)

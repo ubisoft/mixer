@@ -61,6 +61,9 @@ class DatablockRefProxy(Proxy):
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({self._datablock_uuid}, bpy.data.{self._bpy_data_collection}, name at creation: {self._initial_name})"
 
+    def __bool__(self):
+        return self._datablock_uuid is not None
+
     @property
     def display_string(self) -> str:
         return f"bpy.data.{self._bpy_data_collection}[{self._initial_name}]"
