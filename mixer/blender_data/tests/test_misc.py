@@ -89,38 +89,6 @@ class TestLoadProxy(unittest.TestCase):
         scene_ = blend_data_["scenes"].search_one("Scene_0")._data
         self.assertFalse("eevee" in scene_)
 
-    # @unittest.skip("")
-    def test_scene(self):
-        # test_misc.TestLoadProxy.test_scene
-        scene = self.proxy._data["scenes"].search_one("Scene_0")._data
-        # will vary slightly during tuning of the default filter
-        self.assertGreaterEqual(len(scene), 45)
-        self.assertLessEqual(len(scene), 55)
-
-        # objects = scene["objects"]._data
-        # self.assertEqual(4, len(objects))
-
-        # for o in objects.values():
-        #     self.assertEqual(type(o), DatablockRefProxy, o)
-
-        # builtin attributes (floats)
-        frame_properties = [name for name in scene.keys() if name.startswith("frame_")]
-        self.assertEqual(7, len(frame_properties))
-
-        # bpy_struct
-        eevee = scene["eevee"]._data
-        self.assertEqual(58, len(eevee))
-
-        # Currently mot loaded
-        # # PropertiesGroup
-        # cycles_proxy = scene["view_layers"]._data["View Layer"]._data["cycles"]
-        # self.assertIsInstance(cycles_proxy, StructProxy)
-        # self.assertEqual(32, len(cycles_proxy._data))
-
-        # # The master collection
-        # master_collection = scene["collection"]
-        # self.assertIsInstance(master_collection, DatablockProxy)
-
     def test_collections(self):
         # test_misc.TestLoadProxy.test_collections
         collections = self.proxy._data["collections"]

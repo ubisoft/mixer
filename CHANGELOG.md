@@ -1,3 +1,9 @@
+# 0.21.0 (wip)
+
+## Breaking changes
+
+- require Blender 2.91.2
+
 # 0.20.0 (22-01-2020)
 
 ## Features
