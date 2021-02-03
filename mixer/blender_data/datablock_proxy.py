@@ -186,6 +186,9 @@ class DatablockProxy(StructProxy):
 
         self.clear_data()
         self._has_datablock = True
+        if isinstance(datablock, T.Object):
+            context.proxy_state.register_object(datablock)
+
         properties = context.synchronized_properties.properties(datablock)
         # this assumes that specifics.py apply only to ID, not Struct
         properties = specifics.conditional_properties(datablock, properties)
