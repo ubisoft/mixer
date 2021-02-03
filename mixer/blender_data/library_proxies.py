@@ -77,9 +77,6 @@ class LibraryProxy(DatablockProxy):
             for linked_datablock in library_datablock.users_id:
                 if repr(linked_datablock) == identifier:
                     # logger.warning(f"register indirect for {library_datablock}: {identifier} {uuid}")
-                    linked_datablock.mixer_uuid = uuid
-                    if isinstance(linked_datablock, T.Object):
-                        context.proxy_state.register_object(linked_datablock)
                     return linked_datablock
 
         #   The library is not already loaded:
@@ -279,7 +276,11 @@ class DatablockLinkProxy(DatablockProxy):
             # them in order to assign them a uuid after their creation. A uuid is required because they can be
             # referenced by non linked datablocks after load (e.g. a linked Camera referenced by the main Scene)
             datablock = library_proxy.register_indirect(self._identifier, self.mixer_uuid, context)
-            self._has_datablock = datablock is not None
+            if datablock:
+                datablock.mixer_uuid = self.mixer_uuid
+                self._has_datablock = True
+                if isinstance(datablock, T.Object):
+                    context.proxy_state.register_object(datablock)
             return datablock, None
 
         try:
