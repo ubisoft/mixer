@@ -153,7 +153,7 @@ class StructCollectionProxy(Proxy):
             # So the value must always be written for all collection types.
             for i in range(len(collection), len(sequence)):
                 item_proxy = sequence[i]
-                specifics.add_element(collection, item_proxy, context)
+                specifics.add_element(collection, item_proxy, i, context)
             for i, v in enumerate(sequence):
                 write_attribute(collection, i, v, context)
         finally:

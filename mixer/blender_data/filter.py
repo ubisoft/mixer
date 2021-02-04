@@ -268,12 +268,13 @@ default_exclusions: FilterSet = {
         TypeFilterOut(T.PoseBone),
         NameFilterOut(_exclude_names),
     ],
-    T.ActionGroup: [
+    T.Action: [
         NameFilterOut(
-            # TODO temportary
-            "channels"
+            # Read only
+            "frame_range"
         )
     ],
+    T.ActionGroup: [NameFilterOut(["channels"])],
     T.BezierSplinePoint: [
         NameFilterOut(
             [
@@ -293,14 +294,6 @@ default_exclusions: FilterSet = {
     T.CurveMapPoint: [NameFilterOut(["select"])],
     T.DecimateModifier: [NameFilterOut(["face_count"])],
     T.FaceMap: [NameFilterOut(["index"])],
-    T.FCurve: [
-        NameFilterOut(
-            [
-                # TODO
-                "group"
-            ]
-        )
-    ],
     T.Image: [
         NameFilterOut(
             [

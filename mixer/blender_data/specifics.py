@@ -461,7 +461,6 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
     elif isinstance(target, T.Scene):
         sequence_editor = proxy.data("sequence_editor")
         if sequence_editor is not None:
-            # NonePtrProxy or StructProxy
             if sequence_editor:
                 if target.sequence_editor is None:
                     target.sequence_editor_create()
@@ -475,12 +474,22 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
             target.type = light_type
             # must reload the reference
             target = proxy.target(context)
+    elif isinstance(target, T.Action):
+        groups = proxy.data("groups")
+        if groups:
+            # TODO not enough
+            groups.save(target, "groups", context)
     elif isinstance(target, T.Object):
         animation_data = proxy.data("animation_data")
-        if animation_data is not None and target.animation_data is None:
-            target.animation_data_create()
-        elif animation_data is None and target.animation_data is not None:
-            target.animation_data_clear()
+        if animation_data is not None:
+            from mixer.blender_data.misc_proxies import NonePtrProxy
+
+            if not isinstance(animation_data, NonePtrProxy):
+                if target.animation_data is None:
+                    target.animation_data_create()
+            else:
+                if target.animation_data is not None:
+                    target.animation_data_clear()
 
     return target
 
@@ -489,7 +498,7 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
 # add_element
 #
 @dispatch_rna
-def add_element(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def add_element(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     """Add an element to a bpy_prop_collection using the collection specific API"""
     try:
         collection.bl_rna
@@ -503,7 +512,7 @@ def add_element(collection: T.bpy_prop_collection, proxy: Proxy, context: Contex
 
 
 @add_element.register_default()
-def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     try:
         return collection.add()
     except Exception:
@@ -534,7 +543,7 @@ def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, contex
 @add_element.register(T.NodeOutputs)
 @add_element.register(T.NodeTreeInputs)
 @add_element.register(T.NodeTreeOutputs)
-def _add_element_type_name(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_type_name(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     socket_type = proxy.data("type")
     name = proxy.data("name")
     return collection.new(socket_type, name)
@@ -543,7 +552,7 @@ def _add_element_type_name(collection: T.bpy_prop_collection, proxy: Proxy, cont
 @add_element.register(T.ObjectModifiers)
 @add_element.register(T.ObjectGpencilModifiers)
 @add_element.register(T.SequenceModifiers)
-def _add_element_name_type(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_name_type(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     name = proxy.data("name")
     type_ = proxy.data("type")
     return collection.new(name, type_)
@@ -551,31 +560,31 @@ def _add_element_name_type(collection: T.bpy_prop_collection, proxy: Proxy, cont
 
 @add_element.register(T.ObjectConstraints)
 @add_element.register(T.CurveSplines)
-def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     type_ = proxy.data("type")
     return collection.new(type_)
 
 
 @add_element.register(T.SplinePoints)
 @add_element.register(T.SplineBezierPoints)
-def _add_element_one(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_one(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     return collection.add(1)
 
 
 @add_element.register(T.MetaBallElements)
-def _add_element_type_eq(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_type_eq(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     type_ = proxy.data("type")
     return collection.new(type=type_)
 
 
 @add_element.register(T.CurveMapPoints)
-def _add_element_location(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_location(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     location = proxy.data("location")
     return collection.new(location[0], location[1])
 
 
 @add_element.register(T.Nodes)
-def _add_element_idname(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_idname(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     node_type = proxy.data("bl_idname")
     return collection.new(node_type)
 
@@ -584,32 +593,32 @@ def _add_element_idname(collection: T.bpy_prop_collection, proxy: Proxy, context
 @add_element.register(T.LoopColors)
 @add_element.register(T.FaceMaps)
 @add_element.register(T.VertexGroups)
-def _add_element_name_eq(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_name_eq(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     name = proxy.data("name")
     return collection.new(name=name)
 
 
 @add_element.register(T.GreasePencilLayers)
-def _add_element_info(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_info(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     name = proxy.data("info")
     return collection.new(name)
 
 
 @add_element.register(T.GPencilFrames)
-def _add_element_frame_number(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_frame_number(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     frame_number = proxy.data("frame_number")
     return collection.new(frame_number)
 
 
 @add_element.register(T.KeyingSets)
-def _add_element_bl_label(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_bl_label(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     label = proxy.data("bl_label")
     idname = proxy.data("bl_idname")
     return collection.new(name=label, idname=idname)
 
 
 @add_element.register(T.KeyingSetPaths)
-def _add_element_keyingset(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_keyingset(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     # TODO current implementation fails
     # All keying sets paths have an empty name, and insertion with add() fails
     # with an empty name
@@ -628,14 +637,13 @@ def _add_element_keyingset(collection: T.bpy_prop_collection, proxy: Proxy, cont
 
 
 @add_element.register(T.ActionFCurves)
-def _add_element_bl_label(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_action_curve(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     data_path = proxy.data("data_path")
-    # TODO required index in the add_element API
-    return collection.new(data_path, index=0)
+    return collection.new(data_path, index=index)
 
 
 @add_element.register(T.FCurveKeyframePoints)
-def _add_element_bl_label(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_add_one(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     return collection.add(1)
 
 
@@ -644,7 +652,7 @@ _effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.ke
 
 
 @add_element.register(T.Sequences)
-def _add_element_sequence(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_sequence(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     type_name = proxy.data("type")
     name = proxy.data("name")
     channel = proxy.data("channel")
@@ -675,7 +683,7 @@ def _add_element_sequence(collection: T.bpy_prop_collection, proxy: Proxy, conte
 
 
 @add_element.register(T.IDMaterials)
-def _add_element_material_ref(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_material_ref(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     material_datablock = proxy.target(context)
     return collection.append(material_datablock)
 
