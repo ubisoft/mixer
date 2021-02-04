@@ -201,9 +201,6 @@ class DatablockProxy(StructProxy):
                 # master collection will conflicting writes with Master Collection
                 self._data[name] = attr_value
 
-        if uuid:
-            context.proxy_state.proxies[uuid] = self
-
         self.attach_filepath_raw(datablock)
         self.attach_media_descriptor(datablock, context)
         self._custom_properties.load(datablock)
