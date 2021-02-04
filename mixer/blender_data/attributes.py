@@ -106,7 +106,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
         if issubclass(attr_type, T.PropertyGroup):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy().load(attr, key, context)
+            return StructProxy.make(attr).load(attr, key, context)
 
         if issubclass(attr_type, T.ID):
             if attr.is_embedded_data:
@@ -129,7 +129,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, c
         if issubclass(attr_type, T.bpy_struct):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy().load(attr, key, context)
+            return StructProxy.make(attr).load(attr, key, context)
 
         if attr is None:
             from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy

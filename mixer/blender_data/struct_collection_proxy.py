@@ -48,7 +48,7 @@ def _proxy_factory(attr):
 
         return DatablockRefProxy()
     else:
-        return StructProxy()
+        return StructProxy.make(attr)
 
 
 @serialize

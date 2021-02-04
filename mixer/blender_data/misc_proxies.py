@@ -29,6 +29,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data.attributes import write_attribute
 from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Proxy
+from mixer.blender_data.struct_proxy import StructProxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context

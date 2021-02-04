@@ -477,8 +477,7 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
     elif isinstance(target, T.Action):
         groups = proxy.data("groups")
         if groups:
-            # TODO not enough
-            groups.save(target, "groups", context)
+            groups.save(target.groups, target, "groups", context)
     elif isinstance(target, T.Object):
         animation_data = proxy.data("animation_data")
         if animation_data is not None:
@@ -515,8 +514,9 @@ def add_element(collection: T.bpy_prop_collection, proxy: Proxy, index: int, con
 def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     try:
         return collection.add()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"add_element (default) exception for {collection} ...")
+        logger.warning(f"... {e!r}")
 
     # try our best
     new_or_add = getattr(collection, "new", None)
@@ -593,6 +593,7 @@ def _add_element_idname(collection: T.bpy_prop_collection, proxy: Proxy, index: 
 @add_element.register(T.LoopColors)
 @add_element.register(T.FaceMaps)
 @add_element.register(T.VertexGroups)
+@add_element.register(T.ActionGroups)
 def _add_element_name_eq(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     name = proxy.data("name")
     return collection.new(name=name)

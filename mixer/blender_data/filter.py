@@ -257,8 +257,6 @@ _exclude_names = [
     "type_info",
     "users",
     "use_fake_user",
-    # TODO
-    "animation_data",
 ]
 """Names of properties that are always excluded"""
 
@@ -271,10 +269,17 @@ default_exclusions: FilterSet = {
     T.Action: [
         NameFilterOut(
             # Read only
-            "frame_range"
+            ["frame_range"]
         )
     ],
-    T.ActionGroup: [NameFilterOut(["channels"])],
+    T.ActionGroup: [
+        NameFilterOut(
+            [
+                # a view into FCurve.group
+                "channels"
+            ]
+        )
+    ],
     T.BezierSplinePoint: [
         NameFilterOut(
             [

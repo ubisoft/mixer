@@ -201,6 +201,9 @@ class DatablockProxy(StructProxy):
                 # master collection will conflicting writes with Master Collection
                 self._data[name] = attr_value
 
+        if uuid:
+            context.proxy_state.proxies[uuid] = self
+
         self.attach_filepath_raw(datablock)
         self.attach_media_descriptor(datablock, context)
         self._custom_properties.load(datablock)
@@ -389,9 +392,12 @@ class DatablockProxy(StructProxy):
                 logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
 
         self._has_datablock = True
-        datablock.mixer_uuid = self.mixer_uuid
+        uuid = self.mixer_uuid
+        datablock.mixer_uuid = uuid
         if isinstance(datablock, T.Object):
             context.proxy_state.register_object(datablock)
+        context.proxy_state.add_datablock(uuid, datablock)
+        context.proxy_state.proxies[uuid] = self
 
         datablock = self._save(datablock, context)
         return datablock, renames
