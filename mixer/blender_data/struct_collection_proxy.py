@@ -216,7 +216,7 @@ class StructCollectionProxy(Proxy):
                 for i, delta_addition in enumerate(update._diff_additions, len(sequence)):
                     if to_blender:
                         item_proxy = delta_addition.value
-                        specifics.add_element(collection, item_proxy, context)
+                        specifics.add_element(collection, item_proxy, i, context)
                         write_attribute(collection, i, item_proxy, context)
                     sequence.append(delta_addition.value)
 
