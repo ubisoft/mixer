@@ -189,13 +189,13 @@ class StructCollectionProxy(Proxy):
         assert type(update) == type(self)
 
         if isinstance(delta, DeltaReplace):
+            # The collection must be replaced as a whole
             self._sequence = update._sequence
             if to_blender:
                 specifics.truncate_collection(collection, 0)
                 self.save(collection, parent, key, context)
         else:
             # a sparse update
-
             context.visit_state.path.append(key)
             try:
                 sequence = self._sequence

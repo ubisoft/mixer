@@ -755,7 +755,7 @@ def diff_must_replace(
 ) -> bool:
     """
     Returns True if a diff between the proxy sequence state and the Blender collection state must force a
-    full collection replacement
+    full collection replacement.
     """
 
     if collection_property == _object_material_slots_property:
@@ -860,6 +860,10 @@ def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]
     """
     Returns the index of the first item in collection that has a type that does not match the
     coresponding item in sequence
+
+    This is the case for items that would require to change type (e.g. ObjectModifier) but cannot be morphed. This enables the caller
+    to truncate the collection at the first element that cannot be morphed in-place and re_write thj collection
+    from this point on.
     """
     return min(len(sequence), len(collection))
 
@@ -868,7 +872,7 @@ def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]
 @clear_from.register(T.ObjectGpencilModifiers)
 @clear_from.register(T.SequenceModifiers)
 def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
-    """clear_from() implementation for collections with items types are named "type" """
+    """clear_from implementation for collections of items that cannot be updated if their "type" attribute changes."""
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         if proxy.data("type") != item.type:
             return i
@@ -877,12 +881,8 @@ def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
 
 @clear_from.register(T.Nodes)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
-    """clear_from() implementation for collections with items types are named "bl_idname".
-
-    Nodes items cannot be morphed in place, so an update can keep the head of sequence for items
-    with types unchanged, and must replace the end of the sequence from the first item with a
-    changed type.
-    """
+    """clear_from implementation for collections of items that cannot be updated if their "bl_idname" attribute
+    changes."""
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         if proxy.data("bl_idname") != item.bl_idname:
             return i
@@ -895,11 +895,7 @@ def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
 #
 @dispatch_rna
 def truncate_collection(collection: T.bpy_prop_collection, size: int):
-    """Truncates collection to size elements, ensuring that items can safely be saved into
-    the collection. This might clear the collection if its elements cannot be updated.
-
-    This method is useful for bpy _prop_collections that cannot be safely be overwritten in place,
-    because the items cannot be morphed."""
+    """Truncates collection to size elements by removing elements at the end."""
     return
 
 
