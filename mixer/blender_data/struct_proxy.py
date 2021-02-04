@@ -74,7 +74,7 @@ class StructProxy(Proxy):
         try:
             for name, bl_rna_property in properties:
                 attr = getattr(attribute, name)
-                attr_value = read_attribute(attr, name, bl_rna_property, context)
+                attr_value = read_attribute(attr, name, bl_rna_property, attribute, context)
                 self._data[name] = attr_value
         finally:
             context.visit_state.path.pop()
@@ -109,6 +109,7 @@ class StructProxy(Proxy):
 
             return
 
+        specifics.pre_save_struct(self, attribute)
         context.visit_state.path.append(key)
         try:
             for k, v in self._data.items():
@@ -147,6 +148,7 @@ class StructProxy(Proxy):
         else:
 
             assert type(update) == type(self)
+            specifics.pre_save_struct(self, attribute)
 
             context.visit_state.path.append(key)
             try:

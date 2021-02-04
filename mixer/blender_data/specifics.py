@@ -265,6 +265,7 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
 @bpy_data_ctor.register("objects")
 def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+    from mixer.blender_data.misc_proxies import NonePtrProxy
 
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
@@ -272,6 +273,8 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
     data_proxy = proxy.data("data")
     if isinstance(data_proxy, DatablockRefProxy):
         data_datablock = data_proxy.target(context)
+    elif isinstance(data_proxy, NonePtrProxy):
+        data_datablock = None
     else:
         # error on the sender side
         logger.warning(f"bpy.data.objects[{name}].data proxy is a {data_proxy.__class__}.")
@@ -421,15 +424,18 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
 
 def create_clear_animation_data(target: T.bpy_struct, proxy: Union[StructProxy, DatablockProxy]):
     if hasattr(target, "animation_data"):
-        from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+        from mixer.blender_data.misc_proxies import NonePtrProxy
+        from mixer.blender_data.struct_proxy import StructProxy
 
-        animation_data = cast(Optional[DatablockRefProxy], proxy.data("animation_data"))
+        animation_data = cast(Optional[Union[StructProxy, NonePtrProxy]], proxy.data("animation_data"))
         if animation_data is not None:
             if animation_data:
                 if target.animation_data is None:
+                    # None -> not None
                     target.animation_data_create()
             else:
                 if target.animation_data is not None:
+                    # not None -> None
                     target.animation_data_clear()
 
 
@@ -447,6 +453,8 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
     if target.library:
         return target
 
+    create_clear_animation_data(target, proxy)
+
     if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
         target.clear_geometry()
     elif isinstance(target, T.Material):
@@ -459,15 +467,15 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
             elif not is_grease_pencil and target.grease_pencil:
                 bpy.data.materials.remove_gpencil_data(target)
     elif isinstance(target, T.Scene):
+        from mixer.blender_data.misc_proxies import NonePtrProxy
+
         sequence_editor = proxy.data("sequence_editor")
         if sequence_editor is not None:
             # NonePtrProxy or StructProxy
-            if sequence_editor:
-                if target.sequence_editor is None:
-                    target.sequence_editor_create()
-            else:
-                if target.sequence_editor is not None:
-                    target.sequence_editor_clear()
+            if not isinstance(sequence_editor, NonePtrProxy) and target.sequence_editor is None:
+                target.sequence_editor_create()
+            elif isinstance(sequence_editor, NonePtrProxy) and target.sequence_editor is not None:
+                target.sequence_editor_clear()
     elif isinstance(target, T.Light):
         # required first to have access to new light type attributes
         light_type = proxy.data("type")
@@ -475,6 +483,10 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
             target.type = light_type
             # must reload the reference
             target = proxy.target(context)
+    elif isinstance(target, T.Action):
+        groups = proxy.data("groups")
+        if groups:
+            groups.save(target.groups, target, "groups", context)
 
     return target
 
@@ -483,7 +495,7 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
 # add_element
 #
 @dispatch_rna
-def add_element(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def add_element(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     """Add an element to a bpy_prop_collection using the collection specific API"""
     try:
         collection.bl_rna
@@ -497,11 +509,12 @@ def add_element(collection: T.bpy_prop_collection, proxy: Proxy, context: Contex
 
 
 @add_element.register_default()
-def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     try:
         return collection.add()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"add_element (default) exception for {collection} ...")
+        logger.warning(f"... {e!r}")
 
     # try our best
     new_or_add = getattr(collection, "new", None)
@@ -528,7 +541,7 @@ def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, contex
 @add_element.register(T.NodeOutputs)
 @add_element.register(T.NodeTreeInputs)
 @add_element.register(T.NodeTreeOutputs)
-def _add_element_type_name(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_type_name(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     socket_type = proxy.data("type")
     name = proxy.data("name")
     return collection.new(socket_type, name)
@@ -537,73 +550,76 @@ def _add_element_type_name(collection: T.bpy_prop_collection, proxy: Proxy, cont
 @add_element.register(T.ObjectModifiers)
 @add_element.register(T.ObjectGpencilModifiers)
 @add_element.register(T.SequenceModifiers)
-def _add_element_name_type(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_name_type(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     name = proxy.data("name")
     type_ = proxy.data("type")
     return collection.new(name, type_)
 
 
-@add_element.register(T.ObjectConstraints)
 @add_element.register(T.CurveSplines)
-def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+@add_element.register(T.FCurveModifiers)
+@add_element.register(T.ObjectConstraints)
+def _add_element_type(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     type_ = proxy.data("type")
     return collection.new(type_)
 
 
 @add_element.register(T.SplinePoints)
 @add_element.register(T.SplineBezierPoints)
-def _add_element_one(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_one(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     return collection.add(1)
 
 
 @add_element.register(T.MetaBallElements)
-def _add_element_type_eq(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_type_eq(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     type_ = proxy.data("type")
     return collection.new(type=type_)
 
 
 @add_element.register(T.CurveMapPoints)
-def _add_element_location(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_location(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     location = proxy.data("location")
     return collection.new(location[0], location[1])
 
 
 @add_element.register(T.Nodes)
-def _add_element_idname(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_idname(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     node_type = proxy.data("bl_idname")
     return collection.new(node_type)
 
 
-@add_element.register(T.UVLoopLayers)
-@add_element.register(T.LoopColors)
+@add_element.register(T.ActionGroups)
 @add_element.register(T.FaceMaps)
+@add_element.register(T.LoopColors)
+@add_element.register(T.TimelineMarkers)
+@add_element.register(T.UVLoopLayers)
 @add_element.register(T.VertexGroups)
-def _add_element_name_eq(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_name_eq(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     name = proxy.data("name")
     return collection.new(name=name)
 
 
 @add_element.register(T.GreasePencilLayers)
-def _add_element_info(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_info(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     name = proxy.data("info")
     return collection.new(name)
 
 
 @add_element.register(T.GPencilFrames)
-def _add_element_frame_number(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_frame_number(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     frame_number = proxy.data("frame_number")
     return collection.new(frame_number)
 
 
 @add_element.register(T.KeyingSets)
-def _add_element_bl_label(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_bl_label(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     label = proxy.data("bl_label")
     idname = proxy.data("bl_idname")
     return collection.new(name=label, idname=idname)
 
 
 @add_element.register(T.KeyingSetPaths)
-def _add_element_keyingset(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_keyingset(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     # TODO current implementation fails
     # All keying sets paths have an empty name, and insertion with add() fails
     # with an empty name
@@ -621,12 +637,24 @@ def _add_element_keyingset(collection: T.bpy_prop_collection, proxy: Proxy, cont
     )
 
 
+@add_element.register(T.ActionFCurves)
+def _add_element_action_curve(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
+    data_path = proxy.data("data_path")
+    array_index = proxy.data("array_index")
+    return collection.new(data_path, index=array_index)
+
+
+@add_element.register(T.FCurveKeyframePoints)
+def _add_element_add_one(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
+    return collection.add(1)
+
+
 _non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}
 _effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - _non_effect_sequences
 
 
 @add_element.register(T.Sequences)
-def _add_element_sequence(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_sequence(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     type_name = proxy.data("type")
     name = proxy.data("name")
     channel = proxy.data("channel")
@@ -657,7 +685,7 @@ def _add_element_sequence(collection: T.bpy_prop_collection, proxy: Proxy, conte
 
 
 @add_element.register(T.IDMaterials)
-def _add_element_material_ref(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_material_ref(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     material_datablock = proxy.target(context)
     return collection.append(material_datablock)
 
@@ -727,7 +755,7 @@ def diff_must_replace(
 ) -> bool:
     """
     Returns True if a diff between the proxy sequence state and the Blender collection state must force a
-    full collection replacement
+    full collection replacement.
     """
 
     if collection_property == _object_material_slots_property:
@@ -735,6 +763,7 @@ def diff_must_replace(
 
         # Object.material_slots has no bl_rna, so rely on the property to identify it
         # TODO should we change to a dispatch on the property value ?
+        from mixer.blender_data.misc_proxies import NonePtrProxy
 
         if len(collection) != len(sequence):
             return True
@@ -745,8 +774,8 @@ def diff_must_replace(
         # As diff yields a complete DiffReplace or nothing, all the attributes are present in the proxy
         for bl_item, proxy in zip(collection, sequence):
             bl_material = bl_item.material
-            material_proxy = cast(Optional[DatablockRefProxy], proxy.data("material"))
-            if (bl_material is None) != bool(material_proxy):
+            material_proxy: Union[DatablockRefProxy, NonePtrProxy] = proxy.data("material")
+            if (bl_material is None) != isinstance(material_proxy, NonePtrProxy):
                 return True
             if bl_material is not None and bl_material.mixer_uuid != material_proxy.mixer_uuid:
                 return True
@@ -763,17 +792,13 @@ def diff_must_replace(
     return False
 
 
-@diff_must_replace.register(T.CurveSplines)
-def _diff_must_replace_always(
-    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
-) -> bool:
+@diff_must_replace.register(T.CurveSplines)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
     return True
 
 
-@diff_must_replace.register(T.VertexGroups)
-def _diff_must_replace_vertex_groups(
-    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
-) -> bool:
+@diff_must_replace.register(T.VertexGroups)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
     # Full replace if anything has changed is easier to cope with in ObjectProxy._update_vertex_groups()
     return (
         any((bl_item.name != proxy.data("name") for bl_item, proxy in zip(collection, sequence)))
@@ -783,12 +808,48 @@ def _diff_must_replace_vertex_groups(
 
 
 @diff_must_replace.register(T.GreasePencilLayers)
-def _diff_must_replace_info_mismatch(
-    collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
-) -> bool:
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
     # Name mismatch (in info property). This may happen during layer swap and cause unsolicited rename
     # Easier to solve with full replace
     return any((bl_item.info != proxy.data("info") for bl_item, proxy in zip(collection, sequence)))
+
+
+@diff_must_replace.register(T.ActionFCurves)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
+    # The FCurve API has two caveats (seen in 2.83.9):
+    # - it is not possible to set FCurve.group from a valid group to None (but the inverse is possible)
+    # - setting group sometimes changes array_index, like in (no groups initially)
+    #       >>> a=D.actions[0]
+    #       >>> g=a.groups.new('plop')
+    #       >>> a.fcurves[1].color[0] = 0.1
+    #       >>> a.fcurves[2].color[0] = 0.2
+    #       >>> [(i.data_path, i.array_index, i.color[0]) for i in a.fcurves]
+    #       [('location', 0, 0.0), ('location', 1, 0.10000000149011612), ('location', 2, 0.20000000298023224)]
+    #       >>>
+    #       >>> a.fcurves[2].group = g
+    #       >>> [(i.data_path, i.array_index, i.color[0]) for i in a.fcurves]
+    #       [('location', 2, 0.20000000298023224), ('location', 0, 0.0), ('location', 1, 0.10000000149011612)]
+
+    # So overwrite the whole Action.fcurves array as soon as any group changes
+
+    from mixer.blender_data.misc_proxies import PtrToCollectionItemProxy
+
+    for proxy, item in zip(sequence, collection):
+        group_proxy = cast(PtrToCollectionItemProxy, proxy.data("group"))
+        assert group_proxy is not None
+        if item.group is None:
+            if group_proxy:
+                # not None -> None
+                return True
+        else:
+            if not group_proxy:
+                # None -> not None
+                return True
+            same_group = group_proxy == PtrToCollectionItemProxy.make(T.FCurve, "group").load(item)
+            if not same_group:
+                return True
+
+    return False
 
 
 #
@@ -799,6 +860,10 @@ def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]
     """
     Returns the index of the first item in collection that has a type that does not match the
     coresponding item in sequence
+
+    This is the case for items that would require to change type (e.g. ObjectModifier) but cannot be morphed. This enables the caller
+    to truncate the collection at the first element that cannot be morphed in-place and re_write thj collection
+    from this point on.
     """
     return min(len(sequence), len(collection))
 
@@ -806,22 +871,18 @@ def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]
 @clear_from.register(T.ObjectModifiers)
 @clear_from.register(T.ObjectGpencilModifiers)
 @clear_from.register(T.SequenceModifiers)
-def _clear_from_name(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
-    """clear_from() implementation for collections with items types are named "type" """
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+    """clear_from implementation for collections of items that cannot be updated if their "type" attribute changes."""
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         if proxy.data("type") != item.type:
             return i
     return min(len(sequence), len(collection))
 
 
-@clear_from.register(T.Nodes)
-def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
-    """clear_from() implementation for collections with items types are named "bl_idname".
-
-    Nodes items cannot be morphed in place, so an update can keep the head of sequence for items
-    with types unchanged, and must replace the end of the sequence from the first item with a
-    changed type.
-    """
+@clear_from.register(T.Nodes)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+    """clear_from implementation for collections of items that cannot be updated if their "bl_idname" attribute
+    changes."""
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         if proxy.data("bl_idname") != item.bl_idname:
             return i
@@ -834,11 +895,7 @@ def _clear_from_bl_idname(collection: T.bpy_prop_collection, sequence: List[Data
 #
 @dispatch_rna
 def truncate_collection(collection: T.bpy_prop_collection, size: int):
-    """Truncates collection to size elements, ensuring that items can safely be saved into
-    the collection. This might clear the collection if its elements cannot be updated.
-
-    This method is useful for bpy _prop_collections that cannot be safely be overwritten in place,
-    because the items cannot be morphed."""
+    """Truncates collection to size elements by removing elements at the end."""
     return
 
 

@@ -51,7 +51,7 @@ def skip_bpy_data_item(collection_name, item):
 
 class Filter:
     def apply(self, properties):
-        return properties
+        return properties, ""
 
     def is_active(self):
         return True
@@ -74,12 +74,12 @@ class TypeFilter(Filter):
 
 class TypeFilterIn(TypeFilter):
     def apply(self, properties):
-        return [p for p in properties if self.matches(p)]
+        return [p for p in properties if self.matches(p)], ""
 
 
 class TypeFilterOut(TypeFilter):
     def apply(self, properties):
-        return [p for p in properties if not self.matches(p)]
+        return [p for p in properties if not self.matches(p)], ""
 
 
 class CollectionFilterOut(TypeFilter):
@@ -89,7 +89,7 @@ class CollectionFilterOut(TypeFilter):
             p
             for p in properties
             if p.bl_rna is not T.CollectionProperty.bl_rna or p.srna and p.srna.bl_rna not in self._types
-        ]
+        ], ""
 
 
 class FuncFilterOut(Filter):
@@ -101,25 +101,24 @@ class NameFilter(Filter):
         self._names = names
 
     def check_unknown(self, properties):
+        if not DEBUG:
+            return None
         identifiers = [p.identifier for p in properties]
         local_exclusions = set(self._names) - set(_exclude_names)
-        unknowns = [name for name in local_exclusions if name not in identifiers]
-        for unknown in unknowns:
-            logger.warning(f"Internal error: Filtering unknown property {unknown}. Check spelling")
+        unknowns = [repr(name) for name in local_exclusions if name not in identifiers]
+        if unknowns:
+            return f"Unknown properties: {', '.join(unknowns)}. Check spelling"
+        return ""
 
 
 class NameFilterOut(NameFilter):
     def apply(self, properties):
-        if DEBUG:
-            self.check_unknown(properties)
-        return [p for p in properties if p.identifier not in self._names]
+        return [p for p in properties if p.identifier not in self._names], self.check_unknown(properties)
 
 
 class NameFilterIn(NameFilter):
     def apply(self, properties):
-        if DEBUG:
-            self.check_unknown(properties)
-        return [p for p in properties if p.identifier in self._names]
+        return [p for p in properties if p.identifier in self._names], self.check_unknown(properties)
 
 
 # true class with isactive()
@@ -145,7 +144,12 @@ class FilterStack:
             for filter_set in self._filter_stack:
                 filters = filter_set.get(bl_rna, [])
                 for filter_ in filters:
-                    properties = filter_.apply(properties)
+                    properties, error = filter_.apply(properties)
+                    if error:
+                        logger.error(
+                            f"Error while applying filter {filter_.__class__.__name__!r} on {bl_rna.identifier!r} ..."
+                        )
+                        logger.error(f"... {error}")
         return properties
 
     def append(self, filter_set: FilterSet):
@@ -226,8 +230,6 @@ test_filter = FilterStack()
 blenddata_exclude = [
     # "brushes" generates harmless warnings when EnumProperty properties are initialized with a value not in the enum
     "brushes",
-    # TODO actions require to handle the circular reference between ActionGroup.channel and FCurve.group
-    "actions",
     # we do not need those
     "screens",
     "window_managers",
@@ -259,8 +261,6 @@ _exclude_names = [
     "type_info",
     "users",
     "use_fake_user",
-    # TODO
-    "animation_data",
 ]
 """Names of properties that are always excluded"""
 
@@ -270,7 +270,24 @@ default_exclusions: FilterSet = {
         TypeFilterOut(T.PoseBone),
         NameFilterOut(_exclude_names),
     ],
-    T.ActionGroup: [NameFilterOut(["channels"])],
+    T.Action: [
+        NameFilterOut(
+            # Read only
+            ["frame_range"]
+        )
+    ],
+    T.ActionGroup: [
+        NameFilterOut(
+            [
+                # a view into FCurve.group
+                "channels",
+                # UI
+                "select",
+                "show_expanded",
+                "show_expanded_graph",
+            ]
+        )
+    ],
     T.BezierSplinePoint: [
         NameFilterOut(
             [
@@ -288,11 +305,19 @@ default_exclusions: FilterSet = {
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
     T.Curve: [NameFilterOut(["shape_keys"])],
     T.CurveMapPoint: [NameFilterOut(["select"])],
-    # TODO this avoids the recursion path Node.socket , NodeSocker.Node
-    # can probably be included in the readonly filter
-    # TODO temporary ? Restore after foreach_get()
     T.DecimateModifier: [NameFilterOut(["face_count"])],
     T.FaceMap: [NameFilterOut(["index"])],
+    T.FCurve: [NameFilterOut(["select"])],
+    T.Keyframe: [
+        NameFilterOut(
+            [
+                # UI
+                "select_control_point",
+                "select_right_handle",
+                "select_left_handle",
+            ]
+        )
+    ],
     T.Image: [
         NameFilterOut(
             [
@@ -543,6 +568,10 @@ Per-type property exclusions
 
 
 property_order: PropertiesOrder = {
+    T.Action: {
+        # before fcurves
+        "groups",
+    },
     T.ColorManagedViewSettings: {
         "use_curve_mapping",
     },
@@ -574,6 +603,7 @@ test_properties = SynchronizedProperties(test_filter, property_order)
 """For tests"""
 
 safe_depsgraph_updates = (
+    T.Action,
     T.Camera,
     T.Collection,
     T.Curve,
@@ -600,6 +630,7 @@ See synchronization.md
 
 safe_filter = FilterStack()
 safe_blenddata_collections = [
+    "actions",
     "cameras",
     "collections",
     "curves",
