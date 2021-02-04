@@ -475,6 +475,12 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
             target.type = light_type
             # must reload the reference
             target = proxy.target(context)
+    elif isinstance(target, T.Object):
+        animation_data = proxy.data("animation_data")
+        if animation_data is not None and target.animation_data is None:
+            target.animation_data_create()
+        elif animation_data is None and target.animation_data is not None:
+            target.animation_data_clear()
 
     return target
 
@@ -619,6 +625,18 @@ def _add_element_keyingset(collection: T.bpy_prop_collection, proxy: Proxy, cont
     return collection.add(
         target_id=target, data_path=data_path, index=index, group_method=group_method, group_name=group_name
     )
+
+
+@add_element.register(T.ActionFCurves)
+def _add_element_bl_label(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    data_path = proxy.data("data_path")
+    # TODO required index in the add_element API
+    return collection.new(data_path, index=0)
+
+
+@add_element.register(T.FCurveKeyframePoints)
+def _add_element_bl_label(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+    return collection.add(1)
 
 
 _non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}

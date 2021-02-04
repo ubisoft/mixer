@@ -226,8 +226,6 @@ test_filter = FilterStack()
 blenddata_exclude = [
     # "brushes" generates harmless warnings when EnumProperty properties are initialized with a value not in the enum
     "brushes",
-    # TODO actions require to handle the circular reference between ActionGroup.channel and FCurve.group
-    "actions",
     # we do not need those
     "screens",
     "window_managers",
@@ -270,7 +268,12 @@ default_exclusions: FilterSet = {
         TypeFilterOut(T.PoseBone),
         NameFilterOut(_exclude_names),
     ],
-    T.ActionGroup: [NameFilterOut(["channels"])],
+    T.ActionGroup: [
+        NameFilterOut(
+            # TODO temportary
+            "channels"
+        )
+    ],
     T.BezierSplinePoint: [
         NameFilterOut(
             [
@@ -288,11 +291,16 @@ default_exclusions: FilterSet = {
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
     T.Curve: [NameFilterOut(["shape_keys"])],
     T.CurveMapPoint: [NameFilterOut(["select"])],
-    # TODO this avoids the recursion path Node.socket , NodeSocker.Node
-    # can probably be included in the readonly filter
-    # TODO temporary ? Restore after foreach_get()
     T.DecimateModifier: [NameFilterOut(["face_count"])],
     T.FaceMap: [NameFilterOut(["index"])],
+    T.FCurve: [
+        NameFilterOut(
+            [
+                # TODO
+                "group"
+            ]
+        )
+    ],
     T.Image: [
         NameFilterOut(
             [
@@ -574,6 +582,7 @@ test_properties = SynchronizedProperties(test_filter, property_order)
 """For tests"""
 
 safe_depsgraph_updates = (
+    T.Action,
     T.Camera,
     T.Collection,
     T.Curve,
@@ -600,6 +609,7 @@ See synchronization.md
 
 safe_filter = FilterStack()
 safe_blenddata_collections = [
+    "actions",
     "cameras",
     "collections",
     "curves",
