@@ -583,6 +583,10 @@ class BlenderClient(Client):
             path = self.get_object_path(obj)
             mesh_name = self.get_mesh_name(mesh)
 
+            # objects may share mesh but baked mesh may be different in instances with different modifiers
+            if len(obj.modifiers) > 0:
+                mesh_name = obj.name_full + "_" + mesh_name
+
         binary_buffer = common.encode_string(path) + common.encode_string(mesh_name)
 
         binary_buffer += mesh_api.encode_mesh(
