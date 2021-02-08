@@ -298,9 +298,7 @@ default_exclusions: FilterSet = {
         )
     ],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
-    # makes a loop
     T.Bone: [NameFilterOut(["parent"])],
-    # TODO temporary ?
     T.Collection: [NameFilterOut(["all_objects"])],
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
     T.Curve: [NameFilterOut(["shape_keys"])],
@@ -474,6 +472,15 @@ default_exclusions: FilterSet = {
                 "field",
                 # TODO
                 "particle_systems",
+                # unsupported
+                "motion_path",
+                "pose",
+                "proxy_collection",
+                "proxy",
+                "soft_body",
+                "rigid_body",
+                "rigid_body_constraint",
+                "image_user",
             ]
         )
     ],

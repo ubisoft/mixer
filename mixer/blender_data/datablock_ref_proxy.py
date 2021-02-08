@@ -107,8 +107,6 @@ class DatablockRefProxy(Proxy):
             context: the proxy and visit state
         """
         ref_target = self.target(context)
-        if ref_target is None:
-            logger.info(f"Unresolved reference {parent}.{key} -> {self.display_string}]")
 
         try:
             if isinstance(parent, T.bpy_prop_collection):

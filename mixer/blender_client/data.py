@@ -96,7 +96,7 @@ def send_data_updates(updates: UpdateChangeset):
 
     codec = Codec()
     for update in updates:
-        logger.info("%s %s", "send_data_update", update)
+        logger.debug("%s %s", "send_data_update", update)
 
         try:
             encoded_update = codec.encode(update)
@@ -165,7 +165,7 @@ def build_data_update(buffer: bytes):
         message = BlenderDataMessage()
         message.decode(buffer)
         delta: Delta = codec.decode(message.proxy_string)
-        logger.info("%s: %s", "build_data_update", delta)
+        logger.debug("%s: %s", "build_data_update", delta)
         delta.value.arrays = message.arrays
         share_data.bpy_data_proxy.update_datablock(delta)
 

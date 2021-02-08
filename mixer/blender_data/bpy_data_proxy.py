@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from itertools import islice
 import logging
 import sys
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
 import pathlib
 
 import bpy
@@ -249,6 +249,24 @@ def _remove_order_predicate(removal: Removal) -> int:
     return _removal_order.get(removal[1], sys.maxsize)
 
 
+def retain(arg):
+    def retain_(f):
+        def wrapper(*args, **kwargs):
+            def func():
+                return f(*args, **kwargs)
+
+            if bpy.context.mode != "OBJECT":
+                bpy_data_proxy = args[0]
+                bpy_data_proxy._delayed_remote_updates.append(func)
+                return arg
+            else:
+                return func()
+
+        return wrapper
+
+    return retain_
+
+
 class BpyDataProxy(Proxy):
     """Proxy to bpy.data collections
 
@@ -263,8 +281,12 @@ class BpyDataProxy(Proxy):
             name: DatablockCollectionProxy(name) for name in BlendData.instance().collection_names()
         }
 
-        self._delayed_updates: Set[Uuid] = set()
-        """Datablock updates delayed until returning to Object mode."""
+        self._delayed_local_updates: Set[Uuid] = set()
+        """Local datablock updates retained until returning to Object mode.
+        This avoids transmitting edit mode updates in real time"""
+
+        self._delayed_remote_updates: List[Callable[[], None]] = []
+        """Remote datablock updates retained until returning to Object mode."""
 
     def clear(self):
         self._data.clear()
@@ -371,8 +393,11 @@ class BpyDataProxy(Proxy):
 
         all_updates = updates
         if process_delayed_updates:
-            all_updates |= {self.state.datablock(uuid) for uuid in self._delayed_updates}
-            self._delayed_updates.clear()
+            for f in self._delayed_remote_updates:
+                f()
+            self._delayed_remote_updates.clear()
+            all_updates |= {self.state.datablock(uuid) for uuid in self._delayed_local_updates}
+            self._delayed_local_updates.clear()
 
         sorted_updates = sorted(all_updates, key=_updates_order_predicate)
 
@@ -403,10 +428,13 @@ class BpyDataProxy(Proxy):
                 proxy.apply_to_proxy(datablock, delta, context)
                 changeset.updates.append(delta)
             else:
-                logger.info("depsgraph update: ignore empty delta %s", datablock)
+                logger.debug("depsgraph update: ignore empty delta %s", datablock)
 
         return changeset
 
+    @retain(
+        (None, None),
+    )
     def create_datablock(
         self, incoming_proxy: DatablockProxy, synchronized_properties: SynchronizedProperties = safe_properties
     ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
@@ -421,9 +449,8 @@ class BpyDataProxy(Proxy):
         context = self.context(synchronized_properties)
         return bpy_data_collection_proxy.create_datablock(incoming_proxy, context)
 
-    def update_datablock(
-        self, update: DeltaUpdate, synchronized_properties: SynchronizedProperties = safe_properties
-    ) -> Optional[T.ID]:
+    @retain(None)
+    def update_datablock(self, update: DeltaUpdate, synchronized_properties: SynchronizedProperties = safe_properties):
         """
         Process a received datablock update command, updating the datablock and the proxy state
         """
@@ -437,8 +464,9 @@ class BpyDataProxy(Proxy):
             return None
 
         context = self.context(synchronized_properties)
-        return bpy_data_collection_proxy.update_datablock(update, context)
+        bpy_data_collection_proxy.update_datablock(update, context)
 
+    @retain(None)
     def remove_datablock(self, uuid: str):
         """
         Process a received datablock removal command, removing the datablock and updating the proxy state
@@ -474,6 +502,7 @@ class BpyDataProxy(Proxy):
         del self.state.proxies[uuid]
         del self.state._datablocks[uuid]
 
+    @retain([])
     def rename_datablocks(self, items: List[Tuple[str, str, str]]) -> RenameChangeset:
         """
         Process a received datablock rename command, renaming the datablocks and updating the proxy state.
@@ -544,13 +573,14 @@ class BpyDataProxy(Proxy):
             return diff
         return None
 
+    @retain(None)
     def update_soa(self, uuid: Uuid, path: Path, soa_members: List[SoaMember]):
         datablock_proxy = self.state.proxies[uuid]
         datablock = self.state.datablock(uuid)
         datablock_proxy.update_soa(datablock, path, soa_members)
 
     def append_delayed_updates(self, delayed_updates: Set[T.ID]):
-        self._delayed_updates |= {update.mixer_uuid for update in delayed_updates}
+        self._delayed_local_updates |= {update.mixer_uuid for update in delayed_updates}
 
     def sanity_check(self):
         state = self.state
