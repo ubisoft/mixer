@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from itertools import islice
 import logging
 import sys
-from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING, Union
 import pathlib
 
 import bpy
@@ -285,7 +285,7 @@ class BpyDataProxy(Proxy):
         """Local datablock updates retained until returning to Object mode.
         This avoids transmitting edit mode updates in real time"""
 
-        self._delayed_remote_updates: List[Callable] = []
+        self._delayed_remote_updates: List[Callable[[], None]] = []
         """Remote datablock updates retained until returning to Object mode."""
 
     def clear(self):
