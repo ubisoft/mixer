@@ -79,18 +79,19 @@ class StructDatablockRef(DifferentialApply):
         # set reference from None to a valid datablock
         # test_diff_apply.StructDatablockRef.test_add
 
+        # create first so that is is correctly registered (bpt_data.diff would register it, not scene_proxy.diff)
         world = bpy.data.worlds.new("W")
         self.scene.world = None
         self.proxy = BpyDataProxy()
         self.proxy.load(test_properties)
+        # Loaded proxy contains scene.world = None
         self.scene_proxy: DatablockProxy = self.proxy.data("scenes").search_one("Scene")
 
         self.scene.world = world
         self.generate_all_uuids()
         delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
-        # diff -> set world
+        # Diff contains set scene.proxy to world
 
-        # reset
         self.scene.world = None
 
         # apply the diff
@@ -122,16 +123,26 @@ class StructDatablockRef(DifferentialApply):
         self.assertEqual(self.scene.world, world2)
 
     def test_remove(self):
-        # set reference from a valid datablock to None
+        # apply sets reference from a valid datablock to None
         # test_diff_apply.StructDatablockRef.test_remove
-        world1 = bpy.data.worlds.new("W1")
-        self.scene.world = world1
+        world = bpy.data.worlds.new("W")
+        self.scene.world = world
         self.proxy = BpyDataProxy()
         self.proxy.load(test_properties)
+        # Loaded proxy contains scene.world = world
+        self.scene_proxy: DatablockProxy = self.proxy.data("scenes").search_one("Scene")
+
         self.scene.world = None
         self.generate_all_uuids()
-        _ = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
-        # delta - > None
+        delta = self.scene_proxy.diff(self.scene, self.scene.name, self.scenes_property, self.proxy.context())
+        # Delta contains set scene.proxy to none
+
+        self.scene.world = world
+
+        # apply the diff
+        scene = bpy.data.scenes[self.scene.name]
+        self.scene_proxy.apply(scene, bpy.data.scenes, self.scene.name, delta, self.proxy.context())
+        self.assertEqual(self.scene.world, None)
 
 
 class Collection(DifferentialApply):

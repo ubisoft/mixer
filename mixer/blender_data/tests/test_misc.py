@@ -27,6 +27,7 @@ from mixer.blender_data.aos_soa_proxy import SoaElement
 from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+from mixer.blender_data.misc_proxies import NonePtrProxy
 from mixer.blender_data.filter import (
     property_order,
     SynchronizedProperties,
@@ -126,7 +127,7 @@ class TestLoadProxy(unittest.TestCase):
         # load into proxy
         cam_proxy = self.proxy.data("cameras").search_one("Camera_0")
         focus_object_proxy = cam_proxy.data("dof").data("focus_object")
-        self.assertFalse(focus_object_proxy)
+        self.assertIsInstance(focus_object_proxy, NonePtrProxy)
 
 
 class TestBlendData(unittest.TestCase):

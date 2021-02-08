@@ -26,7 +26,8 @@ from typing import Any, Optional, TYPE_CHECKING, List, Set, Tuple, Union
 
 import bpy.types as T  # noqa
 
-from mixer.blender_data.attributes import write_attribute
+from mixer.blender_data.attributes import read_attribute, write_attribute
+from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Proxy
 
@@ -34,6 +35,99 @@ if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
 
 logger = logging.getLogger(__name__)
+
+
+@serialize
+class NonePtrProxy(Proxy):
+    """Proxy for a None PointerProperty value.
+
+    This is used for pointers to standalone datablocks (e.g. Scene.camera, AnimData.action), pointers to embedded
+    datablocks (e.g. Scene.node_tree) and pointers to other structs (Scene.sequence_editor). A null DatablockRefProxy
+    can also be used for null pointers to standalone datablocks if its is clearly known that the target is a
+    standalone reference. Usually, this is not known in readçattribute and a NonePtrProxy is created.
+
+    Note: when setting a PointerProperty from None to a valid reference, apply_attributs requires that the managed
+    value implements apply().
+    """
+
+    def __bool__(self):
+        return False
+
+    def target(self, context: Context) -> None:
+        return None
+
+    @property
+    def mixer_uuid(self) -> str:
+        return "00000000-0000-0000-0000-000000000000"
+
+    def load(self, *_):
+        return self
+
+    def save(self, unused_attribute, parent: T.bpy_struct, key: Union[int, str], context: Context):
+        """Save None into parent.key or parent[key]"""
+
+        if isinstance(key, int):
+            parent[key] = None
+        else:
+            try:
+                setattr(parent, key, None)
+            except AttributeError as e:
+                # Motsly errors like
+                #   AttributeError: bpy_struct: attribute "node_tree" from "Material" is read-only
+                # Avoiding them would require filtering attributes on save in order not to set
+                # Material.node_tree if Material.use_nodes is False
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("NonePtrProxy.save(): exception for attribute ...")
+                    logger.debug(f"... {context.visit_state.display_path()}.{key}...")
+                    logger.debug(f"... {e!r}")
+
+    def apply(
+        self,
+        attribute: Union[T.bpy_struct, T.bpy_prop_collection],
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        delta: Delta,
+        context: Context,
+        to_blender: bool = True,
+    ) -> Union[DatablockRefProxy, NonePtrProxy]:
+        """
+        Apply delta to an attribute with None value.
+
+        This is used for instance Scene.camera is None and update to hold a valid Camera reference
+
+        Args:
+            attribute: the Blender attribute to update (e.g a_scene.camera)
+            parent: the attribute that contains attribute (e.g. a Scene instance)
+            key: the key that identifies attribute in parent (e.g; "camera").
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update attribute in addition to this Proxy
+        """
+        replace = delta.value
+
+        if isinstance(replace, DatablockRefProxy):
+            if to_blender:
+                datablock = context.proxy_state.datablock(replace._datablock_uuid)
+                if isinstance(key, int):
+                    parent[key] = datablock
+                else:
+                    setattr(parent, key, datablock)
+            return replace
+
+        # for instance animation_data set from None to a valid value, after animation_data_create() has been called
+        return replace
+
+    def diff(
+        self,
+        container: Union[T.bpy_prop_collection, T.Struct],
+        key: Union[str, int],
+        prop: T.Property,
+        context: Context,
+    ) -> Optional[DeltaUpdate]:
+        attr = read_attribute(container, key, prop, None, context)
+        if isinstance(attr, NonePtrProxy):
+            return None
+        return DeltaReplace(attr)
 
 
 @serialize
@@ -214,7 +308,7 @@ class PtrToCollectionItemProxy(Proxy):
     _serialize = ("_path", "_index")
 
     _ctors = {(T.ShapeKey, "relative_key"): ("key_blocks",), (T.FCurve, "group"): ("groups",)}
-    """ { struct member: path to the enclosing datablock connection}"""
+    """ { struct member: path to the enclosing datablock collection}"""
 
     @classmethod
     def make(cls, attr_type: type, key: str) -> Optional[PtrToCollectionItemProxy]:
@@ -234,6 +328,9 @@ class PtrToCollectionItemProxy(Proxy):
     def __bool__(self):
         return self._index != -1
 
+    def __eq__(self, other):
+        return (self._path, self._index) == (other._path, other._index)
+
     def _collection(self, datablock) -> T.bpy_prop_collection:
         """Returns the bpy_prop_collection that contains the pointees referenced by the attribute managed by this proxy
         (e.g. returns Key.key_blocks, if this proxy manages Skape_key.relative_key)."""
@@ -249,6 +346,8 @@ class PtrToCollectionItemProxy(Proxy):
     def _compute_index(self, attribute: T.bpy_struct):
         """Returns the index in the pointee bpy_prop_collection (e.g Key.key_blocks) that contains the item referenced
         by the attribute managed by this proxy (e.g ShapeKey.relative_key)."""
+        if attribute is None:
+            return -1
         collection = self._collection(attribute.id_data)
         for index, item in enumerate(collection):
             if item == attribute:
@@ -281,8 +380,12 @@ class PtrToCollectionItemProxy(Proxy):
             key: the string or index that identifies attribute in parent
             context: proxy and visit state
         """
-        collection = self._collection(attribute.id_data)
-        pointee = collection[self._index]
+
+        if self._index == -1:
+            pointee = None
+        else:
+            collection = self._collection(parent.id_data)
+            pointee = collection[self._index]
         write_attribute(parent, key, pointee, context)
 
     def apply(

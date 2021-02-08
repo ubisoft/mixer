@@ -153,10 +153,8 @@ class DatablockCollectionProxy(Proxy):
 
         uuid = incoming_proxy.mixer_uuid
         self._data[uuid] = incoming_proxy
-
-        # TODO code placement is inconsistent with BpyDataProxy.remove_datablock()
-        context.proxy_state.add_datablock(uuid, datablock)
         context.proxy_state.proxies[uuid] = incoming_proxy
+
         if datablock is not None:
             context.proxy_state.unresolved_refs.resolve(uuid, datablock)
 
@@ -461,7 +459,7 @@ class DatablockRefCollectionProxy(Proxy):
         maybe_updated_keys = proxy_keys & blender_keys
 
         for k in added_keys:
-            value = read_attribute(blender_items[k], k, item_property, context)
+            value = read_attribute(blender_items[k], k, item_property, collection, context)
             assert isinstance(value, (DatablockProxy, DatablockRefProxy))
             diff._data[k] = DeltaAddition(value)
 
