@@ -428,7 +428,7 @@ class BpyDataProxy(Proxy):
                 proxy.apply_to_proxy(datablock, delta, context)
                 changeset.updates.append(delta)
             else:
-                logger.info("depsgraph update: ignore empty delta %s", datablock)
+                logger.debug("depsgraph update: ignore empty delta %s", datablock)
 
         return changeset
 
