@@ -94,8 +94,8 @@ class ProxyState:
         self.unresolved_refs: UnresolvedRefs = UnresolvedRefs()
 
         self.unregistered_libraries: Set[LibraryProxy] = set()
-        """indirect libraries that were received but not yet registered because no datablock
-        they provide were processed yet"""
+        """indirect libraries that were received but not yet registered because no datablock they provide were processed
+        yet"""
 
         self.shared_folders: List[str] = []
 
