@@ -56,9 +56,12 @@ def get_source_file_path(cache_path: str):
     if cache_path is None:
         return None
     metadata_path = Path(cache_path).with_suffix(".metadata")
-    if not metadata_path.exists():
-        return cache_path
-
+    try:
+        if not metadata_path.exists():
+            return cache_path
+    except Exception:
+        logger.warning("Error accessing file " + cache_path)
+        return None
     return metadata_path.read_text()
 
 
