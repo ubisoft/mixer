@@ -95,7 +95,12 @@ class BpyDataCollectionDiff:
         # (item name, collection name)
         blender_items: Dict[Uuid, Tuple[T.ID, str]] = {}
 
-        for datablock in bl_collection.values():
+        # Iterating in reverse "ensures" that linked datablocks are processed before local datablocks. If a linked
+        # Object is duplicate-linked, the result is a local Object with a linked Mesh data. The local Object has a uuid
+        # that is duplicate with the linked Object datablock. The duplicate detection must reset the uuid on the *local*
+        # datablock(s). Iterating in straight order would reset the uuid on the linked datablock, which has already been
+        # sent to the peers
+        for datablock in reversed(bl_collection.values()):
             if skip_bpy_data_item(collection_name, datablock):
                 continue
 

@@ -1,5 +1,9 @@
 # 0.21.0 (wip)
 
+## Fixes
+
+- Libraries: synchronization error after using "duplicate linked" on an Object from a library
+
 ## Breaking changes
 
 - require Blender 2.91.0

@@ -53,6 +53,16 @@ bpy.data.libraries.remove(bpy.data.library[0])
         self.send_string(self._remove_link, to=0)
         self.assert_matches()
 
+    def test_duplicate_linked(self):
+        self.send_string(self._create_link, to=0)
+        duplicate = """
+import bpy
+bpy.data.objects['Camera'].select_set(True)
+bpy.ops.object.duplicate_move_linked()
+"""
+        self.send_string(duplicate, to=0)
+        self.assert_matches()
+
     def test_reference_direct_datablock(self):
         self.send_string(self._create_link, to=0)
 
