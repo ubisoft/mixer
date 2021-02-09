@@ -64,6 +64,7 @@ class DatablockProxy(StructProxy):
         "_custom_properties",
         "_is_in_shared_folder",
         "_filepath_raw",
+        "_type_name",
     )
 
     def __init__(self):
@@ -100,6 +101,9 @@ class DatablockProxy(StructProxy):
         """False for local (non link) datablocks received if they cannot be created (file error for images), for a
         library before the first link datalock is loaded, for an indirect link datablock before the direct link
         datablock is loaded. Always True on the sender side."""
+
+        self._type_name: str = ""
+        """The type name in the bpy.type module, e.g. Object, TextCurve"""
 
     def copy_data(self, other: DatablockProxy):
         super().copy_data(other)
@@ -185,6 +189,8 @@ class DatablockProxy(StructProxy):
         """
 
         self.clear_data()
+        self._type_name = type(datablock).__name__
+
         self._has_datablock = True
         if isinstance(datablock, T.Object):
             context.proxy_state.register_object(datablock)
@@ -208,14 +214,25 @@ class DatablockProxy(StructProxy):
 
     def attach_filepath_raw(self, datablock: T.ID):
         if hasattr(datablock, "filepath"):
-            if len(datablock.filepath) == 0:
+            filepath = datablock.filepath
+            if len(filepath) == 0:
                 return
-            path_string = get_source_file_path(bpy.path.abspath(datablock.filepath))
+            if filepath[0] == "<" and filepath[-1] == ">":
+                # various builtin names, like "<builtin>" for VectorFont, or "<startup.blend>" for Library
+                return
+
+            try:
+                path_string = get_source_file_path(bpy.path.abspath(filepath))
+            except OSError as e:
+                logger.warning(f"{datablock!r}: invalid file path {filepath} ...")
+                logger.warning(f"... {e!r}")
+                return
+
             path = pathlib.Path(path_string)
             if not path.exists():
                 logger.warning(f"{datablock!r}: file with computed source path does not exist ...")
-                logger.warning(f"... filepath: '{datablock.filepath}'")
-                logger.warning(f"... abspath:  '{bpy.path.abspath(datablock.filepath)}'")
+                logger.warning(f"... filepath: '{filepath}'")
+                logger.warning(f"... abspath:  '{bpy.path.abspath(filepath)}'")
                 logger.warning(f"... source:   '{path_string}'")
             self._filepath_raw = str(path)
 

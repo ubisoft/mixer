@@ -1219,6 +1219,7 @@ def clear_scene_content():
             "cameras",
             "collections",
             "curves",
+            "fonts",
             "grease_pencils",
             "images",
             "lights",
@@ -1228,6 +1229,7 @@ def clear_scene_content():
             "metaballs",
             "movieclips",
             "sounds",
+            "texts",
             "textures",
             "worlds",
         ]

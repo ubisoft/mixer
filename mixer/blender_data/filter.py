@@ -628,6 +628,8 @@ safe_depsgraph_updates = (
     T.Camera,
     T.Collection,
     T.Curve,
+    # no updates, builtin font only
+    # T.VectorFont,
     T.Image,
     T.GreasePencil,
     T.Key,
@@ -656,6 +658,7 @@ safe_blenddata_collections = [
     "cameras",
     "collections",
     "curves",
+    "fonts",
     "grease_pencils",
     "images",
     "libraries",

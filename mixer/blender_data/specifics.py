@@ -194,8 +194,10 @@ def is_soable_property(bl_rna_property):
 
 
 node_tree_type = {
+    "COMPOSITING": "CompositorNodeTree",
+    "GEOMETRY": "GeometryNodeTree",
     "SHADER": "ShaderNodeTree",
-    "COMPOSITOR": "CompositorNodeTree",
+    "SIMULATION": "SimulationNodeTree",
     "TEXTURE": "TextureNodeTree",
 }
 
@@ -219,10 +221,24 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
     return id_
 
 
+@bpy_data_ctor.register("fonts")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> T.VectorFont:
+    name = proxy.data("name")
+    filepath = proxy.data("filepath")
+
+    if filepath != "<builtin>":
+        raise NotImplementedError(f"non builtin font: {name}")
+
+    dummy_text = bpy.data.curves.new("_mixer_tmp_text", "FONT")
+    font = dummy_text.font
+    bpy.data.curves.remove(dummy_text)
+    return font
+
+
 @bpy_data_ctor.register("images")
 @bpy_data_ctor.register("movieclips")
-@bpy_data_ctor.register("sounds")
-def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("sounds")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     media = None
     media_name = proxy.data("name")
@@ -264,8 +280,8 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
     return media
 
 
-@bpy_data_ctor.register("objects")
-def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("objects")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
     from mixer.blender_data.misc_proxies import NonePtrProxy
 
@@ -286,8 +302,8 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
     return collection.new(name, data_datablock)
 
 
-@bpy_data_ctor.register("lights")
-def bpy_data_ctor_lights(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("lights")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
     light_type = proxy.data("type")
@@ -295,34 +311,31 @@ def bpy_data_ctor_lights(collection_name: str, proxy: DatablockProxy, context: C
     return light
 
 
-@bpy_data_ctor.register("node_groups")
-def bpy_data_ctor_node_groups(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("node_groups")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
     type_ = node_tree_type[proxy.data("type")]
     return collection.new(name, type_)
 
 
-@bpy_data_ctor.register("sounds")
-def bpy_data_ctor_sounds(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
-    collection = getattr(bpy.data, collection_name)
-    filepath = proxy.data("filepath")
-    # TODO what about "check_existing" ?
-    id_ = collection.load(filepath)
-    # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
-    id_.name = proxy.data("name")
-    return id_
+_curve_ids = {
+    "Curve": "CURVE",
+    "SurfaceCurve": "SURFACE",
+    "TextCurve": "FONT",
+}
 
 
-@bpy_data_ctor.register("curves")
-def bpy_data_ctor_curves(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("curves")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
-    return collection.new(name, "CURVE")
+    curve_type = proxy._type_name
+    return collection.new(name, _curve_ids[curve_type])
 
 
-@bpy_data_ctor.register("shape_keys")
-def bpy_data_ctor_shape_keys(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("shape_keys")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     user = proxy._data["user"]
     user_proxy = context.proxy_state.proxies.get(user.mixer_uuid)
     datablock = proxy.create_shape_key_datablock(user_proxy, context)

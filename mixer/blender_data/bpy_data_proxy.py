@@ -209,6 +209,8 @@ class Context:
 _creation_order = {
     # Libraries are needed to create all linked datablocks
     "libraries": -10,
+    # before curves
+    "fonts": -5,
     # anything else: 0
     "collections": 10,
     # Scene after Collection. Scene.collection must be up to date before Scene.view_layers can be saved

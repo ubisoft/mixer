@@ -1,5 +1,10 @@
 # 0.21.0 (wip)
 
+## Features
+
+- MovieClip: synchronization
+- TextCurve: synchronization (with builtin VectorFont only)
+
 ## Fixes
 
 - Libraries: synchronization error after using "duplicate linked" on an Object from a library
