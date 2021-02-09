@@ -1224,11 +1224,12 @@ def clear_scene_content():
             "lights",
             "objects",
             "materials",
-            "metaballs",
             "meshes",
+            "metaballs",
+            "movieclips",
+            "sounds",
             "textures",
             "worlds",
-            "sounds",
         ]
 
         for name in data:

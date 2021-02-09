@@ -220,10 +220,12 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
 
 
 @bpy_data_ctor.register("images")
+@bpy_data_ctor.register("movieclips")
+@bpy_data_ctor.register("sounds")
 def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
-    image = None
-    image_name = proxy.data("name")
+    media = None
+    media_name = proxy.data("name")
     filepath = proxy.data("filepath")
 
     resolved_filepath = proxy.resolved_filepath(context)
@@ -232,24 +234,24 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
 
     packed_files = proxy.data("packed_files")
     if packed_files is not None and packed_files.length:
-        name = proxy.data("name")
-        width, height = proxy.data("size")
-        try:
-            with open(resolved_filepath, "rb") as file_:
-                buffer = file_.read()
-            image = collection.new(name, width, height)
-            image.pack(data=buffer, data_len=len(buffer))
-        except RuntimeError as e:
-            logger.warning(
-                f'Cannot load packed file original "{filepath}"", resolved "{resolved_filepath}". Exception: '
-            )
-            logger.warning(f"... {e}")
-            raise ExternalFileFailed from e
+        if collection_name == "images":
+            width, height = proxy.data("size")
+            try:
+                with open(resolved_filepath, "rb") as file_:
+                    buffer = file_.read()
+                media = collection.new(media_name, width, height)
+                media.pack(data=buffer, data_len=len(buffer))
+            except RuntimeError as e:
+                logger.warning(
+                    f'Cannot load packed file original "{filepath}"", resolved "{resolved_filepath}". Exception: '
+                )
+                logger.warning(f"... {e}")
+                raise ExternalFileFailed from e
 
     else:
         try:
-            image = collection.load(resolved_filepath)
-            image.name = image_name
+            media = collection.load(resolved_filepath)
+            media.name = media_name
         except RuntimeError as e:
             logger.warning(f'Cannot load file original "{filepath}"", resolved "{resolved_filepath}". Exception: ')
             logger.warning(f"... {e}")
@@ -259,7 +261,7 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
     # from the incoming path that may not exist
     proxy._data["filepath"] = resolved_filepath
     proxy._data["filepath_raw"] = resolved_filepath
-    return image
+    return media
 
 
 @bpy_data_ctor.register("objects")
@@ -510,13 +512,6 @@ def add_element(collection: T.bpy_prop_collection, proxy: Proxy, index: int, con
 
 @add_element.register_default()
 def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
-    try:
-        return collection.add()
-    except Exception as e:
-        logger.warning(f"add_element (default) exception for {collection} ...")
-        logger.warning(f"... {e!r}")
-
-    # try our best
     new_or_add = getattr(collection, "new", None)
     if new_or_add is None:
         new_or_add = getattr(collection, "add", None)
