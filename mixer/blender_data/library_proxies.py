@@ -74,6 +74,7 @@ class LibraryProxy(DatablockProxy):
         if library_datablock:
             # The library is already loaded. Register the linked datablock at once.
             # Registration in ProxyState.datablocks is performed by a caller during datablock creation
+            # TODO/perf: users_id iterates over all items of all collections
             for linked_datablock in library_datablock.users_id:
                 if repr(linked_datablock) == identifier:
                     # logger.warning(f"register indirect for {library_datablock}: {identifier} {uuid}")
@@ -158,6 +159,8 @@ class LibraryProxy(DatablockProxy):
             proxy_state.add_datablock(self.mixer_uuid, library_datablock)
 
         # Register the link datablocks provided by this library
+
+        # TODO/perf: users_id iterates over all items of all collections
         for linked_datablock in library_datablock.users_id:
             identifier = repr(linked_datablock)
             uuid = self._unregistered_datablocks.get(identifier)

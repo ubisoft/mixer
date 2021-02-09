@@ -37,16 +37,30 @@ DEBUG = True
 logger = logging.getLogger(__name__)
 
 
+def _skip_scene(item):
+    return item.name == "_mixer_to_be_removed_"
+
+
+def _skip_image(item):
+    return item.source == "VIEWER"
+
+
+def _skip_skape_key(item):
+    # shape keys are not linkable, they can only be linked indirectly via a Mesh or other
+    return item.library is not None
+
+
+_skip = {"scenes": _skip_scene, "images": _skip_image, "shape_keys": _skip_skape_key}
+
+
 def skip_bpy_data_item(collection_name, item):
     # Never want to consider these as updated, created, removed, ...
-    if collection_name == "scenes":
-        if item.name == "_mixer_to_be_removed_":
-            return True
-    elif collection_name == "images":
-        if item.source == "VIEWER":
-            # "Render Result", "Viewer Node"
-            return True
-    return False
+    try:
+        skip = _skip[collection_name]
+    except KeyError:
+        return False
+    else:
+        return skip(item)
 
 
 class Filter:
