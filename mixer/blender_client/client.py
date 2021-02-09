@@ -1219,16 +1219,19 @@ def clear_scene_content():
             "cameras",
             "collections",
             "curves",
+            "fonts",
             "grease_pencils",
             "images",
             "lights",
             "objects",
             "materials",
-            "metaballs",
             "meshes",
+            "metaballs",
+            "movieclips",
+            "sounds",
+            "texts",
             "textures",
             "worlds",
-            "sounds",
         ]
 
         for name in data:

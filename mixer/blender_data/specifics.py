@@ -194,8 +194,10 @@ def is_soable_property(bl_rna_property):
 
 
 node_tree_type = {
+    "COMPOSITING": "CompositorNodeTree",
+    "GEOMETRY": "GeometryNodeTree",
     "SHADER": "ShaderNodeTree",
-    "COMPOSITOR": "CompositorNodeTree",
+    "SIMULATION": "SimulationNodeTree",
     "TEXTURE": "TextureNodeTree",
 }
 
@@ -219,11 +221,27 @@ def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> 
     return id_
 
 
+@bpy_data_ctor.register("fonts")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> T.VectorFont:
+    name = proxy.data("name")
+    filepath = proxy.data("filepath")
+
+    if filepath != "<builtin>":
+        raise NotImplementedError(f"non builtin font: {name}")
+
+    dummy_text = bpy.data.curves.new("_mixer_tmp_text", "FONT")
+    font = dummy_text.font
+    bpy.data.curves.remove(dummy_text)
+    return font
+
+
 @bpy_data_ctor.register("images")
-def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("movieclips")
+@bpy_data_ctor.register("sounds")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
-    image = None
-    image_name = proxy.data("name")
+    media = None
+    media_name = proxy.data("name")
     filepath = proxy.data("filepath")
 
     resolved_filepath = proxy.resolved_filepath(context)
@@ -232,24 +250,24 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
 
     packed_files = proxy.data("packed_files")
     if packed_files is not None and packed_files.length:
-        name = proxy.data("name")
-        width, height = proxy.data("size")
-        try:
-            with open(resolved_filepath, "rb") as file_:
-                buffer = file_.read()
-            image = collection.new(name, width, height)
-            image.pack(data=buffer, data_len=len(buffer))
-        except RuntimeError as e:
-            logger.warning(
-                f'Cannot load packed file original "{filepath}"", resolved "{resolved_filepath}". Exception: '
-            )
-            logger.warning(f"... {e}")
-            raise ExternalFileFailed from e
+        if collection_name == "images":
+            width, height = proxy.data("size")
+            try:
+                with open(resolved_filepath, "rb") as file_:
+                    buffer = file_.read()
+                media = collection.new(media_name, width, height)
+                media.pack(data=buffer, data_len=len(buffer))
+            except RuntimeError as e:
+                logger.warning(
+                    f'Cannot load packed file original "{filepath}"", resolved "{resolved_filepath}". Exception: '
+                )
+                logger.warning(f"... {e}")
+                raise ExternalFileFailed from e
 
     else:
         try:
-            image = collection.load(resolved_filepath)
-            image.name = image_name
+            media = collection.load(resolved_filepath)
+            media.name = media_name
         except RuntimeError as e:
             logger.warning(f'Cannot load file original "{filepath}"", resolved "{resolved_filepath}". Exception: ')
             logger.warning(f"... {e}")
@@ -259,11 +277,11 @@ def bpy_data_ctor_images(collection_name: str, proxy: DatablockProxy, context: C
     # from the incoming path that may not exist
     proxy._data["filepath"] = resolved_filepath
     proxy._data["filepath_raw"] = resolved_filepath
-    return image
+    return media
 
 
-@bpy_data_ctor.register("objects")
-def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("objects")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
     from mixer.blender_data.misc_proxies import NonePtrProxy
 
@@ -284,8 +302,8 @@ def bpy_data_ctor_objects(collection_name: str, proxy: DatablockProxy, context: 
     return collection.new(name, data_datablock)
 
 
-@bpy_data_ctor.register("lights")
-def bpy_data_ctor_lights(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("lights")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
     light_type = proxy.data("type")
@@ -293,34 +311,31 @@ def bpy_data_ctor_lights(collection_name: str, proxy: DatablockProxy, context: C
     return light
 
 
-@bpy_data_ctor.register("node_groups")
-def bpy_data_ctor_node_groups(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("node_groups")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
     type_ = node_tree_type[proxy.data("type")]
     return collection.new(name, type_)
 
 
-@bpy_data_ctor.register("sounds")
-def bpy_data_ctor_sounds(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
-    collection = getattr(bpy.data, collection_name)
-    filepath = proxy.data("filepath")
-    # TODO what about "check_existing" ?
-    id_ = collection.load(filepath)
-    # we may have received an ID named xxx.001 although filepath is xxx, so fix it now
-    id_.name = proxy.data("name")
-    return id_
+_curve_ids = {
+    "Curve": "CURVE",
+    "SurfaceCurve": "SURFACE",
+    "TextCurve": "FONT",
+}
 
 
-@bpy_data_ctor.register("curves")
-def bpy_data_ctor_curves(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("curves")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
-    return collection.new(name, "CURVE")
+    curve_type = proxy._type_name
+    return collection.new(name, _curve_ids[curve_type])
 
 
-@bpy_data_ctor.register("shape_keys")
-def bpy_data_ctor_shape_keys(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+@bpy_data_ctor.register("shape_keys")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     user = proxy._data["user"]
     user_proxy = context.proxy_state.proxies.get(user.mixer_uuid)
     datablock = proxy.create_shape_key_datablock(user_proxy, context)
@@ -510,13 +525,6 @@ def add_element(collection: T.bpy_prop_collection, proxy: Proxy, index: int, con
 
 @add_element.register_default()
 def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
-    try:
-        return collection.add()
-    except Exception as e:
-        logger.warning(f"add_element (default) exception for {collection} ...")
-        logger.warning(f"... {e!r}")
-
-    # try our best
     new_or_add = getattr(collection, "new", None)
     if new_or_add is None:
         new_or_add = getattr(collection, "add", None)
