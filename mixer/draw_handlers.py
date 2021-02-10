@@ -254,10 +254,14 @@ def users_selection_name_draw():
         bbox_corner = matrix @ Vector(local_bbox[1])
         draw_user_name(user_dict, bbox_corner)
 
-    users_selection_draw_iteration(per_user_callback, per_object_callback, collection_detail=False)
+    users_selection_draw_iteration(
+        per_user_callback, per_object_callback, collection_detail=False, draw_first_only=True
+    )
 
 
-def users_selection_draw_iteration(per_user_callback, per_object_callback, collection_detail=True):
+def users_selection_draw_iteration(
+    per_user_callback, per_object_callback, collection_detail=True, draw_first_only=False
+):
     if share_data.client is None:
         return
 
@@ -299,6 +303,8 @@ def users_selection_draw_iteration(per_user_callback, per_object_callback, colle
                     objects = []
                 parent_matrix = Matrix.Translation(-collection.instance_offset) @ obj.matrix_world
                 per_object_callback(user_dict, obj, parent_matrix @ BBOX_SCALE_MATRIX, DEFAULT_BBOX)
+                if draw_first_only:
+                    return
 
             for obj in objects:
                 bbox = obj.bound_box
@@ -308,6 +314,8 @@ def users_selection_draw_iteration(per_user_callback, per_object_callback, colle
                     bbox = DEFAULT_BBOX
 
                 per_object_callback(user_dict, obj, parent_matrix @ obj.matrix_world @ BBOX_SCALE_MATRIX, bbox)
+                if draw_first_only:
+                    return
 
 
 def draw_user_name(user_dict, coord_3d):
