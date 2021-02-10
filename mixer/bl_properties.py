@@ -163,6 +163,7 @@ class MixerProperties(bpy.types.PropertyGroup):
     user_index: bpy.props.IntProperty()  # index in the list of users
 
     display_shared_folders_options: bpy.props.BoolProperty(default=True)
+    display_gizmos_options: bpy.props.BoolProperty(default=True)
     display_advanced_options: bpy.props.BoolProperty(default=False)
     display_developer_options: bpy.props.BoolProperty(default=False)
     display_rooms: bpy.props.BoolProperty(default=True)
