@@ -246,14 +246,16 @@ def draw_developer_settings_ui(layout: bpy.types.UILayout):
     layout.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
     layout.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
     layout.prop(mixer_prefs, "commands_send_interval")
+    layout.prop(mixer_prefs, "display_own_gizmos")
+    layout.prop(mixer_prefs, "display_ids_gizmos")
 
-    box = layout.box().column()
-    box.label(text="Gizmos")
-    box.prop(mixer_prefs, "display_own_gizmos")
-    box.prop(mixer_prefs, "display_frustums_gizmos")
-    box.prop(mixer_prefs, "display_names_gizmos")
-    box.prop(mixer_prefs, "display_ids_gizmos")
-    box.prop(mixer_prefs, "display_selections_gizmos")
+
+def draw_gizmos_settings_ui(layout: bpy.types.UILayout):
+    mixer_prefs = get_mixer_prefs()
+    layout.prop(mixer_prefs, "display_frustums_gizmos")
+    layout.prop(mixer_prefs, "display_frustums_names_gizmos")
+    layout.prop(mixer_prefs, "display_selections_gizmos")
+    layout.prop(mixer_prefs, "display_selections_names_gizmos")
 
 
 def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Context):
@@ -267,6 +269,10 @@ def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Contex
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Room Settings")
     layout.prop(mixer_prefs, "room", text="Default Room Name")
+
+    layout = mixer_prefs.layout.box().column()
+    layout.label(text="Gizmos")
+    draw_gizmos_settings_ui(layout)
 
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Advanced Settings")
@@ -334,24 +340,6 @@ class MixerSettingsPanel(bpy.types.Panel):
                         split.scale_y = 0.5
                     user_layout.separator(factor=0.2)
 
-        if collapsable_panel(
-            layout, mixer_props, "display_snapping_options", alert=True, text="Sync Options - Not implemented yet"
-        ):
-            box = layout.box().column()
-            if share_data.client.current_room is None:
-                box.label(text="You must join a room to select sync options")
-            else:
-                row = box.row()
-                row.prop(mixer_props, "snap_view_user_enabled", text="3D View: ")
-                row.prop(mixer_props, "snap_view_user", text="", icon="USER")
-                row.prop(mixer_props, "snap_view_area", text="", icon="VIEW_CAMERA")
-                row = box.row()
-                row.prop(mixer_props, "snap_time_user_enabled", text="Time: ")
-                row.prop(mixer_props, "snap_time_user", text="", icon="USER")
-                row = box.row()
-                row.prop(mixer_props, "snap_3d_cursor_user_enabled", text="3D Cursor: ")
-                row.prop(mixer_props, "snap_3d_cursor_user", text="", icon="USER")
-
     def connected(self):
         return share_data.client is not None and share_data.client.is_connected()
 
@@ -411,8 +399,9 @@ class MixerSettingsPanel(bpy.types.Panel):
             self.draw_users(layout)
 
         self.draw_shared_folders_options(layout)
+        if self.connected():
+            self.draw_gizmos_options(layout)
         self.draw_advanced_options(layout)
-        self.draw_developer_options(layout)
 
     def draw_rooms(self, layout):
         mixer_props = get_mixer_props()
@@ -445,6 +434,12 @@ class MixerSettingsPanel(bpy.types.Panel):
         collapsable_panel(layout, mixer_props, "display_shared_folders_options", text="Shared Folders")
         if mixer_props.display_shared_folders_options:
             draw_shared_folders_settings_ui(layout.box().column())
+
+    def draw_gizmos_options(self, layout):
+        mixer_props = get_mixer_props()
+        collapsable_panel(layout, mixer_props, "display_gizmos_options", text="Gizmos")
+        if mixer_props.display_gizmos_options:
+            draw_gizmos_settings_ui(layout.box().column())
 
     def draw_advanced_options(self, layout):
         mixer_props = get_mixer_props()

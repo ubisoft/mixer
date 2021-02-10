@@ -152,7 +152,11 @@ def users_frustrum_draw():
 def users_frustum_name_draw():
     prefs = get_mixer_prefs()
 
-    if not prefs.display_names_gizmos or share_data.client.current_room is None:
+    if (
+        not prefs.display_frustums_gizmos
+        or not prefs.display_frustums_names_gizmos
+        or share_data.client.current_room is None
+    ):
         return
 
     def per_user_callback(user_dict):
@@ -243,7 +247,11 @@ def users_selection_draw():
 def users_selection_name_draw():
     prefs = get_mixer_prefs()
 
-    if not prefs.display_names_gizmos or share_data.client.current_room is None:
+    if (
+        not prefs.display_selections_gizmos
+        or not prefs.display_selections_names_gizmos
+        or share_data.client.current_room is None
+    ):
         return
 
     def per_user_callback(user_dict):
