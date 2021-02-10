@@ -334,24 +334,6 @@ class MixerSettingsPanel(bpy.types.Panel):
                         split.scale_y = 0.5
                     user_layout.separator(factor=0.2)
 
-        if collapsable_panel(
-            layout, mixer_props, "display_snapping_options", alert=True, text="Sync Options - Not implemented yet"
-        ):
-            box = layout.box().column()
-            if share_data.client.current_room is None:
-                box.label(text="You must join a room to select sync options")
-            else:
-                row = box.row()
-                row.prop(mixer_props, "snap_view_user_enabled", text="3D View: ")
-                row.prop(mixer_props, "snap_view_user", text="", icon="USER")
-                row.prop(mixer_props, "snap_view_area", text="", icon="VIEW_CAMERA")
-                row = box.row()
-                row.prop(mixer_props, "snap_time_user_enabled", text="Time: ")
-                row.prop(mixer_props, "snap_time_user", text="", icon="USER")
-                row = box.row()
-                row.prop(mixer_props, "snap_3d_cursor_user_enabled", text="3D Cursor: ")
-                row.prop(mixer_props, "snap_3d_cursor_user", text="", icon="USER")
-
     def connected(self):
         return share_data.client is not None and share_data.client.is_connected()
 
