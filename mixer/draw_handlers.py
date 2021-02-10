@@ -292,13 +292,13 @@ def users_selection_draw_iteration(per_user_callback, per_object_callback, colle
             parent_matrix = IDENTITY_MATRIX
 
             if obj.type == "EMPTY" and obj.instance_collection is not None:
+                collection = obj.instance_collection
                 if collection_detail:
-                    objects = obj.instance_collection.objects
+                    objects = collection.objects
                 else:
                     objects = []
-                parent_matrix = obj.matrix_world
-
-                per_object_callback(user_dict, obj, obj.matrix_world @ BBOX_SCALE_MATRIX, DEFAULT_BBOX)
+                parent_matrix = Matrix.Translation(-collection.instance_offset) @ obj.matrix_world
+                per_object_callback(user_dict, obj, parent_matrix @ BBOX_SCALE_MATRIX, DEFAULT_BBOX)
 
             for obj in objects:
                 bbox = obj.bound_box
