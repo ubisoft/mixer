@@ -125,6 +125,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
     VRtist: bpy.props.StringProperty(
         name="VRtist", default=os.environ.get("VRTIST_EXE", "D:/unity/VRtist/Build/VRtist.exe"), subtype="FILE_PATH"
     )
+    VRtist_suffix: bpy.props.StringProperty(name="VRtist_suffix", default="_VRtist")
 
     data_directory: bpy.props.StringProperty(
         name="Data Directory", default=os.environ.get("MIXER_DATA_DIR", get_data_directory()), subtype="FILE_PATH"

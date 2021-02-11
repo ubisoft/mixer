@@ -472,6 +472,7 @@ class VRtistSettingsPanel(bpy.types.Panel):
         layout.prop(
             mixer_prefs, "VRtist", text="Path", icon=("ERROR" if not os.path.exists(mixer_prefs.VRtist) else "NONE")
         )
+        layout.prop(mixer_prefs, "VRtist_suffix", text="Save Suffix")
 
 
 panels = [
