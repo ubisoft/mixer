@@ -699,7 +699,7 @@ def _add_element_material_ref(collection: T.bpy_prop_collection, proxy: Proxy, i
 
 
 @add_element.register(T.ColorRampElements)
-def _add_element_position(collection: T.bpy_prop_collection, proxy: Proxy, context: Context):
+def _add_element_position(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     position = proxy.data("position")
     return collection.new(position)
 
