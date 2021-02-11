@@ -155,11 +155,14 @@ class StructCollectionProxy(Proxy):
             # For collections like `IDMaterials`, the creation API (`.new(datablock_ref)`) also writes the value.
             # For collections like `Nodes`, the creation API (`.new(name)`) does not write the item value.
             # So the value must always be written for all collection types.
-            for i in range(len(collection), len(sequence)):
-                item_proxy = sequence[i]
+            collection_length = len(collection)
+            for i, item_proxy in enumerate(sequence[:collection_length]):
+                write_attribute(collection, i, item_proxy, context)
+            for i, item_proxy in enumerate(sequence[collection_length:], collection_length):
                 specifics.add_element(collection, item_proxy, i, context)
-            for i, v in enumerate(sequence):
-                write_attribute(collection, i, v, context)
+                # Must write at once, otherwise the default item name might conflit with a later item name
+                write_attribute(collection, i, item_proxy, context)
+
         finally:
             context.visit_state.path.pop()
 
