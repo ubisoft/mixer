@@ -94,33 +94,50 @@ class BpyDataCollectionDiff:
 
         # (item name, collection name)
         blender_items: Dict[Uuid, Tuple[T.ID, str]] = {}
-
-        # Iterating in reverse "ensures" that linked datablocks are processed before local datablocks. If a linked
-        # Object is duplicate-linked, the result is a local Object with a linked Mesh data. The local Object has a uuid
-        # that is duplicate with the linked Object datablock. The duplicate detection must reset the uuid on the *local*
-        # datablock(s). Iterating in straight order would reset the uuid on the linked datablock, which has already been
-        # sent to the peers
-        for datablock in reversed(bl_collection.values()):
+        conflicts: List[T.ID] = []
+        for datablock in bl_collection.values():
             if skip_bpy_data_item(collection_name, datablock):
                 continue
 
             uuid = datablock.mixer_uuid
             if uuid in blender_items.keys():
-                # duplicate uuid, from an object duplication
-                duplicate_name, duplicate_collection_name = blender_items[uuid]
-                logger.info(
-                    f"Duplicate uuid {uuid} in bpy.data.{duplicate_collection_name} for {duplicate_name} and bpy.data.{collection_name} for {datablock.name_full!r}..."
-                )
-                logger.info(f"... assuming object was duplicated. Resetting {datablock.name_full!r} (not an error)")
-                # reset the uuid, ensure will regenerate
-                datablock.mixer_uuid = ""
+                conflicts.append(datablock)
+            else:
+                ensure_uuid(datablock)
+                if datablock.mixer_uuid in blender_items.keys():
+                    logger.error(f"Duplicate uuid found for {datablock}")
+                    continue
 
-            ensure_uuid(datablock)
-            if datablock.mixer_uuid in blender_items.keys():
-                logger.error(f"Duplicate uuid found for {datablock}")
-                continue
+                blender_items[datablock.mixer_uuid] = (datablock, collection_name)
 
-            blender_items[datablock.mixer_uuid] = (datablock, collection_name)
+        for second_datablock in conflicts:
+            first_datablock = blender_items[second_datablock.mixer_uuid][0]
+            if first_datablock.library is None:
+                if second_datablock.library is None:
+                    # local/local : assume second is the new conflicting, from a copy paste
+                    second_datablock.mixer_uuid = ""
+                    ensure_uuid(second_datablock)
+                    blender_items[second_datablock.mixer_uuid] = (second_datablock, collection_name)
+                else:
+                    # local/linked: first is made_local from linked second
+                    first_datablock.mixer_uuid = ""
+                    ensure_uuid(first_datablock)
+                    blender_items[first_datablock.mixer_uuid] = (first_datablock, collection_name)
+            else:
+                if second_datablock.library is not None:
+                    # linked/local: breaks the assumption that local are listed before linked. Strange.
+                    # could do as local.linked if we were sure that is doe"s not have another weird cause
+                    logger.error(
+                        f"Unexpected link datablock {first_datablock} listed before local {second_datablock} ..."
+                    )
+                    logger.error(f"... {second_datablock} ignored")
+                else:
+                    # linked/linked: Conflicts between two linked. One of:
+                    # - a library contains uuids and is indirectly linked more than once
+                    # - a self link
+                    # Probably need to locally reset both uuids, keeping the link target uuid for direct link datablock
+                    logger.error(f"Linked datablock with duplicate uuids {first_datablock} {second_datablock}...")
+                    logger.error("... unsupported")
 
         proxy_uuids = set(proxies.keys())
         blender_uuids = set(blender_items.keys())
