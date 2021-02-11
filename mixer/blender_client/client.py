@@ -544,6 +544,12 @@ class BlenderClient(Client):
         if ob.data:
             ob.data.animation_data_clear()
 
+    def build_save(self, data):
+        filename, file_extension = os.path.splitext(bpy.data.filepath)
+        if get_mixer_prefs().VRtist_suffix not in filename:
+            filename = filename + get_mixer_prefs().VRtist_suffix + file_extension
+        bpy.ops.wm.save_as_mainfile(filepath=filename, copy=True)
+
     def build_montage_mode(self, data):
         index = 0
         montage, index = common.decode_bool(data, index)
@@ -1088,6 +1094,8 @@ class BlenderClient(Client):
                         constraint_api.build_remove_constraint(command.data)
                     elif command.type == MessageType.ASSET_BANK:
                         delayed_messages.append(delayed_message_call(asset_bank.receive_message, command.data))
+                    elif command.type == MessageType.SAVE:
+                        self.build_save(command.data)
 
                     elif command.type == MessageType.BLENDER_DATA_UPDATE:
                         data_api.build_data_update(command.data)
