@@ -815,7 +815,7 @@ def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collect
     )
 
 
-@diff_must_replace.register(T.GreasePencilLayers)
+@diff_must_replace.register(T.GreasePencilLayers)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
     # Name mismatch (in info property). This may happen during layer swap and cause unsolicited rename
     # Easier to solve with full replace
@@ -878,7 +878,7 @@ def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]
 
 @clear_from.register(T.ObjectModifiers)
 @clear_from.register(T.ObjectGpencilModifiers)
-@clear_from.register(T.SequenceModifiers)
+@clear_from.register(T.SequenceModifiers)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
     """clear_from implementation for collections of items that cannot be updated if their "type" attribute changes."""
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
