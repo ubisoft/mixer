@@ -114,7 +114,18 @@ class NonePtrProxy(Proxy):
                     setattr(parent, key, datablock)
             return replace
 
-        # for instance animation_data set from None to a valid value, after animation_data_create() has been called
+        # This branch is taken when animation_data or node_tree instance animation_data are set from None to a valid
+        # value, after animation_data_create() has been called or use_nodes is set to True
+
+        # TODO When a single Material update includes use_nodes = True and and update to the node_tree, the received
+        # node_tree update is not applied correctly. This happens in test_duplicate_socket_name if the two actions are
+        # merged. After use_nodes is updated, the node_tree update is performed by NonePtrProxy.apply(), which ignores
+        # the update if the new value is not a DatablockRefProxy. This leaves the Blender node_tree in its initial
+        # state. There may be a similar problem with animation_data. During a user session the problem is unlikely to
+        # happen since the use_nodes modification by the user will trigger an update before the user modifies the
+        # node_tree.
+        # See internal issue #465
+
         return replace
 
     def diff(

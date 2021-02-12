@@ -47,12 +47,13 @@ class NodeLinksProxy(StructCollectionProxy):
     def _load(self, links: T.NodeLinks) -> List[Dict[str, str]]:
         seq = []
         for link in links:
+            # TODO change to a tuple
             item = {}
+
             # NodeLink contain pointers to Node and NodeSocket.
             # Just keep the names to restore the links in ShaderNodeTreeProxy.save
-            # Nodes names are unique in a node_tree
-            # node socket names are *not* unique, must use identifier or index in array
-
+            # Nodes names are unique in a node_tree.
+            # Node socket names are *not* unique in a node_tree, so use index in array
             item["from_node"] = link.from_node.name
             item["from_socket"] = _find_socket(link.from_node.outputs, link.from_socket.identifier)
             item["to_node"] = link.to_node.name
