@@ -594,7 +594,13 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
 @add_element.register(T.Nodes)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     node_type = proxy.data("bl_idname")
-    return collection.new(node_type)
+    try:
+        return collection.new(node_type)
+    except RuntimeError as e:
+        name = proxy.data("name")
+        logger.error(f"add_element failed for node {name!r} into {context.visit_state.display_path()} ...")
+        logger.error(f"... {e!r}")
+        raise AddElementFailed from None
 
 
 @add_element.register(T.ActionGroups)
