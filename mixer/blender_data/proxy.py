@@ -140,6 +140,12 @@ class ExternalFileFailed(MixerException):
     pass
 
 
+class AddElementFailed(MixerException):
+    """Creation of an element into a bpy_prop_collection failed"""
+
+    pass
+
+
 class Proxy:
     """
     Base class for all proxies.
