@@ -2,14 +2,19 @@
 
 ## Features
 
+- Animation data: synchronization of key frames and curves
 - MovieClip: synchronization
 - TextCurve: synchronization (with builtin VectorFont only)
-- Mixer panel: simplify and make Gizmos settings more accessible
+- Scene annotations: synchronization
+- UI: simplify the Mixer panel and make Gizmos settings more accessible
+- UI: updates received when not in OBJECT mode are retained until OBJECT mode is entered
 - UI: can disable display of peer names on selection boxes in Mixer Gizmos preferences
 
 ## Fixes
 
+- Material nodes: fix possibly missing nodes and connections
 - Libraries: synchronization error after using "duplicate linked" on an Object from a library
+- Undo: fix some synchronization failures and crashes
 - UI: selection box displayed with offset for instances of collections with instance_offset
 
 ## Breaking changes
