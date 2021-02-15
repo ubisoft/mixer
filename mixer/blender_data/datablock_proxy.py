@@ -273,7 +273,7 @@ class DatablockProxy(StructProxy):
         else:
             resolved_filepath = self.resolve_shared_folder_file(self._filepath_raw, context)
             if resolved_filepath is None:
-                logger.error(f'"{self._filepath_raw}" not in shared_folder')
+                logger.info(f'"{self._filepath_raw}" not in shared_folder')
             logger.info(f"resolved_filepath: for {self} in shared folder ...")
             logger.info(f"... resolve {self._filepath_raw!r} to {resolved_filepath}")
         return resolved_filepath

@@ -180,7 +180,7 @@ def write_attribute(
             else:
                 if not hasattr(parent, key):
                     # probably from an addon loaded in the sender and not in the receiver
-                    logger.warning(
+                    logger.info(
                         f"write attribute: ignoring missing attribute from {context.visit_state.display_path()}: {key!r}"
                     )
                     return
