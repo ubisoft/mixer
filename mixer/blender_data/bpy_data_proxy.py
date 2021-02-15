@@ -106,7 +106,19 @@ class ProxyState:
             self.objects[data_uuid].add(object_uuid)
 
     def datablock(self, uuid: Uuid) -> Optional[T.ID]:
-        return self._datablocks.get(uuid)
+        datablock = self._datablocks.get(uuid)
+        if datablock:
+            try:
+                _ = datablock.name
+            except ReferenceError as e:
+                logger.error(f"datablock {uuid} access exception {e!r}")
+                # TODO returning a deleted datablock is dangerous, but returning None erases the difference between no
+                # datablock and deleted datablock which causes some tests to fail. It would be better to return a
+                # "LocallyDeleted" object. Also, remove_datablock should probably assign a tombstone instead of deleting
+                # the entry. This requires reviewing all callers
+
+                # datablock = None
+        return datablock
 
     def add_datablock(self, uuid: Uuid, datablock: T.ID):
         assert self.datablock(uuid) in [datablock, None]
@@ -252,6 +264,12 @@ def _remove_order_predicate(removal: Removal) -> int:
 
 
 def retain(arg):
+    """Decorator that delays BypDataProxy methods calls while not in OBJECT mode.
+
+    Used to defer the execution of received update until mode is back to OBJECT. This makes is possible to use undo
+    while not in OBJECT mode.
+    """
+
     def retain_(f):
         def wrapper(*args, **kwargs):
             def func():
@@ -475,7 +493,7 @@ class BpyDataProxy(Proxy):
         """
         proxy = self.state.proxies.get(uuid)
         if proxy is None:
-            logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
+            logger.error(f"remove_datablock(): no proxy for {uuid}")
             return
 
         bpy_data_collection_proxy = self._data.get(proxy.collection_name)

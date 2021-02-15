@@ -68,7 +68,11 @@ class LibraryProxy(DatablockProxy):
             datablock that references it is not yet loaded)
         """
 
-        assert identifier not in self._unregistered_datablocks or self._unregistered_datablocks[identifier] == uuid
+        if identifier in self._unregistered_datablocks and self._unregistered_datablocks[identifier] != uuid:
+            logger.error(f"register_indirect: in {self} ...")
+            logger.error(f"... {identifier}({uuid}) already in unregistered list ...")
+            logger.error(f"... with {self._unregistered_datablocks[identifier]}. Update ignored")
+            return None
 
         library_datablock = bpy.data.libraries.get(self._data["name"])
         if library_datablock:
@@ -293,6 +297,8 @@ class DatablockLinkProxy(DatablockProxy):
 
         try:
             datablock = library_proxy.load_library_item(self._bpy_data_collection, self._name, context)
+        except ExternalFileFailed:
+            return None, None
         except Exception as e:
             logger.error(
                 f"load_library {library_proxy.data('name')!r} failed for bpy.data.{self._bpy_data_collection}[{self._name}] ..."

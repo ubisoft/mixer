@@ -192,26 +192,37 @@ class DatablockCollectionProxy(Proxy):
 
         return id_
 
-    def remove_datablock(self, proxy: DatablockProxy, datablock: T.ID):
+    def remove_datablock(self, proxy: DatablockProxy, datablock: Optional[T.ID]):
         """Remove a bpy.data collection item and update the proxy state"""
-        logger.warning("Perform removal for %s", proxy)
+        logger.info("Perform removal for %s", proxy)
         try:
-            specifics.remove_datablock(proxy.collection, datablock)
-        except ReferenceError as e:
-            # We probably have processed previously the deletion of a datablock referenced by Object.data (e.g. Light).
-            # On both sides it deletes the Object as well. So the sender issues a message for object deletion
-            # but deleting the light on this side has already deleted the object.
-            # Alternatively we could try to sort messages on the sender side
-            logger.warning(f"Exception during remove_datablock for {proxy}")
-            logger.warning(f"... {e!r}")
-        uuid = proxy.mixer_uuid
-        del self._data[uuid]
+            if datablock is None:
+                from mixer.blender_data.library_proxies import DatablockLinkProxy
+
+                if not isinstance(proxy, DatablockLinkProxy):
+                    logger.error(f"remove_datablock. Unexpected None datablock for uuid {proxy}")
+                else:
+                    # the datablock loading probably failed because the library was missing locally because of a shared
+                    # folders misconfiguration bu the user
+                    logger.info(f"remove_datablock(None) for unloaded {proxy}")
+            else:
+                try:
+                    specifics.remove_datablock(proxy.collection, datablock)
+                except ReferenceError as e:
+                    # We probably have processed previously the deletion of a datablock referenced by Object.data (e.g.
+                    # Light). On both sides it deletes the Object as well. This is a failure in properly orderring
+                    # delete messages on the sender
+                    logger.warning(f"Exception during remove_datablock for {proxy}")
+                    logger.warning(f"... {e!r}")
+        finally:
+            uuid = proxy.mixer_uuid
+            del self._data[uuid]
 
     def rename_datablock(self, proxy: DatablockProxy, new_name: str, datablock: T.ID):
         """
         Rename a bpy.data collection item and update the proxy state (receiver side)
         """
-        logger.warning("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
+        logger.info("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
         datablock.name = new_name
         proxy._data["name"] = new_name
 
