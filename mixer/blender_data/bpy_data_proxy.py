@@ -112,7 +112,12 @@ class ProxyState:
                 _ = datablock.name
             except ReferenceError as e:
                 logger.error(f"datablock {uuid} access exception {e!r}")
-                datablock = None
+                # TODO returning a deleted datablock is dangerous, but returning None erases the difference between no
+                # datablock and deleted datablock which causes some tests to fail. It would be better to return a
+                # "LocallyDeleted" object. Also, remove_datablock should probably assign a tombstone instead of deleting
+                # the entry. This requires reviewing all callers
+
+                # datablock = None
         return datablock
 
     def add_datablock(self, uuid: Uuid, datablock: T.ID):
@@ -259,6 +264,12 @@ def _remove_order_predicate(removal: Removal) -> int:
 
 
 def retain(arg):
+    """Decorator that delays BypDataProxy methods calls while not in OBJECT mode.
+
+    Used to defer the execution of received update until mode is back to OBJECT. This makes is possible to use undo
+    while not in OBJECT mode.
+    """
+
     def retain_(f):
         def wrapper(*args, **kwargs):
             def func():
