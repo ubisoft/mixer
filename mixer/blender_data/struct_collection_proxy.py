@@ -31,8 +31,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
 from mixer.blender_data.json_codec import serialize
-from mixer.blender_data.proxy import Delta, DeltaAddition, DeltaReplace, DeltaUpdate
-from mixer.blender_data.proxy import Proxy
+from mixer.blender_data.proxy import AddElementFailed, Delta, DeltaAddition, DeltaReplace, DeltaUpdate, Proxy
 from mixer.blender_data.struct_proxy import StructProxy
 
 if TYPE_CHECKING:
@@ -155,11 +154,17 @@ class StructCollectionProxy(Proxy):
             # For collections like `IDMaterials`, the creation API (`.new(datablock_ref)`) also writes the value.
             # For collections like `Nodes`, the creation API (`.new(name)`) does not write the item value.
             # So the value must always be written for all collection types.
-            for i in range(len(collection), len(sequence)):
-                item_proxy = sequence[i]
-                specifics.add_element(collection, item_proxy, i, context)
-            for i, v in enumerate(sequence):
-                write_attribute(collection, i, v, context)
+            collection_length = len(collection)
+            for i, item_proxy in enumerate(sequence[:collection_length]):
+                write_attribute(collection, i, item_proxy, context)
+            for i, item_proxy in enumerate(sequence[collection_length:], collection_length):
+                try:
+                    specifics.add_element(collection, item_proxy, i, context)
+                except AddElementFailed:
+                    break
+                # Must write at once, otherwise the default item name might conflit with a later item name
+                write_attribute(collection, i, item_proxy, context)
+
         finally:
             context.visit_state.path.pop()
 
@@ -220,7 +225,10 @@ class StructCollectionProxy(Proxy):
                 for i, delta_addition in enumerate(update._diff_additions, len(sequence)):
                     if to_blender:
                         item_proxy = delta_addition.value
-                        specifics.add_element(collection, item_proxy, i, context)
+                        try:
+                            specifics.add_element(collection, item_proxy, i, context)
+                        except AddElementFailed:
+                            break
                         write_attribute(collection, i, item_proxy, context)
                     sequence.append(delta_addition.value)
 

@@ -33,6 +33,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _find_socket(sockets: Union[T.NodeInputs, T.NodeOutputs], identifier: str) -> int:
+    for i, socket in enumerate(sockets):
+        if socket.identifier == identifier:
+            return i
+    return -1
+
+
 @serialize
 class NodeLinksProxy(StructCollectionProxy):
     """Proxy for bpy.types.NodeLinks"""
@@ -40,13 +47,17 @@ class NodeLinksProxy(StructCollectionProxy):
     def _load(self, links: T.NodeLinks) -> List[Dict[str, str]]:
         seq = []
         for link in links:
+            # TODO change to a tuple
             item = {}
+
             # NodeLink contain pointers to Node and NodeSocket.
             # Just keep the names to restore the links in ShaderNodeTreeProxy.save
+            # Nodes names are unique in a node_tree.
+            # Node socket names are *not* unique in a node_tree, so use index in array
             item["from_node"] = link.from_node.name
-            item["from_socket"] = link.from_socket.name
+            item["from_socket"] = _find_socket(link.from_node.outputs, link.from_socket.identifier)
             item["to_node"] = link.to_node.name
-            item["to_socket"] = link.to_socket.name
+            item["to_socket"] = _find_socket(link.to_node.inputs, link.to_socket.identifier)
             seq.append(item)
         return seq
 
@@ -65,9 +76,9 @@ class NodeLinksProxy(StructCollectionProxy):
         node_tree.links.clear()
         for link_proxy in self._sequence:
             from_node_name = link_proxy["from_node"]
-            from_socket_name = link_proxy["from_socket"]
+            from_socket_index = link_proxy["from_socket"]
             to_node_name = link_proxy["to_node"]
-            to_socket_name = link_proxy["to_socket"]
+            to_socket_index = link_proxy["to_socket"]
 
             from_node = node_tree.nodes.get(from_node_name)
             if from_node is None:
@@ -76,10 +87,10 @@ class NodeLinksProxy(StructCollectionProxy):
                 )
                 return
 
-            from_socket = from_node.outputs.get(from_socket_name)
+            from_socket = from_node.outputs[from_socket_index]
             if from_socket is None:
                 logger.error(
-                    f"save(): from_socket is None for {context.visit_state.display_path()}.nodes[{from_socket_name}]"
+                    f"save(): from_socket is None for {context.visit_state.display_path()}.nodes[{from_node_name}].ouputs[{from_socket_index}]"
                 )
                 return
 
@@ -88,10 +99,10 @@ class NodeLinksProxy(StructCollectionProxy):
                 logger.error(f"save(): to_node is None for {context.visit_state.display_path()}.nodes[{to_node_name}]")
                 return
 
-            to_socket = to_node.inputs.get(to_socket_name)
+            to_socket = to_node.inputs[to_socket_index]
             if to_socket is None:
                 logger.error(
-                    f"save(): to_socket is None for {context.visit_state.display_path()}.nodes[{to_socket_name}]"
+                    f"save(): to_socket is None for {context.visit_state.display_path()}.nodes[{to_node_name}].inputs[{to_socket_index}]"
                 )
                 return
 
