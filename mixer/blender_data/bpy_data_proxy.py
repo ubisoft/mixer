@@ -106,7 +106,14 @@ class ProxyState:
             self.objects[data_uuid].add(object_uuid)
 
     def datablock(self, uuid: Uuid) -> Optional[T.ID]:
-        return self._datablocks.get(uuid)
+        datablock = self._datablocks.get(uuid)
+        if datablock:
+            try:
+                _ = datablock.name
+            except ReferenceError as e:
+                logger.error(f"datablock {uuid} access exception {e!r}")
+                datablock = None
+        return datablock
 
     def add_datablock(self, uuid: Uuid, datablock: T.ID):
         assert self.datablock(uuid) in [datablock, None]
@@ -475,7 +482,7 @@ class BpyDataProxy(Proxy):
         """
         proxy = self.state.proxies.get(uuid)
         if proxy is None:
-            logger.error(f"remove_datablock(): no proxy for {uuid} (debug info)")
+            logger.error(f"remove_datablock(): no proxy for {uuid}")
             return
 
         bpy_data_collection_proxy = self._data.get(proxy.collection_name)
