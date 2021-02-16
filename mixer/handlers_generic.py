@@ -49,13 +49,16 @@ def send_scene_data_to_server(scene, dummy):
 
     updates = {update.id.original for update in depsgraph.updates}
 
-    # in some cases (TestShapeKey.test_rename_key), the Key update is missing. Always check for shape_keys
-    shape_key_updates = {
-        datablock.shape_keys
-        for datablock in updates
-        if hasattr(datablock, "shape_keys") and isinstance(datablock.shape_keys, T.Key)
-    }
-    updates.update(shape_key_updates)
+    extra_check = set()
+    for datablock in updates:
+        if hasattr(datablock, "shape_keys") and isinstance(datablock.shape_keys, T.Key):
+            # in some cases (TestShapeKey.test_rename_key), the Key update is missing. Always check for shape_keys
+            extra_check.add(datablock.shape_keys)
+        if isinstance(datablock, T.Scene) and datablock.grease_pencil is not None:
+            # scene annotation change do not trigger a DG update
+            extra_check.add(datablock.grease_pencil)
+
+    updates.update(extra_check)
 
     # Delay the update of Object data to avoid Mesh updates in edit or paint mode, but keep other updates.
     # Mesh separate delivers Collection as well as created Object and Mesh updates while the edited
