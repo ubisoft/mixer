@@ -84,6 +84,16 @@ class HandlerManager:
         return False
 
     @classmethod
+    def _set_connection_handler(cls, connect: bool):
+        try:
+            if connect:
+                bpy.app.handlers.load_pre.append(handler_on_load)
+            else:
+                bpy.app.handlers.load_pre.remove(handler_on_load)
+        except Exception as e:
+            logger.error("Exception during _set_connection_handler(%s) : %s", connect, e)
+
+    @classmethod
     def _set_handlers(cls, connect: bool):
         try:
             if connect:
@@ -93,9 +103,7 @@ class HandlerManager:
                 bpy.app.handlers.redo_pre.append(handler_on_undo_redo_pre)
                 bpy.app.handlers.undo_post.append(handler_on_undo_redo_post)
                 bpy.app.handlers.redo_post.append(handler_on_undo_redo_post)
-                bpy.app.handlers.load_pre.append(handler_on_load)
             else:
-                bpy.app.handlers.load_pre.remove(handler_on_load)
                 # bpy.app.handlers.frame_change_post.remove(handler_send_frame_changed)
                 bpy.app.handlers.depsgraph_update_post.remove(handler_send_scene_data_to_server)
                 bpy.app.handlers.undo_pre.remove(handler_on_undo_redo_pre)
