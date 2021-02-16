@@ -16,8 +16,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """Package for Blender generic synchronization."""
 
-import bpy
-
 # import triggers Proxy classes registration into json_codec
 try:
     import mixer.blender_data.aos_proxy
@@ -40,6 +38,7 @@ except (ImportError, AttributeError):
 
 
 def register():
+    import bpy
     from mixer.blender_data.bpy_data import collections_types
 
     for type_ in collections_types:
