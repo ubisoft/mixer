@@ -31,7 +31,7 @@ from typing import Any, Dict, ItemsView, Iterable, List, Optional, Set, Union
 from bpy import types as T  # noqa
 
 from mixer.blender_data.type_helpers import is_pointer_to
-from mixer.blender_data.blenddata import collections_names
+from mixer.blender_data.bpy_data import collections_names
 
 DEBUG = True
 logger = logging.getLogger(__name__)

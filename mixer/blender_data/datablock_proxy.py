@@ -30,7 +30,7 @@ import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data import specifics
-from mixer.blender_data.blenddata import rna_identifier_to_collection_name
+from mixer.blender_data.bpy_data import rna_identifier_to_collection_name
 
 from mixer.blender_data.attributes import read_attribute, write_attribute
 from mixer.blender_data.json_codec import serialize

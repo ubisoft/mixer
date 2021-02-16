@@ -40,7 +40,7 @@ except (ImportError, AttributeError):
 
 
 def register():
-    from mixer.blender_data.blenddata import collections_types
+    from mixer.blender_data.bpy_data import collections_types
 
     for type_ in collections_types:
         type_.mixer_uuid = bpy.props.StringProperty(default="")

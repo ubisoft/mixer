@@ -33,7 +33,7 @@ import pathlib
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.blenddata import collections_names
+from mixer.blender_data.bpy_data import collections_names
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
