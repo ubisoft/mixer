@@ -24,7 +24,6 @@ from bpy import data as D  # noqa
 from bpy import types as T  # noqa
 
 from mixer.blender_data.aos_soa_proxy import SoaElement
-from mixer.blender_data.blenddata import BlendData
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 from mixer.blender_data.misc_proxies import NonePtrProxy
@@ -128,26 +127,6 @@ class TestLoadProxy(unittest.TestCase):
         cam_proxy = self.proxy.data("cameras").search_one("Camera_0")
         focus_object_proxy = cam_proxy.data("dof").data("focus_object")
         self.assertIsInstance(focus_object_proxy, NonePtrProxy)
-
-
-class TestBlendData(unittest.TestCase):
-    def setUp(self):
-        bpy.ops.wm.open_mainfile(filepath=test_blend_file)
-
-    def test_one(self):
-        blenddata = BlendData.instance()
-        scenes = blenddata.collection("scenes").bpy_collection()
-        sounds = blenddata.collection("sounds").bpy_collection()
-        # identity is not true
-        self.assertEqual(scenes, D.scenes)
-        self.assertEqual(sounds, D.sounds)
-        self.assertIs(scenes["Scene_0"], D.scenes["Scene_0"])
-
-    def test_derived_from_id(self):
-        light = bpy.data.lights.new("new_area", "AREA")
-        blenddata = BlendData.instance()
-        collection_name = blenddata.bl_collection_name_from_ID(type(light))
-        self.assertEqual(collection_name, "lights")
 
 
 class TestAosSoa(unittest.TestCase):

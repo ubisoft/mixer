@@ -24,7 +24,6 @@ from typing import Any, Optional, Union, TYPE_CHECKING
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.blenddata import bl_rna_to_type
 from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
 from mixer.blender_data.specifics import is_soable_collection
 from mixer.blender_data.type_helpers import is_vector, is_matrix
@@ -33,13 +32,6 @@ if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
 
 logger = logging.getLogger(__name__)
-
-
-def is_ID_subclass_rna(bl_rna):  # noqa
-    """
-    Return true if the RNA is of a subclass of bpy.types.ID
-    """
-    return issubclass(bl_rna_to_type(bl_rna), bpy.types.ID)
 
 
 MAX_DEPTH = 30

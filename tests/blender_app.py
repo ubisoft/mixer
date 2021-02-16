@@ -34,12 +34,15 @@ share_data.client.set_room_keep_open("{room_name}", {keep_room_open})
 """
 
 _join_room = """
+import mixer.blender_data
 from mixer.connection import join_room
 from mixer.broadcaster.common import RoomAttributes
 from mixer.share_data import share_data
 from mixer.blender_client.client import clear_scene_content
 import sys
 import time
+
+mixer.blender_data.register()
 
 # prevent sending our contents in case of cross join. Easier to diagnose the problem
 clear_scene_content()

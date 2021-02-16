@@ -31,7 +31,7 @@ from typing import Any, Dict, ItemsView, Iterable, List, Optional, Set, Union
 from bpy import types as T  # noqa
 
 from mixer.blender_data.type_helpers import is_pointer_to
-from mixer.blender_data.blenddata import collection_name_to_type
+from mixer.blender_data.bpy_data import collections_names
 
 DEBUG = True
 logger = logging.getLogger(__name__)
@@ -234,7 +234,7 @@ class SynchronizedProperties:
         """
         if self._unhandled_bpy_data_collection_names is None:
             handled = {item[0] for item in self.properties(bpy_type=T.BlendData)}
-            self._unhandled_bpy_data_collection_names = list(collection_name_to_type.keys() - handled)
+            self._unhandled_bpy_data_collection_names = list(collections_names - handled)
 
         return self._unhandled_bpy_data_collection_names
 
