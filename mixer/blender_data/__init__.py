@@ -14,7 +14,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""Implementation the Blender generic synchronization."""
+"""Package for Blender generic synchronization."""
+
+import bpy
 
 # import triggers Proxy classes registration into json_codec
 try:
@@ -34,4 +36,15 @@ try:
     import mixer.blender_data.struct_proxy  # noqa: 401
 except (ImportError, AttributeError):
     # Import is not possible when not run within Blender (unittest)
+    pass
+
+
+def register():
+    from mixer.blender_data.blenddata import collection_name_to_type
+
+    for type_ in collection_name_to_type.values():
+        type_.mixer_uuid = bpy.props.StringProperty(default="")
+
+
+def unregister():
     pass

@@ -33,7 +33,7 @@ import pathlib
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.blenddata import BlendData
+from mixer.blender_data.blenddata import collection_name_to_type
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -297,9 +297,10 @@ class BpyDataProxy(Proxy):
 
         self.state: ProxyState = ProxyState()
 
-        self._data: Dict[str, DatablockCollectionProxy] = {
-            name: DatablockCollectionProxy(name) for name in BlendData.instance().collection_names()
-        }
+        self._data: Dict[str, DatablockCollectionProxy] = {}
+        for name, type_ in collection_name_to_type.items():
+            self._data[name] = DatablockCollectionProxy(name)
+            # type_.mixer_uuid = bpy.props.StringProperty(default="")
 
         self._delayed_local_updates: Set[Uuid] = set()
         """Local datablock updates retained until returning to Object mode.
@@ -349,9 +350,6 @@ class BpyDataProxy(Proxy):
         for folder in shared_folders:
             normalized_folders.append(pathlib.Path(folder))
         self.state.shared_folders = normalized_folders
-
-    def get_non_empty_collections(self):
-        return {key: value for key, value in self._data.items() if len(value) > 0}
 
     def load(self, synchronized_properties: SynchronizedProperties):
         """FOR TESTS ONLY Load the current scene into this proxy

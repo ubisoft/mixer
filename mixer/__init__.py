@@ -67,6 +67,7 @@ def register():
     from mixer import bl_panels
     from mixer import bl_operators
     from mixer import bl_properties, bl_preferences
+    from mixer import blender_data
     from mixer.blender_data import debug_addon
     from mixer.log_utils import Formatter, get_log_file
     from mixer import icons
@@ -110,6 +111,7 @@ def register():
     bl_operators.register()
     utils_ui_operators.register()
     ui.register()
+    blender_data.unregister()
 
     atexit.register(cleanup)
 
@@ -118,6 +120,7 @@ def unregister():
     from mixer import bl_panels
     from mixer import bl_operators
     from mixer import bl_properties, bl_preferences
+    from mixer import blender_data
     from mixer.blender_data import debug_addon
     from mixer import icons
     from mixer.utils import utils_ui_operators
@@ -129,6 +132,7 @@ def unregister():
 
     ui.unregister()
     utils_ui_operators.unregister()
+    blender_data.unregister()
     bl_operators.unregister()
     bl_panels.unregister()
     bl_properties.unregister()
