@@ -33,7 +33,7 @@ import pathlib
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.blenddata import collection_name_to_type
+from mixer.blender_data.blenddata import collections_names
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -297,10 +297,7 @@ class BpyDataProxy(Proxy):
 
         self.state: ProxyState = ProxyState()
 
-        self._data: Dict[str, DatablockCollectionProxy] = {}
-        for name, type_ in collection_name_to_type.items():
-            self._data[name] = DatablockCollectionProxy(name)
-            # type_.mixer_uuid = bpy.props.StringProperty(default="")
+        self._data = {name: DatablockCollectionProxy(name) for name in collections_names}
 
         self._delayed_local_updates: Set[Uuid] = set()
         """Local datablock updates retained until returning to Object mode.

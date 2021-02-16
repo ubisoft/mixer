@@ -111,7 +111,7 @@ def register():
     bl_operators.register()
     utils_ui_operators.register()
     ui.register()
-    blender_data.unregister()
+    blender_data.register()
 
     atexit.register(cleanup)
 

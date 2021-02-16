@@ -15,30 +15,28 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""
-Interface to the bpy.data collections
+"""Helpers for bpy.data collections."""
 
-TODO This module is obsolete and should be removed
-"""
-import logging
-
-import bpy.types as T  # noqa N812
-
-logger = logging.getLogger(__name__)
+import bpy
 
 
 def bl_rna_to_type(bl_rna):
-    return getattr(T, bl_rna.identifier)
+    return getattr(bpy.types, bl_rna.identifier)
 
 
-# Map root collection name to object type
-# e.g. "objects" -> bpy.types.Object, "lights" -> bpy.types.Light, ...
 collection_name_to_type = {
     p.identifier: bl_rna_to_type(p.fixed_type)
-    for p in T.BlendData.bl_rna.properties
+    for p in bpy.types.BlendData.bl_rna.properties
     if p.bl_rna.identifier == "CollectionProperty"
 }
+""""Map root collection name to object type (e.g. "objects" -> bpy.types.Object, "lights" -> bpy.types.Light, ...)"""
 
-# Map object type name to root collection
-# e.g. "Object" -> "objects", "Light" -> "lights"
+
 rna_identifier_to_collection_name = {value.bl_rna.identifier: key for key, value in collection_name_to_type.items()}
+"""Map object type name to root collection, e.g. "Object" -> "objects", "Light" -> "lights"""
+
+collections_types = collection_name_to_type.values()
+"""Types of datablocks in bpy.data datablock collections (e.g. bpy.types.Object, bpy.data.Light, ...)"""
+
+collections_names = collection_name_to_type.keys()
+"""Names of the datablock collections in bpy.data (e.g. "objects", "lights", ...)"""
