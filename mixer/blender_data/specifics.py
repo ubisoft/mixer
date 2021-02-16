@@ -658,6 +658,7 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
     )
 
 
+@add_element.register(T.AnimDataDrivers)
 @add_element.register(T.ActionFCurves)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     data_path = proxy.data("data_path")
