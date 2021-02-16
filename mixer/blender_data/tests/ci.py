@@ -14,17 +14,23 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
+"""
+Script executed on the Blender command line to execute blender_data tests.
+"""
 import os
 from pathlib import Path
 import unittest
-
 import xmlrunner
+
+import bpy
 
 this_folder = str(Path(__file__).parent)
 
 
 def main_ci():
+
+    # despite installing and enabling the addon in install_mixer.py, it does not remain enabled
+    bpy.ops.preferences.addon_enable(module="mixer")
 
     os.makedirs("logs/tests", exist_ok=True)
     with open("logs/tests/blender_data.xml", "wb") as output:
