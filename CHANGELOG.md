@@ -1,21 +1,24 @@
-# 0.21.0 (wip)
+# 0.21.0-beta1 (16-02-2020)
 
 ## Features
 
-- Animation data: synchronization of key frames and curves
+- Animation data: synchronization of key frames, curves and drivers
 - MovieClip: synchronization
-- TextCurve: synchronization (with builtin VectorFont only)
 - Scene annotations: synchronization
-- UI: simplify the Mixer panel and make Gizmos settings more accessible
+- TextCurve: synchronization (with builtin VectorFont only)
+- Texture: synchronization
+- UI: simplify the Mixer panel and make selection gizmos settings more accessible
 - UI: updates received when not in OBJECT mode are retained until OBJECT mode is entered
-- UI: can disable display of peer names on selection boxes in Mixer Gizmos preferences
+- UI: can disable display of peer names on selection boxes in Mixer gizmos preferences
 
 ## Fixes
 
 - Material nodes: fix possibly missing nodes and connections
+- Lights: after light morphing, new type-specific attributes were not synchronized
 - Libraries: synchronization error after using "duplicate linked" on an Object from a library
 - Undo: fix some synchronization failures and crashes
 - UI: selection box displayed with offset for instances of collections with instance_offset
+- UI: room creation failed after loading a new file without disconnecting
 
 ## Breaking changes
 
