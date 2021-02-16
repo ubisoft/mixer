@@ -96,14 +96,16 @@ area.shape = 'DISK'
     def test_morph_light(self):
         action = """
 import bpy
-bpy.ops.object.light_add(type='AREA', location=(4.0, 0.0, 0.0))
+bpy.ops.object.light_add(type='POINT', location=(4.0, 0.0, 0.0))
 """
         self.send_string(action)
         action = """
 import bpy
 D=bpy.data
-light = D.lights["Area"]
-light.type = "SUN"
+light = D.lights["Point"]
+light.type = "AREA"
+light = light.type_recast()
+light.shape = "RECTANGLE"
 """
         self.send_string(action)
         self.end_test()
