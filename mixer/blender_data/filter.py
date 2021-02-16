@@ -643,6 +643,7 @@ safe_depsgraph_updates = (
     T.Object,
     T.Scene,
     T.Sound,
+    T.Texture,
     T.World,
 )
 """
@@ -671,6 +672,7 @@ safe_blenddata_collections = [
     "scenes",
     "shape_keys",
     "sounds",
+    "textures",
     "worlds",
 ]
 """
