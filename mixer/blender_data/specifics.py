@@ -302,20 +302,20 @@ def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional
     return collection.new(name, data_datablock)
 
 
-@bpy_data_ctor.register("lights")  # type: ignore[no-redef]
-def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
-    collection = getattr(bpy.data, collection_name)
-    name = proxy.data("name")
-    light_type = proxy.data("type")
-    light = collection.new(name, light_type)
-    return light
-
-
 @bpy_data_ctor.register("node_groups")  # type: ignore[no-redef]
 def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
     type_ = node_tree_type[proxy.data("type")]
+    return collection.new(name, type_)
+
+
+@bpy_data_ctor.register("lights")
+@bpy_data_ctor.register("textures")  # type: ignore[no-redef]
+def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
+    collection = getattr(bpy.data, collection_name)
+    name = proxy.data("name")
+    type_ = proxy.data("type")
     return collection.new(name, type_)
 
 
@@ -458,6 +458,9 @@ def pre_save_struct(proxy: StructProxy, target: T.bpy_struct):
     create_clear_animation_data(target, proxy)
 
 
+_morphable_types = (T.Light, T.Texture)
+
+
 def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
     """Process attributes that must be saved first and return a possibly updated reference to the target"""
 
@@ -491,13 +494,16 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
                 target.sequence_editor_create()
             elif isinstance(sequence_editor, NonePtrProxy) and target.sequence_editor is not None:
                 target.sequence_editor_clear()
-    elif isinstance(target, T.Light):
-        # required first to have access to new light type attributes
-        light_type = proxy.data("type")
-        if light_type is not None and light_type != target.type:
-            target.type = light_type
+    elif isinstance(target, _morphable_types):
+        # required first to have access to new datablock attributes
+        type_ = proxy.data("type")
+        if type_ is not None and type_ != target.type:
+            target.type = type_
             # must reload the reference
-            target = proxy.target(context)
+            target = target.type_recast()
+            uuid = proxy.mixer_uuid
+            context.proxy_state.remove_datablock(uuid)
+            context.proxy_state.add_datablock(uuid, target)
     elif isinstance(target, T.Action):
         groups = proxy.data("groups")
         if groups:
