@@ -152,6 +152,7 @@ def connect():
     assert is_client_connected()
 
     set_client_attributes()
+    HandlerManager._set_connection_handler(True)
 
 
 def disconnect():
@@ -173,6 +174,7 @@ def disconnect():
         share_data.client = None
 
     update_ui_lists()
+    HandlerManager._set_connection_handler(False)
 
 
 def is_client_connected():
