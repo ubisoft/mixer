@@ -110,8 +110,8 @@ class StructProxy(Proxy):
             key: (e.g. "display)
             context: the proxy and visit state
         """
-        if key == "animation_data" and isinstance(attribute, T.AnimData):
-            attribute = _create_clear_animation_data(self, attribute, parent)
+        if key == "animation_data" and (attribute is None or isinstance(attribute, T.AnimData)):
+            attribute = _create_clear_animation_data(self, parent)
 
         if attribute is None:
             logger.info(f"save: attribute is None for {context.visit_state.display_path()}.{key}")
@@ -156,11 +156,11 @@ class StructProxy(Proxy):
                 self.save(attribute, parent, key, context)
         else:
             # the structure is updated
-            if key == "animation_data" and isinstance(attribute, T.AnimData):
+            if key == "animation_data" and (attribute is None or isinstance(attribute, T.AnimData)):
                 # if animation_data is updated to None (cleared), the parent structure is updated to store
                 # a NonePtrProxy
                 if to_blender:
-                    attribute = _create_clear_animation_data(update, attribute, parent)
+                    attribute = _create_clear_animation_data(update, parent)
                     if attribute is None:
                         return NonePtrProxy()
                 else:
