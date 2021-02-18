@@ -596,6 +596,10 @@ property_order: PropertiesOrder = {
     T.ColorManagedViewSettings: {
         "use_curve_mapping",
     },
+    T.DriverTarget: {
+        # before id
+        "id_type",
+    },
     T.Material: {
         "use_nodes",
     },

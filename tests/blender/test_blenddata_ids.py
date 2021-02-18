@@ -291,12 +291,6 @@ mat0 = bpy.data.materials.new("mat0")
 mat0.use_nodes=True
 bpy.ops.object.material_slot_add()
 obj.material_slots[0].material = mat0
-"""
-        # see internal issue #465 and NonePtrProxy.apply() for why the action is split
-
-        action2 = """
-import bpy
-mat0 = bpy.data.materials["mat0"]
 node_tree = mat0.node_tree
 nodes = node_tree.nodes
 mix_node = nodes.new("ShaderNodeMixShader")
@@ -309,7 +303,6 @@ node_tree.links.new(src, dst1)
 node_tree.links.new(mix_node.outputs[0], nodes["Material Output"].inputs[1])
 """
         self.send_string(action)
-        self.send_string(action2)
         self.end_test()
 
     def test_duplicate_node_name(self):

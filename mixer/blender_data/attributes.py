@@ -147,6 +147,16 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
         context.visit_state.recursion_guard.pop()
 
 
+def get_attribute_value(parent, key):
+    if isinstance(key, int):
+        target = parent[key]
+    elif isinstance(parent, T.bpy_prop_collection):
+        target = parent.get(key)
+    else:
+        target = getattr(parent, key, None)
+    return target
+
+
 def write_attribute(
     parent: Union[T.bpy_struct, T.bpy_prop_collection], key: Union[str, int], value: Any, context: Context
 ):
@@ -165,20 +175,9 @@ def write_attribute(
     # Like in apply_attribute parent and key are needed to specify a L-value in setattr()
     try:
         if isinstance(value, Proxy):
-            if isinstance(key, int):
-                target = parent[key]
-            elif isinstance(parent, T.bpy_prop_collection):
-                target = parent.get(key)
-            else:
-                if not hasattr(parent, key):
-                    # probably from an addon loaded in the sender and not in the receiver
-                    logger.info(
-                        f"write attribute: ignoring missing attribute from {context.visit_state.display_path()}: {key!r}"
-                    )
-                    return
-                target = getattr(parent, key)
+            attribute_value = get_attribute_value(parent, key)
+            value.save(attribute_value, parent, key, context)
 
-            value.save(target, parent, key, context)
         else:
             assert isinstance(key, str)
 
@@ -250,13 +249,8 @@ def apply_attribute(
 
     try:
         if isinstance(current_proxy_value, Proxy):
-            if isinstance(key, int):
-                target = parent[key]
-            elif isinstance(parent, T.bpy_prop_collection):
-                target = parent.get(key)
-            else:
-                target = getattr(parent, key, None)
-            return current_proxy_value.apply(target, parent, key, delta, context, to_blender)
+            attribute_value = get_attribute_value(parent, key)
+            return current_proxy_value.apply(attribute_value, parent, key, delta, context, to_blender)
         else:
             if to_blender:
                 # try is less costly than fetching the property to find if the attribute is readonly
@@ -267,7 +261,7 @@ def apply_attribute(
                         setattr(parent, key, delta_value)
                     except AttributeError as e:
                         # most likely an addon (runtime) attribute that exists on the sender but no on this
-                        # receiver or a readonbly attribute that should be filtered out
+                        # receiver or a readonly attribute that should be filtered out
                         # Do not be too verbose
                         logger.info("apply_attribute: exception for ...")
                         logger.info(f"... attribute: {context.visit_state.display_path()}.{key}, value: {delta_value}")
