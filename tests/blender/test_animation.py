@@ -24,7 +24,8 @@ bpy.ops.object.modifier_add(type="ARRAY")
 obj = bpy.data.objects[0]
 obj.modifiers[0].keyframe_insert("count")
 # trigger update !
-# bpy.context.view_layer.update()
+obj.hide_viewport = True
+obj.hide_viewport = False
 """
         self.send_string(action)
 
@@ -33,7 +34,8 @@ import bpy
 obj = bpy.data.objects[0]
 obj.animation_data_clear()
 # trigger update !
-bpy.context.view_layer.update()
+obj.hide_viewport = True
+obj.hide_viewport = False
 """
         self.send_string(action)
 
@@ -99,6 +101,9 @@ import bpy
 bpy.ops.mesh.primitive_plane_add()
 obj = bpy.data.objects[0]
 obj.driver_add("location", 0)
+# trigger update
+obj.hide_viewport = True
+obj.hide_viewport = False
 """
         self.send_string(action)
 
@@ -106,6 +111,9 @@ obj.driver_add("location", 0)
 import bpy
 obj = bpy.data.objects[0]
 obj.driver_add("location", 1)
+# trigger update
+obj.hide_viewport = True
+obj.hide_viewport = False
 """
         self.send_string(action)
 
@@ -117,6 +125,9 @@ import bpy
 bpy.ops.mesh.primitive_plane_add()
 obj = bpy.data.objects[0]
 obj.driver_add("location")
+# trigger update
+obj.hide_viewport = True
+obj.hide_viewport = False
 """
         self.send_string(action)
 
@@ -124,6 +135,9 @@ obj.driver_add("location")
 import bpy
 obj = bpy.data.objects[0]
 obj.driver_remove("location", 1)
+# trigger update
+obj.hide_viewport = True
+obj.hide_viewport = False
 """
         self.send_string(action)
 
