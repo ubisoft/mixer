@@ -30,6 +30,7 @@ import bpy.types as T  # noqa
 from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
 from mixer.blender_data.json_codec import serialize
+from mixer.blender_data.misc_proxies import NonePtrProxy
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
@@ -38,21 +39,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _create_clear_animation_data(proxy: StructProxy, attribute, struct_: T.bpy_struct):
-
-    from mixer.blender_data.misc_proxies import NonePtrProxy
-
-    if struct_.animation_data is None:
-        if not isinstance(proxy, NonePtrProxy):
+def _create_clear_animation_data(incoming_proxy: StructProxy, existing_struct: T.bpy_struct) -> Optional[T.AnimData]:
+    if existing_struct.animation_data is None:
+        if not isinstance(incoming_proxy, NonePtrProxy):
             # None (current blender value) -> not None (incoming proxy)
-            struct_.animation_data_create()
-            return struct_.animation_data
+            existing_struct.animation_data_create()
     else:
-        if isinstance(proxy, NonePtrProxy):
+        if isinstance(incoming_proxy, NonePtrProxy):
             # not None (current blender value) -> None (incoming proxy)
-            struct_.animation_data_clear()
-            return None
-    return attribute
+            existing_struct.animation_data_clear()
+    return existing_struct.animation_data
 
 
 @serialize
@@ -114,7 +110,7 @@ class StructProxy(Proxy):
             key: (e.g. "display)
             context: the proxy and visit state
         """
-        if key == "animation_data":
+        if key == "animation_data" and isinstance(attribute, T.AnimData):
             attribute = _create_clear_animation_data(self, attribute, parent)
 
         if attribute is None:
@@ -160,9 +156,9 @@ class StructProxy(Proxy):
                 self.save(attribute, parent, key, context)
         else:
             # the structure is updated
-            if key == "animation_data":
-                from mixer.blender_data.misc_proxies import NonePtrProxy
-
+            if key == "animation_data" and isinstance(attribute, T.AnimData):
+                # if animation_data is updated to None (cleared), the parent structure is updated to store
+                # a NonePtrProxy
                 if to_blender:
                     attribute = _create_clear_animation_data(update, attribute, parent)
                     if attribute is None:
