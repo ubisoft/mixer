@@ -87,9 +87,11 @@ class HandlerManager:
     def _set_connection_handler(cls, connect: bool):
         try:
             if connect:
-                bpy.app.handlers.load_pre.append(handler_on_load)
+                if handler_on_load not in bpy.app.handlers.load_pre:
+                    bpy.app.handlers.load_pre.append(handler_on_load)
             else:
-                bpy.app.handlers.load_pre.remove(handler_on_load)
+                if handler_on_load in bpy.app.handlers.load_pre:
+                    bpy.app.handlers.load_pre.remove(handler_on_load)
         except Exception as e:
             logger.error("Exception during _set_connection_handler(%s) : %s", connect, e)
 
