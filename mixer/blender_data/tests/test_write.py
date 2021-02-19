@@ -231,6 +231,13 @@ class TestWriteAttribute(unittest.TestCase):
         # Write a whole scene datablock
         scene_name = "Scene_0"
         scene = D.scenes[scene_name]
+
+        # HACK
+        # frame_current is 99 in the blend file and 1 on a freshly created scene
+        # this avoids committing the blend file with an updated Scene.frame_current after Scene.frame_current is
+        # filtered out
+        scene.frame_current = 1
+
         scene_proxy = self.proxy.data("scenes").search_one(scene_name)
         self.assertIsInstance(scene_proxy, DatablockProxy)
 

@@ -43,7 +43,6 @@ if TYPE_CHECKING:
     from mixer.blender_data.aos_proxy import AosProxy
     from mixer.blender_data.datablock_proxy import DatablockProxy
     from mixer.blender_data.proxy import Context, Proxy
-    from mixer.blender_data.struct_proxy import StructProxy
 
 logger = logging.getLogger(__name__)
 
@@ -437,27 +436,6 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
     return filtered.items()
 
 
-def create_clear_animation_data(target: T.bpy_struct, proxy: Union[StructProxy, DatablockProxy]):
-    if hasattr(target, "animation_data"):
-        from mixer.blender_data.misc_proxies import NonePtrProxy
-        from mixer.blender_data.struct_proxy import StructProxy
-
-        animation_data = cast(Optional[Union[StructProxy, NonePtrProxy]], proxy.data("animation_data"))
-        if animation_data is not None:
-            if animation_data:
-                if target.animation_data is None:
-                    # None -> not None
-                    target.animation_data_create()
-            else:
-                if target.animation_data is not None:
-                    # not None -> None
-                    target.animation_data_clear()
-
-
-def pre_save_struct(proxy: StructProxy, target: T.bpy_struct):
-    create_clear_animation_data(target, proxy)
-
-
 _morphable_types = (T.Light, T.Texture)
 
 
@@ -471,7 +449,7 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
     if target.library:
         return target
 
-    create_clear_animation_data(target, proxy)
+    #  animation_data is handled in StructProxy (parent class of DatablockProxy)
 
     if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
         target.clear_geometry()

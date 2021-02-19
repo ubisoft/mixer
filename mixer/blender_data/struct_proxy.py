@@ -30,12 +30,25 @@ import bpy.types as T  # noqa
 from mixer.blender_data import specifics
 from mixer.blender_data.attributes import apply_attribute, diff_attribute, read_attribute, write_attribute
 from mixer.blender_data.json_codec import serialize
+from mixer.blender_data.misc_proxies import NonePtrProxy
 from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
 
 logger = logging.getLogger(__name__)
+
+
+def _create_clear_animation_data(incoming_proxy: StructProxy, existing_struct: T.bpy_struct) -> Optional[T.AnimData]:
+    if existing_struct.animation_data is None:
+        if not isinstance(incoming_proxy, NonePtrProxy):
+            # None (current blender value) -> not None (incoming proxy)
+            existing_struct.animation_data_create()
+    else:
+        if isinstance(incoming_proxy, NonePtrProxy):
+            # not None (current blender value) -> None (incoming proxy)
+            existing_struct.animation_data_clear()
+    return existing_struct.animation_data
 
 
 @serialize
@@ -97,19 +110,13 @@ class StructProxy(Proxy):
             key: (e.g. "display)
             context: the proxy and visit state
         """
-        if attribute is None:
-            if isinstance(parent, T.bpy_prop_collection):
-                logger.warning(f"Cannot write to '{parent}', attribute '{key}' because it does not exist.")
-            else:
-                # Don't log this because it produces too many log messages when participants have plugins
-                # f"Note: May be due to a plugin used by the sender and not on this Blender"
-                # f"Note: May be due to unimplemented 'use_{key}' implementation for type {type(bl_instance)}"
-                # f"Note: May be {bl_instance}.{key} should not have been saved"
-                pass
+        if key == "animation_data" and (attribute is None or isinstance(attribute, T.AnimData)):
+            attribute = _create_clear_animation_data(self, parent)
 
+        if attribute is None:
+            logger.info(f"save: attribute is None for {context.visit_state.display_path()}.{key}")
             return
 
-        specifics.pre_save_struct(self, attribute)
         context.visit_state.path.append(key)
         try:
             for k, v in self._data.items():
@@ -142,28 +149,40 @@ class StructProxy(Proxy):
         update = delta.value
 
         if isinstance(delta, DeltaReplace):
+            # The structure is replaced as a whole.
+            # TODO explain when this occurs
             self.copy_data(update)
             if to_blender:
                 self.save(attribute, parent, key, context)
         else:
-
-            assert type(update) == type(self)
-            specifics.pre_save_struct(self, attribute)
-
-            context.visit_state.path.append(key)
-            try:
-                for k, member_delta in update._data.items():
-                    current_value = self._data.get(k)
-                    try:
-                        self._data[k] = apply_attribute(attribute, k, current_value, member_delta, context, to_blender)
-                    except Exception as e:
-                        logger.warning(f"Struct.apply(). Processing {member_delta}")
-                        logger.warning(f"... for {attribute}.{k}")
-                        logger.warning(f"... Exception: {e!r}")
-                        logger.warning("... Update ignored")
-                        continue
-            finally:
-                context.visit_state.path.pop()
+            # the structure is updated
+            if key == "animation_data" and (attribute is None or isinstance(attribute, T.AnimData)):
+                # if animation_data is updated to None (cleared), the parent structure is updated to store
+                # a NonePtrProxy
+                if to_blender:
+                    attribute = _create_clear_animation_data(update, parent)
+                    if attribute is None:
+                        return NonePtrProxy()
+                else:
+                    if isinstance(update, NonePtrProxy):
+                        return NonePtrProxy()
+            if attribute:
+                context.visit_state.path.append(key)
+                try:
+                    for k, member_delta in update._data.items():
+                        current_value = self._data.get(k)
+                        try:
+                            self._data[k] = apply_attribute(
+                                attribute, k, current_value, member_delta, context, to_blender
+                            )
+                        except Exception as e:
+                            logger.warning(f"Struct.apply(). Processing {member_delta}")
+                            logger.warning(f"... for {attribute}.{k}")
+                            logger.warning(f"... Exception: {e!r}")
+                            logger.warning("... Update ignored")
+                            continue
+                finally:
+                    context.visit_state.path.pop()
 
         return self
 
@@ -211,6 +230,11 @@ class StructProxy(Proxy):
         Returns:
             a delta if any difference is found, None otherwise
         """
+        if attribute is None:
+            from mixer.blender_data.misc_proxies import NonePtrProxy
+
+            return DeltaUpdate(NonePtrProxy())
+
         # PERF accessing the properties from the synchronized_properties is **far** cheaper that iterating over
         # _data and the getting the properties with
         #   member_property = struct.bl_rna.properties[k]

@@ -527,6 +527,9 @@ default_exclusions: FilterSet = {
     T.Scene: [
         NameFilterOut(
             [
+                # Let each participant play his own time
+                "frame_current",
+                "frame_float",
                 # messy in tests because setting either may reset the other to frame_start or frame_end
                 # would require
                 "frame_preview_start",
@@ -595,6 +598,10 @@ property_order: PropertiesOrder = {
     },
     T.ColorManagedViewSettings: {
         "use_curve_mapping",
+    },
+    T.DriverTarget: {
+        # before id
+        "id_type",
     },
     T.Material: {
         "use_nodes",
