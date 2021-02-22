@@ -652,8 +652,13 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
 _non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}
 _effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - _non_effect_sequences
 
+if bpy.app.version < (2, 92, 0):
+    _Sequences = T.Sequences
+else:
+    _Sequences = T.SequencesTopLevel
 
-@add_element.register(T.Sequences)  # type: ignore[no-redef]
+
+@add_element.register(_Sequences)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     type_name = proxy.data("type")
     name = proxy.data("name")
