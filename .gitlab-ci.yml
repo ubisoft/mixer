@@ -147,6 +147,9 @@ test_2.92.beta:
 test_2.93.alpha:
   extends:
     - .test_nightly
+  when: 
+    # Would need a way to get a valid filename to download to run it automatically
+    - manual
   variables:
     MIXER_BLENDER_VERSION_BASE: "2.93"
     MIXER_BLENDER_ZIP_BASENAME: blender-2.93.0-c97ea30e956d-windows64
