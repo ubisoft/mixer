@@ -141,17 +141,17 @@ test_2.92.beta:
     - .test_nightly
   variables:
     MIXER_BLENDER_VERSION_BASE: "2.92"
-    MIXER_BLENDER_ZIP_BASENAME: blender-${beta}-windows64
+    # from https://builder.blender.org/download/
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.92.${beta}-windows64
     MIXER_BLENDER_DOWNLOAD: "builder"
 
 test_2.93.alpha:
   extends:
     - .test_nightly
-  # Would need a way to get a valid filename to download to run it automatically
-  when: manual
   variables:
     MIXER_BLENDER_VERSION_BASE: "2.93"
-    MIXER_BLENDER_ZIP_BASENAME: blender-${alpha}-windows64
+    # from https://builder.blender.org/download/
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.93.${alpha}-windows64
     MIXER_BLENDER_DOWNLOAD: "builder"
 
 test_gitlab.com:
