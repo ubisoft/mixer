@@ -1,10 +1,10 @@
-# 0.21.1 (wip)
+# 0.21.1 (22-02-2021)
 
 ## Fixes
 
-- addon load failure on Blender 2.92
+- Addon load failure on Blender 2.92 RC
 
-# 0.21.0 (19-02-2020)
+# 0.21.0 (19-02-2021)
 
 ## Features
 
@@ -30,7 +30,7 @@
 
 - require Blender 2.91.0
 
-# 0.20.0 (22-01-2020)
+# 0.20.0 (22-01-2021)
 
 ## Features
 
