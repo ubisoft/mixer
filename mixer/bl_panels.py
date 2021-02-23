@@ -36,6 +36,7 @@ from mixer.blender_data.debug_addon import DebugDataPanel, use_debug_addon
 from mixer import display_version
 from mixer import icons
 from mixer.local_data import get_data_directory
+from mixer.vrtist import icons as vrtist_icons
 
 if TYPE_CHECKING:
     from mixer.bl_preferences import MixerPreferences
@@ -284,7 +285,7 @@ def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Contex
 
 
 class MixerSettingsPanel(bpy.types.Panel):
-    bl_label = f"Mixer {display_version or '(Unknown version)'}"
+    bl_label = f"Mixer  {display_version or '(Unknown version)'}"
     bl_idname = "MIXER_PT_mixer_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -454,11 +455,24 @@ class MixerSettingsPanel(bpy.types.Panel):
 
 
 class VRtistSettingsPanel(bpy.types.Panel):
-    bl_label = "VRtist"
+    bl_label = f"VRtist  {display_version or '(Unknown version)'}"
+    # bl_label = "VRtist"
     bl_idname = "MIXER_PT_vrtist_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "VRtist"
+
+    def draw_header(self, context):
+        self.layout.emboss = "NONE"
+        icon = vrtist_icons.vrtist_icons_col["VRtist_32"]
+        row = self.layout.row(align=True)
+        row.operator("vrtist.about", text="", icon_value=icon.icon_id)
+
+    def draw_header_preset(self, context):
+        self.layout.emboss = "NONE"
+        row = self.layout.row(align=True)
+        row.menu("VRTIST_MT_prefs_main_menu", icon="PREFERENCES", text="")
+        row.separator(factor=1.0)
 
     def draw(self, context):
         layout = self.layout
@@ -492,7 +506,7 @@ def update_panels_category(self, context):
                 bpy.utils.unregister_class(panel)
 
         for panel in panels:
-            if panel.bl_label == "VRtist":
+            if panel.bl_label.startswith("VRtist"):
                 panel.bl_category = mixer_prefs.vrtist_category
             else:
                 panel.bl_category = mixer_prefs.category

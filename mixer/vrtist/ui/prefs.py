@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-This module defines the Preference menu.
+This module defines the Preference menu of VRtist.
 """
 
 import bpy
@@ -28,9 +28,9 @@ from bpy.types import Menu
 #############
 
 
-class MIXER_MT_prefs_main_menu(Menu):  # noqa 801
-    bl_idname = "MIXER_MT_prefs_main_menu"
-    bl_label = "Mixer Settings"
+class VRTIST_MT_prefs_main_menu(Menu):  # noqa 801
+    bl_idname = "VRTIST_MT_prefs_main_menu"
+    bl_label = "VRtist Settings"
 
     def draw(self, context):
         layout = self.layout
@@ -46,10 +46,10 @@ class MIXER_MT_prefs_main_menu(Menu):  # noqa 801
 
         layout.separator()
         row = layout.row(align=True)
-        row.operator("mixer.about", text="About...")
+        row.operator("vrtist.about", text="About...")
 
 
-_classes = (MIXER_MT_prefs_main_menu,)
+_classes = (VRTIST_MT_prefs_main_menu,)
 
 
 def register():
