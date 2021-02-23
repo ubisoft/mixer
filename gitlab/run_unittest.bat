@@ -26,7 +26,7 @@ IF EXIST %CURRENT_DIR%\blender\cache\%MIXER_BLENDER_ZIP_BASENAME% GOTO COPYUNZIP
 IF EXIST %CURRENT_DIR%\blender\cache\%MIXER_BLENDER_ZIP_BASENAME%.zip GOTO UNZIP
 
 REM rely on a bash script to download blender, to bypass proxy issues with powershell Invoke-WebRequest
-"%MIXER_BASH_EXE%" %CURRENT_DIR%\download_blender.sh
+"%MIXER_BASH_EXE%" %CURRENT_DIR%\download_blender_%MIXER_BLENDER_DOWNLOAD%%.sh
 
 :UNZIP
 
