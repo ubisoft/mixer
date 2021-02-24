@@ -438,7 +438,10 @@ default_exclusions: FilterSet = {
             ]
         )
     ],
-    #
+    T.Modifier: [
+        # UI
+        NameFilterOut(["is_active"])
+    ],
     T.Node: [
         NameFilterOut(
             [
