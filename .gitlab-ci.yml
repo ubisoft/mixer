@@ -109,9 +109,6 @@ release:
       junit:
         - logs\tests\*.xml
 
-
-
-
 .test_version_dev:
   variables:
     MIXER_BLENDER_ZIP_BASENAME: blender-2.91.0-windows64
@@ -187,6 +184,7 @@ test_2.93.alpha_manual:
     - .test_version_2.93.alpha
     - .except_nightly_test
     - .except_on_gitlab.com
+  when: manual
 
 test_gitlab.com:
   extends:
