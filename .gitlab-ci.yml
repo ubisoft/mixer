@@ -148,7 +148,7 @@ test_2.91.2_manual:
   variables:
     MIXER_BLENDER_VERSION_BASE: "2.92"
     # from https://builder.blender.org/download/
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.92.${beta}-windows64
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.92.${blender_beta}-windows64
     MIXER_BLENDER_DOWNLOAD: "builder"
 
 test_2.92.beta:
@@ -170,7 +170,7 @@ test_2.92.beta_manual:
   variables:
     MIXER_BLENDER_VERSION_BASE: "2.93"
     # from https://builder.blender.org/download/
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.93.${alpha}-windows64
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.93.${blender_alpha}-windows64
     MIXER_BLENDER_DOWNLOAD: "builder"
 
 test_2.93.alpha:
