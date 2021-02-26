@@ -1,5 +1,9 @@
 # 0.22.0 (wip)
 
+## Features
+
+- Grease pencil: synchronize effects
+
 ## Fixes
 
 - Object modifier synchronization failure on Blender 2.92
