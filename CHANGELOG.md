@@ -3,7 +3,7 @@
 ## Fixes
 
 - Object modifier synchronization failure on Blender 2.92
-
+- VSE synchronization error on 2.92
 
 ## CI
 
