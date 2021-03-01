@@ -179,42 +179,36 @@ class SHAREDFOLDER_UL_ItemRenderer(bpy.types.UIList):  # noqa
 def draw_user_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
 
-    col = layout.column()
-    col.separator(factor=0.5)
+    split = layout.split(factor=0.233, align=False)
+    split.label(text="User:")
 
-    grid = col.column_flow(columns=2)
-    row = grid.row()
+    row = split.row()
+    row.prop(mixer_prefs, "user", text="")
     sub_row = row.row()
     sub_row.scale_x = 0.4
-    sub_row.label(text="User:")
-    row.prop(mixer_prefs, "user", text="")
-    row = grid.row()
-    row.prop(mixer_prefs, "color", text="")
-    icon = icons.icons_col["General_Explorer_32"]
-    user_data_path = os.environ.get("MIXER_DATA_DIR", get_data_directory())
-    #   from pathlib import Path
-    #   user_data_path = Path(user_data_path).parent
-    row.operator("mixer.open_explorer", text="", icon_value=icon.icon_id).path = str(user_data_path)
-
-    col.separator(factor=1.0)
+    sub_row.prop(mixer_prefs, "color", text="")
 
 
 def draw_connection_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
 
-    col = layout.column()
-    col.separator(factor=0.5)
+    row = layout.row()
+    split = row.split(factor=0.233, align=False)
+    split.label(text="Host:")
+    sub_row = split.row()
+    sub_row.prop(mixer_prefs, "host", text="")
+    sub_row.prop(mixer_prefs, "port")
 
-    grid = col.column_flow(columns=2)
-    row = grid.row()
-    sub_row = row.row()
-    sub_row.scale_x = 0.4
-    sub_row.label(text="Host:")
-    row.prop(mixer_prefs, "host", text="")
-    row = grid.row()
-    row.prop(mixer_prefs, "port")
-
-    col.separator(factor=0.5)
+    layout.separator()
+    row = layout.row()
+    split = row.split(factor=0.233, align=False)
+    split.label(text="Session Log:")
+    sub_row = split.row()
+    icon = icons.icons_col["General_Explorer_32"]
+    user_data_path = os.environ.get("MIXER_DATA_DIR", get_data_directory())
+    #   from pathlib import Path
+    #   user_data_path = Path(user_data_path).parent
+    sub_row.operator("mixer.open_explorer", text="Open Log Folder", icon_value=icon.icon_id).path = str(user_data_path)
 
 
 def draw_shared_folders_settings_ui(layout: bpy.types.UILayout):
@@ -331,7 +325,7 @@ def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Contex
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Connection Settings")
     draw_user_settings_ui(layout.row())
-    draw_connection_settings_ui(layout.row())
+    draw_connection_settings_ui(layout)
 
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Room Settings")
@@ -388,7 +382,12 @@ class MixerSettingsPanel(bpy.types.Panel):
         draw_user_settings_ui(layout.row())
 
         if not self.connected():
-            draw_connection_settings_ui(layout.row())
+            layout.separator(factor=0.2)
+            split = layout.split(factor=0.233, align=False)
+            split.label(text="Host:")
+            split.prop(mixer_prefs, "host", text="")
+
+            layout.separator(factor=0.5)
             row = layout.row()
             row.scale_y = 1.5
             row.operator(bl_operators.ConnectOperator.bl_idname, text="Connect")
@@ -508,14 +507,19 @@ class VRtistSettingsPanel(bpy.types.Panel):
         mixer_prefs = get_mixer_prefs()
 
         draw_user_settings_ui(layout.row())
-        draw_connection_settings_ui(layout.row())
+        layout.prop(mixer_prefs, "host", text="Host")
         layout.prop(mixer_prefs, "room", text="Room")
+        layout.separator(factor=1.0)
 
-        layout.operator(bl_operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
+        row = layout.row()
+        row.scale_y = 1.5
+        row.operator(bl_operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
+
         layout.prop(
             mixer_prefs, "VRtist", text="Path", icon=("ERROR" if not os.path.exists(mixer_prefs.VRtist) else "NONE")
         )
         layout.prop(mixer_prefs, "VRtist_suffix", text="Save Suffix")
+        layout.separator(factor=0.5)
 
 
 panels = [

@@ -48,6 +48,7 @@ class VRTIST_MT_prefs_main_menu(Menu):  # noqa 801
 
         layout.separator()
         row = layout.row(align=True)
+
         from mixer import icons
 
         icon = icons.icons_col["Mixer_32"]

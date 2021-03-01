@@ -99,14 +99,31 @@ class MixerPreferences(bpy.types.AddonPreferences):
         default="MIXER",
     )
 
-    host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
-    port: bpy.props.IntProperty(name="Port", default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)))
-    room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", getuser()))
+    host: bpy.props.StringProperty(
+        name="Host", description="Server Host Name", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST)
+    )
+    port: bpy.props.IntProperty(
+        name="Port",
+        description="Port to use to connect the server host",
+        default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)),
+    )
+    room: bpy.props.StringProperty(
+        name="Room", description="Name of the session room", default=os.environ.get("VRTIST_ROOM", getuser())
+    )
 
     # User name as displayed in peers user list
-    user: bpy.props.StringProperty(name="User", default=getuser(), update=on_user_changed)
+    user: bpy.props.StringProperty(
+        name="User Name",
+        description="Name by which the other users will identify you during\na cooperative session",
+        default=getuser(),
+        update=on_user_changed,
+    )
     color: bpy.props.FloatVectorProperty(
-        name="Color", subtype="COLOR", default=gen_random_color(), update=on_user_color_changed
+        name="User Color",
+        subtype="COLOR",
+        description="Color used in the viewport of the cooperative session\nto differenciate you from the other users",
+        default=gen_random_color(),
+        update=on_user_color_changed,
     )
 
     def get_log_level(self):
