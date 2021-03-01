@@ -231,30 +231,45 @@ def draw_shared_folders_settings_ui(layout: bpy.types.UILayout):
 
 def draw_advanced_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "data_directory", text="Data Directory")
-    layout.prop(mixer_prefs, "ignore_version_check")
-    layout.prop(mixer_prefs, "log_level")
-    layout.prop(mixer_prefs, "show_server_console")
-    layout.prop(mixer_prefs, "vrtist_protocol")
+    mixer_props = get_mixer_props()
+
+    collapsable_panel(layout, mixer_props, "display_advanced_options", text="Advanced Settings")
+    if mixer_props.display_advanced_options:
+        box = layout.box()
+        box.prop(mixer_prefs, "data_directory", text="Data Directory")
+        box.prop(mixer_prefs, "ignore_version_check")
+        box.prop(mixer_prefs, "log_level")
+        box.prop(mixer_prefs, "show_server_console")
+        box.prop(mixer_prefs, "vrtist_protocol")
 
 
 def draw_developer_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
-    layout.prop(mixer_prefs, "no_start_server", text="Do not start server on connect")
-    layout.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
-    layout.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
-    layout.prop(mixer_prefs, "commands_send_interval")
-    layout.prop(mixer_prefs, "display_own_gizmos")
-    layout.prop(mixer_prefs, "display_ids_gizmos")
+    mixer_props = get_mixer_props()
+
+    collapsable_panel(layout, mixer_props, "display_developer_options", text="Developer Options")
+    if mixer_props.display_developer_options:
+        box = layout.box()
+        box.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
+        box.prop(mixer_prefs, "no_start_server", text="Do not start server on connect")
+        box.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
+        box.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
+        box.prop(mixer_prefs, "commands_send_interval")
+        box.prop(mixer_prefs, "display_own_gizmos")
+        box.prop(mixer_prefs, "display_ids_gizmos")
 
 
 def draw_gizmos_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "display_frustums_gizmos")
-    layout.prop(mixer_prefs, "display_frustums_names_gizmos")
-    layout.prop(mixer_prefs, "display_selections_gizmos")
-    layout.prop(mixer_prefs, "display_selections_names_gizmos")
+    mixer_props = get_mixer_props()
+
+    collapsable_panel(layout, mixer_props, "display_gizmos_options", text="Gizmos")
+    if mixer_props.display_gizmos_options:
+        box = layout.box()
+        box.prop(mixer_prefs, "display_frustums_gizmos")
+        box.prop(mixer_prefs, "display_frustums_names_gizmos")
+        box.prop(mixer_prefs, "display_selections_gizmos")
+        box.prop(mixer_prefs, "display_selections_names_gizmos")
 
 
 def draw_server_users_ui(layout: bpy.types.UILayout):
@@ -321,19 +336,16 @@ def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Contex
     layout.prop(mixer_prefs, "room", text="Default Room Name")
 
     layout = mixer_prefs.layout.box().column()
-    layout.label(text="Gizmos")
     draw_gizmos_settings_ui(layout)
 
     layout = mixer_prefs.layout.box().column()
-    layout.label(text="Advanced Settings")
+    draw_server_users_ui(layout)
+
+    layout = mixer_prefs.layout.box().column()
     draw_advanced_settings_ui(layout)
 
     layout = mixer_prefs.layout.box().column()
-    layout.label(text="Developer Settings")
     draw_developer_settings_ui(layout)
-
-    layout = mixer_prefs.layout.box().column()
-    draw_server_users_ui(layout)
 
 
 class MixerSettingsPanel(bpy.types.Panel):
