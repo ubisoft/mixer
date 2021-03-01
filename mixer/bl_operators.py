@@ -504,6 +504,20 @@ class ToggleBetweenMixerAndVRtistPanels(bpy.types.Operator):
 
     panel_mode: bpy.props.StringProperty(default="MIXER")
 
+    @classmethod
+    def description(self, context, properties):
+        descr = "Toggle between Mixer and VRtist panels.\n"
+        if "MIXER" == properties.panel_mode:
+            descr = "Toggle from VRtist to Mixer panel.\n"
+            descr += "Mixer offers a collaborative real-time environment for Blender users."
+            descr += "\n\nSee the documentation for more information."
+        elif "VRTIST" == properties.panel_mode:
+            descr = "Toggle from Mixer to VRtist Panel.\n"
+            descr += "This panel will allow you to set up a live link between Blender and VRtist,"
+            descr += "\na VR application developed by Ubisoft Animation Studio for immersive animation direction."
+            descr += "\n\nSee the documentation for more information."
+        return descr
+
     def invoke(self, context, event):
         mixer_prefs = get_mixer_prefs()
         mixer_prefs.display_mixer_vrtist_panels = self.panel_mode
