@@ -496,6 +496,20 @@ class LaunchVRtistOperator(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class ToggleBetweenMixerAndVRtistPanels(bpy.types.Operator):
+    bl_idname = "mixervrtist.toggle"
+    bl_label = "Mixer / VRtist Panels"
+    bl_description = "Toggle Between Mixer and VRtist Panels"
+    bl_options = {"INTERNAL"}
+
+    panel_mode: bpy.props.StringProperty(default="MIXER")
+
+    def invoke(self, context, event):
+        mixer_prefs = get_mixer_prefs()
+        mixer_prefs.display_mixer_vrtist_panels = self.panel_mode
+        return {"FINISHED"}
+
+
 classes = (
     LaunchVRtistOperator,
     CreateRoomOperator,
@@ -508,6 +522,7 @@ classes = (
     UploadRoomOperator,
     SharedFoldersAddFolderOperator,
     SharedFoldersRemoveFolderOperator,
+    ToggleBetweenMixerAndVRtistPanels,
 )
 
 register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)

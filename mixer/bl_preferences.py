@@ -88,6 +88,17 @@ class MixerPreferences(bpy.types.AddonPreferences):
         update=update_panels_category,
     )
 
+    display_mixer_vrtist_panels: bpy.props.EnumProperty(
+        name="Display Mixer and VRtist Panels",
+        description="Control which panel is displayed between Mixer and VRtist",
+        items=[
+            ("MIXER", "Mixer", ""),
+            ("VRTIST", "VRtit", ""),
+            ("MIXER_AND_VRTIST", "Mixer And VRtist", ""),
+        ],
+        default="MIXER",
+    )
+
     host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
     port: bpy.props.IntProperty(name="Port", default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)))
     room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", getuser()))

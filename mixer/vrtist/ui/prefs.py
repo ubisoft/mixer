@@ -38,15 +38,20 @@ class VRTIST_MT_prefs_main_menu(Menu):  # noqa 801
         row = layout.row(align=True)
         row.operator("preferences.addon_show", text="Add-on Preferences...").module = "mixer"
 
-        layout.separator()
         row = layout.row(align=True)
         row.operator(
             "mixer.open_documentation_url", text="Documentation"
         ).path = "https://gitlab.com/ubisoft-animation-studio/mixer#mixer"
 
-        layout.separator()
         row = layout.row(align=True)
         row.operator("vrtist.about", text="About...")
+
+        layout.separator()
+        row = layout.row(align=True)
+        from mixer import icons
+
+        icon = icons.icons_col["Mixer_32"]
+        row.operator("mixervrtist.toggle", text="Switch to Mixer Panel", icon_value=icon.icon_id).panel_mode = "MIXER"
 
 
 _classes = (VRTIST_MT_prefs_main_menu,)

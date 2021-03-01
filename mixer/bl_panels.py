@@ -326,6 +326,8 @@ def draw_server_users_ui(layout: bpy.types.UILayout):
 def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Context):
     mixer_prefs.layout.prop(mixer_prefs, "category")
 
+    mixer_prefs.layout.prop(mixer_prefs, "display_mixer_vrtist_panels")
+
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Connection Settings")
     draw_user_settings_ui(layout.row())
@@ -354,6 +356,14 @@ class MixerSettingsPanel(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Mixer"
+
+    @classmethod
+    def poll(cls, context):
+        mixer_prefs = get_mixer_prefs()
+        return (
+            "MIXER" == mixer_prefs.display_mixer_vrtist_panels
+            or "MIXER_AND_VRTIST" == mixer_prefs.display_mixer_vrtist_panels
+        )
 
     def connected(self):
         return share_data.client is not None and share_data.client.is_connected()
@@ -472,6 +482,14 @@ class VRtistSettingsPanel(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "VRtist"
+
+    @classmethod
+    def poll(cls, context):
+        mixer_prefs = get_mixer_prefs()
+        return (
+            "VRTIST" == mixer_prefs.display_mixer_vrtist_panels
+            or "MIXER_AND_VRTIST" == mixer_prefs.display_mixer_vrtist_panels
+        )
 
     def draw_header(self, context):
         self.layout.emboss = "NONE"
