@@ -23,14 +23,29 @@ import logging
 
 import bpy
 
+from mixer import display_version
 from mixer.broadcaster.common import RoomAttributes
 from mixer.os_utils import getuser
 from mixer.share_data import share_data
+from mixer.utils.utils import convert_version_str_to_int
 
 logger = logging.getLogger(__name__)
 
 
 class RoomItem(bpy.types.PropertyGroup):
+    def has_warnings(self):
+        blender_version_int_app = convert_version_str_to_int(bpy.app.version_string)
+        blender_version_int_room = convert_version_str_to_int(self.blender_version)
+        if blender_version_int_app != blender_version_int_room:
+            return True
+
+        mixer_version_int_app = convert_version_str_to_int(display_version[1:])
+        mixer_version_int_room = convert_version_str_to_int(self.mixer_version[1:])
+        if mixer_version_int_app != mixer_version_int_room:
+            return True
+
+        return False
+
     def get_room_blender_version(self):
         if (
             share_data.client is not None
@@ -107,9 +122,17 @@ class RoomItem(bpy.types.PropertyGroup):
             return share_data.client.rooms_attributes[self.name][RoomAttributes.JOINABLE]
         return False
 
-    name: bpy.props.StringProperty(name="Name")
-    blender_version: bpy.props.StringProperty(name="Blender Version", get=get_room_blender_version)
-    mixer_version: bpy.props.StringProperty(name="Mixer Version", get=get_room_mixer_version)
+    name: bpy.props.StringProperty(name="Name", description="Room name")
+    blender_version: bpy.props.StringProperty(
+        name="Blender Version",
+        description="Version of the Blender instance from which the room has been created",
+        get=get_room_blender_version,
+    )
+    mixer_version: bpy.props.StringProperty(
+        name="Mixer Version",
+        description="Version of the Mixer instance from which the room has been created",
+        get=get_room_mixer_version,
+    )
     ignore_version_check: bpy.props.BoolProperty(name="Ignore Version Check", get=is_ignore_version_check)
     users_count: bpy.props.IntProperty(name="Users Count")
     protocol: bpy.props.StringProperty(name="Protocol", get=get_protocol)
