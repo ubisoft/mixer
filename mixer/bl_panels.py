@@ -513,9 +513,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                 row = box.row()
                 row.separator(factor=6)
                 col = row.column()
-                col.use_property_split = True
                 col.use_property_decorate = False
-                # col.enabled = False
                 col.separator(factor=0.5)
                 col.scale_y = 0.8
 
@@ -554,16 +552,18 @@ class MixerSettingsPanel(bpy.types.Panel):
                 _display_property(col, "Room Can Be Joined:", "Yes" if current_room.joinable else "No")
 
                 # enabled properties:
-
                 row = box.row()
                 row.separator(factor=6)
                 col = row.column()
+                col.use_property_split = False
                 col.use_property_decorate = False
 
-                col.use_property_split = False
                 split = col.split(factor=0.5)
-                split.alignment = "LEFT"
-                split.label(text="Keep Open:")
+                sub_row = split.row()
+                sub_sub_row = sub_row.row()
+                sub_sub_row.label(text="", icon="BLANK1")
+                sub_row.label(text="Keep Open:")
+
                 split.prop(current_room, "keep_open", text="")
 
                 col.separator(factor=0.5)

@@ -136,7 +136,13 @@ class RoomItem(bpy.types.PropertyGroup):
     ignore_version_check: bpy.props.BoolProperty(name="Ignore Version Check", get=is_ignore_version_check)
     users_count: bpy.props.IntProperty(name="Users Count")
     protocol: bpy.props.StringProperty(name="Protocol", get=get_protocol)
-    keep_open: bpy.props.BoolProperty(name="Keep Open", default=False, get=is_kept_open, set=on_keep_open_changed)
+    keep_open: bpy.props.BoolProperty(
+        name="Keep Open",
+        description="Indicate if the room should be kept on the server when no more client is inside",
+        default=False,
+        get=is_kept_open,
+        set=on_keep_open_changed,
+    )
     command_count: bpy.props.IntProperty(name="Command Count", get=get_command_count)
     mega_byte_size: bpy.props.FloatProperty(name="Mega Byte Size", get=get_mega_byte_size)
     joinable: bpy.props.BoolProperty(name="Joinable", get=is_joinable)
