@@ -164,9 +164,9 @@ class MixerPreferences(bpy.types.AddonPreferences):
     # Developer option to avoid sending scene content to server at the first connexion
     # Allow to quickly iterate debugging/test on large scenes with only one client in room
     # Main usage: optimization of client timers to check if updates are required
-    no_send_scene_content: bpy.props.BoolProperty(default=False)
+    no_send_scene_content: bpy.props.BoolProperty(name="Do Not Send Scene Content", default=False)
     no_start_server: bpy.props.BoolProperty(
-        name="Do not start server", default=os.environ.get("MIXER_NO_START_SERVER") is not None
+        name="Do Not Start Server on Connect", default=os.environ.get("MIXER_NO_START_SERVER") is not None
     )
     send_base_meshes: bpy.props.BoolProperty(default=True)
     send_baked_meshes: bpy.props.BoolProperty(default=True)

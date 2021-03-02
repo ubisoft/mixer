@@ -505,7 +505,7 @@ class ToggleBetweenMixerAndVRtistPanels(bpy.types.Operator):
     panel_mode: bpy.props.StringProperty(default="MIXER")
 
     @classmethod
-    def description(self, context, properties):
+    def description(cls, context, properties):
         descr = "Toggle between Mixer and VRtist panels.\n"
         if "MIXER" == properties.panel_mode:
             descr = "Toggle from VRtist to Mixer panel.\n"

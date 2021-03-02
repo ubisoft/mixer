@@ -244,8 +244,9 @@ def draw_developer_settings_ui(layout: bpy.types.UILayout):
     collapsable_panel(layout, mixer_props, "display_developer_options", text="Developer Options")
     if mixer_props.display_developer_options:
         box = layout.box()
-        box.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
-        box.prop(mixer_prefs, "no_start_server", text="Do not start server on connect")
+        box.prop(mixer_props, "display_rooms_details")
+        box.prop(mixer_prefs, "no_send_scene_content")
+        box.prop(mixer_prefs, "no_start_server")
         box.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
         box.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
         box.prop(mixer_prefs, "commands_send_interval")
@@ -424,6 +425,7 @@ class MixerSettingsPanel(bpy.types.Panel):
 
     def draw_rooms(self, layout):
         mixer_props = get_mixer_props()
+
         if collapsable_panel(layout, mixer_props, "display_rooms", text="Server Rooms"):
             layout = layout.box().column()
             ROOM_UL_ItemRenderer.draw_header(layout)
@@ -432,8 +434,10 @@ class MixerSettingsPanel(bpy.types.Panel):
                 layout.operator(bl_operators.JoinRoomOperator.bl_idname)
             else:
                 layout.operator(bl_operators.LeaveRoomOperator.bl_idname)
-            row = layout.row()
-            row.prop(get_mixer_props(), "display_rooms_details")
+
+            if len(mixer_props.rooms):
+                self.draw_current_room_properties(layout)
+
             # if collapsable_panel(layout, mixer_props, "display_advanced_room_control", text="Advanced Room Controls"):
             #     box = layout.box()
             #     col = box.column()
@@ -472,6 +476,57 @@ class MixerSettingsPanel(bpy.types.Panel):
         mixer_props = get_mixer_props()
         if collapsable_panel(layout, mixer_props, "display_developer_options", text="Developer Options"):
             draw_developer_settings_ui(layout.box().column())
+
+    def draw_current_room_properties(self, layout):
+        mixer_props = get_mixer_props()
+
+        layout.separator(factor=0.5)
+        collapsable_panel(layout, mixer_props, "display_selected_room_properties", text="Selected Room Properties")
+        if mixer_props.display_selected_room_properties:
+            box = layout.box()
+            if not len(mixer_props.rooms):
+                box.label(text="No room available")
+            else:
+                current_room = mixer_props.rooms[mixer_props.room_index]
+                box.use_property_decorate = False
+
+                # disabled properties
+                col = box.column()
+                col.use_property_split = True
+                col.use_property_decorate = False
+                col.enabled = False
+                col.separator(factor=0.5)
+                col.scale_y = 0.8
+
+                def _display_property(layout, name, value):
+                    layout.use_property_split = False
+                    split = col.split(factor=0.5)
+                    split.alignment = "RIGHT"
+                    split.label(text=name)
+                    split.alignment = "LEFT"
+                    split.label(text=str(value))
+                    # split.prop(current_room, "name", text="")
+
+                _display_property(col, "Name:", current_room.name)
+                _display_property(col, "Memory Size:", str(current_room.mega_byte_size) + " Mb")
+                _display_property(col, "Blender Version:", current_room.blender_version)
+                _display_property(col, "Mixer Version:", current_room.mixer_version)
+                _display_property(col, "Command Count:", current_room.command_count)
+                _display_property(col, "Protocol:", current_room.protocol)
+                _display_property(col, "Room Can Be Joined:", "Yes" if current_room.joinable else "No")
+
+                # enabled properties:
+                col = box.column()
+                col.use_property_split = True
+                col.use_property_decorate = False
+
+                col.use_property_split = False
+                split = col.split(factor=0.5)
+                split.alignment = "RIGHT"
+                split.label(text="Keep Open")
+                split.prop(current_room, "keep_open", text="")
+
+                col.separator(factor=0.5)
 
 
 class VRtistSettingsPanel(bpy.types.Panel):

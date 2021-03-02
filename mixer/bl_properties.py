@@ -162,12 +162,15 @@ class MixerProperties(bpy.types.PropertyGroup):
     users: bpy.props.CollectionProperty(name="Users", type=UserItem)
     user_index: bpy.props.IntProperty()  # index in the list of users
 
-    display_shared_folders_options: bpy.props.BoolProperty(default=True)
+    display_shared_folders_options: bpy.props.BoolProperty(default=False)
     display_gizmos_options: bpy.props.BoolProperty(default=True)
     display_advanced_options: bpy.props.BoolProperty(default=False)
     display_developer_options: bpy.props.BoolProperty(default=False)
     display_rooms: bpy.props.BoolProperty(default=True)
-    display_rooms_details: bpy.props.BoolProperty(default=False, name="Display Rooms Details")
+    display_selected_room_properties: bpy.props.BoolProperty(default=False)
+    display_rooms_details: bpy.props.BoolProperty(
+        default=False, name="Display Rooms Details in the Server Rooms List Panel"
+    )
     display_users: bpy.props.BoolProperty(default=True)
 
     display_users_filter: bpy.props.EnumProperty(
