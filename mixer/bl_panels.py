@@ -491,7 +491,9 @@ class MixerSettingsPanel(bpy.types.Panel):
                 box.use_property_decorate = False
 
                 # disabled properties
-                col = box.column()
+                row = box.row()
+                row.separator(factor=6)
+                col = row.column()
                 col.use_property_split = True
                 col.use_property_decorate = False
                 col.enabled = False
@@ -501,14 +503,14 @@ class MixerSettingsPanel(bpy.types.Panel):
                 def _display_property(layout, name, value):
                     layout.use_property_split = False
                     split = col.split(factor=0.5)
-                    split.alignment = "RIGHT"
+                    split.alignment = "LEFT"
                     split.label(text=name)
                     split.alignment = "LEFT"
                     split.label(text=str(value))
                     # split.prop(current_room, "name", text="")
 
                 _display_property(col, "Name:", current_room.name)
-                _display_property(col, "Memory Size:", str(current_room.mega_byte_size) + " Mb")
+                _display_property(col, "Memory Size:", f"{current_room.mega_byte_size:.2} Mb")
                 _display_property(col, "Blender Version:", current_room.blender_version)
                 _display_property(col, "Mixer Version:", current_room.mixer_version)
                 _display_property(col, "Command Count:", current_room.command_count)
@@ -516,13 +518,15 @@ class MixerSettingsPanel(bpy.types.Panel):
                 _display_property(col, "Room Can Be Joined:", "Yes" if current_room.joinable else "No")
 
                 # enabled properties:
-                col = box.column()
-                col.use_property_split = True
+
+                row = box.row()
+                row.separator(factor=6)
+                col = row.column()
                 col.use_property_decorate = False
 
                 col.use_property_split = False
                 split = col.split(factor=0.5)
-                split.alignment = "RIGHT"
+                split.alignment = "LEFT"
                 split.label(text="Keep Open")
                 split.prop(current_room, "keep_open", text="")
 

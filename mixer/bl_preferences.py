@@ -119,8 +119,12 @@ class MixerPreferences(bpy.types.AddonPreferences):
         update=on_user_changed,
     )
     color: bpy.props.FloatVectorProperty(
-        name="User Color",
+        name="User Color 2",
         subtype="COLOR",
+        size=3,
+        min=0.0,
+        max=1.0,
+        precision=2,
         description="Color used in the viewport of the cooperative session\nto differenciate you from the other users",
         default=gen_random_color(),
         update=on_user_color_changed,

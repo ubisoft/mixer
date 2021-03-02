@@ -138,8 +138,17 @@ class UserItem(bpy.types.PropertyGroup):
     port: bpy.props.IntProperty(name="Port")
     ip_port: bpy.props.StringProperty(name="IP:Port")
     room: bpy.props.StringProperty(name="Room")
-    internal_color: bpy.props.FloatVectorProperty(name="Color", subtype="COLOR")
-    color: bpy.props.FloatVectorProperty(name="Color", subtype="COLOR", get=lambda self: self.internal_color)
+    internal_color: bpy.props.FloatVectorProperty(
+        name="Color",
+        subtype="COLOR",
+        size=3,
+        min=0.0,
+        max=1.0,
+        precision=2,
+    )
+    color: bpy.props.FloatVectorProperty(
+        name="Color", subtype="COLOR", size=3, min=0.0, max=1.0, precision=2, get=lambda self: self.internal_color
+    )
     windows: bpy.props.CollectionProperty(name="Windows", type=UserWindowItem)
     selected_window_index: bpy.props.IntProperty(name="Window Index")
     scenes: bpy.props.CollectionProperty(name="Scenes", type=UserSceneItem)
