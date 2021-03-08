@@ -546,8 +546,9 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
     return collection.new(socket_type, name)
 
 
-@add_element.register(T.ObjectModifiers)
 @add_element.register(T.ObjectGpencilModifiers)
+@add_element.register(T.ObjectModifiers)
+@add_element.register(T.ObjectShaderFx)
 @add_element.register(T.SequenceModifiers)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     name = proxy.data("name")
