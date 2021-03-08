@@ -425,9 +425,11 @@ def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> Items
 
     filter_props = []
     if any(isinstance(bpy_struct, t) for t in filter_crop_transform):
-        if not bpy_struct.use_crop:
+        if hasattr(bpy_struct, "use_crop") and not bpy_struct.use_crop:
+            # only for < 2.92
             filter_props.append("crop")
-        if not bpy_struct.use_translation:
+        if hasattr(bpy_struct, "use_translation") and not bpy_struct.use_translation:
+            # only for < 2.92
             filter_props.append("transform")
 
     if not filter_props:
