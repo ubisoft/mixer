@@ -1,3 +1,14 @@
+# 0.22.0 (wip)
+
+## Fixes
+
+- Object modifier synchronization failure on Blender 2.92
+
+
+## CI
+
+- Run unit tests against several Blender versions
+
 # 0.21.1 (22-02-2021)
 
 ## Fixes

@@ -97,8 +97,14 @@ class TestCore(unittest.TestCase):
 
     def test_check_types(self):
         # check our own assertions about types
-        for t in dir(bpy.types):
-            for prop in getattr(bpy.types, t).bl_rna.properties.values():
+        for name in dir(bpy.types):
+            item = getattr(bpy.types, name)
+            try:
+                rna = item.bl_rna
+            except AttributeError:
+                continue
+
+            for prop in rna.properties.values():
                 # All ID are behind pointers or in collections
                 self.assertFalse(isinstance(prop.bl_rna, T.ID))
 

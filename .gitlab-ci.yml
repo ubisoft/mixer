@@ -109,15 +109,7 @@ release:
       junit:
         - logs\tests\*.xml
 
-
-.test_nightly:
-  extends:
-    - .test_base
-    - .except_on_gitlab.com
-    - .only_nightly_test
-
-
-.test_dev_version:
+.test_version_dev:
   variables:
     MIXER_BLENDER_ZIP_BASENAME: blender-2.91.0-windows64
     MIXER_BLENDER_VERSION_BASE: "2.91"
@@ -126,39 +118,77 @@ release:
 test_dev:
   extends:
     - .test_base
-    - .test_dev_version
+    - .test_version_dev
     - .except_nightly_test
 
-test_2.91.2:
+.test_version_2.91.2:
   extends:
-    - .test_nightly
+    - .test_base
   variables:
     MIXER_BLENDER_VERSION_BASE: "2.91"
     MIXER_BLENDER_ZIP_BASENAME: blender-2.91.2-windows64
     MIXER_BLENDER_DOWNLOAD: "release"
 
-test_2.92.beta:
+test_2.91.2:
   extends:
-    - .test_nightly
+    - .test_version_2.91.2
+    - .only_nightly_test
+    - .except_on_gitlab.com
+
+test_2.91.2_manual:
+  extends:
+    - .test_version_2.91.2
+    - .except_nightly_test
+    - .except_on_gitlab.com
+  when: manual
+
+.test_version_2.92:
+  extends:
+    - .test_base
   variables:
     MIXER_BLENDER_VERSION_BASE: "2.92"
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.92.0-windows64
+    MIXER_BLENDER_DOWNLOAD: "release"
+
+test_2.92:
+  extends:
+    - .test_version_2.92
+    - .only_nightly_test
+    - .except_on_gitlab.com
+
+test_2.92_manual:
+  extends:
+    - .test_version_2.92
+    - .except_nightly_test
+    - .except_on_gitlab.com
+  when: manual
+
+.test_version_2.93.alpha:
+  extends:
+    - .test_base
+  variables:
+    MIXER_BLENDER_VERSION_BASE: "2.93"
     # from https://builder.blender.org/download/
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.92.${beta}-windows64
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.93.${blender_alpha}-windows64
     MIXER_BLENDER_DOWNLOAD: "builder"
 
 test_2.93.alpha:
   extends:
-    - .test_nightly
-  variables:
-    MIXER_BLENDER_VERSION_BASE: "2.93"
-    # from https://builder.blender.org/download/
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.93.${alpha}-windows64
-    MIXER_BLENDER_DOWNLOAD: "builder"
+    - .test_version_2.93.alpha
+    - .only_nightly_test
+    - .except_on_gitlab.com
+
+test_2.93.alpha_manual:
+  extends:
+    - .test_version_2.93.alpha
+    - .except_nightly_test
+    - .except_on_gitlab.com
+  when: manual
 
 test_gitlab.com:
   extends:
     - .test_base
-    - .test_dev_version
+    - .test_version_dev
     - .only_version_tag
     - .only_on_gitlab.com
 
