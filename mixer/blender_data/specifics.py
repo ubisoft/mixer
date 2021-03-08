@@ -341,104 +341,108 @@ def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional
     return datablock
 
 
-filter_crop_transform = [
-    T.EffectSequence,
-    T.ImageSequence,
-    T.MaskSequence,
-    T.MetaSequence,
-    T.MovieClipSequence,
-    T.MovieSequence,
-    T.SceneSequence,
-]
+def _filter_properties(properties: ItemsView, exclude_names: List[str]) -> ItemsView:
+    filtered = {k: v for k, v in properties if k not in exclude_names}
+    return filtered.items()
 
 
+@dispatch_rna
 def conditional_properties(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
-    """Filter properties list according to a specific property value in the same ID
+    """Filter properties list according to a specific property value in the same structure.
 
     This prevents loading values that cannot always be saved, such as Object.instance_collection
     that can only be saved when Object.data is None
 
     Args:
-        properties: the properties list to filter
+        bpy_struct: the structure
+        properties: a view into a Dict[str, bpy.types.Property] to filter
     Returns:
-
+        The filtered properties
     """
-    if isinstance(bpy_struct, T.ColorManagedViewSettings):
-        if bpy_struct.use_curve_mapping:
-            # Empty
-            return properties
-        filtered = {}
-        filter_props = ["curve_mapping"]
-        filtered = {k: v for k, v in properties if k not in filter_props}
-        return filtered.items()
+    return properties
 
-    if isinstance(bpy_struct, T.Object):
-        if not bpy_struct.data:
-            # Empty
-            return properties
-        filtered = {}
-        filter_props = ["instance_collection"]
-        filtered = {k: v for k, v in properties if k not in filter_props}
-        return filtered.items()
 
-    if isinstance(bpy_struct, T.Mesh):
-        if not bpy_struct.use_auto_texspace:
-            # Empty
-            return properties
-        filtered = {}
-        filter_props = ["texspace_location", "texspace_size"]
-        filtered = {k: v for k, v in properties if k not in filter_props}
-        return filtered.items()
+@conditional_properties.register(T.ColorManagedViewSettings)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if bpy_struct.use_curve_mapping:
+        return properties
+    filter_props = ["curve_mapping"]
+    return _filter_properties(properties, filter_props)
 
-    if isinstance(bpy_struct, (T.MetaBall, T.Curve)):
-        if not bpy_struct.use_auto_texspace:
-            return properties
-        filter_props = ["texspace_location", "texspace_size"]
-        filtered = {k: v for k, v in properties if k not in filter_props}
-        return filtered.items()
 
-    if isinstance(bpy_struct, T.Node):
-        if bpy_struct.hide:
-            return properties
+@conditional_properties.register(T.Object)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if not bpy_struct.data:
+        return properties
 
-        # not hidden: saving width_hidden is ignored
-        filter_props = ["width_hidden"]
-        filtered = {k: v for k, v in properties if k not in filter_props}
-        return filtered.items()
+    filter_props = ["instance_collection"]
+    return _filter_properties(properties, filter_props)
 
-    if isinstance(bpy_struct, T.NodeTree):
-        if not bpy_struct.is_embedded_data:
-            return properties
 
-        filter_props = ["name"]
-        filtered = {k: v for k, v in properties if k not in filter_props}
-        return filtered.items()
+@conditional_properties.register(T.Curve)
+@conditional_properties.register(T.Mesh)
+@conditional_properties.register(T.MetaBall)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if not bpy_struct.use_auto_texspace:
+        return properties
 
-    if isinstance(bpy_struct, T.LayerCollection):
-        scene = bpy_struct.id_data
-        if bpy_struct.collection != scene.collection:
-            return properties
+    filter_props = ["texspace_location", "texspace_size"]
+    return _filter_properties(properties, filter_props)
 
-        filter_props = ["exclude"]
-        filtered = {k: v for k, v in properties if k not in filter_props}
-        return filtered.items()
 
+@conditional_properties.register(T.Node)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if bpy_struct.hide:
+        return properties
+
+    # not hidden: saving width_hidden is ignored
+    filter_props = ["width_hidden"]
+    return _filter_properties(properties, filter_props)
+
+
+@conditional_properties.register(T.NodeTree)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if not bpy_struct.is_embedded_data:
+        return properties
+
+    filter_props = ["name"]
+    return _filter_properties(properties, filter_props)
+
+
+@conditional_properties.register(T.LayerCollection)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    scene = bpy_struct.id_data
+    if bpy_struct.collection != scene.collection:
+        return properties
+
+    filter_props = ["exclude"]
+    return _filter_properties(properties, filter_props)
+
+
+@conditional_properties.register(T.EffectSequence)
+@conditional_properties.register(T.ImageSequence)
+@conditional_properties.register(T.MaskSequence)
+@conditional_properties.register(T.MetaSequence)
+@conditional_properties.register(T.MovieClipSequence)
+@conditional_properties.register(T.MovieSequence)
+@conditional_properties.register(T.SceneSequence)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if bpy.app.version >= (2, 92, 0):
+        return properties
     filter_props = []
-    if any(isinstance(bpy_struct, t) for t in filter_crop_transform):
-        if hasattr(bpy_struct, "use_crop") and not bpy_struct.use_crop:
-            # only for < 2.92
-            filter_props.append("crop")
-        if hasattr(bpy_struct, "use_translation") and not bpy_struct.use_translation:
-            # only for < 2.92
-            filter_props.append("transform")
+    if not bpy_struct.use_crop:
+        filter_props.append("crop")
+    if not bpy_struct.use_translation:
+        filter_props.append("transform")
 
     if not filter_props:
         return properties
-    filtered = {k: v for k, v in properties if k not in filter_props}
-    return filtered.items()
+
+    return _filter_properties(properties, filter_props)
 
 
 _morphable_types = (T.Light, T.Texture)
+"""Datablock types that may change and need type_recast type after modification of their type attribute."""
 
 
 def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) -> T.ID:
