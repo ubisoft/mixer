@@ -37,7 +37,7 @@ from mixer import display_version
 from mixer import icons
 from mixer.local_data import get_data_directory
 from mixer.vrtist import icons as vrtist_icons
-from mixer.utils.utils import convert_version_str_to_int
+from mixer.utils.utils import convert_version_str_to_tupple
 
 if TYPE_CHECKING:
     from mixer.bl_preferences import MixerPreferences
@@ -365,7 +365,7 @@ def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Contex
 
 
 class MixerSettingsPanel(bpy.types.Panel):
-    bl_label = f"Mixer   V. {display_version[1:] or '(Unknown version)'}"
+    bl_label = f"Mixer   V. {display_version or '(Unknown version)'}"
     bl_idname = "MIXER_PT_mixer_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -537,14 +537,10 @@ class MixerSettingsPanel(bpy.types.Panel):
                 _display_property(col, "Room Name:", current_room.name)
                 _display_property(col, "Room Size:", f"{current_room.mega_byte_size:.2} MB")
 
-                blender_version_int_app = convert_version_str_to_int(bpy.app.version_string)
-                blender_version_int_room = convert_version_str_to_int(current_room.blender_version)
-                blender_warning = blender_version_int_app != blender_version_int_room
+                blender_warning = bpy.app.version != convert_version_str_to_tupple(current_room.blender_version)
                 _display_property(col, "Blender Version:", current_room.blender_version, has_warning=blender_warning)
 
-                mixer_version_int_app = convert_version_str_to_int(display_version[1:])
-                mixer_version_int_room = convert_version_str_to_int(current_room.mixer_version[1:])
-                mixer_warning = mixer_version_int_app != mixer_version_int_room
+                mixer_warning = display_version != current_room.mixer_version
                 _display_property(col, "Mixer Version:", current_room.mixer_version[1:], has_warning=mixer_warning)
 
                 _display_property(col, "Command Count:", current_room.command_count)
@@ -570,8 +566,7 @@ class MixerSettingsPanel(bpy.types.Panel):
 
 
 class VRtistSettingsPanel(bpy.types.Panel):
-    bl_label = f"VRtist   V. {display_version[1:] or '(Unknown version)'}"
-    # bl_label = "VRtist"
+    bl_label = f"VRtist   V. {display_version or '(Unknown version)'}"
     bl_idname = "MIXER_PT_vrtist_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"

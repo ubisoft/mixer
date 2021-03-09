@@ -76,7 +76,7 @@ def main():
                 if line.startswith("__version__ = "):
                     new_init_file_str += f'__version__ = "v{version_string}"{comment}\n'
                 elif line.startswith("display_version = "):
-                    new_init_file_str += f'display_version = "v{version_string}{suffix}"{comment}\n'
+                    new_init_file_str += f'display_version = "{version_string}{suffix}"{comment}\n'
                 elif line.startswith("version_date = "):
                     date = datetime.now(timezone.utc).strftime("%Y-%m-%d:%H:%M:%S %Z")
                     new_init_file_str += f'version_date = "{date}"{comment}\n'

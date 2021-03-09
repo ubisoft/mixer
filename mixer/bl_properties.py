@@ -27,24 +27,17 @@ from mixer import display_version
 from mixer.broadcaster.common import RoomAttributes
 from mixer.os_utils import getuser
 from mixer.share_data import share_data
-from mixer.utils.utils import convert_version_str_to_int
+from mixer.utils.utils import convert_version_str_to_tupple
 
 logger = logging.getLogger(__name__)
 
 
 class RoomItem(bpy.types.PropertyGroup):
     def has_warnings(self):
-        blender_version_int_app = convert_version_str_to_int(bpy.app.version_string)
-        blender_version_int_room = convert_version_str_to_int(self.blender_version)
-        if blender_version_int_app != blender_version_int_room:
-            return True
-
-        mixer_version_int_app = convert_version_str_to_int(display_version[1:])
-        mixer_version_int_room = convert_version_str_to_int(self.mixer_version[1:])
-        if mixer_version_int_app != mixer_version_int_room:
-            return True
-
-        return False
+        return (
+            bpy.app.version != convert_version_str_to_tupple(self.blender_version)
+            or display_version != self.mixer_version
+        )
 
     def get_room_blender_version(self):
         if (

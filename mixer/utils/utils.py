@@ -20,8 +20,7 @@ This module contains useful functions that could be reused in other add-ons.
 """
 
 
-def convert_version_str_to_int(version_str):
-    """Convert a string formated like "1.23.48" to a version integer such as 1023048"""
-    formated_version = "{:02}{:03}{:03}"
+def convert_version_str_to_tupple(version_str):
+    """Convert a string formated like "1.23.48" to a tupple such as (1,23,48)"""
     version_splitted = version_str.split(".")
-    return int(formated_version.format(int(version_splitted[0]), int(version_splitted[1]), int(version_splitted[2])))
+    return (int(version_splitted[0]), int(version_splitted[1]), int(version_splitted[2]))
