@@ -4,6 +4,8 @@ stages:
   - deploy
 
 flake8:
+  extends:
+    - .except_nightly_test
   tags:
     - docker
   image: python:3
@@ -13,12 +15,15 @@ flake8:
     - flake8 -v mixer tests extra
 
 zip:
+  extends:
+    - .except_nightly_test
   tags:
     - docker
   image: alpine
   stage: pre_release
   script:
     - cp CHANGELOG.md README.md LICENSE mixer/
+    - rm -rf mixer/blender_data/tests/
   artifacts:
     name: "${CI_PROJECT_NAME}_${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}"
     paths:
@@ -34,21 +39,33 @@ zip:
 
 # Note: you cannot extend this job with another except: variables job
 # If you need that, you should rewrite and combine the rules
-.exclude_on_gitlab.com:
+.except_on_gitlab.com:
   except:
     variables:
       - $CI_SERVER_URL == "https://gitlab.com"
 
 # Note: you cannot extend this job with another only: variables job
 # If you need that, you should rewrite and combine the rules
-.on_version_tag:
+.only_version_tag:
   only:
     refs:
       # see inject_version.py
       - /^v([0-9]+)\.([0-9]+)\.([0-9]+)(\-[0-9A-Za-z-]+)?(\+[0-9A-Za-z-]+)?$/
 
+.except_nightly_test:
+  except:
+    variables:
+      - $NIGHTLY_TEST == "true"
+
+.only_nightly_test:
+  only:
+    variables:
+      - $NIGHTLY_TEST == "true"
+
 release:
-  extends: .on_version_tag
+  extends:
+    - .only_version_tag
+    - .except_nightly_test
   dependencies:
     - zip
   tags:
@@ -63,14 +80,19 @@ release:
     paths:
       - mixer-${CI_COMMIT_REF_NAME}.zip
 
+####################################################################################
+
 # https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
-.base_unittest:
+
+
+.test_base:
   stage: pre_release
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /\[skip-tests\]/
   tags:
     - blender
   variables:
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.91.0-windows64
-    MIXER_BLENDER_VERSION_BASE: "2.91"
     MIXER_BASH_EXE: C:\Program Files\Git\bin\bash.exe
     VRTIST_PORT: 25600 # In case a server is already running on our default port on the test computer
     MIXER_TEST_OUTPUT: logs\tests
@@ -86,33 +108,98 @@ release:
     reports:
       junit:
         - logs\tests\*.xml
-  
-unittest:
-  extends:
-    - .base_unittest
-  except:
-    variables:
-      - $CI_COMMIT_MESSAGE =~ /\[skip-tests\]/
-      - $CI_SERVER_URL == "https://gitlab.com"
 
-unittest_gitlab.com:
+.test_version_dev:
+  variables:
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.91.0-windows64
+    MIXER_BLENDER_VERSION_BASE: "2.91"
+    MIXER_BLENDER_DOWNLOAD: "release"
+
+test_dev:
   extends:
-    - .base_unittest
-  except:
-    variables:
-      - $CI_COMMIT_MESSAGE =~ /\[skip-tests\]/
-  only:
-    refs:
-      # see inject_version.py
-      - /^v([0-9]+)\.([0-9]+)\.([0-9]+)(\-[0-9A-Za-z-]+)?(\+[0-9A-Za-z-]+)?$/
-    variables:
-      - $CI_SERVER_URL == "https://gitlab.com"
+    - .test_base
+    - .test_version_dev
+    - .except_nightly_test
+
+.test_version_2.91.2:
+  extends:
+    - .test_base
+  variables:
+    MIXER_BLENDER_VERSION_BASE: "2.91"
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.91.2-windows64
+    MIXER_BLENDER_DOWNLOAD: "release"
+
+test_2.91.2:
+  extends:
+    - .test_version_2.91.2
+    - .only_nightly_test
+    - .except_on_gitlab.com
+
+test_2.91.2_manual:
+  extends:
+    - .test_version_2.91.2
+    - .except_nightly_test
+    - .except_on_gitlab.com
+  when: manual
+
+.test_version_2.92:
+  extends:
+    - .test_base
+  variables:
+    MIXER_BLENDER_VERSION_BASE: "2.92"
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.92.0-windows64
+    MIXER_BLENDER_DOWNLOAD: "release"
+
+test_2.92:
+  extends:
+    - .test_version_2.92
+    - .only_nightly_test
+    - .except_on_gitlab.com
+
+test_2.92_manual:
+  extends:
+    - .test_version_2.92
+    - .except_nightly_test
+    - .except_on_gitlab.com
+  when: manual
+
+.test_version_2.93.alpha:
+  extends:
+    - .test_base
+  variables:
+    MIXER_BLENDER_VERSION_BASE: "2.93"
+    # from https://builder.blender.org/download/
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.93.${blender_alpha}-windows64
+    MIXER_BLENDER_DOWNLOAD: "builder"
+
+test_2.93.alpha:
+  extends:
+    - .test_version_2.93.alpha
+    - .only_nightly_test
+    - .except_on_gitlab.com
+
+test_2.93.alpha_manual:
+  extends:
+    - .test_version_2.93.alpha
+    - .except_nightly_test
+    - .except_on_gitlab.com
+  when: manual
+
+test_gitlab.com:
+  extends:
+    - .test_base
+    - .test_version_dev
+    - .only_version_tag
+    - .only_on_gitlab.com
+
+#########################################################################################
 
 .deploy_network_folder:
-  extends:
-    - .on_version_tag
-    - .exclude_on_gitlab.com
   stage: deploy
+  extends:
+    - .only_version_tag
+    - .except_on_gitlab.com
+    - .except_nightly_test
   tags:
     - linux
     - uas_network_drive
@@ -121,10 +208,11 @@ unittest_gitlab.com:
   when: manual
 
 .deploy_perforce_folder:
-  extends:
-    - .on_version_tag
-    - .exclude_on_gitlab.com
   stage: deploy
+  extends:
+    - .only_version_tag
+    - .except_on_gitlab.com
+    - .except_nightly_test
   tags:
     - linux
     - uas_perforce_client

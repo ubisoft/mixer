@@ -164,6 +164,23 @@ scene.name = "new_name"
         self.end_test()
 
 
+class TestSceneSequencer(TestCase):
+    def test_create(self):
+        action = """
+import bpy
+scene = bpy.context.scene
+seq = scene.sequence_editor.sequences
+s0 = seq.new_effect(type='COLOR', name='color1', channel=1, frame_start=1, frame_end=10)
+s1 = seq.new_effect(type='COLOR', name='color2', channel=2, frame_start=10, frame_end=20)
+# The value read by default (0.) cannot be written. Set to a valid value
+s0.strobe = 1.0
+s1.strobe = 1.0
+"""
+        self.send_string(action)
+
+        self.end_test()
+
+
 class TestSceneViewLayer(TestCase):
     _setup = """
 import bpy

@@ -1,3 +1,18 @@
+# 0.22.0 (wip)
+
+## Features
+
+- Grease pencil: synchronize effects
+
+## Fixes
+
+- Object modifier synchronization failure on Blender 2.92
+- VSE synchronization error on 2.92
+
+## CI
+
+- Run unit tests against several Blender versions
+
 # 0.21.1 (22-02-2021)
 
 ## Fixes

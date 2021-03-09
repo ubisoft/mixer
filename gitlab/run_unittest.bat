@@ -12,29 +12,33 @@ set
 
 REM create local folders if required
 if not exist %CURRENT_DIR%\blender mkdir %CURRENT_DIR%\blender
-if not exist %CURRENT_DIR%\blender\cache mkdir %CURRENT_DIR%\blender\cache
+set CACHE=%CURRENT_DIR%\blender\cache
+if not exist %CACHE% mkdir %CACHE%
 
 REM remove old blender install if it exists
-IF NOT EXIST %CURRENT_DIR%\blender\%MIXER_BLENDER_ZIP_BASENAME% GOTO DOWNLOADZIP
-RMDIR /S /Q %CURRENT_DIR%\blender\%MIXER_BLENDER_ZIP_BASENAME%
+RD /S /Q %CURRENT_DIR%\blender\%MIXER_BLENDER_ZIP_BASENAME%
+
+IF %MIXER_BLENDER_DOWNLOAD% == "release" GOTO DOWNLOADZIP
+REM Download from builder: always cleanup, files are never reusable
+REM - Beta file changes event if name does not
+REM - Alpha file has hash in name
+RMDIR /S /Q %CACHE%\%MIXER_BLENDER_ZIP_BASENAME%
+DEL %CACHE%\%MIXER_BLENDER_ZIP_BASENAME%.zip
 
 :DOWNLOADZIP
-
 REM if unzipped folder already exists in cache folder, just copy it
-IF EXIST %CURRENT_DIR%\blender\cache\%MIXER_BLENDER_ZIP_BASENAME% GOTO COPYUNZIPEDFOLDER
-
-IF EXIST %CURRENT_DIR%\blender\cache\%MIXER_BLENDER_ZIP_BASENAME%.zip GOTO UNZIP
+IF EXIST %CACHE%\%MIXER_BLENDER_ZIP_BASENAME% GOTO COPYUNZIPEDFOLDER
+IF EXIST %CACHE%\%MIXER_BLENDER_ZIP_BASENAME%.zip GOTO UNZIP
 
 REM rely on a bash script to download blender, to bypass proxy issues with powershell Invoke-WebRequest
-"%MIXER_BASH_EXE%" %CURRENT_DIR%\download_blender.sh
+"%MIXER_BASH_EXE%" %CURRENT_DIR%\download_blender_%MIXER_BLENDER_DOWNLOAD%%.sh
 
 :UNZIP
-
 REM unzip blender
-powershell Expand-Archive %CURRENT_DIR%\blender\cache\%MIXER_BLENDER_ZIP_BASENAME%.zip -DestinationPath %CURRENT_DIR%\blender\cache
+powershell Expand-Archive %CACHE%\%MIXER_BLENDER_ZIP_BASENAME%.zip -DestinationPath %CURRENT_DIR%\blender\cache
 
 :COPYUNZIPEDFOLDER
-xcopy /S /Q /Y /F %CURRENT_DIR%\blender\cache\%MIXER_BLENDER_ZIP_BASENAME% %CURRENT_DIR%\blender\%MIXER_BLENDER_ZIP_BASENAME%\
+xcopy /S /Q /Y /F %CACHE%\%MIXER_BLENDER_ZIP_BASENAME% %CURRENT_DIR%\blender\%MIXER_BLENDER_ZIP_BASENAME%\
 
 REM create config folder to isolate blender from user environment
 powershell New-Item -ItemType Directory -Path %CURRENT_DIR%\blender\%MIXER_BLENDER_ZIP_BASENAME%\%MIXER_BLENDER_VERSION_BASE%\config
@@ -61,5 +65,10 @@ if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 %PYTHON% -m xmlrunner discover --verbose tests.blender -o %MIXER_TEST_OUTPUT%
 if %ERRORLEVEL% GEQ 1 SET ERROR=%ERRORLEVEL%
 
+IF %MIXER_BLENDER_DOWNLOAD% == "release" GOTO END
+REM Download from builder: always cleanup, files are never reusable
+RMDIR /S /Q %CACHE%\%MIXER_BLENDER_ZIP_BASENAME%
+DEL %CACHE%\%MIXER_BLENDER_ZIP_BASENAME%.zip
 
+:END
 if %ERROR% GEQ 1 EXIT /B %ERROR%
