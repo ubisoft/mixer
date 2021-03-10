@@ -67,3 +67,7 @@ $RECYCLE.BIN/
 gitlab/blender
 logs/
 *.blend1
+
+# documentation
+docs/_build
+docs/_html
