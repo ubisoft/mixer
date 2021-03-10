@@ -71,3 +71,5 @@ logs/
 # documentation
 docs/_build
 docs/_html
+docs_tech/_build
+docs_tech/_html
