@@ -71,8 +71,11 @@ def register():
     from mixer.blender_data import debug_addon
     from mixer.log_utils import Formatter, get_log_file
     from mixer import icons
-    from mixer.utils import utils_ui_operators
     from mixer import ui
+    from mixer.utils import utils_ui_operators
+    from mixer import vrtist
+
+    print("\n ------ UAS: Loading Mixer Add-on ------- ")
 
     if len(logger.handlers) == 0:
         # Add the pid to the log. Just enough for the tests, that merge the logs and need to distinguish
@@ -112,6 +115,7 @@ def register():
     utils_ui_operators.register()
     ui.register()
     blender_data.register()
+    vrtist.register()
 
     atexit.register(cleanup)
 
@@ -125,11 +129,13 @@ def unregister():
     from mixer import icons
     from mixer.utils import utils_ui_operators
     from mixer import ui
+    from mixer import vrtist
 
     cleanup()
 
     atexit.unregister(cleanup)
 
+    vrtist.unregister()
     ui.unregister()
     utils_ui_operators.unregister()
     blender_data.unregister()

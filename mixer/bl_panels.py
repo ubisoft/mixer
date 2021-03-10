@@ -36,6 +36,8 @@ from mixer.blender_data.debug_addon import DebugDataPanel, use_debug_addon
 from mixer import display_version
 from mixer import icons
 from mixer.local_data import get_data_directory
+from mixer.vrtist import icons as vrtist_icons
+from mixer.utils.utils import convert_version_str_to_tupple
 
 if TYPE_CHECKING:
     from mixer.bl_preferences import MixerPreferences
@@ -140,17 +142,20 @@ def collapsable_panel(
 class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
     @classmethod
     def draw_header(cls, layout):
-        row = layout.row()
-        row.prop(get_mixer_props(), "display_rooms_details")
         box = layout.box()
         split = box.split()
-        split.alignment = "CENTER"
-        split.label(text="Name")
+        split.alignment = "LEFT"
+
+        row = split.row()
+        row.scale_x = 0.9
+        row.label(text="", icon="BLANK1")  # BLANK1
+        row.label(text="Name")
+
         split.label(text="Users")
-        split.label(text="Keep Open")
-        split.label(text="Blender Version")
-        split.label(text="Mixer Version")
         if get_mixer_props().display_rooms_details:
+            split.label(text="Blender Version")
+            split.label(text="Mixer Version")
+            split.label(text="Keep Open")
             split.label(text="No Version Check")
             split.label(text="Protocol")
             split.label(text="Command Count")
@@ -159,12 +164,25 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.split()
-        split.label(text=item.name)  # avoids renaming the item by accident
-        split.label(text=f"{item.users_count if item.users_count >= 0 else '?'} users")
-        split.prop(item, "keep_open", text="")
-        split.label(text=item.blender_version)
-        split.label(text=item.mixer_version)
+
+        row = split.row()
+        row.scale_x = 0.9
+        sub_row = row.row()
+        sub_row.alert = True
+        icon_warning = "BLANK1"
+        if item.has_warnings():
+            icon_warning = "ERROR"
+
+        sub_row.label(text="", icon=icon_warning)
+        row.label(text=item.name)  # avoids renaming the item by accident
+
+        split.label(
+            text=f"{item.users_count if item.users_count >= 0 else '?'} user{'s' if item.users_count > 1 else ''}"
+        )
         if get_mixer_props().display_rooms_details:
+            split.label(text=item.blender_version)
+            split.label(text=item.mixer_version)
+            split.prop(item, "keep_open", text="")
             split.prop(item, "ignore_version_check", text="")
             split.label(text=item.protocol)
             split.prop(item, "command_count", text="")
@@ -180,42 +198,36 @@ class SHAREDFOLDER_UL_ItemRenderer(bpy.types.UIList):  # noqa
 def draw_user_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
 
-    col = layout.column()
-    col.separator(factor=0.5)
+    split = layout.split(factor=0.233, align=False)
+    split.label(text="User:")
 
-    grid = col.column_flow(columns=2)
-    row = grid.row()
+    row = split.row()
+    row.prop(mixer_prefs, "user", text="")
     sub_row = row.row()
     sub_row.scale_x = 0.4
-    sub_row.label(text="User:")
-    row.prop(mixer_prefs, "user", text="")
-    row = grid.row()
-    row.prop(mixer_prefs, "color", text="")
-    icon = icons.icons_col["General_Explorer_32"]
-    user_data_path = os.environ.get("MIXER_DATA_DIR", get_data_directory())
-    #   from pathlib import Path
-    #   user_data_path = Path(user_data_path).parent
-    row.operator("mixer.open_explorer", text="", icon_value=icon.icon_id).path = str(user_data_path)
-
-    col.separator(factor=1.0)
+    sub_row.prop(mixer_prefs, "color", text="")
 
 
 def draw_connection_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
 
-    col = layout.column()
-    col.separator(factor=0.5)
+    row = layout.row()
+    split = row.split(factor=0.233, align=False)
+    split.label(text="Host:")
+    sub_row = split.row()
+    sub_row.prop(mixer_prefs, "host", text="")
+    sub_row.prop(mixer_prefs, "port")
 
-    grid = col.column_flow(columns=2)
-    row = grid.row()
-    sub_row = row.row()
-    sub_row.scale_x = 0.4
-    sub_row.label(text="Host:")
-    row.prop(mixer_prefs, "host", text="")
-    row = grid.row()
-    row.prop(mixer_prefs, "port")
-
-    col.separator(factor=0.5)
+    layout.separator()
+    row = layout.row()
+    split = row.split(factor=0.233, align=False)
+    split.label(text="Session Log:")
+    sub_row = split.row()
+    icon = icons.icons_col["General_Explorer_32"]
+    user_data_path = os.environ.get("MIXER_DATA_DIR", get_data_directory())
+    #   from pathlib import Path
+    #   user_data_path = Path(user_data_path).parent
+    sub_row.operator("mixer.open_explorer", text="Open Log Folder", icon_value=icon.icon_id).path = str(user_data_path)
 
 
 def draw_shared_folders_settings_ui(layout: bpy.types.UILayout):
@@ -232,113 +244,140 @@ def draw_shared_folders_settings_ui(layout: bpy.types.UILayout):
 
 def draw_advanced_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "data_directory", text="Data Directory")
-    layout.prop(mixer_prefs, "ignore_version_check")
-    layout.prop(mixer_prefs, "log_level")
-    layout.prop(mixer_prefs, "show_server_console")
-    layout.prop(mixer_prefs, "vrtist_protocol")
+    mixer_props = get_mixer_props()
+
+    collapsable_panel(layout, mixer_props, "display_advanced_options", text="Advanced Settings")
+    if mixer_props.display_advanced_options:
+        box = layout.box()
+        box.prop(mixer_prefs, "data_directory", text="Data Directory")
+        box.prop(mixer_prefs, "ignore_version_check")
+        box.prop(mixer_prefs, "log_level")
+        box.prop(mixer_prefs, "show_server_console")
+        box.prop(mixer_prefs, "vrtist_protocol")
 
 
 def draw_developer_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "no_send_scene_content", text="No send_scene_content")
-    layout.prop(mixer_prefs, "no_start_server", text="Do not start server on connect")
-    layout.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
-    layout.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
-    layout.prop(mixer_prefs, "commands_send_interval")
-    layout.prop(mixer_prefs, "display_own_gizmos")
-    layout.prop(mixer_prefs, "display_ids_gizmos")
+    mixer_props = get_mixer_props()
+
+    collapsable_panel(layout, mixer_props, "display_developer_options", text="Developer Options")
+    if mixer_props.display_developer_options:
+        box = layout.box()
+        box.prop(mixer_props, "display_rooms_details")
+        box.prop(mixer_prefs, "no_send_scene_content")
+        box.prop(mixer_prefs, "no_start_server")
+        box.prop(mixer_prefs, "send_base_meshes", text="Send Base Meshes")
+        box.prop(mixer_prefs, "send_baked_meshes", text="Send Baked Meshes")
+        box.prop(mixer_prefs, "commands_send_interval")
+        box.prop(mixer_prefs, "display_own_gizmos")
+        box.prop(mixer_prefs, "display_ids_gizmos")
 
 
 def draw_gizmos_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
-    layout.prop(mixer_prefs, "display_frustums_gizmos")
-    layout.prop(mixer_prefs, "display_frustums_names_gizmos")
-    layout.prop(mixer_prefs, "display_selections_gizmos")
-    layout.prop(mixer_prefs, "display_selections_names_gizmos")
+    mixer_props = get_mixer_props()
+
+    collapsable_panel(layout, mixer_props, "display_gizmos_options", text="Gizmos")
+    if mixer_props.display_gizmos_options:
+        box = layout.box()
+        box.prop(mixer_prefs, "display_frustums_gizmos")
+        box.prop(mixer_prefs, "display_frustums_names_gizmos")
+        box.prop(mixer_prefs, "display_selections_gizmos")
+        box.prop(mixer_prefs, "display_selections_names_gizmos")
+
+
+def draw_server_users_ui(layout: bpy.types.UILayout):
+    mixer_props = get_mixer_props()
+
+    def is_user_displayed(user: UserItem):
+        if mixer_props.display_users_filter == "all":
+            return True
+        if mixer_props.display_users_filter == "no_room":
+            return user.room == ""
+        if mixer_props.display_users_filter == "current_room":
+            return user.room == share_data.client.current_room or (
+                share_data.client.current_room is None and user.room == ""
+            )
+        if mixer_props.display_users_filter == "selected_room":
+            if mixer_props.room_index >= 0 and mixer_props.room_index < len(mixer_props.rooms):
+                return user.room == mixer_props.rooms[mixer_props.room_index].name
+            return user.room == ""
+
+    collapsable_panel(layout, mixer_props, "display_users", text="Server Users")
+    if mixer_props.display_users:
+        box = layout.box()
+        box.row().prop(mixer_props, "display_users_details")
+        box.row().prop(mixer_props, "display_users_filter", expand=True)
+        for user in (user for user in mixer_props.users if is_user_displayed(user)):
+            user_layout = box
+            if mixer_props.display_users_details:
+                user_layout = box.box()
+            row = user_layout.split()
+            row.label(text=f"{user.name}", icon="HOME" if user.is_me else "NONE")
+            row.label(text=f"{user.room}")
+            row.prop(user, "color", text="")
+            if mixer_props.display_users_details:
+                row.label(text=f"{user.ip_port}")
+                window_count = len(user.windows)
+                row.label(text=f"{window_count} window{'s' if window_count > 1 else ''}")
+
+                frame_of_scene = {}
+                for scene in user.scenes:
+                    frame_of_scene[scene.scene] = scene.frame
+
+                for window in user.windows:
+                    split = user_layout.split(align=True)
+                    split.label(text="  ")
+                    split.label(text=window.scene, icon="SCENE_DATA")
+                    split.label(text=str(frame_of_scene[window.scene]), icon="TIME")
+                    split.label(text=window.view_layer, icon="RENDERLAYERS")
+                    split.label(text=window.screen, icon="SCREEN_BACK")
+                    split.label(text=f"{window.areas_3d_count}", icon="VIEW_CAMERA")
+                    split.scale_y = 0.5
+                user_layout.separator(factor=0.2)
 
 
 def draw_preferences_ui(mixer_prefs: MixerPreferences, context: bpy.types.Context):
     mixer_prefs.layout.prop(mixer_prefs, "category")
 
+    mixer_prefs.layout.prop(mixer_prefs, "display_mixer_vrtist_panels")
+
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Connection Settings")
     draw_user_settings_ui(layout.row())
-    draw_connection_settings_ui(layout.row())
+    draw_connection_settings_ui(layout)
 
     layout = mixer_prefs.layout.box().column()
     layout.label(text="Room Settings")
     layout.prop(mixer_prefs, "room", text="Default Room Name")
 
     layout = mixer_prefs.layout.box().column()
-    layout.label(text="Gizmos")
     draw_gizmos_settings_ui(layout)
 
     layout = mixer_prefs.layout.box().column()
-    layout.label(text="Advanced Settings")
+    draw_server_users_ui(layout)
+
+    layout = mixer_prefs.layout.box().column()
     draw_advanced_settings_ui(layout)
 
     layout = mixer_prefs.layout.box().column()
-    layout.label(text="Developer Settings")
     draw_developer_settings_ui(layout)
 
 
 class MixerSettingsPanel(bpy.types.Panel):
-    bl_label = f"Mixer {display_version or '(Unknown version)'}"
+    bl_label = f"Mixer   V. {display_version or '(Unknown version)'}"
     bl_idname = "MIXER_PT_mixer_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Mixer"
 
-    def draw_users(self, layout):
-        mixer_props = get_mixer_props()
-
-        def is_user_displayed(user: UserItem):
-            if mixer_props.display_users_filter == "all":
-                return True
-            if mixer_props.display_users_filter == "no_room":
-                return user.room == ""
-            if mixer_props.display_users_filter == "current_room":
-                return user.room == share_data.client.current_room or (
-                    share_data.client.current_room is None and user.room == ""
-                )
-            if mixer_props.display_users_filter == "selected_room":
-                if mixer_props.room_index >= 0 and mixer_props.room_index < len(mixer_props.rooms):
-                    return user.room == mixer_props.rooms[mixer_props.room_index].name
-                return user.room == ""
-
-        collapsable_panel(layout, mixer_props, "display_users", text="Server Users")
-        if mixer_props.display_users:
-            box = layout.box()
-            box.row().prop(mixer_props, "display_users_details")
-            box.row().prop(mixer_props, "display_users_filter", expand=True)
-            for user in (user for user in mixer_props.users if is_user_displayed(user)):
-                user_layout = box
-                if mixer_props.display_users_details:
-                    user_layout = box.box()
-                row = user_layout.split()
-                row.label(text=f"{user.name}", icon="HOME" if user.is_me else "NONE")
-                row.label(text=f"{user.room}")
-                row.prop(user, "color", text="")
-                if mixer_props.display_users_details:
-                    row.label(text=f"{user.ip_port}")
-                    window_count = len(user.windows)
-                    row.label(text=f"{window_count} window{'s' if window_count > 1 else ''}")
-
-                    frame_of_scene = {}
-                    for scene in user.scenes:
-                        frame_of_scene[scene.scene] = scene.frame
-
-                    for window in user.windows:
-                        split = user_layout.split(align=True)
-                        split.label(text="  ")
-                        split.label(text=window.scene, icon="SCENE_DATA")
-                        split.label(text=str(frame_of_scene[window.scene]), icon="TIME")
-                        split.label(text=window.view_layer, icon="RENDERLAYERS")
-                        split.label(text=window.screen, icon="SCREEN_BACK")
-                        split.label(text=f"{window.areas_3d_count}", icon="VIEW_CAMERA")
-                        split.scale_y = 0.5
-                    user_layout.separator(factor=0.2)
+    @classmethod
+    def poll(cls, context):
+        mixer_prefs = get_mixer_prefs()
+        return (
+            "MIXER" == mixer_prefs.display_mixer_vrtist_panels
+            or "MIXER_AND_VRTIST" == mixer_prefs.display_mixer_vrtist_panels
+        )
 
     def connected(self):
         return share_data.client is not None and share_data.client.is_connected()
@@ -363,16 +402,19 @@ class MixerSettingsPanel(bpy.types.Panel):
         draw_user_settings_ui(layout.row())
 
         if not self.connected():
-            draw_connection_settings_ui(layout.row())
+            layout.separator(factor=0.2)
+            split = layout.split(factor=0.233, align=False)
+            split.label(text="Host:")
+            split.prop(mixer_prefs, "host", text="")
+
+            layout.separator(factor=0.5)
             row = layout.row()
             row.scale_y = 1.5
             row.operator(bl_operators.ConnectOperator.bl_idname, text="Connect")
             layout.separator(factor=1.0)
         else:
             layout.separator(factor=0.5)
-            layout.label(
-                text=f"Connected to  {mixer_prefs.host}:{mixer_prefs.port}  with ID  {share_data.client.client_id}"
-            )
+            layout.label(text=f"Connected to  {mixer_prefs.host}:{mixer_prefs.port}")
 
             row = layout.row()
             row.scale_y = 1.5
@@ -396,15 +438,13 @@ class MixerSettingsPanel(bpy.types.Panel):
                 split.operator(bl_operators.LeaveRoomOperator.bl_idname, text="Leave Room", depress=True)
 
             self.draw_rooms(layout)
-            self.draw_users(layout)
 
-        self.draw_shared_folders_options(layout)
         if self.connected():
-            self.draw_gizmos_options(layout)
-        self.draw_advanced_options(layout)
+            self.draw_shared_folders_options(layout)
 
     def draw_rooms(self, layout):
         mixer_props = get_mixer_props()
+
         if collapsable_panel(layout, mixer_props, "display_rooms", text="Server Rooms"):
             layout = layout.box().column()
             ROOM_UL_ItemRenderer.draw_header(layout)
@@ -413,21 +453,25 @@ class MixerSettingsPanel(bpy.types.Panel):
                 layout.operator(bl_operators.JoinRoomOperator.bl_idname)
             else:
                 layout.operator(bl_operators.LeaveRoomOperator.bl_idname)
-            if collapsable_panel(layout, mixer_props, "display_advanced_room_control", text="Advanced Room Controls"):
-                box = layout.box()
-                col = box.column()
-                col.operator(bl_operators.DeleteRoomOperator.bl_idname)
-                col.operator(bl_operators.DownloadRoomOperator.bl_idname)
-                subbox = col.box()
-                subbox.row().operator(bl_operators.UploadRoomOperator.bl_idname)
-                row = subbox.row()
-                row.prop(mixer_props, "upload_room_name", text="Name")
-                row.prop(
-                    mixer_props,
-                    "upload_room_filepath",
-                    text="File",
-                    icon=("ERROR" if not os.path.exists(mixer_props.upload_room_filepath) else "NONE"),
-                )
+
+            if len(mixer_props.rooms):
+                self.draw_current_room_properties(layout)
+
+            # if collapsable_panel(layout, mixer_props, "display_advanced_room_control", text="Advanced Room Controls"):
+            #     box = layout.box()
+            #     col = box.column()
+            #     col.operator(bl_operators.DeleteRoomOperator.bl_idname)
+            #     col.operator(bl_operators.DownloadRoomOperator.bl_idname)
+            #     subbox = col.box()
+            #     subbox.row().operator(bl_operators.UploadRoomOperator.bl_idname)
+            #     row = subbox.row()
+            #     row.prop(mixer_props, "upload_room_name", text="Name")
+            #     row.prop(
+            #         mixer_props,
+            #         "upload_room_filepath",
+            #         text="File",
+            #         icon=("ERROR" if not os.path.exists(mixer_props.upload_room_filepath) else "NONE"),
+            #     )
 
     def draw_shared_folders_options(self, layout):
         mixer_props = get_mixer_props()
@@ -452,27 +496,120 @@ class MixerSettingsPanel(bpy.types.Panel):
         if collapsable_panel(layout, mixer_props, "display_developer_options", text="Developer Options"):
             draw_developer_settings_ui(layout.box().column())
 
+    def draw_current_room_properties(self, layout):
+        mixer_props = get_mixer_props()
+
+        layout.separator(factor=0.5)
+        collapsable_panel(layout, mixer_props, "display_selected_room_properties", text="Selected Room Properties")
+        if mixer_props.display_selected_room_properties:
+            box = layout.box()
+            if not len(mixer_props.rooms):
+                box.label(text="No room available")
+            else:
+                current_room = mixer_props.rooms[mixer_props.room_index]
+                box.use_property_decorate = False
+
+                # disabled properties
+                row = box.row()
+                row.separator(factor=6)
+                col = row.column()
+                col.use_property_decorate = False
+                col.separator(factor=0.5)
+                col.scale_y = 0.8
+
+                def _display_property(layout, name, value, has_warning=False):
+                    row_icon = "BLANK1"
+
+                    layout.use_property_split = False
+                    split = col.split(factor=0.5)
+
+                    row = split.row()
+                    sub_row = row.row()
+                    if has_warning:
+                        sub_row.alert = True
+                        row_icon = "ERROR"
+                    sub_row.label(text="", icon=row_icon)
+                    row.label(text=name)
+
+                    split.alert = has_warning
+                    split.label(text=str(value))
+
+                _display_property(col, "Room Name:", current_room.name)
+                _display_property(col, "Room Size:", f"{current_room.mega_byte_size:.2} MB")
+
+                blender_warning = bpy.app.version != convert_version_str_to_tupple(current_room.blender_version)
+                _display_property(col, "Blender Version:", current_room.blender_version, has_warning=blender_warning)
+
+                mixer_warning = display_version != current_room.mixer_version
+                _display_property(col, "Mixer Version:", current_room.mixer_version[1:], has_warning=mixer_warning)
+
+                _display_property(col, "Command Count:", current_room.command_count)
+                _display_property(col, "Protocol:", current_room.protocol)
+                _display_property(col, "Room Can Be Joined:", "Yes" if current_room.joinable else "No")
+
+                # enabled properties:
+                row = box.row()
+                row.separator(factor=6)
+                col = row.column()
+                col.use_property_split = False
+                col.use_property_decorate = False
+
+                split = col.split(factor=0.5)
+                sub_row = split.row()
+                sub_sub_row = sub_row.row()
+                sub_sub_row.label(text="", icon="BLANK1")
+                sub_row.label(text="Keep Open:")
+
+                split.prop(current_room, "keep_open", text="")
+
+                col.separator(factor=0.5)
+
 
 class VRtistSettingsPanel(bpy.types.Panel):
-    bl_label = "VRtist"
+    bl_label = f"VRtist   V. {display_version or '(Unknown version)'}"
     bl_idname = "MIXER_PT_vrtist_settings"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "VRtist"
+
+    @classmethod
+    def poll(cls, context):
+        mixer_prefs = get_mixer_prefs()
+        return (
+            "VRTIST" == mixer_prefs.display_mixer_vrtist_panels
+            or "MIXER_AND_VRTIST" == mixer_prefs.display_mixer_vrtist_panels
+        )
+
+    def draw_header(self, context):
+        self.layout.emboss = "NONE"
+        icon = vrtist_icons.vrtist_icons_col["VRtist_32"]
+        row = self.layout.row(align=True)
+        row.operator("vrtist.about", text="", icon_value=icon.icon_id)
+
+    def draw_header_preset(self, context):
+        self.layout.emboss = "NONE"
+        row = self.layout.row(align=True)
+        row.menu("VRTIST_MT_prefs_main_menu", icon="PREFERENCES", text="")
+        row.separator(factor=1.0)
 
     def draw(self, context):
         layout = self.layout
         mixer_prefs = get_mixer_prefs()
 
         draw_user_settings_ui(layout.row())
-        draw_connection_settings_ui(layout.row())
+        layout.prop(mixer_prefs, "host", text="Host")
         layout.prop(mixer_prefs, "room", text="Room")
+        layout.separator(factor=1.0)
 
-        layout.operator(bl_operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
+        row = layout.row()
+        row.scale_y = 1.5
+        row.operator(bl_operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
+
         layout.prop(
             mixer_prefs, "VRtist", text="Path", icon=("ERROR" if not os.path.exists(mixer_prefs.VRtist) else "NONE")
         )
         layout.prop(mixer_prefs, "VRtist_suffix", text="Save Suffix")
+        layout.separator(factor=0.5)
 
 
 panels = [
@@ -492,7 +629,7 @@ def update_panels_category(self, context):
                 bpy.utils.unregister_class(panel)
 
         for panel in panels:
-            if panel.bl_label == "VRtist":
+            if panel.bl_label.startswith("VRtist"):
                 panel.bl_category = mixer_prefs.vrtist_category
             else:
                 panel.bl_category = mixer_prefs.category

@@ -23,14 +23,22 @@ import logging
 
 import bpy
 
+from mixer import display_version
 from mixer.broadcaster.common import RoomAttributes
 from mixer.os_utils import getuser
 from mixer.share_data import share_data
+from mixer.utils.utils import convert_version_str_to_tupple
 
 logger = logging.getLogger(__name__)
 
 
 class RoomItem(bpy.types.PropertyGroup):
+    def has_warnings(self):
+        return (
+            bpy.app.version != convert_version_str_to_tupple(self.blender_version)
+            or display_version != self.mixer_version
+        )
+
     def get_room_blender_version(self):
         if (
             share_data.client is not None
@@ -107,13 +115,27 @@ class RoomItem(bpy.types.PropertyGroup):
             return share_data.client.rooms_attributes[self.name][RoomAttributes.JOINABLE]
         return False
 
-    name: bpy.props.StringProperty(name="Name")
-    blender_version: bpy.props.StringProperty(name="Blender Version", get=get_room_blender_version)
-    mixer_version: bpy.props.StringProperty(name="Mixer Version", get=get_room_mixer_version)
+    name: bpy.props.StringProperty(name="Name", description="Room name")
+    blender_version: bpy.props.StringProperty(
+        name="Blender Version",
+        description="Version of the Blender instance from which the room has been created",
+        get=get_room_blender_version,
+    )
+    mixer_version: bpy.props.StringProperty(
+        name="Mixer Version",
+        description="Version of the Mixer instance from which the room has been created",
+        get=get_room_mixer_version,
+    )
     ignore_version_check: bpy.props.BoolProperty(name="Ignore Version Check", get=is_ignore_version_check)
     users_count: bpy.props.IntProperty(name="Users Count")
     protocol: bpy.props.StringProperty(name="Protocol", get=get_protocol)
-    keep_open: bpy.props.BoolProperty(name="Keep Open", default=False, get=is_kept_open, set=on_keep_open_changed)
+    keep_open: bpy.props.BoolProperty(
+        name="Keep Open",
+        description="Indicate if the room should be kept on the server when no more client is inside",
+        default=False,
+        get=is_kept_open,
+        set=on_keep_open_changed,
+    )
     command_count: bpy.props.IntProperty(name="Command Count", get=get_command_count)
     mega_byte_size: bpy.props.FloatProperty(name="Mega Byte Size", get=get_mega_byte_size)
     joinable: bpy.props.BoolProperty(name="Joinable", get=is_joinable)
@@ -138,8 +160,17 @@ class UserItem(bpy.types.PropertyGroup):
     port: bpy.props.IntProperty(name="Port")
     ip_port: bpy.props.StringProperty(name="IP:Port")
     room: bpy.props.StringProperty(name="Room")
-    internal_color: bpy.props.FloatVectorProperty(name="Color", subtype="COLOR")
-    color: bpy.props.FloatVectorProperty(name="Color", subtype="COLOR", get=lambda self: self.internal_color)
+    internal_color: bpy.props.FloatVectorProperty(
+        name="Color",
+        subtype="COLOR",
+        size=3,
+        min=0.0,
+        max=1.0,
+        precision=2,
+    )
+    color: bpy.props.FloatVectorProperty(
+        name="Color", subtype="COLOR", size=3, min=0.0, max=1.0, precision=2, get=lambda self: self.internal_color
+    )
     windows: bpy.props.CollectionProperty(name="Windows", type=UserWindowItem)
     selected_window_index: bpy.props.IntProperty(name="Window Index")
     scenes: bpy.props.CollectionProperty(name="Scenes", type=UserSceneItem)
@@ -162,12 +193,15 @@ class MixerProperties(bpy.types.PropertyGroup):
     users: bpy.props.CollectionProperty(name="Users", type=UserItem)
     user_index: bpy.props.IntProperty()  # index in the list of users
 
-    display_shared_folders_options: bpy.props.BoolProperty(default=True)
+    display_shared_folders_options: bpy.props.BoolProperty(default=False)
     display_gizmos_options: bpy.props.BoolProperty(default=True)
     display_advanced_options: bpy.props.BoolProperty(default=False)
     display_developer_options: bpy.props.BoolProperty(default=False)
     display_rooms: bpy.props.BoolProperty(default=True)
-    display_rooms_details: bpy.props.BoolProperty(default=False, name="Display Rooms Details")
+    display_selected_room_properties: bpy.props.BoolProperty(default=False)
+    display_rooms_details: bpy.props.BoolProperty(
+        default=False, name="Display Rooms Details in the Server Rooms List Panel"
+    )
     display_users: bpy.props.BoolProperty(default=True)
 
     display_users_filter: bpy.props.EnumProperty(

@@ -88,14 +88,46 @@ class MixerPreferences(bpy.types.AddonPreferences):
         update=update_panels_category,
     )
 
-    host: bpy.props.StringProperty(name="Host", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST))
-    port: bpy.props.IntProperty(name="Port", default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)))
-    room: bpy.props.StringProperty(name="Room", default=os.environ.get("VRTIST_ROOM", getuser()))
+    display_mixer_vrtist_panels: bpy.props.EnumProperty(
+        name="Display Mixer and VRtist Panels",
+        description="Control which panel is displayed between Mixer and VRtist",
+        items=[
+            ("MIXER", "Mixer", ""),
+            ("VRTIST", "VRtit", ""),
+            ("MIXER_AND_VRTIST", "Mixer And VRtist", ""),
+        ],
+        default="MIXER",
+    )
+
+    host: bpy.props.StringProperty(
+        name="Host", description="Server Host Name", default=os.environ.get("VRTIST_HOST", common.DEFAULT_HOST)
+    )
+    port: bpy.props.IntProperty(
+        name="Port",
+        description="Port to use to connect the server host",
+        default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)),
+    )
+    room: bpy.props.StringProperty(
+        name="Room", description="Name of the session room", default=os.environ.get("VRTIST_ROOM", getuser())
+    )
 
     # User name as displayed in peers user list
-    user: bpy.props.StringProperty(name="User", default=getuser(), update=on_user_changed)
+    user: bpy.props.StringProperty(
+        name="User Name",
+        description="Name by which the other users will identify you during\na cooperative session",
+        default=getuser(),
+        update=on_user_changed,
+    )
     color: bpy.props.FloatVectorProperty(
-        name="Color", subtype="COLOR", default=gen_random_color(), update=on_user_color_changed
+        name="User Color 2",
+        subtype="COLOR",
+        size=3,
+        min=0.0,
+        max=1.0,
+        precision=2,
+        description="Color used in the viewport of the cooperative session\nto differenciate you from the other users",
+        default=gen_random_color(),
+        update=on_user_color_changed,
     )
 
     def get_log_level(self):
@@ -136,9 +168,9 @@ class MixerPreferences(bpy.types.AddonPreferences):
     # Developer option to avoid sending scene content to server at the first connexion
     # Allow to quickly iterate debugging/test on large scenes with only one client in room
     # Main usage: optimization of client timers to check if updates are required
-    no_send_scene_content: bpy.props.BoolProperty(default=False)
+    no_send_scene_content: bpy.props.BoolProperty(name="Do Not Send Scene Content", default=False)
     no_start_server: bpy.props.BoolProperty(
-        name="Do not start server", default=os.environ.get("MIXER_NO_START_SERVER") is not None
+        name="Do Not Start Server on Connect", default=os.environ.get("MIXER_NO_START_SERVER") is not None
     )
     send_base_meshes: bpy.props.BoolProperty(default=True)
     send_baked_meshes: bpy.props.BoolProperty(default=True)
