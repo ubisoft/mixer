@@ -691,7 +691,7 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
     name = proxy.data("name")
     channel = proxy.data("channel")
     frame_start = proxy.data("frame_start")
-    if type_name in _effect_sequences:
+    if type_name in _effect_sequences():
         # overwritten anyway
         frame_end = frame_start + 1
         return collection.new_effect(name, type_name, channel, frame_start, frame_end=frame_end)
