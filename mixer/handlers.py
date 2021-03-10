@@ -43,7 +43,13 @@ import itertools
 from typing import Mapping, Any
 from uuid import uuid4
 
-from bpy.app.handlers import persistent
+if bpy.app.handlers.persistent is not None:
+    from bpy.app.handlers import persistent
+else:
+
+    def persistent(f):
+        return f
+
 
 from mixer.share_data import object_visibility
 from mixer.draw_handlers import remove_draw_handlers

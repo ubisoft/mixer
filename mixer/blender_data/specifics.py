@@ -27,6 +27,7 @@ to control behavior with plugin data.
 from __future__ import annotations
 
 import array
+from functools import lru_cache
 import logging
 from pathlib import Path
 from typing import Any, Callable, cast, Dict, ItemsView, List, Optional, TYPE_CHECKING, Union
@@ -49,30 +50,36 @@ logger = logging.getLogger(__name__)
 
 # Beware that MeshVertex must be handled as SOA although "groups" is a variable length item.
 # Enums are not handled by foreach_get()
-soable_collection_properties = {
-    T.GPencilStroke.bl_rna.properties["points"],
-    T.GPencilStroke.bl_rna.properties["triangles"],
-    T.Mesh.bl_rna.properties["edges"],
-    T.Mesh.bl_rna.properties["loops"],
-    T.Mesh.bl_rna.properties["loop_triangles"],
-    T.Mesh.bl_rna.properties["polygons"],
-    T.Mesh.bl_rna.properties["vertices"],
-    T.MeshFaceMapLayer.bl_rna.properties["data"],
-    T.MeshLoopColorLayer.bl_rna.properties["data"],
-    T.MeshUVLoopLayer.bl_rna.properties["data"],
-    T.ShapeKey.bl_rna.properties["data"],
-    T.Spline.bl_rna.properties["bezier_points"],
-}
-_resize_geometry_types = tuple(
-    type(t.bl_rna)
-    for t in [
-        T.MeshEdges,
-        T.MeshLoops,
-        T.MeshLoopTriangles,
-        T.MeshPolygons,
-        T.MeshVertices,
-    ]
-)
+@lru_cache(None)
+def soable_collection_properties():
+    return {
+        T.GPencilStroke.bl_rna.properties["points"],
+        T.GPencilStroke.bl_rna.properties["triangles"],
+        T.Mesh.bl_rna.properties["edges"],
+        T.Mesh.bl_rna.properties["loops"],
+        T.Mesh.bl_rna.properties["loop_triangles"],
+        T.Mesh.bl_rna.properties["polygons"],
+        T.Mesh.bl_rna.properties["vertices"],
+        T.MeshFaceMapLayer.bl_rna.properties["data"],
+        T.MeshLoopColorLayer.bl_rna.properties["data"],
+        T.MeshUVLoopLayer.bl_rna.properties["data"],
+        T.ShapeKey.bl_rna.properties["data"],
+        T.Spline.bl_rna.properties["bezier_points"],
+    }
+
+
+@lru_cache(None)
+def _resize_geometry_types():
+    return tuple(
+        type(t.bl_rna)
+        for t in [
+            T.MeshEdges,
+            T.MeshLoops,
+            T.MeshLoopTriangles,
+            T.MeshPolygons,
+            T.MeshVertices,
+        ]
+    )
 
 
 # in sync with soa_initializers
@@ -185,7 +192,7 @@ def dispatch_value(default_func):
 
 
 def is_soable_collection(prop):
-    return prop in soable_collection_properties
+    return prop in soable_collection_properties()
 
 
 def is_soable_property(bl_rna_property):
@@ -657,9 +664,22 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
 
 
 _non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}
-_effect_sequences = set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - _non_effect_sequences
 
-if bpy.app.version < (2, 92, 0):
+
+@lru_cache(None)
+def _effect_sequences():
+    return set(T.EffectSequence.bl_rna.properties["type"].enum_items.keys()) - _non_effect_sequences
+
+
+@lru_cache(None)
+def _version():
+    version = bpy.app.version
+    if not isinstance(version, tuple):
+        return (0,)
+    return version
+
+
+if _version() < (2, 92, 0):
     _Sequences = T.Sequences
 else:
     _Sequences = T.SequencesTopLevel
@@ -717,7 +737,7 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
         return
 
     target_rna = target.bl_rna
-    if isinstance(target_rna, _resize_geometry_types):
+    if isinstance(target_rna, _resize_geometry_types()):
         existing_length = len(target)
         incoming_length = len(proxy)
         if existing_length != incoming_length:
@@ -757,8 +777,14 @@ def fit_aos(target: T.bpy_prop_collection, proxy: AosProxy, context: Context):
 #
 # must_replace
 #
-_object_material_slots_property = T.Object.bl_rna.properties["material_slots"]
-_key_key_blocks_property = T.Key.bl_rna.properties["key_blocks"]
+@lru_cache(None)
+def _object_material_slots_property():
+    return T.Object.bl_rna.properties["material_slots"]
+
+
+@lru_cache(None)
+def _key_blocks_property():
+    return T.Key.bl_rna.properties["key_blocks"]
 
 
 @dispatch_rna
@@ -770,7 +796,7 @@ def diff_must_replace(
     full collection replacement.
     """
 
-    if collection_property == _object_material_slots_property:
+    if collection_property == _object_material_slots_property():
         from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
         # Object.material_slots has no bl_rna, so rely on the property to identify it
@@ -794,7 +820,7 @@ def diff_must_replace(
             if bl_item.link != proxy.data("link"):
                 return True
 
-    elif collection_property == _key_key_blocks_property:
+    elif collection_property == _key_blocks_property():
         if len(collection) != len(sequence):
             return True
         for bl_item, proxy in zip(collection, sequence):
