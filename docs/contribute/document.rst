@@ -1,5 +1,5 @@
-Documenting Mixer
-=================
+Documenting Mixer TODO
+========================
 
 Mixer documentation is written in reStructuredText, generated with `Sphinx <https://www.sphinx-doc.org/>`_ and hosted at `<https://mixer-github.readthedocs.io/en/latest/>`_.
 

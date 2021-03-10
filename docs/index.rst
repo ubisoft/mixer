@@ -3,9 +3,6 @@ Mixer: a Blender Addon For Collaborative Editing
 
 Mixer is a Blender addon for collaborative 3D editing.
 
-
-
-
 Getting started
 ---------------
 
@@ -21,6 +18,8 @@ You will be then ready to use Mixer on a :doc:`local area network</getting-start
 
    /getting-started/install
    /getting-started/lan
+   /getting-started/synchronization
+   /getting-started/glossary
 
 Advanced usage
 --------------

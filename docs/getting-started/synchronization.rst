@@ -1,4 +1,5 @@
-Reporting an issue TODO
+Synchronized items TODO
 =========================
+
 
 
