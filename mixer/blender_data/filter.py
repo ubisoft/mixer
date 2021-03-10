@@ -101,20 +101,6 @@ class TypeFilterOut(TypeFilter):
         return [p for p in properties if not self.matches(p)], ""
 
 
-class CollectionFilterOut(TypeFilter):
-    def apply(self, properties):
-        # srna looks like the type inside the collection
-        return [
-            p
-            for p in properties
-            if p.bl_rna is not T.CollectionProperty.bl_rna or p.srna and p.srna.bl_rna not in self._types
-        ], ""
-
-
-class FuncFilterOut(Filter):
-    pass
-
-
 class NameFilter(Filter):
     def __init__(self, names: List[str]):
         self._names = names

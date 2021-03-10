@@ -22,7 +22,6 @@ from bpy import types as T  # noqa
 from mixer.blender_data.tests.utils import matches_type
 
 from mixer.blender_data.filter import (
-    CollectionFilterOut,
     FilterStack,
     property_order,
     SynchronizedProperties,
@@ -50,44 +49,3 @@ class TestTypeFilterIn(unittest.TestCase):
         props = list(synchronized_properties.properties(T.BlendData))
         self.assertTrue(any([matches_type(p, T.BlendDataCameras) for _, p in props]))
         self.assertFalse(any([matches_type(p, T.StringProperty) for _, p in props]))
-
-
-class TestCollectionFilterOut(unittest.TestCase):
-    def test_exact_class(self):
-        filter_stack = FilterStack()
-        filter_set = {T.Mesh: [CollectionFilterOut(T.MeshVertices)]}
-        filter_stack.append(filter_set)
-        synchronized_properties = SynchronizedProperties(filter_stack, property_order)
-        props = synchronized_properties.properties(T.Mesh)
-        self.assertFalse(any([matches_type(p, T.MeshVertices) for _, p in props]))
-        self.assertTrue(any([matches_type(p, T.MeshLoops) for _, p in props]))
-
-    def test_base_class(self):
-        filter_stack = FilterStack()
-        # Exclude on ID, applies to derived classes
-        filter_set = {T.ID: [CollectionFilterOut(T.MeshVertices)]}
-        filter_stack.append(filter_set)
-        synchronized_properties = SynchronizedProperties(filter_stack, property_order)
-        props = synchronized_properties.properties(T.Mesh)
-        self.assertFalse(any([matches_type(p, T.MeshVertices) for _, p in props]))
-        self.assertTrue(any([matches_type(p, T.MeshLoops) for _, p in props]))
-
-    def test_root_class(self):
-        filter_stack = FilterStack()
-        # Exclude on all classes
-        filter_set = {None: [CollectionFilterOut(T.MeshVertices)]}
-        filter_stack.append(filter_set)
-        synchronized_properties = SynchronizedProperties(filter_stack, property_order)
-        props = synchronized_properties.properties(T.Mesh)
-        self.assertFalse(any([matches_type(p, T.MeshVertices) for _, p in props]))
-        self.assertTrue(any([matches_type(p, T.MeshLoops) for _, p in props]))
-
-    def test_unrelated_class(self):
-        filter_stack = FilterStack()
-        # Exclude on unrelated class : does nothing
-        filter_set = {T.Collection: [CollectionFilterOut(T.MeshVertices)]}
-        filter_stack.append(filter_set)
-        synchronized_properties = SynchronizedProperties(filter_stack, property_order)
-        props = synchronized_properties.properties(T.Mesh)
-        self.assertTrue(any([matches_type(p, T.MeshVertices) for _, p in props]))
-        self.assertTrue(any([matches_type(p, T.MeshLoops) for _, p in props]))
