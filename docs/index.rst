@@ -1,23 +1,42 @@
-Mixer: a Blender addon for collaborative editing
+Mixer: a Blender Addon For Collaborative Editing
 ================================================
+
+Mixer is a Blender addon for collaborative 3D editing.
+
+
+
+
+Getting started
+---------------
+
+This section will guide you into the process of :ref:`installing<installing>` Mixer, then
+:ref:`testing<testing>` your installation.
+
+You will be then ready to use Mixer on a :doc:`local area network</getting-started/lan>`.
 
 .. toctree::
    :maxdepth: 2
    :hidden:
    :caption: Getting started
 
-   /src/install
-   /src/lan
-   /src/features
+   /getting-started/install
+   /getting-started/lan
 
+Advanced usage
+--------------
+
+Mixer make it possible to collaborate with remote friends or colleagues using an :doc:`Internet</advanced/internet>` connection, with a :ref:`VPN<vpn>` or :ref:`port forwarding<port-forwarding>`
+
+In case you keep a server running without tying it to a Blender instance, you can also start a :doc:`standalone server</advanced/standalone-server>`.
 
 .. toctree::
    :maxdepth: 2
    :hidden:
    :caption: Advanced usage
 
-   /src/remote-network
-   /src/shared-folders
+   /advanced/internet
+   /advanced/standalone-server
+   /advanced/shared-folders
 
 
 .. toctree::
@@ -25,8 +44,10 @@ Mixer: a Blender addon for collaborative editing
    :hidden:
    :caption: Troubleshooting
 
-   /src/faq
-   /src/issue
+   /troubleshoot/faq
+   /troubleshoot/caveats
+   /troubleshoot/checklist
+   /troubleshoot/issue
 
 
 .. toctree::
@@ -34,34 +55,12 @@ Mixer: a Blender addon for collaborative editing
    :hidden:
    :caption: Contributing
 
-   /src/document
+   /contribute/document
 
 
-Mixer is a Blender addon for collaborative 3D editing.
 
 
-Blah 
 
-Install Sphinx:
-
-``pip install -r requirements-dev``
-
-Install useful VScode addons:
-
-- reStructuredText
-- HTML Preview
-
-So many `cheat sheets <https://www.google.com/search?q=restructuredtext+cheat+sheet>`_
-
-Build the doc locally with 
-
-``make html``
-
-More in `<https://docs.readthedocs.io/en/stable/intro/getting-started-with-sphinx.html>`_
-
-This doctree was originally initialized with :
-
-``sphinx-quickstart``
 
 
 

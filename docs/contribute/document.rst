@@ -1,29 +1,25 @@
 Documenting Mixer
-=================================
+=================
 
-Mixer documentation is is written in ReStructuredText and hosted at `<https://mixer-github.readthedocs.io/en/latest/>`_.
+Mixer documentation is written in reStructuredText, generated with `Sphinx <https://www.sphinx-doc.org/>`_ and hosted at `<https://mixer-github.readthedocs.io/en/latest/>`_.
 
-Useful tools
-------------
-
-reStructuredText Cheat sheet:  `<https://docutils.sourceforge.io/docs/user/rst/quickref.html>`_
-
-This VSCode extension provides previewing in VSCode with your favorite theme `<https://github.com/vscode-restructuredtext/vscode-restructuredtext>`_.
 
 Generating the documentation
 ----------------------------
-A local copy of the HTML documentation can be generated using Sphinx :
 
-Install Sphinx and the readthedocs theme
+Install the development tools:
 
 ::
-   pip install sphinx
-   pip install sphinx-rtd-theme
+
+   pip install -r requirements-dev
 
 Generate the documentation:
 
 ::
-   cd docs
+
+   cd mixer/docs
    make html
 
 The resulting documentation is in the ``docs/_build`` folder, the index file being ``docs/_build/html/index.html``.
+
+The `reStructuredText VSCode extension <https://github.com/vscode-restructuredtext/vscode-restructuredtext>`_ provides previewing in VSCode with your favorite theme.
