@@ -16,35 +16,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-This module defines the list of the custom icons used by the add-on.
+This module contains useful functions that could be reused in other add-ons.
 """
 
-import bpy
 
-import os
-from pathlib import Path
-import bpy.utils.previews
-
-
-def register():
-
-    global icons_col
-
-    pcoll = bpy.utils.previews.new()
-    my_icons_dir = os.path.join(os.path.dirname(__file__), ".")
-    for png in Path(my_icons_dir).rglob("*.png"):
-        pcoll.load(png.stem, str(png), "IMAGE")
-
-    icons_col = pcoll
-
-
-def unregister():
-
-    global icons_col
-
-    try:
-        bpy.utils.previews.remove(icons_col)
-    except Exception:
-        pass
-
-    icons_col = None
+def convert_version_str_to_tupple(version_str):
+    """Convert a string formated like "1.23.48" to a tupple such as (1,23,48)"""
+    version_splitted = version_str.split(".")
+    return (int(version_splitted[0]), int(version_splitted[1]), int(version_splitted[2]))

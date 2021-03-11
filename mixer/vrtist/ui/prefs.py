@@ -16,7 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-This module defines the Preference menu.
+This module defines the Preference menu of VRtist.
 """
 
 import bpy
@@ -28,9 +28,9 @@ from bpy.types import Menu
 #############
 
 
-class MIXER_MT_prefs_main_menu(Menu):  # noqa 801
-    bl_idname = "MIXER_MT_prefs_main_menu"
-    bl_label = "Mixer Settings"
+class VRTIST_MT_prefs_main_menu(Menu):  # noqa 801
+    bl_idname = "VRTIST_MT_prefs_main_menu"
+    bl_label = "VRtist Settings"
 
     def draw(self, context):
         layout = self.layout
@@ -44,18 +44,18 @@ class MIXER_MT_prefs_main_menu(Menu):  # noqa 801
         ).path = "https://gitlab.com/ubisoft-animation-studio/mixer#mixer"
 
         row = layout.row(align=True)
-        row.operator("mixer.about", text="About...")
+        row.operator("vrtist.about", text="About...")
 
         layout.separator()
         row = layout.row(align=True)
 
-        from mixer.vrtist import icons as vrtist_icons
+        from mixer import icons
 
-        icon = vrtist_icons.vrtist_icons_col["VRtist_32"]
-        row.operator("mixervrtist.toggle", text="Switch to VRtist Panel", icon_value=icon.icon_id).panel_mode = "VRTIST"
+        icon = icons.icons_col["Mixer_32"]
+        row.operator("mixervrtist.toggle", text="Switch to Mixer Panel", icon_value=icon.icon_id).panel_mode = "MIXER"
 
 
-_classes = (MIXER_MT_prefs_main_menu,)
+_classes = (VRTIST_MT_prefs_main_menu,)
 
 
 def register():

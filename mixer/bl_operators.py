@@ -496,6 +496,36 @@ class LaunchVRtistOperator(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class ToggleBetweenMixerAndVRtistPanels(bpy.types.Operator):
+    bl_idname = "mixervrtist.toggle"
+    bl_label = "Mixer / VRtist Panels"
+    bl_description = "Toggle Between Mixer and VRtist Panels"
+    bl_options = {"INTERNAL"}
+
+    mixer_desciption = """Toggle from VRtist to Mixer panel.
+Mixer offers a collaborative real-time environment for Blender users.
+\nSee the documentation for more information"""
+    vrtist_desciption = """Toggle from Mixer to VRtist panel.
+This panel will allow you to set up a live link between Blender and VRtist,
+a VR application developed by Ubisoft Animation Studio for immersive animation direction.
+\nSee the documentation for more information"""
+    panel_mode: bpy.props.StringProperty(default="MIXER")
+
+    @classmethod
+    def description(cls, context, properties):
+        descr = "Toggle between Mixer and VRtist panels.\n"
+        if "MIXER" == properties.panel_mode:
+            descr = cls.mixer_desciption
+        elif "VRTIST" == properties.panel_mode:
+            descr = cls.vrtist_desciption
+        return descr
+
+    def invoke(self, context, event):
+        mixer_prefs = get_mixer_prefs()
+        mixer_prefs.display_mixer_vrtist_panels = self.panel_mode
+        return {"FINISHED"}
+
+
 classes = (
     LaunchVRtistOperator,
     CreateRoomOperator,
@@ -508,6 +538,7 @@ classes = (
     UploadRoomOperator,
     SharedFoldersAddFolderOperator,
     SharedFoldersRemoveFolderOperator,
+    ToggleBetweenMixerAndVRtistPanels,
 )
 
 register_factory, unregister_factory = bpy.utils.register_classes_factory(classes)
