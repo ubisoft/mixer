@@ -29,6 +29,9 @@ author = "Ubisoft Animation Studio"
 # ones.
 extensions = ["sphinx.ext.napoleon"]
 
+# using autodoc will require :
+# autodoc_mock_imports = ["bpy", "mathutils"]
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 

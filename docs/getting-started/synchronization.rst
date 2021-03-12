@@ -1,5 +1,0 @@
-Synchronized items TODO
-=========================
-
-
-

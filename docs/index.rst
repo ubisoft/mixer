@@ -1,15 +1,13 @@
-Mixer: a Blender Addon For Collaborative Editing
+Mixer: a Blender Addon for Collaborative Editing
 ================================================
 
-Mixer is a Blender addon for collaborative 3D editing.
+With Mixer, several Blender users can work together on the same data and collaborate in real time.
 
 Getting started
 ---------------
 
-This section will guide you into the process of :ref:`installing<installing>` Mixer, then
-:ref:`testing<testing>` your installation.
-
-You will be then ready to use Mixer on a :doc:`local area network</getting-started/lan>`.
+This section will guide you into the process of :ref:`downloading <download>` the Mixer zip file, :ref:`installing<installing>` Mixer as a Blender addon, then
+:ref:`try out<first-steps>` your installation.
 
 .. toctree::
    :maxdepth: 2
@@ -17,14 +15,26 @@ You will be then ready to use Mixer on a :doc:`local area network</getting-start
    :caption: Getting started
 
    /getting-started/install
-   /getting-started/lan
-   /getting-started/synchronization
+   /getting-started/first-steps
+   /getting-started/features
    /getting-started/glossary
+
+Collaborating
+-------------
+
+Learn how to collaborate with friends or colleagues either on the :doc:`same LAN</collaborate/lan>` or through :doc:`Internet</collaborate/internet>`.
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+   :caption: Collaboration
+
+   /collaborate/lan
+   /collaborate/internet
+
 
 Advanced usage
 --------------
-
-Mixer make it possible to collaborate with remote friends or colleagues using an :doc:`Internet</advanced/internet>` connection, with a :ref:`VPN<vpn>` or :ref:`port forwarding<port-forwarding>`
 
 In case you keep a server running without tying it to a Blender instance, you can also start a :doc:`standalone server</advanced/standalone-server>`.
 
@@ -33,7 +43,6 @@ In case you keep a server running without tying it to a Blender instance, you ca
    :hidden:
    :caption: Advanced usage
 
-   /advanced/internet
    /advanced/standalone-server
    /advanced/shared-folders
 

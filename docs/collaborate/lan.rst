@@ -1,13 +1,15 @@
-Using Mixer on a LAN
-====================
+On a LAN
+========
 
 This section describes how to use Mixer on a LAN.
 
 A user will first host a server and create a room,
 then the other users will connect to the server and join the room.
 
-First User Hosts a Server
--------------------------
+.. _host-a-server:
+
+Host a Server
+-------------
 
 Open the Mixer panel in the 3D editor, then click on the **Connect** button.
 
@@ -35,15 +37,18 @@ Now click on **Create Room** to create a :term:`room`
 .. image:: /img/room-created-localhost.png
    :align: center
 
-The server is now ready. Find out the :ref:`IP address <ip-address>` of your machine and communicate it to the other participants.
+The server is now ready.
+
+Find out the :ref:`IP address <ip-address>` of your machine and communicate it to the other
+participants.
 
 
-.. _next-users:
+.. _connect:
 
-Next Users
-----------
+Connect to a Server
+-------------------
 
-Open the Mixer panel in the 3D editor.
+Start Blender and open the Mixer panel in the 3D editor.
 
 In the **Host** text box, replace ``localhost`` by the IP address of the machine that hosts the server,
 then click on the **Connect** button.
@@ -51,12 +56,9 @@ then click on the **Connect** button.
 .. image:: /img/connect-ip.png
    :align: center
 
-The panel now lists the room created on the server.
+The panel now lists the room created on the server. Click on **Join Room**. 
 
 .. image:: /img/join-room.png
    :align: center
 
-.. tip::
-   If the connection fails, see the :ref:`troubleshooting FAQ <faq-failures>`.
-
-Click on **Join Room** and you are ready to collaborate with your colleagues or friends.
+You are ready to collaborate with your colleagues or friends.
