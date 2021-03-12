@@ -20,12 +20,16 @@ Choose the zip file listed in the **Other** section of the release you want to i
 Install
 -------
 
-Install Mixer addon from the Blender Preferences panel and enable it.
+Launch Blender, open the Preferences panel and go to the Add-ons section.
+Press the Install button located at the top of the panel. A dialog box opens, pick the Mixer
+zip file you previously downloaded and validate.
+The add-on will be installed. Click on the checkbox at the left side of its name to enable it.
+
 
 .. image:: /img/install.png
    :align: center
 
-After the addon is installed and enabled, a Mixer tab is displayed in the 3D viewport N-Panel.
+One the addon enabled, a Mixer tab is displayed in the 3D viewport N-Panel.
 
 
 Now close Blender to save your user preferences with the Mixer installation.
