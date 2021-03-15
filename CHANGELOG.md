@@ -13,6 +13,7 @@
 - Object modifier synchronization failure on Blender 2.92
 - VSE synchronization error on 2.92
 - Invalid values for user color
+- Removed synchronisation for 3D Cursor, viewport transform modes and snapping, render engine
 
 ## CI
 
