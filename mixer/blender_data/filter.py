@@ -524,6 +524,8 @@ default_exclusions: FilterSet = {
                 "stereo_views",
                 # Causes error in pass_filter, maybe not useful
                 "bake",
+                # Engine type (Eevee, Cycle...)
+                "engine",
             ]
         )
     ],
@@ -550,6 +552,12 @@ default_exclusions: FilterSet = {
                 # TODO
                 # a view into builtin U keying_sets ?
                 "keying_sets_all",
+                # ui: scene transform mode
+                "transform_orientation_slots",
+                # ui: user settings for viewport content manipulation
+                "tool_settings",
+                # ui: 3D cursor
+                "cursor",
             ]
         ),
     ],
