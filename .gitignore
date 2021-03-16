@@ -68,8 +68,6 @@ gitlab/blender
 logs/
 *.blend1
 
-# documentation
+# Docs
 docs/_build
 docs/_html
-docs_tech/_build
-docs_tech/_html

@@ -20,8 +20,8 @@ Pending local or remote modifications are applied when the object mode changes.
 Some items are excluded from synchronization, mainly the current frame time, as well as UI-related data
 like object modes and active list items.
 
-What is synchronized ?
-----------------------
+What is synchronized
+--------------------
 
 This table described the status of synchronization for the main Blender data types.
 The custom properties of all datablocks are also synchronized
@@ -34,14 +34,15 @@ The custom properties of all datablocks are also synchronized
 ==============  ==================  ==============================================
 Data                  Status          Comments
 ==============  ==================  ==============================================
-Action          |P|                 Except NLA
+Action          |Y|                 
 Armature        |N|
 Brush           |N|
 Collection      |P|                 Except collection children ordering
 Camera          |Y|
-Curve           |P|                 Bézier curves only. See [Edit]_, [ObjectConvert]_
-Grease pencil   |Y|                 See [GreasePencil]_, [Edit]_, [ObjectConvert]_
+Curve           |P|                 Except surface and Bézier curves. See [Edit]_, [Convert]_
+Grease pencil   |Y|                 See [GreasePencil]_, [Edit]_, [Convert]_
 Image           |P|                 See [Image]_, [Media]_
+Keying sets     |N|
 Library         |P|                 See [Library]_             
 Light           |Y|
 Light probe     |N|
@@ -49,29 +50,28 @@ Line style      |N|
 Mask            |N|
 Material        |Y|
 Mesh            |P|                 except split normals, see [Edit]_
-MetaBall        |Y|                 See [Edit]_, [ObjectConvert]_
+Metaball        |Y|                 See [Edit]_, [Convert]_
 Movie clip      |Y|                 See [Media]_
 Node group      |Y|                 Not extensively tested
-Object          |P|                 Except particles and physics. See [ObjectConvert]_ 
+Object          |P|                 Except motion paths, particles and physics. See [Convert]_ 
 Paint curve     |N|
 Particles       |N|
 Shape key       |Y|
-Scene           |Y|
+Scene           |Y|                 
 Sound           |Y|                 See [Media]_
 Text            |N|
 Texture         |Y|
 Volume          |N|
+VSE             |P|                 Except meta strips. Not extensively tested
 Workspace       |N|
 World           |Y|
-Keying sets     |N|
-VSE             |P|                 Except meta strips. Not extensively tested
 ==============  ==================  ==============================================
 
 
 .. [Image]
-    Generated images and UDIMs are not synchronized:
+    Generated images and UDIMs are not synchronized. Image files are synchronized.
 
-.. [ObjectConvert]
+.. [Convert]
     The result of object conversion (**Object**/**Convert to** menu) is not synchronized.
 
 .. [Edit]
@@ -86,9 +86,8 @@ VSE             |P|                 Except meta strips. Not extensively tested
     * library overrides
 
 .. [Media] 
-    The result of **reload** or media path modification are not synchronized.
+    Media files are synchronized. The result of **reload** or media path modification are not synchronized.
     
 .. [GreasePencil]
     * the mask layer is not correctly synchronized
     * area fill is sometimes not correct
-

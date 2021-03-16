@@ -3,8 +3,7 @@ On a LAN
 
 This section describes how to use Mixer on a LAN.
 
-A user will first host a server and create a room,
-then the other users will connect to the server and join the room.
+ check the "keep open" checkbox so the room will remain open even if it has no users.
 
 .. _host-a-server:
 
