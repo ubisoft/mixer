@@ -1,9 +1,6 @@
 Installation
 ============
 
-.. note::
-    Development and testing is on Windows 10. Please report issues for other operating systems.
-
 .. _download:
 
 Download

@@ -8,7 +8,7 @@ Overview
 
 Mixer synchronizes in real time the modifications done to the scene and the objects it contains.
 
-During a collaboration session, Mixer display the position of other participants and highlights their selections.
+During a collaboration session, Mixer displays the position of other participants and highlights their selections.
 
 .. image:: /img/select.png
    :align: center
@@ -19,6 +19,8 @@ Pending local or remote modifications are applied when the object mode changes.
 
 Some items are excluded from synchronization, mainly the current frame time, as well as UI-related data
 like object modes and active list items.
+
+.. _synchronized:
 
 What is synchronized
 --------------------
@@ -34,7 +36,7 @@ The custom properties of all datablocks are also synchronized
 ==============  ==================  ==============================================
 Data                  Status          Comments
 ==============  ==================  ==============================================
-Action          |Y|                 
+Action          |Y|                 See [Delay]_
 Armature        |N|
 Brush           |N|
 Collection      |P|                 Except collection children ordering
@@ -57,7 +59,7 @@ Object          |P|                 Except motion paths, particles and physics. 
 Paint curve     |N|
 Particles       |N|
 Shape key       |Y|
-Scene           |Y|                 
+Scene           |Y|                 See [Delay]_
 Sound           |Y|                 See [Media]_
 Text            |N|
 Texture         |Y|
@@ -67,17 +69,26 @@ Workspace       |N|
 World           |Y|
 ==============  ==================  ==============================================
 
-
-.. [Image]
-    Generated images and UDIMs are not synchronized. Image files are synchronized.
-
 .. [Convert]
     The result of object conversion (**Object**/**Convert to** menu) is not synchronized.
+
+.. [Delay]
+    Some updates may be delayed until another modification is detected:
+
+    * scene annotations: try to click around in the background of the 3D viewport
+    * animation curves names : try to toggle the curve *Enable* checkbox twice.
 
 .. [Edit]
     While an object is not in Object mode (in Edit, Sculpt, Paint, ...) the local modifications to this object are
     not sent to the other participants and the other participants modifications are not applied. Pending modifications
     are applied when the mode changes.
+
+.. [GreasePencil]
+    * the mask layer is not correctly synchronized
+    * area fill is sometimes not correct
+
+.. [Image]
+    Generated images and UDIMs are not synchronized. Image files are synchronized.
 
 .. [Library]
     The following are not synchronized:
@@ -88,6 +99,3 @@ World           |Y|
 .. [Media] 
     Media files are synchronized. The result of **reload** or media path modification are not synchronized.
     
-.. [GreasePencil]
-    * the mask layer is not correctly synchronized
-    * area fill is sometimes not correct

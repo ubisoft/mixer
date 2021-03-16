@@ -44,7 +44,6 @@ In case you keep a server running without tying it to a Blender instance, you ca
    :caption: Advanced usage
 
    /advanced/standalone-server
-   /advanced/shared-folders
 
 
 .. toctree::
@@ -53,8 +52,6 @@ In case you keep a server running without tying it to a Blender instance, you ca
    :caption: Troubleshooting
 
    /troubleshoot/faq
-   /troubleshoot/caveats
-   /troubleshoot/checklist
    /troubleshoot/issue
 
 

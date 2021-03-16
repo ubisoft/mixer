@@ -1,6 +1,7 @@
 On the Internet
 ===============
 
+.. _internet:
 .. _vpn:
 
 With a hosted VPN

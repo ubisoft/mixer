@@ -8,7 +8,7 @@ Start two Blender instances, lay them side by side. In each one, open the Mixer 
 
 .. _first-steps:
 
-First Mixer Creates a Server
+Create a Server
 ----------------------------
 
 On one of the Blender (say the left one), click on the **Connect** button.

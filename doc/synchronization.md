@@ -33,7 +33,7 @@ There is currently no way for the user to control what can be synchronized.
 
 Subclasses of `Proxy` handles `bpy.data` synchronization in a very generic way, but type-specific adjustments are needed, for instance because factory methods for collection elements differ according to the element type. All these type-specific code is in `specifics.py`.
 
-#### How to synchronize a new datablock collection ?
+#### How to synchronize a new datablock collection?
 Add a new `bpy.data collection` and datablock type to the synchronization in `filter.py` and test the synchronization during datablock creation and modification with log in info or debug mode.
 
 There are several causes for failures :

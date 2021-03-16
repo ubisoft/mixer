@@ -1,9 +1,9 @@
 On a LAN
 ========
 
-This section describes how to use Mixer on a LAN.
+.. _lan:
 
- check the "keep open" checkbox so the room will remain open even if it has no users.
+This section describes how to use Mixer on a LAN.
 
 .. _host-a-server:
 
