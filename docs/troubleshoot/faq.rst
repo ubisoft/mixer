@@ -1,6 +1,8 @@
 Frequently asked questions
 ==========================
 
+.. _faq:
+
 General
 -------
 

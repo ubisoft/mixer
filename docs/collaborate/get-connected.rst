@@ -48,7 +48,7 @@ participants.
 .. _connect:
 
 Connect to a Server
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
 
 Start Blender and open the Mixer panel in the 3D editor.
 

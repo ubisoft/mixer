@@ -54,18 +54,3 @@ In case you keep a server running without tying it to a Blender instance, you ca
    /troubleshoot/faq
    /troubleshoot/issue
 
-
-.. toctree::
-   :maxdepth: 2
-   :hidden:
-   :caption: Contributing
-
-   /contribute/document
-
-
-
-
-
-
-
-

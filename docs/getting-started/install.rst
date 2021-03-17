@@ -1,12 +1,27 @@
 Installation
 ============
 
+Supported versions
+------------------
+
+Operating System
+^^^^^^^^^^^^^^^^
+
+Mixer is developed and actively tested on Windows 10. Community users reported successful usage on Linux platform, although fixes were sometimes required. 
+
+Blender
+^^^^^^^
+
+The currently supported Blender version is 2.91.0. Mixer also loads successfully and should work on 2.83LTS, 2.91.2 and 2.92.0.
+
+The supported Blender version will shortly be upgraded to 2.92.0.
+
 .. _download:
 
 Download
 --------
 
-Open the `latest release <https://github.com/ubisoft/mixer/releases/latest>`__  page from the `Mixer Gihub repository <https://github.com/ubisoft/mixer/>`_.
+Open the `latest release <https://github.com/ubisoft/mixer/releases/latest>`__  page from the Mixer Gihub `releases page <https://github.com/ubisoft/mixer/releases>`_.
 Download the zip file listed in **Assets** that has the package icon: |package-icon|.
 
 .. |package-icon| image:: /img/package-icon.png
