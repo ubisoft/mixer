@@ -22,15 +22,15 @@ This section will guide you into the process of :ref:`downloading <download>` th
 Collaborating
 -------------
 
-Learn how to collaborate with friends or colleagues either on the :doc:`same LAN</collaborate/lan>` or through :doc:`Internet</collaborate/internet>`.
+Learn how to collaborate with friends or colleagues either on the :ref:`same LAN<lan>` or through :ref:`Internet<internet>`.
 
 .. toctree::
    :maxdepth: 2
    :hidden:
    :caption: Collaboration
 
-   /collaborate/lan
-   /collaborate/internet
+   /collaborate/get-connected
+   /collaborate/work-together
 
 
 Advanced usage

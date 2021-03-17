@@ -72,6 +72,8 @@ World           |Y|
 .. [Convert]
     The result of object conversion (**Object**/**Convert to** menu) is not synchronized.
 
+.. _update-delays:
+
 .. [Delay]
     Some updates may be delayed until another modification is detected:
 
@@ -99,3 +101,12 @@ World           |Y|
 .. [Media] 
     Media files are synchronized. The result of **reload** or media path modification are not synchronized.
     
+.. _caveats:
+
+Caveats
+-------
+
+In additions to the limitations listed in the previous section, you should be aware of the following points:
+
+* using undo may cause unexpected behavior. Using undo while in **Object** mode may undo other participants changes and also lead to crashes.
+* the files saved by all participants are :ref:`not exactly identical <saves-not-identical>`.

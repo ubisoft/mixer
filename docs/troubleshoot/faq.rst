@@ -9,6 +9,18 @@ Why is Mixer still in a 0. version?
 
 Mixer is still in active development. Using it may cause data loss. Save your work regularly and make sure that you have backups.
 
+Can I control access to the server or a room?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+No. Anyone who knows the address a Mixer server and has network access to the server can join a room an collaborate.
+
+Can I control access to parts os a scene?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+No. All room users can edit all the Blender data without restriction.
+
+
+.. _saves-not-identical:
 
 Will files saved by all participants contain the same data?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

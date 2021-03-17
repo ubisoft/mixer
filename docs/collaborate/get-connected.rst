@@ -1,19 +1,88 @@
-On the Internet
-===============
+Get connected
+=============
+On a LAN
+----------
+
+.. _lan:
+
+This section describes how to use Mixer on a LAN.
+
+.. _host-a-server:
+
+Host a Server
+^^^^^^^^^^^^^^^^^^
+
+Open the Mixer panel in the 3D editor, then click on the **Connect** button.
+
+.. image:: /img/connect-localhost.png
+   :align: center
+   :alt: Connect to localhost
+
+If you are using Windows and starting a server for the first time,
+the firewall will prompt you to allow access for Python like in the image below.
+    
+.. important::
+    Make sure to allow access for private networks.
+
+.. image:: /img/firewall.png
+   :align: center
+
+
+Your machine is now hosting a :term:`Mixer server<server>` and the panel changes to :
+
+.. image:: /img/create-room-localhost.png
+   :align: center
+
+
+Now click on **Create Room** to create a :term:`room`
+
+.. image:: /img/room-created-localhost.png
+   :align: center
+
+The server is now ready.
+
+Find out the :ref:`IP address <ip-address>` of your machine and communicate it to the other
+participants.
+
+
+.. _connect:
+
+Connect to a Server
+^^^^^^^^^^^^^^^^^^
+
+Start Blender and open the Mixer panel in the 3D editor.
+
+In the **Host** text box, replace ``localhost`` by the IP address of the machine that hosts the server,
+then click on the **Connect** button.
+
+.. image:: /img/connect-ip.png
+   :align: center
+
+The panel now lists the room created on the server. Click on **Join Room**. 
+
+.. image:: /img/join-room.png
+   :align: center
+
+You are ready to collaborate with your colleagues or friends.
+
 
 .. _internet:
+
+On the Internet
+-----------------
+
 .. _vpn:
 
 With a hosted VPN
------------------
+^^^^^^^^^^^^^^^^^^^^
 
 Hamachi
-^^^^^^^
+"""""""""""""""""""""
 
 TODO
 
 Other VPN software
-^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""
 
 Mixer has been reported to work successfully with other VPN software:
 
@@ -23,14 +92,14 @@ Mixer has been reported to work successfully with other VPN software:
 .. _port-forwarding:
 
 With port forwarding
---------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. use addresses from https://tools.ietf.org/html/rfc5737
 
 Collaborating over the Internet without a VPN may require to setup port forwarding and is more involved.
 
 On the network that hosts the server
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""""""""""""""""""""""""""""
 The user who creates the server must setup a TCP port forwarding rule on his router:
 
 * on the machine that hosts the server:
@@ -54,7 +123,7 @@ The user who creates the server must setup a TCP port forwarding rule on his rou
 
 
 On the other users locations
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"""""""""""""""""""""""""""""""""
 Start Blender and open the Mixer panel in the 3D editor.
 
 * In the **Host** text box, replace ``localhost`` by  the *public* address of the router on the server location,
@@ -70,7 +139,7 @@ Start Blender and open the Mixer panel in the 3D editor.
    .. image:: /img/open-preferences-internet.png
       :align: center
 
-   * in the **Port** test box type the public forwarded port number, ``9090`` in our example
+   * in the **Port** text box type the public forwarded port number, ``9090`` in our example
   
    .. image:: /img/preferences-internet-port.png
         :align: center
