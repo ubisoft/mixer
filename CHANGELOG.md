@@ -1,3 +1,11 @@
+
+# 0.22.2 (tbd)
+
+## Fixes
+
+- missing digit in Mixer version display in Room Properties panel
+
+
 # 0.22.0-beta1 (16-03-2021)
 
 ## Features

@@ -541,7 +541,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                 _display_property(col, "Blender Version:", current_room.blender_version, has_warning=blender_warning)
 
                 mixer_warning = display_version != current_room.mixer_version
-                _display_property(col, "Mixer Version:", current_room.mixer_version[1:], has_warning=mixer_warning)
+                _display_property(col, "Mixer Version:", current_room.mixer_version, has_warning=mixer_warning)
 
                 _display_property(col, "Command Count:", current_room.command_count)
                 _display_property(col, "Protocol:", current_room.protocol)
