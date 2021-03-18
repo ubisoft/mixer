@@ -121,6 +121,27 @@ test_dev:
     - .test_version_dev
     - .except_nightly_test
 
+.test_version_2.83.13:
+  extends:
+    - .test_base
+  variables:
+    MIXER_BLENDER_VERSION_BASE: "2.83"
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.83.13-windows64
+    MIXER_BLENDER_DOWNLOAD: "release"
+
+test_2.83.13:
+  extends:
+    - .test_version_2.83.13
+    - .only_nightly_test
+    - .except_on_gitlab.com
+
+test_2.83.13_manual:
+  extends:
+    - .test_version_2.83.13
+    - .except_nightly_test
+    - .except_on_gitlab.com
+  when: manual
+
 .test_version_2.91.2:
   extends:
     - .test_base
