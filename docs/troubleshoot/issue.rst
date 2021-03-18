@@ -13,10 +13,6 @@ If you think you have found a bug or would like to propose a new feature, please
 
 Please consider attaching the Mixer log file:
 
-- Open the Mixer preferences using the Mixer panel title bar setings icon
-
-    .. image:: /img/open-preferences-internet.png
-        :align: center
-
+- Open the Mixer preferences using the Mixer panel title bar settings icon
 - in the preferences window, go to the **Connection Settings** group and click on **Open Log Folder**.
 - attach the relevant file to the issue.

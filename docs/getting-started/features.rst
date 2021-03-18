@@ -6,19 +6,12 @@ Key Features
 Overview
 --------
 
-Mixer synchronizes in real time the modifications done to the scene and the objects it contains.
-
-During a collaboration session, Mixer displays the position of other participants and highlights their selections.
+Mixer synchronizes in real time the modifications done to the scene and the objects it contains. During a collaboration session, Mixer displays the position of other participants and highlights their selections. 
 
 .. image:: /img/select.png
    :align: center
 
-While an object is not in Object mode (in Edit, Sculpt, Paint, ...) the local modifications to this object are
-not sent in real time to the other participants and the other participants modifications are not applied immediately.
-Pending local or remote modifications are applied when the object mode changes.
-
-Some items are excluded from synchronization, mainly the current frame time, as well as UI-related data
-like object modes and active list items.
+See :ref:`work-together` for more details.
 
 .. _synchronized:
 
@@ -50,11 +43,11 @@ Light           |Y|
 Light probe     |N|
 Line style      |N|
 Mask            |N|
-Material        |Y|
-Mesh            |P|                 except split normals, see [Edit]_
+Material        |P|                 see [Nodes]_
+Mesh            |P|                 except split normals, custom properties, see [Edit]_
 Metaball        |Y|                 See [Edit]_, [Convert]_
 Movie clip      |Y|                 See [Media]_
-Node group      |Y|                 Not extensively tested
+Node group      |Y|                 Not extensively tested, see [Nodes]_
 Object          |P|                 Except motion paths, particles and physics. See [Convert]_ 
 Paint curve     |N|
 Particles       |N|
@@ -93,20 +86,23 @@ World           |Y|
     Generated images and UDIMs are not synchronized. Image files are synchronized.
 
 .. [Library]
-    The following are not synchronized:
+    Nested libraries will fail when shared folders are not in use. The following are not synchronized:
 
     * the results of **make local** and **reload**
     * library overrides
 
 .. [Media] 
     Media files are synchronized. The result of **reload** or media path modification are not synchronized.
-    
+
+.. [Nodes]
+    Links synchronization sometimes fails. Some cases might cause crashes.
+
 .. _caveats:
 
 Caveats
 -------
 
-In additions to the limitations listed in the previous section, you should be aware of the following points:
+In addition to the limitations listed in the previous section, you should be aware of the following :
 
-* using undo may cause unexpected behavior. Using undo while in **Object** mode may undo other participants changes and also lead to crashes.
+* using undo may cause unexpected behavior and cause crashes. Using undo while in **Object** mode may undo other participants changes.
 * the files saved by all participants are :ref:`not exactly identical <saves-not-identical>`.

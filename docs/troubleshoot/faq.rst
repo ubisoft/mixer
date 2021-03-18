@@ -55,8 +55,8 @@ There is no hardcoded or configurable limit to the number of users that can coll
 The limit will come from the response times that depend on the number of users, scene complexity and network performance.
 
 
-Can I start a standalone server without executing Blender?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Can I have a server running without executing Blender?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Yes. See :doc:`/advanced/standalone-server`. 
 
@@ -107,7 +107,7 @@ Check the following :
 - are you and the other participants actually connected to the server? The Mixer panel should display the **Disconnect** button in blue.
 - are you attempting to synchronize data that is not or partially supported? See the list of :ref:`synchronized data <synchronized>` and their restrictions.
 
-If you think you have found a bug, please report an `issue <https://gitlab.com/ubisoft-animation-studio/mixer/-/issues>`_.
+If you think you have found a bug, please :doc:`report an issue <issue>`.
 
 ..
     TODO

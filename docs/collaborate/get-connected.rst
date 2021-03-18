@@ -1,18 +1,24 @@
 Get connected
 =============
-On a LAN
-----------
+
+This section describes how several users can connect to the same Mixer server using a LAN or through the Internet.
+
+.. tip::
+    It is recommended that you try Mixer locally before you attempt to connect on a network.
+
+Whatever the network type, one user will have to create a server that the other users can connect to.
 
 .. _lan:
 
-This section describes how to use Mixer on a LAN.
+On a LAN
+----------
 
 .. _host-a-server:
 
 Host a Server
 ^^^^^^^^^^^^^^^^^^
 
-Open the Mixer panel in the 3D editor, then click on the **Connect** button.
+Open the Mixer panel in the 3D editor, check that the **Host** text box contains ``localhost`` then click on the **Connect** button.
 
 .. image:: /img/connect-localhost.png
    :align: center
@@ -21,28 +27,18 @@ Open the Mixer panel in the 3D editor, then click on the **Connect** button.
 If you are using Windows and starting a server for the first time,
 the firewall will prompt you to allow access for Python like in the image below.
     
-.. important::
-    Make sure to allow access for private networks.
-
 .. image:: /img/firewall.png
    :align: center
 
+.. important::
+    Make sure to allow access for private networks.
 
-Your machine is now hosting a :term:`Mixer server<server>` and the panel changes to :
+Your machine is now hosting a Mixer server and the panel changes to :
 
 .. image:: /img/create-room-localhost.png
    :align: center
 
-
-Now click on **Create Room** to create a :term:`room`
-
-.. image:: /img/room-created-localhost.png
-   :align: center
-
-The server is now ready.
-
-Find out the :ref:`IP address <ip-address>` of your machine and communicate it to the other
-participants.
+The server is now ready. Find out the :ref:`IP address <ip-address>` of your machine and communicate it to the other participants.
 
 
 .. _connect:
@@ -52,8 +48,7 @@ Connect to a Server
 
 Start Blender and open the Mixer panel in the 3D editor.
 
-In the **Host** text box, replace ``localhost`` by the IP address of the machine that hosts the server,
-then click on the **Connect** button.
+In the **Host** text box, replace ``localhost`` by the IP address of the machine that hosts the server,, which is ``192.168.0.48`` in the example below, then click on the **Connect** button.
 
 .. image:: /img/connect-ip.png
    :align: center
@@ -63,7 +58,7 @@ The panel now lists the room created on the server. Click on **Join Room**.
 .. image:: /img/join-room.png
    :align: center
 
-You are ready to collaborate with your colleagues or friends.
+You are ready to :ref:`collaborate <work-together-page>` with your colleagues or friends.
 
 
 .. _internet:
@@ -76,18 +71,36 @@ On the Internet
 With a hosted VPN
 ^^^^^^^^^^^^^^^^^^^^
 
+VPN software like Hamachi, Zerotier and others can be used to execute a Mixer session over the Internet. The overall process is as follows:
+
+- all participants:
+
+    - download, install and start the VPN software using the VPN software instructions
+
+- one participant:
+  
+    - creates a VPN network using the VPN software instructions
+    - starts Blender, open the Mixer panel, leaving ``localhost`` in the panel **Host** text box, then click **Connect** to create a server
+    - finds the VPN address of his machine and communicate it to others
+
+- the others:
+
+    - connect to the VPN network using the VPN software instructions
+    - start Blender, open the Mixer panel and fill the **Host** text box with the VPN address of the server.
+  
 Hamachi
-"""""""""""""""""""""
+"""""""
 
 TODO
 
 Other VPN software
 """"""""""""""""""""
-
 Mixer has been reported to work successfully with other VPN software:
 
 * `Zerotier <https://www.zerotier.com/>`__
 * `OpenVPN <https://openvpn.net/>`__ and `portmap.io <https://portmap.io/>`__ : some details in `this issue <https://gitlab.com/ubisoft-animation-studio/mixer/-/issues/23>`__
+
+
 
 .. _port-forwarding:
 
@@ -148,4 +161,4 @@ Start Blender and open the Mixer panel in the 3D editor.
 
 * in the Mixer panel, click on the **Connect** button.
 
-From now on, any participant can create a room and the others can join the room.
+You are ready to :ref:`collaborate <work-together-page>` with your colleagues or friends.

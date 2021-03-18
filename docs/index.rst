@@ -22,7 +22,7 @@ This section will guide you into the process of :ref:`downloading <download>` th
 Collaborating
 -------------
 
-Learn how to collaborate with friends or colleagues either on the :ref:`same LAN<lan>` or through :ref:`Internet<internet>`.
+After installing, learn how to connect with friends or colleagues on the :ref:`same LAN<lan>` or through :ref:`Internet<internet>` and :ref:`work together <work-together-page>`.
 
 .. toctree::
    :maxdepth: 2

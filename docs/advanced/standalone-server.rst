@@ -26,7 +26,6 @@ To start a standalone server:
 
 :ref:`Find the IP address <ip-address>` of the machine that executes the server and communicate it to all the participants.
 
-On all the participating Blender, follow the :ref:`connection instructions <connect>`
+All the participants :ref:`connect <connect>` to the server, one of them :ref:`creates a room <create-room>` and the others :ref:`join the room <join-room>`.
 
-.. warning::
-    When all participants leave the room, the room is destroyed unless **Keep Open** is checked in the room properties.
+

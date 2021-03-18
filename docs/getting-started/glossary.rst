@@ -10,4 +10,4 @@ Glossary
         A Mixer server handles communication between participating Blender in order to synchronize their Blender data.
 
     VRtist
-        A Virtual Reality tool for storytelling: https://github.com/ubisoft/vrtist
+        A Virtual Reality tool for storytelling: https://github.com/ubisoft/vrtist.
