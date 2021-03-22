@@ -74,6 +74,7 @@ release:
   stage: release
   script:
     - pip install requests
+    - rm -rf mixer/blender_data/tests/
     - python -m zipfile -c mixer-${CI_COMMIT_REF_NAME}.zip mixer/
     - python -m gitlab.release mixer-${CI_COMMIT_REF_NAME}.zip
   artifacts:
