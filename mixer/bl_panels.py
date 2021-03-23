@@ -148,7 +148,7 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         row = split.row()
         row.scale_x = 0.9
         row.label(text="", icon="BLANK1")  # BLANK1
-        row.label(text="Name")
+        row.label(text="Room Name")
 
         split.label(text="Users")
         if get_mixer_props().display_rooms_details:
@@ -510,7 +510,7 @@ class MixerSettingsPanel(bpy.types.Panel):
 
                 # disabled properties
                 row = box.row()
-                row.separator(factor=6)
+                row.separator(factor=2)
                 col = row.column()
                 col.use_property_decorate = False
                 col.separator(factor=0.5)
@@ -537,10 +537,26 @@ class MixerSettingsPanel(bpy.types.Panel):
                 _display_property(col, "Room Size:", f"{current_room.mega_byte_size:.2} MB")
 
                 blender_warning = bpy.app.version_string != current_room.blender_version
-                _display_property(col, "Blender Version:", current_room.blender_version, has_warning=blender_warning)
+                if blender_warning:
+                    _display_property(
+                        col,
+                        "Blender Version:",
+                        f"Room: {current_room.blender_version} / Yours: {bpy.app.version_string}",
+                        has_warning=blender_warning,
+                    )
+                else:
+                    _display_property(col, "Blender Version:", current_room.blender_version)
 
                 mixer_warning = display_version != current_room.mixer_version
-                _display_property(col, "Mixer Version:", current_room.mixer_version, has_warning=mixer_warning)
+                if mixer_warning:
+                    _display_property(
+                        col,
+                        "Mixer Version:",
+                        f"Room: {current_room.mixer_version} / Yours: {display_version}",
+                        has_warning=mixer_warning,
+                    )
+                else:
+                    _display_property(col, "Mixer Version:", current_room.mixer_version)
 
                 _display_property(col, "Command Count:", current_room.command_count)
                 _display_property(col, "Protocol:", current_room.protocol)
@@ -548,7 +564,7 @@ class MixerSettingsPanel(bpy.types.Panel):
 
                 # enabled properties:
                 row = box.row()
-                row.separator(factor=6)
+                row.separator(factor=2)
                 col = row.column()
                 col.use_property_split = False
                 col.use_property_decorate = False
