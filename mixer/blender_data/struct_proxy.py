@@ -23,7 +23,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Optional, Tuple, TYPE_CHECKING, Union
 
 import bpy.types as T  # noqa
 
@@ -57,7 +57,7 @@ class StructProxy(Proxy):
     Holds a copy of a Blender bpy_struct
     """
 
-    _serialize = ("_data",)
+    _serialize: Tuple[str, ...] = ("_data",)
 
     def __init__(self):
         self._data = {}
@@ -124,7 +124,7 @@ class StructProxy(Proxy):
         delta: Delta,
         context: Context,
         to_blender: bool = True,
-    ) -> StructProxy:
+    ) -> Union[StructProxy, NonePtrProxy]:
         """
         Apply delta to this proxy and optionally to the Blender attribute its manages.
 
