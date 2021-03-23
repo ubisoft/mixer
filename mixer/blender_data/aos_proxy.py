@@ -73,18 +73,24 @@ class AosProxy(Proxy):
         # TODO optimize and do not send empty arrays
         self._aos_length = len(bl_collection)
 
-        context.visit_state.path.append(key)
-        try:
-            item_bl_rna = bl_collection_property.fixed_type.bl_rna
-            if bl_collection_property.fixed_type.bl_rna is T.UnknownType.bl_rna:
-                # UnknownType used in ShakeKey. Contents depends on the items that has the Key (Curve, Mesh, Lattice)
-                if len(self) != 0:
-                    item = bl_collection[0]
-                    names = set(dir(item)) - _unknown_type_attributes
-                    for attr_name in names:
+        item_bl_rna = bl_collection_property.fixed_type.bl_rna
+        if bl_collection_property.fixed_type.bl_rna is T.UnknownType.bl_rna:
+            # UnknownType used in ShakeKey. Contents depends on the items that has the Key (Curve, Mesh, Lattice)
+            if len(self) != 0:
+                item = bl_collection[0]
+                names = set(dir(item)) - _unknown_type_attributes
+                for attr_name in names:
+                    # Since this dies no use read_attribute, pugh the current item by hand
+                    context.visit_state.push(bl_collection, attr_name)
+                    try:
                         self._data[attr_name] = SoaElement().load(bl_collection, attr_name, item_bl_rna, context)
-            else:
-                for attr_name, bl_rna_property in context.synchronized_properties.properties(item_bl_rna):
+                    finally:
+                        context.visit_state.pop()
+        else:
+            for attr_name, bl_rna_property in context.synchronized_properties.properties(item_bl_rna):
+                # Since this dies no use read_attribute, pugh the current item by hand
+                context.visit_state.push(bl_collection, attr_name)
+                try:
                     if is_soable_property(bl_rna_property):
                         # element supported by foreach_get()/foreach_set(), e.g. MeshVertices.co
                         # The collection is loaded as an array.array and encoded as a binary buffer
@@ -94,8 +100,9 @@ class AosProxy(Proxy):
                         # which is an enum, loaded as string
                         # The collection is loaded as a dict, encoded as such
                         self._data[attr_name] = AosElement().load(bl_collection, attr_name, item_bl_rna, context)
-        finally:
-            context.visit_state.path.pop()
+                finally:
+                    context.visit_state.pop()
+
         return self
 
     def save(self, attribute: T.bpy_prop_collection, parent: T.bpy_struct, key: Union[int, str], context: Context):
@@ -115,12 +122,8 @@ class AosProxy(Proxy):
         # that contains the Mesh members. The children of this are SoaElement and have no child.
         # They are updated directly bu SoaElement.save_array()
 
-        context.visit_state.path.append(key)
-        try:
-            for k, v in self._data.items():
-                write_attribute(attribute, k, v, context)
-        finally:
-            context.visit_state.path.pop()
+        for k, v in self._data.items():
+            write_attribute(attribute, k, v, context)
 
     def apply(
         self,
@@ -145,16 +148,13 @@ class AosProxy(Proxy):
 
         struct_update = delta.value
 
-        context.visit_state.path.append(key)
-        try:
-            self._aos_length = struct_update._aos_length
-            specifics.fit_aos(attribute, self, context)
-            for k, member_delta in struct_update._data.items():
-                current_value = self.data(k)
-                if current_value is not None:
-                    self._data[k] = current_value.apply(None, attribute, k, member_delta, to_blender)
-        finally:
-            context.visit_state.path.pop()
+        self._aos_length = struct_update._aos_length
+        specifics.fit_aos(attribute, self, context)
+        for k, member_delta in struct_update._data.items():
+            current_value = self.data(k)
+            if current_value is not None:
+                self._data[k] = current_value.apply(None, attribute, k, member_delta, to_blender)
+
         return self
 
     def diff(
@@ -168,26 +168,21 @@ class AosProxy(Proxy):
         diff.init(aos)
         diff._aos_length = len(aos)
 
-        context.visit_state.path.append(key)
-        try:
-            item_bl_rna = prop.fixed_type.bl_rna
-            member_names: Iterable[str] = []
-            if item_bl_rna is T.UnknownType.bl_rna:
-                # UnknownType used in ShapeKey. Contents depends on the items that has the Key (Curve, Mesh, Lattice)
-                if len(self) != 0:
-                    member_names = set(dir(aos[0])) - _unknown_type_attributes
-            else:
-                member_names = [item[0] for item in context.synchronized_properties.properties(item_bl_rna)]
+        item_bl_rna = prop.fixed_type.bl_rna
+        member_names: Iterable[str] = []
+        if item_bl_rna is T.UnknownType.bl_rna:
+            # UnknownType used in ShapeKey. Contents depends on the items that has the Key (Curve, Mesh, Lattice)
+            if len(self) != 0:
+                member_names = set(dir(aos[0])) - _unknown_type_attributes
+        else:
+            member_names = [item[0] for item in context.synchronized_properties.properties(item_bl_rna)]
 
-            for member_name in member_names:
-                # co, normals, ...
-                proxy_data = self._data.get(member_name, SoaElement())
-                delta = diff_attribute(aos, member_name, item_bl_rna, proxy_data, context)
-                if delta is not None:
-                    diff._data[member_name] = delta
-
-        finally:
-            context.visit_state.path.pop()
+        for member_name in member_names:
+            # co, normals, ...
+            proxy_data = self._data.get(member_name, SoaElement())
+            delta = diff_attribute(aos, member_name, item_bl_rna, proxy_data, context)
+            if delta is not None:
+                diff._data[member_name] = delta
 
         # if anything has changed, wrap the hollow proxy in a DeltaUpdate. This may be superfluous but
         # it is homogenous with additions and deletions

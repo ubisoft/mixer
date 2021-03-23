@@ -83,14 +83,10 @@ class StructProxy(Proxy):
         # includes properties from the bl_rna only, not the "view like" properties like MeshPolygon.edge_keys
         # that we do not want to load anyway
         properties = specifics.conditional_properties(attribute, properties)
-        context.visit_state.path.append(key)
-        try:
-            for name, bl_rna_property in properties:
-                attr = getattr(attribute, name)
-                attr_value = read_attribute(attr, name, bl_rna_property, attribute, context)
-                self._data[name] = attr_value
-        finally:
-            context.visit_state.path.pop()
+        for name, bl_rna_property in properties:
+            attr = getattr(attribute, name)
+            attr_value = read_attribute(attr, name, bl_rna_property, attribute, context)
+            self._data[name] = attr_value
 
         return self
 
@@ -117,12 +113,8 @@ class StructProxy(Proxy):
             logger.info(f"save: attribute is None for {context.visit_state.display_path()}.{key}")
             return
 
-        context.visit_state.path.append(key)
-        try:
-            for k, v in self._data.items():
-                write_attribute(attribute, k, v, context)
-        finally:
-            context.visit_state.path.pop()
+        for k, v in self._data.items():
+            write_attribute(attribute, k, v, context)
 
     def apply(
         self,
@@ -167,22 +159,16 @@ class StructProxy(Proxy):
                     if isinstance(update, NonePtrProxy):
                         return NonePtrProxy()
             if attribute:
-                context.visit_state.path.append(key)
-                try:
-                    for k, member_delta in update._data.items():
-                        current_value = self._data.get(k)
-                        try:
-                            self._data[k] = apply_attribute(
-                                attribute, k, current_value, member_delta, context, to_blender
-                            )
-                        except Exception as e:
-                            logger.warning(f"Struct.apply(). Processing {member_delta}")
-                            logger.warning(f"... for {attribute}.{k}")
-                            logger.warning(f"... Exception: {e!r}")
-                            logger.warning("... Update ignored")
-                            continue
-                finally:
-                    context.visit_state.path.pop()
+                for k, member_delta in update._data.items():
+                    current_value = self._data.get(k)
+                    try:
+                        self._data[k] = apply_attribute(attribute, k, current_value, member_delta, context, to_blender)
+                    except Exception as e:
+                        logger.warning(f"Struct.apply(). Processing {member_delta}")
+                        logger.warning(f"... for {attribute}.{k}")
+                        logger.warning(f"... Exception: {e!r}")
+                        logger.warning("... Update ignored")
+                        continue
 
         return self
 
@@ -239,26 +225,20 @@ class StructProxy(Proxy):
         # _data and the getting the properties with
         #   member_property = struct.bl_rna.properties[k]
         # line to which py-spy attributes 20% of the total diff !
-        if prop is not None:
-            context.visit_state.path.append(key)
-        try:
-            properties = context.synchronized_properties.properties(attribute)
-            properties = specifics.conditional_properties(attribute, properties)
-            for k, member_property in properties:
-                try:
-                    member = getattr(attribute, k)
-                except AttributeError:
-                    logger.info(f"diff: unknown attribute {k} in {attribute}")
-                    continue
+        properties = context.synchronized_properties.properties(attribute)
+        properties = specifics.conditional_properties(attribute, properties)
+        for k, member_property in properties:
+            try:
+                member = getattr(attribute, k)
+            except AttributeError:
+                logger.info(f"diff: unknown attribute {k} in {attribute}")
+                continue
 
-                proxy_data = self._data.get(k)
-                delta = diff_attribute(member, k, member_property, proxy_data, context)
+            proxy_data = self._data.get(k)
+            delta = diff_attribute(member, k, member_property, proxy_data, context)
 
-                if delta is not None:
-                    diff._data[k] = delta
-        finally:
-            if prop is not None:
-                context.visit_state.path.pop()
+            if delta is not None:
+                diff._data[k] = delta
 
         # TODO detect media updates (reload(), and attach a media descriptor to diff)
         # difficult ?

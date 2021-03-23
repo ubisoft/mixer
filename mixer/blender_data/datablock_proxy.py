@@ -42,7 +42,7 @@ from mixer.local_data import get_resolved_file_path, get_source_file_path
 
 if TYPE_CHECKING:
     from mixer.blender_data.aos_soa_proxy import SoaElement
-    from mixer.blender_data.bpy_data_proxy import RenameChangeset, Context, VisitState
+    from mixer.blender_data.bpy_data_proxy import RenameChangeset, Context
     from mixer.blender_data.types import ArrayGroups, Path, SoaMember
 
 
@@ -79,7 +79,7 @@ class DatablockProxy(StructProxy):
 
         self._custom_properties = CustomPropertiesProxy()
 
-        self._soas: Dict[VisitState.Path, List[Tuple[str, SoaElement]]] = defaultdict(list)
+        self._soas: Dict[Path, List[Tuple[str, SoaElement]]] = defaultdict(list)
         """e.g. {
             ("vertices"): [("co", co_soa), ("normals", normals_soa)]
             ("edges"): ...
@@ -519,6 +519,7 @@ class DatablockProxy(StructProxy):
 
         r = self.find_by_path(bl_item, path)
         if r is None:
+            logger.error(f"update_soa: {path} not found in {bl_item}")
             return
         container, container_proxy = r
         for soa_member in soa_members:
