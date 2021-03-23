@@ -56,26 +56,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RecursionGuard:
-    """
-    Limits allowed attribute depth, and guards against recursion caused by unfiltered circular references
-    """
-
-    MAX_DEPTH = 30
-
-    def __init__(self):
-        self._property_stack: List[str] = []
-
-    def push(self, name: str):
-        self._property_stack.append(name)
-        if len(self._property_stack) > self.MAX_DEPTH:
-            property_path = ".".join([p for p in self._property_stack])
-            raise MaxDepthExceeded(property_path)
-
-    def pop(self):
-        self._property_stack.pop()
-
-
 class ProxyState:
     """
     State of a BpyDataProxy
@@ -130,9 +110,20 @@ class ProxyState:
 
 class VisitState:
     """
-    Visit state updated during the proxy structure hierarchy with local (per datablock)
-    or global (inter datablock) state
+    Keeps track of relevent state during the proxy structure hierarchy visit.
+
+    VisitState contains intra datablock or inter datablock state.
+
+    Intra datablock state is local to a datablock. It is used to keek track of the datablock being processed or
+    when the settign of a block attribute influences the processing of other attributes in a different structure.
+    This state is reset when a new datablock is entered.
+
+    Inter datablock state is global to the set of datablocks visited during an update. It is used when the state of one
+    datablock influences the processing of another datablock.
     """
+
+    _MAX_DEPTH = 30
+    """Maximum nesting level, to guard against unfiltered circular references."""
 
     class CurrentDatablockContext:
         """Context manager to keep track of the current standalone datablock"""
@@ -169,16 +160,21 @@ class VisitState:
         Local state
         """
 
-        self.path: Path = []
-        """The path to the current property from the current datablock, for instance in GreasePencil
-        ["layers", "fills", "frames", 0, "strokes", 1, "points", 0].
+        self._attribute_path: List[Tuple[T.bpy_struct, Union[int, str]]] = []
+        """The sequence of attributes and identifiers to the current property starting from the current datablock.
+            [
+                (bpy.data.objects[0], "modifiers")
+                (bpy.data.objects[0].modifiers, 0)
+                ...
+            ]
 
-        Local state
-        """
+        Note that the first item is the parent attribute of the current attribute and the second element is the
+        identifier of the current attribute in its parent.
 
-        self.recursion_guard = RecursionGuard()
-        """Keeps track of the data depth and guards agains excessive depth that may be caused
-        by circular references.
+        Used to :
+        - identify SoaElement buffer updates : for instance ["layers", "fills", "frames", 0, "strokes", 1, "points", 0]
+        - guard against circular references,
+        - keep track of where we come from
 
         Local state
         """
@@ -197,13 +193,36 @@ class VisitState:
         return VisitState.CurrentDatablockContext(self, proxy, datablock)
 
     def display_path(self) -> str:
-        """Path to the attribute currently visited ("bpy.data.objects['Cube'].modifiers.0.name"), for logging"""
-        if self.path:
-            component = "." + ".".join([str(x) for x in self.path])
+        """Path to the attribute currently visited (e.g. "bpy.data.objects['Cube'].modifiers.0.name"), for logging"""
+        if self._attribute_path:
+            component = "." + ".".join([str(x[1]) for x in self._attribute_path])
         else:
             component = ""
 
         return str(self.datablock_string) + component
+
+    def push(self, attribute: T.bpy_struct, key: Union[int, str]):
+        if len(self._attribute_path) > self._MAX_DEPTH:
+            raise MaxDepthExceeded(self.display_path())
+
+        self._attribute_path.append((attribute, key))
+
+    def pop(self):
+        self._attribute_path.pop()
+
+    def attribute(self, index: int) -> T.bpy_struct:
+        return self._attribute_path[index]
+
+    def path(self) -> Tuple[Union[int, str], ...]:
+        """The path of the attribute being processed.
+
+        In load(), save(), diff(), apply() the value when visiting the first modifier of bpy.data.objects[0] is
+            [
+                (bpy.data.objects[0], "modifiers")
+                (bpy.data.objects[0].modifiers, 0)
+            ]
+        """
+        return tuple(item[1] for item in self._attribute_path)
 
 
 @dataclass

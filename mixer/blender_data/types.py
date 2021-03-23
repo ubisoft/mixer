@@ -33,7 +33,7 @@ SoaMember = Tuple[str, array.array]
 """
 
 Path = List[Union[str, int]]
-"""a data path starting from the datablock e.g. ["curves", 0, "bezier_points"]"""
+"""A data path starting from the datablock e.g. ["curves", 0, "bezier_points"]"""
 
 
 @dataclass

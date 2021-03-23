@@ -133,35 +133,44 @@ class TestAosSoa(unittest.TestCase):
     def setUp(self):
         bpy.ops.wm.open_mainfile(filepath=test_blend_file)
 
-    @unittest.skip("grease_pencil restricted to name")
     def test_all_soa_grease_pencil(self):
+
+        # test_misc.TestAosSoa.test_all_soa_grease_pencil
         import array
 
         bpy.ops.object.gpencil_add(type="STROKE")
         proxy = BpyDataProxy()
         proxy.load(test_properties)
-        gp_layers = proxy.data("grease_pencils").search_one("Stroke").data("layers")
-        gp_points = gp_layers.data("Lines").data("frames").data(0).data("strokes").data(0).data("points")._data
+        gp = proxy.data("grease_pencils").search_one("Stroke")
+        gp_layer_lines = gp.data("layers").data(1)
+        gp_points = gp_layer_lines.data("frames").data(0).data("strokes").data(0).data("points")._data
         expected = (
             ("co", array.array, "f"),
             ("pressure", array.array, "f"),
             ("strength", array.array, "f"),
             ("uv_factor", array.array, "f"),
             ("uv_rotation", array.array, "f"),
-            ("select", list, bool),
         )
         for name, type_, element_type in expected:
             self.assertIn("co", gp_points)
             item = gp_points[name]
             self.assertIsInstance(item, SoaElement)
-            self.assertIsInstance(item._data, type_)
+            self.assertIsInstance(item._array, type_)
             if type_ is array.array:
-                self.assertEqual(item._data.typecode, element_type)
+                self.assertEqual(item._array.typecode, element_type)
             else:
-                self.assertIsInstance(item._data[0], element_type)
+                self.assertIsInstance(item._array[0], element_type)
 
-        self.assertEqual(len(gp_points["pressure"]._data), len(gp_points["strength"]._data))
-        self.assertEqual(3 * len(gp_points["pressure"]._data), len(gp_points["co"]._data))
+        self.assertEqual(len(gp_points["pressure"]._array), len(gp_points["strength"]._array))
+        self.assertEqual(3 * len(gp_points["pressure"]._array), len(gp_points["co"]._array))
+
+        # Test path resolution for soa buffers
+        stroke = bpy.data.grease_pencils["Stroke"]
+        path = next(iter(gp._soas))
+
+        points_attribute, points_gp_points = gp.find_by_path(stroke, path)
+        self.assertEqual(points_attribute, stroke.layers["Lines"].frames[0].strokes[0].points)
+        self.assertIs(points_gp_points._data, gp_points)
 
 
 class TestFunctionDispatch(unittest.TestCase):

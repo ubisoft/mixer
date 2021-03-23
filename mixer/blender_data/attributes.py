@@ -75,7 +75,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
 
         return SetProxy().load(attr)
 
-    context.visit_state.recursion_guard.push(attr_property.identifier)
+    context.visit_state.push(attr_property, key)
     try:
         from mixer.blender_data.misc_proxies import PtrToCollectionItemProxy
 
@@ -144,7 +144,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
         logger.error("read_attribute: no implementation for ...")
         logger.error(f"... {context.visit_state.display_path()}.{key} (type: {type(attr)})")
     finally:
-        context.visit_state.recursion_guard.pop()
+        context.visit_state.pop()
 
 
 def get_attribute_value(parent, key):
@@ -176,7 +176,11 @@ def write_attribute(
     try:
         if isinstance(value, Proxy):
             attribute_value = get_attribute_value(parent, key)
-            value.save(attribute_value, parent, key, context)
+            context.visit_state.push(parent, key)
+            try:
+                value.save(attribute_value, parent, key, context)
+            finally:
+                context.visit_state.pop()
 
         else:
             assert isinstance(key, str)
@@ -250,7 +254,12 @@ def apply_attribute(
     try:
         if isinstance(current_proxy_value, Proxy):
             attribute_value = get_attribute_value(parent, key)
-            return current_proxy_value.apply(attribute_value, parent, key, delta, context, to_blender)
+
+            context.visit_state.push(parent, key)
+            try:
+                return current_proxy_value.apply(attribute_value, parent, key, delta, context, to_blender)
+            finally:
+                context.visit_state.pop()
         else:
             if to_blender:
                 # try is less costly than fetching the property to find if the attribute is readonly
@@ -289,7 +298,11 @@ def diff_attribute(
     """
     try:
         if isinstance(value, Proxy):
-            return value.diff(item, key, item_property, context)
+            context.visit_state.push(item, key)
+            try:
+                return value.diff(item, key, item_property, context)
+            finally:
+                context.visit_state.pop()
 
         # An attribute mappable on a python builtin type
         blender_value = _read_builtin(item)

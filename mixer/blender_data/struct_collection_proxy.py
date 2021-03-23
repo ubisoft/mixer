@@ -122,12 +122,13 @@ class StructCollectionProxy(Proxy):
         bl_collection_property: T.Property,
         context: Context,
     ):
-
-        context.visit_state.path.append(key)
-        try:
-            self._sequence = [_proxy_factory(v).load(v, i, context) for i, v in enumerate(bl_collection.values())]
-        finally:
-            context.visit_state.path.pop()
+        self._sequence.clear()
+        for i, v in enumerate(bl_collection.values()):
+            context.visit_state.push(v, i)
+            try:
+                self._sequence.append(_proxy_factory(v).load(v, i, context))
+            finally:
+                context.visit_state.pop()
         return self
 
     def save(self, collection: T.bpy_prop_collection, parent: T.bpy_struct, key: str, context: Context):
@@ -140,33 +141,28 @@ class StructCollectionProxy(Proxy):
             key: the name of the collection in parent (e.g "background_images")
             context: the proxy and visit state
         """
-        context.visit_state.path.append(key)
-        try:
-            sequence = self._sequence
+        sequence = self._sequence
 
-            # Using clear_from ensures that sequence data is compatible with remaining elements after
-            # truncate_collection. This addresses an issue with Nodes, for which the order of default nodes (material
-            # output and principled in collection) may not match the order of incoming nodes. Saving node data into a
-            # node of the wrong type can lead to a crash.
-            clear_from = specifics.clear_from(collection, sequence)
-            specifics.truncate_collection(collection, clear_from)
+        # Using clear_from ensures that sequence data is compatible with remaining elements after
+        # truncate_collection. This addresses an issue with Nodes, for which the order of default nodes (material
+        # output and principled in collection) may not match the order of incoming nodes. Saving node data into a
+        # node of the wrong type can lead to a crash.
+        clear_from = specifics.clear_from(collection, sequence)
+        specifics.truncate_collection(collection, clear_from)
 
-            # For collections like `IDMaterials`, the creation API (`.new(datablock_ref)`) also writes the value.
-            # For collections like `Nodes`, the creation API (`.new(name)`) does not write the item value.
-            # So the value must always be written for all collection types.
-            collection_length = len(collection)
-            for i, item_proxy in enumerate(sequence[:collection_length]):
-                write_attribute(collection, i, item_proxy, context)
-            for i, item_proxy in enumerate(sequence[collection_length:], collection_length):
-                try:
-                    specifics.add_element(collection, item_proxy, i, context)
-                except AddElementFailed:
-                    break
-                # Must write at once, otherwise the default item name might conflit with a later item name
-                write_attribute(collection, i, item_proxy, context)
-
-        finally:
-            context.visit_state.path.pop()
+        # For collections like `IDMaterials`, the creation API (`.new(datablock_ref)`) also writes the value.
+        # For collections like `Nodes`, the creation API (`.new(name)`) does not write the item value.
+        # So the value must always be written for all collection types.
+        collection_length = len(collection)
+        for i, item_proxy in enumerate(sequence[:collection_length]):
+            write_attribute(collection, i, item_proxy, context)
+        for i, item_proxy in enumerate(sequence[collection_length:], collection_length):
+            try:
+                specifics.add_element(collection, item_proxy, i, context)
+            except AddElementFailed:
+                break
+            # Must write at once, otherwise the default item name might conflit with a later item name
+            write_attribute(collection, i, item_proxy, context)
 
     def apply(
         self,
@@ -201,7 +197,6 @@ class StructCollectionProxy(Proxy):
                 self.save(collection, parent, key, context)
         else:
             # a sparse update
-            context.visit_state.path.append(key)
             try:
                 sequence = self._sequence
 
@@ -236,8 +231,6 @@ class StructCollectionProxy(Proxy):
                 logger.warning("apply: Exception while processing attribute ...")
                 logger.warning(f"... {context.visit_state.display_path()}.{key}")
                 logger.warning(f"... {e!r}")
-            finally:
-                context.visit_state.path.pop()
 
         return self
 
@@ -271,29 +264,25 @@ class StructCollectionProxy(Proxy):
             return DeltaReplace(self)
         else:
             item_property = collection_property.fixed_type
-            context.visit_state.path.append(key)
-            try:
-                diff = self.__class__()
+            diff = self.__class__()
 
-                # items from clear_from index cannot be updated, most often because eir type has changed (e.g
-                # ObjectModifier)
-                clear_from = specifics.clear_from(collection, sequence)
+            # items from clear_from index cannot be updated, most often because eir type has changed (e.g
+            # ObjectModifier)
+            clear_from = specifics.clear_from(collection, sequence)
 
-                # run a diff for the head, that can be updated in-place
-                for i in range(clear_from):
-                    delta = diff_attribute(collection[i], i, item_property, sequence[i], context)
-                    if delta is not None:
-                        diff._diff_updates.append((i, delta))
+            # run a diff for the head, that can be updated in-place
+            for i in range(clear_from):
+                delta = diff_attribute(collection[i], i, item_property, sequence[i], context)
+                if delta is not None:
+                    diff._diff_updates.append((i, delta))
 
-                # delete the existing tail that cannot be modified
-                diff._diff_deletions = len(sequence) - clear_from
+            # delete the existing tail that cannot be modified
+            diff._diff_deletions = len(sequence) - clear_from
 
-                # add the new tail
-                for i, item in enumerate(collection[clear_from:], clear_from):
-                    value = read_attribute(item, i, item_property, collection, context)
-                    diff._diff_additions.append(DeltaAddition(value))
-            finally:
-                context.visit_state.path.pop()
+            # add the new tail
+            for i, item in enumerate(collection[clear_from:], clear_from):
+                value = read_attribute(item, i, item_property, collection, context)
+                diff._diff_additions.append(DeltaAddition(value))
 
             if diff._diff_updates or diff._diff_deletions or diff._diff_additions:
                 return DeltaUpdate(diff)

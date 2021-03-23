@@ -1,3 +1,9 @@
+# 0.23.0 (Wip)
+
+## Fixes
+
+- Synchronization: ignore "select" attribute everywhere
+
 
 # 0.22.0 (19-03-2021)
 

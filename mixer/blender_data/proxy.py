@@ -243,20 +243,17 @@ class Proxy:
         if isinstance(bl_item, T.bpy_struct):
             bl = getattr(bl_item, head)
         elif isinstance(bl_item, T.bpy_prop_collection):
-            if isinstance(head, int) and head + 1 > len(bl_item):
-                logger.error(f"Index {head} > len({bl_item}) ({len(bl_item)})")
+            try:
+                bl = bl_item[head]
+            except (KeyError, IndexError):
                 return None
-            if isinstance(head, str) and head not in bl_item:
-                logger.error(f"Key {head} not in {bl_item}")
-                return None
-            bl = bl_item[head]
         else:
             return None
 
         proxy = self.data(head)
         if proxy is None:
             logger.warning(f"find_by_path: No proxy for {bl_item} {path}")
-            return
+            return None
 
         if not tail:
             return bl, proxy
