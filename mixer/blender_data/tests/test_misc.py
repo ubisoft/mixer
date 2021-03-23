@@ -150,7 +150,6 @@ class TestAosSoa(unittest.TestCase):
             ("strength", array.array, "f"),
             ("uv_factor", array.array, "f"),
             ("uv_rotation", array.array, "f"),
-            ("select", array.array, "b"),
         )
         for name, type_, element_type in expected:
             self.assertIn("co", gp_points)
