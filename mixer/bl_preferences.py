@@ -108,7 +108,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
         default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)),
     )
     room: bpy.props.StringProperty(
-        name="Room", description="Name of the session room", default=os.environ.get("VRTIST_ROOM", getuser())
+        name="Room", description="Name of the session room", default="RM_" + os.environ.get("VRTIST_ROOM", getuser())
     )
 
     # User name as displayed in peers user list
