@@ -194,7 +194,6 @@ class MixerProperties(bpy.types.PropertyGroup):
     display_advanced_options: bpy.props.BoolProperty(default=False)
     display_developer_options: bpy.props.BoolProperty(default=False)
     display_rooms: bpy.props.BoolProperty(default=True)
-    display_selected_room_properties: bpy.props.BoolProperty(default=False)
     display_rooms_details: bpy.props.BoolProperty(
         default=False, name="Display Rooms Details in the Server Rooms List Panel"
     )

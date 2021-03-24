@@ -130,6 +130,13 @@ class MixerPreferences(bpy.types.AddonPreferences):
         update=on_user_color_changed,
     )
 
+    display_selected_room_properties: bpy.props.BoolProperty(
+        name="Room Properties", description="Display the properties of the selected room", default=False
+    )
+    users_list_panel_opened: bpy.props.BoolProperty(
+        name="Users List", description="Display the list of the users in the selected room", default=False
+    )
+
     def get_log_level(self):
         return logging.getLogger(__package__).level
 
