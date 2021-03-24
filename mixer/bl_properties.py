@@ -164,9 +164,25 @@ class UserItem(bpy.types.PropertyGroup):
         max=1.0,
         precision=2,
     )
+
+    def _get_color(self):
+        return self.internal_color
+
+    def _set_color(self, value):
+        self["color"] = self.internal_color
+
     color: bpy.props.FloatVectorProperty(
-        name="Color", subtype="COLOR", size=3, min=0.0, max=1.0, precision=2, get=lambda self: self.internal_color
+        name="User Color",
+        description="Color associated to the user in the 3D viewport.\nCan only be modified by the user himself",
+        subtype="COLOR",
+        size=3,
+        min=0.0,
+        max=1.0,
+        precision=2,
+        get=_get_color,
+        set=_set_color,
     )
+
     windows: bpy.props.CollectionProperty(name="Windows", type=UserWindowItem)
     selected_window_index: bpy.props.IntProperty(name="Window Index")
     scenes: bpy.props.CollectionProperty(name="Scenes", type=UserSceneItem)

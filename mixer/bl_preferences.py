@@ -119,7 +119,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
         update=on_user_changed,
     )
     color: bpy.props.FloatVectorProperty(
-        name="User Color 2",
+        name="User Color",
         subtype="COLOR",
         size=3,
         min=0.0,
