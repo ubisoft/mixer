@@ -241,7 +241,7 @@ def _(collection_name: str, proxy: DatablockProxy, context: Context) -> T.Vector
     return font
 
 
-@bpy_data_ctor.register("images")
+@bpy_data_ctor.register("images")  # type: ignore[no-redef]
 @bpy_data_ctor.register("movieclips")
 @bpy_data_ctor.register("sounds")  # type: ignore[no-redef]
 def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
@@ -316,7 +316,7 @@ def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional
     return collection.new(name, type_)
 
 
-@bpy_data_ctor.register("lights")
+@bpy_data_ctor.register("lights")  # type: ignore[no-redef]
 @bpy_data_ctor.register("textures")  # type: ignore[no-redef]
 def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
@@ -386,8 +386,8 @@ def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     return _filter_properties(properties, filter_props)
 
 
-@conditional_properties.register(T.Curve)
-@conditional_properties.register(T.Mesh)
+@conditional_properties.register(T.Curve)  # type: ignore[no-redef]
+@conditional_properties.register(T.Mesh)  # type: ignore[no-redef]
 @conditional_properties.register(T.MetaBall)  # type: ignore[no-redef]
 def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     if not bpy_struct.use_auto_texspace:
@@ -426,13 +426,13 @@ def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     return _filter_properties(properties, filter_props)
 
 
-@conditional_properties.register(T.EffectSequence)
+@conditional_properties.register(T.EffectSequence)  # type: ignore[no-redef]
 @conditional_properties.register(T.ImageSequence)
 @conditional_properties.register(T.MaskSequence)
 @conditional_properties.register(T.MetaSequence)
 @conditional_properties.register(T.MovieClipSequence)
 @conditional_properties.register(T.MovieSequence)
-@conditional_properties.register(T.SceneSequence)  # type: ignore[no-redef]
+@conditional_properties.register(T.SceneSequence)
 def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     if bpy.app.version >= (2, 92, 0):
         return properties
@@ -543,9 +543,9 @@ def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, index:
             raise AddElementFailed from None
 
 
-@add_element.register(T.NodeInputs)
+@add_element.register(T.NodeInputs)  # type: ignore[no-redef]
 @add_element.register(T.NodeOutputs)
-@add_element.register(T.NodeTreeInputs)
+@add_element.register(T.NodeTreeInputs)  # type: ignore[no-redef]
 @add_element.register(T.NodeTreeOutputs)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     socket_type = proxy.data("type")
@@ -553,9 +553,9 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
     return collection.new(socket_type, name)
 
 
-@add_element.register(T.ObjectGpencilModifiers)
+@add_element.register(T.ObjectGpencilModifiers)  # type: ignore[no-redef]
 @add_element.register(T.ObjectModifiers)
-@add_element.register(T.ObjectShaderFx)
+@add_element.register(T.ObjectShaderFx)  # type: ignore[no-redef]
 @add_element.register(T.SequenceModifiers)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     name = proxy.data("name")
@@ -563,7 +563,7 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
     return collection.new(name, type_)
 
 
-@add_element.register(T.CurveSplines)
+@add_element.register(T.CurveSplines)  # type: ignore[no-redef]
 @add_element.register(T.FCurveModifiers)
 @add_element.register(T.ObjectConstraints)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
@@ -571,7 +571,7 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
     return collection.new(type_)
 
 
-@add_element.register(T.SplinePoints)
+@add_element.register(T.SplinePoints)  # type: ignore[no-redef]
 @add_element.register(T.SplineBezierPoints)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     return collection.add(1)
@@ -601,7 +601,7 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
         raise AddElementFailed from None
 
 
-@add_element.register(T.ActionGroups)
+@add_element.register(T.ActionGroups)  # type: ignore[no-redef]
 @add_element.register(T.FaceMaps)
 @add_element.register(T.LoopColors)
 @add_element.register(T.TimelineMarkers)
@@ -650,7 +650,7 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
     )
 
 
-@add_element.register(T.AnimDataDrivers)
+@add_element.register(T.AnimDataDrivers)  # type: ignore[no-redef]
 @add_element.register(T.ActionFCurves)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     data_path = proxy.data("data_path")
@@ -906,7 +906,7 @@ def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]
     return min(len(sequence), len(collection))
 
 
-@clear_from.register(T.ObjectModifiers)
+@clear_from.register(T.ObjectModifiers)  # type: ignore[no-redef]
 @clear_from.register(T.ObjectGpencilModifiers)
 @clear_from.register(T.SequenceModifiers)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:

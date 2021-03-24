@@ -164,7 +164,10 @@ class SoaElement(Proxy):
         """Attach the buffer to the DatablockProxy or DeltaUpdate"""
         # Store the buffer information at the root of the datablock so that it is easy to find it for serialization
         visit_state = context.visit_state
-        parent_path = tuple(visit_state.path)
+
+        # path to the bl_collection that contains the element managed by this proxy,
+        # e.g ("vertices") if this proxy manages a Mesh.vertices element
+        parent_path = visit_state.path()[:-1]
         root = visit_state.datablock_proxy
         root._soas[parent_path].append((self._member_name, self))
 

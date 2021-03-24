@@ -1,22 +1,30 @@
-# 0.22.0 (wip)
-
-## Features
-
-- Grease pencil: synchronize effects
-- UI: Simplification of Mixer user interface
-- UI: Property panel for the selected room
-- UI: Advanced and developper properties now visible only in the add-on preferences
-- UI: Toggle between Mixer and VRtist panels
+# 0.23.0 (Wip)
 
 ## Fixes
 
-- Object modifier synchronization failure on Blender 2.92
-- VSE synchronization error on 2.92
-- Invalid values for user color
+- Synchronization: ignore "select" attribute everywhere
+
+
+# 0.22.0 (19-03-2021)
+
+## Features
+
+- UI: simplification of Mixer panel
+- UI: property panel for the selected room
+- UI: advanced and developer properties moved to add-on preferences
+- UI: toggle between Mixer and VRtist panels
+- Grease pencil: synchronize effects
+
+## Fixes
+
+- Object modifier: synchronization error on Blender 2.92
+- VSE: synchronization error on Blender 2.92
+- UI: invalid values for user color
+- Synchronization: ignore 3D cursor, viewport transform modes, snapping and render engine
 
 ## CI
 
-- Run unit tests against several Blender versions
+- Tests: run unit tests against several Blender versions
 
 # 0.21.1 (22-02-2021)
 

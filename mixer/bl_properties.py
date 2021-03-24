@@ -27,17 +27,13 @@ from mixer import display_version
 from mixer.broadcaster.common import RoomAttributes
 from mixer.os_utils import getuser
 from mixer.share_data import share_data
-from mixer.utils.utils import convert_version_str_to_tupple
 
 logger = logging.getLogger(__name__)
 
 
 class RoomItem(bpy.types.PropertyGroup):
     def has_warnings(self):
-        return (
-            bpy.app.version != convert_version_str_to_tupple(self.blender_version)
-            or display_version != self.mixer_version
-        )
+        return bpy.app.version_string != self.blender_version or display_version != self.mixer_version
 
     def get_room_blender_version(self):
         if (

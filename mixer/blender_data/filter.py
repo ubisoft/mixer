@@ -275,6 +275,7 @@ _exclude_names = [
     "override_library",
     "preview",
     "rna_type",
+    "select",
     "tag",
     "type_info",
     "users",
@@ -300,7 +301,6 @@ default_exclusions: FilterSet = {
                 # a view into FCurve.group
                 "channels",
                 # UI
-                "select",
                 "show_expanded",
                 "show_expanded_graph",
             ]
@@ -320,10 +320,8 @@ default_exclusions: FilterSet = {
     T.Collection: [NameFilterOut(["all_objects"])],
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
     T.Curve: [NameFilterOut(["shape_keys"])],
-    T.CurveMapPoint: [NameFilterOut(["select"])],
     T.DecimateModifier: [NameFilterOut(["face_count"])],
     T.FaceMap: [NameFilterOut(["index"])],
-    T.FCurve: [NameFilterOut(["select"])],
     T.Keyframe: [
         NameFilterOut(
             [
@@ -428,15 +426,12 @@ default_exclusions: FilterSet = {
             ]
         )
     ],
-    T.MeshEdge: [NameFilterOut(["select"])],
     T.MeshLoopColorLayer: [NameFilterOut(["active"])],
-    T.MeshPolygon: [NameFilterOut(["area", "center", "normal", "select"])],
-    T.MeshUVLoop: [NameFilterOut(["select"])],
+    T.MeshPolygon: [NameFilterOut(["area", "center", "normal"])],
     T.MeshUVLoopLayer: [NameFilterOut(["active", "active_clone"])],
     T.MeshVertex: [
         NameFilterOut(
             [
-                "select",
                 # MeshVertex.groups is updated via Object.vertex_groups
                 "groups",
             ]
@@ -528,6 +523,8 @@ default_exclusions: FilterSet = {
                 "stereo_views",
                 # Causes error in pass_filter, maybe not useful
                 "bake",
+                # Engine type (Eevee, Cycle...)
+                "engine",
             ]
         )
     ],
@@ -554,6 +551,12 @@ default_exclusions: FilterSet = {
                 # TODO
                 # a view into builtin U keying_sets ?
                 "keying_sets_all",
+                # ui: scene transform mode
+                "transform_orientation_slots",
+                # ui: user settings for viewport content manipulation
+                "tool_settings",
+                # ui: 3D cursor
+                "cursor",
             ]
         ),
     ],
