@@ -61,7 +61,7 @@ class UnresolvedRefs:
     (e.g. bpy.types.Collection.children)
     """
 
-    SrcLink = Callable[[T.ID], None]
+    SrcLink = Callable[[], None]
 
     def __init__(self):
         self._refs: Dict[Uuid, List[Tuple[self.Func, str]]] = defaultdict(list)

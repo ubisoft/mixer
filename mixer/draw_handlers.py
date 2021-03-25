@@ -28,9 +28,10 @@ from mixer.bl_utils import get_mixer_prefs, get_mixer_props
 from mixer.broadcaster.common import ClientAttributes
 
 import bpy
-from mathutils import Matrix, Vector
 
+from functools import lru_cache
 import logging
+from mathutils import Matrix, Vector
 
 logger = logging.getLogger(__name__)
 
@@ -310,7 +311,7 @@ def users_selection_draw_iteration(
                 else:
                     objects = []
                 parent_matrix = Matrix.Translation(-collection.instance_offset) @ obj.matrix_world
-                per_object_callback(user_dict, obj, parent_matrix @ BBOX_SCALE_MATRIX, DEFAULT_BBOX)
+                per_object_callback(user_dict, obj, parent_matrix @ _bbox_scale_matrix(), DEFAULT_BBOX)
                 if draw_first_only:
                     return
 
@@ -321,7 +322,7 @@ def users_selection_draw_iteration(
                 if diag.length_squared == 0:
                     bbox = DEFAULT_BBOX
 
-                per_object_callback(user_dict, obj, parent_matrix @ obj.matrix_world @ BBOX_SCALE_MATRIX, bbox)
+                per_object_callback(user_dict, obj, parent_matrix @ obj.matrix_world @ _bbox_scale_matrix(), bbox)
                 if draw_first_only:
                     return
 
@@ -367,7 +368,12 @@ DEFAULT_BBOX = [
     (+1, +1, -1),
 ]
 
-BBOX_SCALE_MATRIX = Matrix.Scale(1.05, 4)
+
+@lru_cache()
+def _bbox_scale_matrix():
+    return Matrix.Scale(1.05, 4)
+
+
 IDENTITY_MATRIX = Matrix()
 
 DEFAULT_COLOR = (1, 0, 1)

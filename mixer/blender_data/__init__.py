@@ -41,7 +41,7 @@ def register():
     import bpy
     from mixer.blender_data.bpy_data import collections_types
 
-    for type_ in collections_types:
+    for type_ in collections_types():
         type_.mixer_uuid = bpy.props.StringProperty(default="")
 
 

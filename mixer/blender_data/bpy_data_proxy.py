@@ -316,7 +316,7 @@ class BpyDataProxy(Proxy):
 
         self.state: ProxyState = ProxyState()
 
-        self._data = {name: DatablockCollectionProxy(name) for name in collections_names}
+        self._data = {name: DatablockCollectionProxy(name) for name in collections_names()}
 
         self._delayed_local_updates: Set[Uuid] = set()
         """Local datablock updates retained until returning to Object mode.

@@ -14,6 +14,26 @@ flake8:
     - pip install black flake8 flake8-black pep8-naming flake8-bugbear --constraint requirements-dev.txt
     - flake8 -v mixer tests extra
 
+
+doc:
+  stage: pre_release
+  extends:
+    - .except_on_gitlab.com
+    - .except_nightly_test
+  tags:
+    - docker
+  image: python:3
+  when: manual
+  script:
+    - pip install sphinx sphinx-rtd-theme
+    - sphinx-build -b html docs docs/_build/html
+    - rm -rf docs/_build/doctree
+  artifacts:
+    name: "${CI_PROJECT_NAME}_${CI_COMMIT_REF_NAME}_${CI_COMMIT_SHORT_SHA}_html"
+    paths:
+      - docs/_build
+    expire_in: 1 week
+
 zip:
   extends:
     - .except_nightly_test

@@ -22,6 +22,8 @@ pycodestyle==2.6.0
 pyflakes==2.2.0
 regex==2020.4.4
 requests==2.23.0
+Sphinx==3.5.1
+sphinx-rtd-theme==0.5.1
 toml==0.10.1
 typed-ast==1.4.1
 typing==3.7.4.1

@@ -42,8 +42,6 @@ DEBUG = True
 
 logger = logging.getLogger(__name__)
 
-_vertex_group_prop = T.Object.bl_rna.properties["vertex_groups"].fixed_type
-
 
 def _window_area():
     for window in bpy.context.window_manager.windows:

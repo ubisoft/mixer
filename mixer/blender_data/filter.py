@@ -25,6 +25,7 @@ see synchronization.md
 """
 from __future__ import annotations
 
+from functools import lru_cache
 import logging
 from typing import Any, Dict, ItemsView, Iterable, List, Optional, Set, Union
 
@@ -79,11 +80,15 @@ class TypeFilter(Filter):
     """
 
     def __init__(self, types: Union[Any, Iterable[Any]]):
-        types = types if isinstance(types, Iterable) else [types]
-        self._types: Iterable[Any] = [t.bl_rna for t in types]
+        self._types = types if isinstance(types, Iterable) else [types]
+
+    @property
+    @lru_cache()
+    def _rnas(self):
+        return [t.bl_rna for t in self._types]
 
     def matches(self, bl_rna_property):
-        return bl_rna_property.bl_rna in self._types or any([is_pointer_to(bl_rna_property, t) for t in self._types])
+        return bl_rna_property.bl_rna in self._rnas or any([is_pointer_to(bl_rna_property, t) for t in self._rnas])
 
 
 class TypeFilterIn(TypeFilter):
@@ -94,20 +99,6 @@ class TypeFilterIn(TypeFilter):
 class TypeFilterOut(TypeFilter):
     def apply(self, properties):
         return [p for p in properties if not self.matches(p)], ""
-
-
-class CollectionFilterOut(TypeFilter):
-    def apply(self, properties):
-        # srna looks like the type inside the collection
-        return [
-            p
-            for p in properties
-            if p.bl_rna is not T.CollectionProperty.bl_rna or p.srna and p.srna.bl_rna not in self._types
-        ], ""
-
-
-class FuncFilterOut(Filter):
-    pass
 
 
 class NameFilter(Filter):
@@ -149,7 +140,15 @@ def bases(bl_rna):
 
 class FilterStack:
     def __init__(self):
-        self._filter_stack: List[FilterSet] = []
+        self._filter_sets: List[FilterSet] = []
+
+    @property
+    @lru_cache()
+    def _filter_stack(self):
+        filters = []
+        for filter_set in self._filter_sets:
+            filters.append({None if k is None else k.bl_rna: v for k, v in filter_set.items()})
+        return filters
 
     def apply(self, bl_rna: T.bpy_struct) -> List[T.Property]:
         properties = list(bl_rna.properties)
@@ -167,7 +166,7 @@ class FilterStack:
         return properties
 
     def append(self, filter_set: FilterSet):
-        self._filter_stack.append({None if k is None else k.bl_rna: v for k, v in filter_set.items()})
+        self._filter_sets.append(filter_set)
 
 
 BlRna = Any
@@ -188,11 +187,16 @@ class SynchronizedProperties:
     and never unloaded
     """
 
-    def __init__(self, filter_stack, order: PropertiesOrder):
+    def __init__(self, filter_stack, properties_order: PropertiesOrder):
         self._properties: Dict[BlRna, Properties] = {}
         self._filter_stack: FilterStack = filter_stack
         self._unhandled_bpy_data_collection_names: Optional[List[str]] = None
-        self._order = {k.bl_rna: v for k, v in order.items()}
+        self._properties_order = properties_order
+
+    @property
+    @lru_cache()
+    def _order(self):
+        return {k.bl_rna: v for k, v in self._properties_order.items()}
 
     def _sort(self, bl_rna, properties: List[T.Property]):
         try:
@@ -234,7 +238,7 @@ class SynchronizedProperties:
         """
         if self._unhandled_bpy_data_collection_names is None:
             handled = {item[0] for item in self.properties(bpy_type=T.BlendData)}
-            self._unhandled_bpy_data_collection_names = list(collections_names - handled)
+            self._unhandled_bpy_data_collection_names = list(collections_names() - handled)
 
         return self._unhandled_bpy_data_collection_names
 

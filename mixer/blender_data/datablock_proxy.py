@@ -159,7 +159,7 @@ class DatablockProxy(StructProxy):
             proxy = DatablockProxy()
 
         type_name = sub_id_type(type(datablock)).bl_rna.identifier
-        proxy._bpy_data_collection = rna_identifier_to_collection_name[type_name]
+        proxy._bpy_data_collection = rna_identifier_to_collection_name()[type_name]
         proxy._datablock_uuid = datablock.mixer_uuid
         return proxy
 

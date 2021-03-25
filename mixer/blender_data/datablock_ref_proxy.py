@@ -82,7 +82,7 @@ class DatablockRefProxy(Proxy):
         # Base type closest to ID (e.g. Light for Point)
         type_ = bases_of(type(datablock).bl_rna)[-2]
         type_name = type_.bl_rna.identifier
-        self._bpy_data_collection = rna_identifier_to_collection_name[type_name]
+        self._bpy_data_collection = rna_identifier_to_collection_name()[type_name]
         self._initial_name = datablock.name
 
         self._datablock_uuid = datablock.mixer_uuid
