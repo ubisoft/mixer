@@ -117,7 +117,7 @@ def generic_description(cls, context, properties):
 
 
 class CreateRoomOperator(bpy.types.Operator):
-    """Create a new room on Mixer server"""
+    """Create a new room on Mixer server with the specified name"""
 
     bl_idname = "mixer.create_room"
     bl_label = "Create Room"

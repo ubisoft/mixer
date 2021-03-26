@@ -148,7 +148,7 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
         row = split.row()
         row.scale_x = 0.9
         row.label(text="", icon="BLANK1")  # BLANK1
-        row.label(text="Name")
+        row.label(text="Room Name")
 
         split.label(text="Users")
         if get_mixer_props().display_rooms_details:
@@ -164,20 +164,33 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.split()
 
-        row = split.row()
+        is_current_room = share_data.client.current_room is not None and item.name == share_data.client.current_room
+
+        row = split.row(align=False)
         row.scale_x = 0.9
         sub_row = row.row()
-        sub_row.alert = True
+
+        current_room_row = sub_row.row()
+        icon_current_room = "BLANK1"
+        if is_current_room:
+            icon_current_room = "HOME"
+        current_room_row.label(text="", icon=icon_current_room)
+
         icon_warning = "BLANK1"
         if item.has_warnings():
+            warning_row = sub_row.row()
+            warning_row.alert = True
             icon_warning = "ERROR"
-
-        sub_row.label(text="", icon=icon_warning)
-        row.label(text=item.name)  # avoids renaming the item by accident
+            warning_row.label(text="", icon=icon_warning)
+        sub_row.label(text=item.name)  # avoids renaming the item by accident
 
         split.label(
             text=f"{item.users_count if item.users_count >= 0 else '?'} user{'s' if item.users_count > 1 else ''}"
         )
+
+        # if is_current_room:
+        #     split.operator(bl_operators.LeaveRoomOperator.bl_idname, depress=True)
+
         if get_mixer_props().display_rooms_details:
             split.label(text=item.blender_version)
             split.label(text=item.mixer_version)
@@ -197,7 +210,7 @@ class SHAREDFOLDER_UL_ItemRenderer(bpy.types.UIList):  # noqa
 def draw_user_settings_ui(layout: bpy.types.UILayout):
     mixer_prefs = get_mixer_prefs()
 
-    split = layout.split(factor=0.233, align=False)
+    split = layout.split(factor=0.258, align=False)
     split.label(text="User:")
 
     row = split.row()
@@ -307,6 +320,7 @@ def draw_server_users_ui(layout: bpy.types.UILayout):
         box = layout.box()
         box.row().prop(mixer_props, "display_users_details")
         box.row().prop(mixer_props, "display_users_filter", expand=True)
+
         for user in (user for user in mixer_props.users if is_user_displayed(user)):
             user_layout = box
             if mixer_props.display_users_details:
@@ -402,7 +416,7 @@ class MixerSettingsPanel(bpy.types.Panel):
 
         if not self.connected():
             layout.separator(factor=0.2)
-            split = layout.split(factor=0.233, align=False)
+            split = layout.split(factor=0.258, align=False)
             split.label(text="Host:")
             split.prop(mixer_prefs, "host", text="")
 
@@ -421,20 +435,38 @@ class MixerSettingsPanel(bpy.types.Panel):
             layout.separator(factor=2.0)
 
             if not share_data.client.current_room:
-
-                grid = layout.column_flow(columns=2)
-                row = grid.row()
+                split = layout.split(factor=0.75)
+                row = split.row()
+                row.scale_y = 1.5
                 sub_row = row.row()
-                sub_row.scale_x = 0.5
-                sub_row.label(text="Room:")
-                row.prop(mixer_prefs, "room", text="")
-                row = grid.row()
-                row.operator(bl_operators.CreateRoomOperator.bl_idname)
+                sub_row.scale_x = 0.74
+                sub_row.label(text="New Room:")
+
+                sub_col = row.column()
+                sub_col.scale_y = 0.7
+                empty_row = sub_col.row()
+                empty_row.scale_y = 0.2
+                empty_row.label(text="")
+                sub_col.prop(mixer_prefs, "room", text="")
+
+                sub_row = split.row()
+                sub_row.scale_y = 1.5
+                sub_row.operator(bl_operators.CreateRoomOperator.bl_idname, text="Create")
+
             else:
-                split = layout.split(factor=0.6)
-                split.label(text=f"Room: {share_data.client.current_room}")
-                split.label(text=f"Join: {get_mixer_props().joining_percentage * 100:.2f} %")
-                split.operator(bl_operators.LeaveRoomOperator.bl_idname, text="Leave Room", depress=True)
+                split = layout.split(factor=0.75)
+                split.scale_y = 1.5
+
+                # code for Join component:
+                # row = split.row()
+                # sub_split = row.split(factor=0.7)
+                # sub_split.label(text=f"Current Room:   {share_data.client.current_room}")
+                # sub_split.label(text=f"Join: {get_mixer_props().joining_percentage * 100:.2f} %")
+
+                split.label(text=f"Current Room:   {share_data.client.current_room}")
+                split.operator(bl_operators.LeaveRoomOperator.bl_idname, text="Leave", depress=True)
+
+            layout.separator(factor=1.5)
 
             self.draw_rooms(layout)
 
@@ -448,10 +480,12 @@ class MixerSettingsPanel(bpy.types.Panel):
             layout = layout.box().column()
             ROOM_UL_ItemRenderer.draw_header(layout)
             layout.template_list("ROOM_UL_ItemRenderer", "", mixer_props, "rooms", mixer_props, "room_index", rows=2)
+            row = layout.row()
+            row.scale_y = 1.3
             if share_data.client.current_room is None:
-                layout.operator(bl_operators.JoinRoomOperator.bl_idname)
+                row.operator(bl_operators.JoinRoomOperator.bl_idname, text="Join Selected Room")
             else:
-                layout.operator(bl_operators.LeaveRoomOperator.bl_idname)
+                row.operator(bl_operators.LeaveRoomOperator.bl_idname, depress=True)
 
             if len(mixer_props.rooms):
                 self.draw_current_room_properties(layout)
@@ -497,10 +531,16 @@ class MixerSettingsPanel(bpy.types.Panel):
 
     def draw_current_room_properties(self, layout):
         mixer_props = get_mixer_props()
+        mixer_prefs = get_mixer_prefs()
+
+        def user_belongs_to_selected_room(user: UserItem):
+            if mixer_props.room_index >= 0 and mixer_props.room_index < len(mixer_props.rooms):
+                return user.room == mixer_props.rooms[mixer_props.room_index].name
+            return False
 
         layout.separator(factor=0.5)
-        collapsable_panel(layout, mixer_props, "display_selected_room_properties", text="Selected Room Properties")
-        if mixer_props.display_selected_room_properties:
+        collapsable_panel(layout, mixer_prefs, "display_selected_room_properties", text="Selected Room Properties")
+        if mixer_prefs.display_selected_room_properties:
             box = layout.box()
             if not len(mixer_props.rooms):
                 box.label(text="No room available")
@@ -510,7 +550,7 @@ class MixerSettingsPanel(bpy.types.Panel):
 
                 # disabled properties
                 row = box.row()
-                row.separator(factor=6)
+                row.separator(factor=2)
                 col = row.column()
                 col.use_property_decorate = False
                 col.separator(factor=0.5)
@@ -537,10 +577,26 @@ class MixerSettingsPanel(bpy.types.Panel):
                 _display_property(col, "Room Size:", f"{current_room.mega_byte_size:.2} MB")
 
                 blender_warning = bpy.app.version_string != current_room.blender_version
-                _display_property(col, "Blender Version:", current_room.blender_version, has_warning=blender_warning)
+                if blender_warning:
+                    _display_property(
+                        col,
+                        "Blender Version:",
+                        f"Room: {current_room.blender_version} / Yours: {bpy.app.version_string}",
+                        has_warning=blender_warning,
+                    )
+                else:
+                    _display_property(col, "Blender Version:", current_room.blender_version)
 
                 mixer_warning = display_version != current_room.mixer_version
-                _display_property(col, "Mixer Version:", current_room.mixer_version, has_warning=mixer_warning)
+                if mixer_warning:
+                    _display_property(
+                        col,
+                        "Mixer Version:",
+                        f"Room: {current_room.mixer_version} / Yours: {display_version}",
+                        has_warning=mixer_warning,
+                    )
+                else:
+                    _display_property(col, "Mixer Version:", current_room.mixer_version)
 
                 _display_property(col, "Command Count:", current_room.command_count)
                 _display_property(col, "Protocol:", current_room.protocol)
@@ -548,7 +604,7 @@ class MixerSettingsPanel(bpy.types.Panel):
 
                 # enabled properties:
                 row = box.row()
-                row.separator(factor=6)
+                row.separator(factor=2)
                 col = row.column()
                 col.use_property_split = False
                 col.use_property_decorate = False
@@ -561,7 +617,22 @@ class MixerSettingsPanel(bpy.types.Panel):
 
                 split.prop(current_room, "keep_open", text="")
 
-                col.separator(factor=0.5)
+                row = box.row()
+                row.separator(factor=2)
+                collapsable_panel(row, mixer_prefs, "users_list_panel_opened", text="Users in the Room")
+                if mixer_prefs.users_list_panel_opened:
+                    sub_row = box.row()
+                    sub_row.separator(factor=7)
+                    sub_box = sub_row.box()
+                    col = sub_box.column()
+
+                    for user in (user for user in mixer_props.users if user_belongs_to_selected_room(user)):
+                        user_split = col.split()
+                        sub_row = user_split.row()
+                        user_sub_split = sub_row.split(factor=0.8)
+                        user_sub_split.label(text=f"{user.name}", icon="USER" if user.is_me else "BLANK1")
+                        user_sub_split.prop(user, "color", text="")
+                        sub_row.label(text=f"{user.ip_port}")
 
 
 class VRtistSettingsPanel(bpy.types.Panel):

@@ -108,7 +108,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
         default=int(os.environ.get("VRTIST_PORT", common.DEFAULT_PORT)),
     )
     room: bpy.props.StringProperty(
-        name="Room", description="Name of the session room", default=os.environ.get("VRTIST_ROOM", getuser())
+        name="Room", description="Name of the session room", default="RM_" + os.environ.get("VRTIST_ROOM", getuser())
     )
 
     # User name as displayed in peers user list
@@ -119,7 +119,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
         update=on_user_changed,
     )
     color: bpy.props.FloatVectorProperty(
-        name="User Color 2",
+        name="User Color",
         subtype="COLOR",
         size=3,
         min=0.0,
@@ -128,6 +128,13 @@ class MixerPreferences(bpy.types.AddonPreferences):
         description="Color used in the viewport of the cooperative session\nto differenciate you from the other users",
         default=gen_random_color(),
         update=on_user_color_changed,
+    )
+
+    display_selected_room_properties: bpy.props.BoolProperty(
+        name="Room Properties", description="Display the properties of the selected room", default=False
+    )
+    users_list_panel_opened: bpy.props.BoolProperty(
+        name="Users List", description="Display the list of the users in the selected room", default=False
     )
 
     def get_log_level(self):

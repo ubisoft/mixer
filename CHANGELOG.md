@@ -1,8 +1,16 @@
 # 0.23.0 (Wip)
 
+## Features
+
+- UI: add a prefix to default room name based on user name
+- UI: add the list of users per room in the Selected Room Properties panel
+- UI: improved visibility of Connect and Disconnect buttons for existing rooms
+- UI: removed unused "Join" progress value
+
 ## Fixes
 
 - Synchronization: ignore "select" attribute everywhere
+- UI: color for other users is now accurate
 
 
 # 0.22.0 (19-03-2021)
