@@ -531,6 +531,8 @@ default_exclusions: FilterSet = {
     T.Scene: [
         NameFilterOut(
             [
+                # each user should be able to view and render through the scene camera she chooses
+                "camera",
                 # Let each participant play his own time
                 "frame_current",
                 "frame_float",
