@@ -316,7 +316,16 @@ default_exclusions: FilterSet = {
         )
     ],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
-    T.Bone: [NameFilterOut(["parent"])],
+    T.Bone: [
+        NameFilterOut(
+            [
+                "parent", 
+                "children",
+                "bbone_custom_handle_start",
+                "bbone_custom_handle_end",
+            ]
+        )
+    ],
     T.Collection: [NameFilterOut(["all_objects"])],
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
     T.Curve: [NameFilterOut(["shape_keys"])],
@@ -642,6 +651,7 @@ test_properties = SynchronizedProperties(test_filter, property_order)
 
 safe_depsgraph_updates = (
     T.Action,
+    T.Armature,
     T.Camera,
     T.Collection,
     T.Curve,
@@ -673,6 +683,7 @@ See synchronization.md
 safe_filter = FilterStack()
 safe_blenddata_collections = [
     "actions",
+    "armatures",
     "cameras",
     "collections",
     "curves",
