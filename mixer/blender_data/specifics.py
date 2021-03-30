@@ -612,6 +612,12 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
     return collection.new(name=name)
 
 
+@add_element.register(T.ArmatureEditBones)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
+    name = proxy.data("name")
+    return collection.new(name)
+
+
 @add_element.register(T.GreasePencilLayers)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     name = proxy.data("info")

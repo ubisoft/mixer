@@ -306,6 +306,7 @@ default_exclusions: FilterSet = {
             ]
         )
     ],
+    T.Armature: [NameFilterOut(["bones"])],
     T.BezierSplinePoint: [
         NameFilterOut(
             [
@@ -316,16 +317,16 @@ default_exclusions: FilterSet = {
         )
     ],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
-    T.Bone: [
-        NameFilterOut(
-            [
-                "parent", 
-                "children",
-                "bbone_custom_handle_start",
-                "bbone_custom_handle_end",
-            ]
-        )
-    ],
+    # T.Bone: [
+    #     NameFilterOut(
+    #         [
+    #             "parent",
+    #             "children",
+    #             "bbone_custom_handle_start",
+    #             "bbone_custom_handle_end",
+    #         ]
+    #     )
+    # ],
     T.Collection: [NameFilterOut(["all_objects"])],
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
     T.Curve: [NameFilterOut(["shape_keys"])],

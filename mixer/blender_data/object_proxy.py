@@ -32,6 +32,7 @@ from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.mesh_proxy import VertexGroups
 from mixer.blender_data.proxy import Delta, DeltaReplace
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
+from mixer.blender_data.armature_proxy import ArmatureProxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context, Proxy
@@ -64,6 +65,7 @@ class ObjectProxy(DatablockProxy):
         self._fit_material_slots(datablock, self._data["material_slots"], context)
         super()._save(datablock, context)
         self._update_vertex_groups(datablock, self._data["vertex_groups"], context)
+        self._update_armature_edit_bones(datablock, context)
         return datablock
 
     def _fit_material_slots(
@@ -169,6 +171,11 @@ class ObjectProxy(DatablockProxy):
 
             for index, weight in zip(indices, weights):
                 vertex_group.add([index], weight, "ADD")
+
+    def _update_armature_edit_bones(self, object_datablock: T.Object, context: Context):
+        if not isinstance(object_datablock.data, T.Armature):
+            return
+        ArmatureProxy.apply_edit_bones(object_datablock, context)
 
     def _diff(self, struct: T.Object, key: str, prop: T.Property, context: Context, diff: Proxy) -> Optional[Delta]:
         from mixer.blender_data.attributes import diff_attribute
