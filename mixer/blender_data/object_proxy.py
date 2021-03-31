@@ -33,6 +33,7 @@ from mixer.blender_data.mesh_proxy import VertexGroups
 from mixer.blender_data.proxy import Delta, DeltaReplace
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 from mixer.blender_data.armature_proxy import ArmatureProxy
+from mixer.blender_data.attributes import write_attribute
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context, Proxy
@@ -176,6 +177,7 @@ class ObjectProxy(DatablockProxy):
         if not isinstance(object_datablock.data, T.Armature):
             return
         ArmatureProxy.apply_edit_bones(object_datablock, context)
+        write_attribute(object_datablock.pose, "bones", self.data("pose").data("bones"), context)
 
     def _diff(self, struct: T.Object, key: str, prop: T.Property, context: Context, diff: Proxy) -> Optional[Delta]:
         from mixer.blender_data.attributes import diff_attribute

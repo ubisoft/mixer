@@ -317,16 +317,13 @@ default_exclusions: FilterSet = {
         )
     ],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
-    # T.Bone: [
-    #     NameFilterOut(
-    #         [
-    #             "parent",
-    #             "children",
-    #             "bbone_custom_handle_start",
-    #             "bbone_custom_handle_end",
-    #         ]
-    #     )
-    # ],
+    T.Bone: [
+        NameFilterOut(
+            [
+                "parent",
+            ]
+        )
+    ],
     T.Collection: [NameFilterOut(["all_objects"])],
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
     T.Curve: [NameFilterOut(["shape_keys"])],
@@ -500,7 +497,6 @@ default_exclusions: FilterSet = {
                 "particle_systems",
                 # unsupported
                 "motion_path",
-                "pose",
                 "proxy_collection",
                 "proxy",
                 "soft_body",
@@ -523,6 +519,14 @@ default_exclusions: FilterSet = {
                 "is_baking",
                 "is_frame_skip",
                 "is_outdated",
+            ]
+        )
+    ],
+    T.PoseBone: [
+        NameFilterOut(
+            [
+                "child",
+                "parent",
             ]
         )
     ],
@@ -629,6 +633,9 @@ property_order: PropertiesOrder = {
     T.NodeTree: {
         # must exist before links are saved
         "nodes"
+    },
+    T.PoseBone: {
+        "matrix",
     },
     T.Scene: {
         # Required to save view_layers

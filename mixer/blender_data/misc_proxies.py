@@ -310,7 +310,11 @@ class PtrToCollectionItemProxy(Proxy):
 
     _serialize = ("_path", "_index")
 
-    _ctors = {(T.ShapeKey, "relative_key"): ("key_blocks",), (T.FCurve, "group"): ("groups",)}
+    _ctors = {
+        (T.ShapeKey, "relative_key"): ("key_blocks",),
+        (T.FCurve, "group"): ("groups",),
+        (T.EditBone, "parent"): ("edit_bones",),
+    }
     """ { struct member: path to the enclosing datablock collection}"""
 
     @classmethod
