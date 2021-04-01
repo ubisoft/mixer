@@ -22,21 +22,17 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data.datablock_proxy import DatablockProxy
 from mixer.blender_data.json_codec import serialize
-from mixer.blender_data.mesh_proxy import VertexGroups
-from mixer.blender_data.proxy import Delta, DeltaReplace
-from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 from mixer.blender_data.attributes import write_attribute
 
 if TYPE_CHECKING:
-    from mixer.blender_data.bpy_data_proxy import Context, Proxy
-    from mixer.blender_data.struct_proxy import StructProxy
+    from mixer.blender_data.bpy_data_proxy import Context
 
 
 DEBUG = True
@@ -56,28 +52,11 @@ def override_context():
     return None
 
 
-class ModeGuard:
-    def __init__(self, obj):
-        self.obj = obj
-
-    def __enter__(self):
-        self.ctx = override_context()
-        self.previous_mode = self.ctx["mode"]
-        self.previous_object = self.ctx["active_object"]
-        self.ctx["active_object"] = self.obj
-        # self.ctx["view_layer"].objects.active = self.obj
-        bpy.ops.object.mode_set(mode="EDIT")
-
-    def __exit__(self, type, value, traceback):
-        bpy.ops.object.mode_set(mode=self.previous_mode)
-        if self.previous_object:
-            self.ctx["active_object"] = self.previous_object
-
-
 @serialize
 class ArmatureProxy(DatablockProxy):
     """
     Proxy for an Armature datablock. This specialization is required to switch between current mode and edit mode
+    in order to read/write edit_bones.
     """
 
     _edit_bones_map = {}
@@ -107,8 +86,12 @@ class ArmatureProxy(DatablockProxy):
         obj = self.find_armature_parent_object(datablock)
         if not obj:
             return self
-        with ModeGuard(obj):
-            super().load(datablock, context)
+        ctx = override_context()
+        ctx["active_object"] = obj
+        previous_mode = ctx["mode"]
+        bpy.ops.object.mode_set(ctx, mode="EDIT")
+        super().load(datablock, context)
+        bpy.ops.object.mode_set(ctx, mode=previous_mode)
         return self
 
     @staticmethod
@@ -128,7 +111,10 @@ class ArmatureProxy(DatablockProxy):
         bpy.context.view_layer.objects.active = obj
         bpy.ops.object.mode_set(mode="EDIT")
 
-        write_attribute(obj.data, "edit_bones", edit_bones, context)
+        try:
+            write_attribute(obj.data, "edit_bones", edit_bones, context)
+        except Exception:
+            pass
         del ArmatureProxy._edit_bones_map[obj.data.mixer_uuid]
 
         bpy.ops.object.mode_set(mode="OBJECT")
