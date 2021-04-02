@@ -51,8 +51,8 @@ async def exec_buffer(reader: asyncio.StreamReader, writer: asyncio.StreamWriter
             logger.error("Exception")
             logger.error(traceback.format_exc())
             logger.error("While processing: ")
-            for line in buffer_string.splitlines():
-                logger.error(line)
+            for i, line in enumerate(buffer_string.splitlines()):
+                logger.error(f"  {i:>5} {line}")
 
         logger.debug("-- Done")
 

@@ -276,13 +276,14 @@ class StructCollectionProxy(Proxy):
                 if delta is not None:
                     diff._diff_updates.append((i, delta))
 
-            # delete the existing tail that cannot be modified
-            diff._diff_deletions = len(sequence) - clear_from
+            if specifics.can_resize(collection, context):
+                # delete the existing tail that cannot be modified
+                diff._diff_deletions = len(sequence) - clear_from
 
-            # add the new tail
-            for i, item in enumerate(collection[clear_from:], clear_from):
-                value = read_attribute(item, i, item_property, collection, context)
-                diff._diff_additions.append(DeltaAddition(value))
+                # add the new tail
+                for i, item in enumerate(collection[clear_from:], clear_from):
+                    value = read_attribute(item, i, item_property, collection, context)
+                    diff._diff_additions.append(DeltaAddition(value))
 
             if diff._diff_updates or diff._diff_deletions or diff._diff_additions:
                 return DeltaUpdate(diff)

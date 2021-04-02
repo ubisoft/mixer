@@ -831,6 +831,23 @@ def _key_blocks_property():
 
 
 @dispatch_rna
+def can_resize(collection: T.bpy_prop_collection, context: Context) -> bool:
+    """Returns True if the collection can safely be resized."""
+    return True
+
+
+@can_resize.register(T.NodeInputs)  # type: ignore[no-redef]
+@can_resize.register(T.NodeOutputs)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, context: Context) -> bool:
+    # in XxxNodeGroups, the number of sockets is controlled by the inner NodeGroup.inputs and NodeGroup.outputs
+    # Extending the collection in XxxNodeGroup would create the socket twice (once in the XXXNodeGroup and once
+    # in NodeTree.inputs or outputs).
+    # The existing items in XxxNodeGroup.inputs and outputs must be saved as they contain the socket default_value
+    node = context.visit_state.attribute(-2)
+    return not isinstance(node, _node_groups)
+
+
+@dispatch_rna
 def diff_must_replace(
     collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property
 ) -> bool:

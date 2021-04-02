@@ -250,7 +250,19 @@ bpy.ops.node.group_make(ctx)
         self.end_test()
 
     def test_add_interface(self):
-        self.send_string(create_material + self.add_nodes + self.create_group)
+        self.send_string(create_material)
+        self.send_string(self.add_nodes)
+        self.send_string(self.create_group)
+
+        add_input = """
+import bpy
+node_tree = bpy.data.node_groups[0]
+new_tree_input = node_tree.inputs.new("NodeSocketColor", "new_color")
+nodes = node_tree.nodes
+sock = node_tree.nodes["Group Input"].outputs[new_tree_input.name]
+node_tree.links.new(sock, nodes["MIX"].inputs["Color1"])
+"""
+        self.send_string(add_input)
         self.end_test()
 
 
