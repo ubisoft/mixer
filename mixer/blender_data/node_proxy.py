@@ -142,7 +142,7 @@ class NodeLinksProxy(StructCollectionProxy):
     def diff(self, links: T.NodeLinks, key, prop, context: Context) -> Optional[DeltaUpdate]:
         # always complete updates
         blender_links = self._load(links)
-        if blender_links == self._sequence:
+        if blender_links == self._sequence and not context.visit_state.send_nodetree_links:
             return None
 
         diff = self.__class__()

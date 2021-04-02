@@ -15,7 +15,7 @@ class TestCase(BlenderTestCase):
         super().setUp(blenderdescs=blenderdescs)
 
 
-context = """
+override_context = """
 def override_context(area_type):
     for window in bpy.context.window_manager.windows:
         for area in (area for area  in window.screen.areas if area.type == area_type):
@@ -125,7 +125,6 @@ bpy.data.materials["mat0"].name="mat0"
 
         self.assert_matches()
 
-
     def test_duplicate_node_name(self):
         # see StructCollectionProxy.apply()
         action = """
@@ -210,6 +209,84 @@ node_tree.links.new(src, dst1)
 node_tree.links.new(mix_node.outputs[0], nodes["Material Output"].inputs[1])
 """
         self.send_string(action)
+        self.end_test()
+
+
+class TestNodeGroups(TestCase):
+    def test_create_group(self):
+        self.send_string(create_material)
+        add_nodes = """
+import bpy
+node_tree = bpy.data.materials["mat0"].node_tree
+principled = node_tree.nodes["Principled BSDF"]
+rgb1 = node_tree.nodes.new("ShaderNodeRGB")
+rgb1.name="RGB1"
+rgb2 = node_tree.nodes.new("ShaderNodeRGB")
+rgb2.name="RGB2"
+mix = node_tree.nodes.new("ShaderNodeMixRGB")
+mix.name="MIX"
+node_tree.links.new(mix.outputs["Color"], principled.inputs["Base Color"])
+node_tree.links.new(rgb1.outputs["Color"], mix.inputs["Color1"])
+node_tree.links.new(rgb2.outputs["Color"], mix.inputs["Color2"])
+for node in node_tree.nodes:
+    node.select = False
+"""
+        self.send_string(add_nodes)
+
+        # https://blenderartists.org/t/best-way-to-group-nodes/576043/4
+        create_group = (
+            override_context
+            + """
+import bpy
+node_tree = bpy.data.materials["mat0"].node_tree
+nodes = node_tree.nodes
+nodes["MIX"].select = True
+nodes["RGB1"].select = True
+ctx = node_editor_context()
+bpy.ops.node.group_make(ctx)
+"""
+        )
+        self.send_string(create_group)
+        self.end_test()
+
+
+class TestGeometryNodes(TestCase):
+    def test_create(self):
+        action = """
+import bpy
+from bpy import context as C
+if bpy.app.version >= (2, 92, 0):
+    bpy.ops.mesh.primitive_cube_add()
+    cube = C.active_object
+    cube.scale *= 0.1
+
+    bpy.ops.mesh.primitive_plane_add()
+    plane = C.active_object
+    plane.scale *= 10
+    bpy.ops.object.modifier_add(type='NODES')
+    ng = plane.modifiers[0].node_group
+    point_distribute=ng.nodes.new("GeometryNodePointDistribute")
+    point_distribute.inputs["Density Max"].default_value = 2
+    randomize=ng.nodes.new("GeometryNodeAttributeRandomize")
+    randomize.inputs["Attribute"].default_value = "scale"
+    randomize.inputs[5].default_value = 0.2
+    point_instance=ng.nodes.new("GeometryNodePointInstance")
+    point_instance.inputs["Object"].default_value = cube
+    in_ = ng.nodes["Group Input"]
+    out_ = ng.nodes["Group Output"]
+    ng.links.new(in_.outputs["Geometry"], point_distribute.inputs["Geometry"])
+    ng.links.new(point_distribute.outputs["Geometry"], randomize.inputs["Geometry"])
+    ng.links.new(randomize.outputs["Geometry"], point_instance.inputs["Geometry"])
+    ng.links.new(point_instance.outputs["Geometry"], out_.inputs["Geometry"])
+"""
+        self.send_string(action, sleep=2.0)
+
+        hack = """
+import bpy
+if bpy.app.version >= (2, 92, 0):
+    bpy.data.objects[0].name = bpy.data.objects[0].name
+"""
+        self.send_string(hack, to=1, sleep=2.0)
         self.end_test()
 
 

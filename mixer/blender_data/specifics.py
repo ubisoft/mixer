@@ -199,15 +199,6 @@ def is_soable_property(bl_rna_property):
     return isinstance(bl_rna_property, soable_properties)
 
 
-node_tree_type = {
-    "COMPOSITING": "CompositorNodeTree",
-    "GEOMETRY": "GeometryNodeTree",
-    "SHADER": "ShaderNodeTree",
-    "SIMULATION": "SimulationNodeTree",
-    "TEXTURE": "TextureNodeTree",
-}
-
-
 @dispatch_value
 def bpy_data_ctor(collection_name: str, proxy: DatablockProxy, context: Any) -> Optional[T.ID]:
     """
@@ -312,8 +303,8 @@ def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional
 def _(collection_name: str, proxy: DatablockProxy, context: Context) -> Optional[T.ID]:
     collection = getattr(bpy.data, collection_name)
     name = proxy.data("name")
-    type_ = node_tree_type[proxy.data("type")]
-    return collection.new(name, type_)
+    bl_idname = proxy.data("bl_idname")
+    return collection.new(name, bl_idname)
 
 
 @bpy_data_ctor.register("lights")  # type: ignore[no-redef]
@@ -405,6 +396,18 @@ def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     # not hidden: saving width_hidden is ignored
     filter_props = ["width_hidden"]
     return _filter_properties(properties, filter_props)
+
+
+@conditional_properties.register(T.NodeGroupInput)  # type: ignore[no-redef]
+@conditional_properties.register(T.NodeGroupOutput)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    # These must not be saved, they are created/updated via NodeTree.inputs and NoteTree.outputs
+    filter_props = ["inputs", "outputs"]
+    if not bpy_struct.hide:
+        filter_props.append("width_hidden")
+
+    filtered = {k: v for k, v in properties if k not in filter_props}
+    return filtered.items()
 
 
 @conditional_properties.register(T.NodeTree)  # type: ignore[no-redef]
@@ -545,10 +548,16 @@ def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, index:
 
 @add_element.register(T.NodeInputs)  # type: ignore[no-redef]
 @add_element.register(T.NodeOutputs)
+def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
+    socket_type = proxy.data("type")
+    name = proxy.data("name")
+    return collection.new(socket_type, name)
+
+
 @add_element.register(T.NodeTreeInputs)  # type: ignore[no-redef]
 @add_element.register(T.NodeTreeOutputs)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
-    socket_type = proxy.data("type")
+    socket_type = proxy.data("bl_socket_idname")
     name = proxy.data("name")
     return collection.new(socket_type, name)
 
@@ -894,7 +903,7 @@ def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collect
 # Clear_from
 #
 @dispatch_rna
-def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], context: Context) -> int:
     """
     Returns the index of the first item in collection that has a type that does not match the
     coresponding item in sequence
@@ -909,7 +918,7 @@ def clear_from(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]
 @clear_from.register(T.ObjectModifiers)  # type: ignore[no-redef]
 @clear_from.register(T.ObjectGpencilModifiers)
 @clear_from.register(T.SequenceModifiers)  # type: ignore[no-redef]
-def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], context: Context) -> int:
     """clear_from implementation for collections of items that cannot be updated if their "type" attribute changes."""
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         if proxy.data("type") != item.type:
@@ -918,11 +927,15 @@ def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
 
 
 @clear_from.register(T.Nodes)  # type: ignore[no-redef]
-def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy]) -> int:
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], context: Context) -> int:
     """clear_from implementation for collections of items that cannot be updated if their "bl_idname" attribute
     changes."""
     for i, (proxy, item) in enumerate(zip(sequence, collection)):
         if proxy.data("bl_idname") != item.bl_idname:
+            # On the receiver, NodeTree.nodes will be partially cleared, which will clear some links.
+            # Resending the links is the easiest way to restore them.
+            # Note that Nodes items order may change after a socket default_value is updated !
+            context.visit_state.send_nodetree_links = True
             return i
 
     return min(len(sequence), len(collection))

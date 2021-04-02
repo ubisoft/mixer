@@ -135,11 +135,13 @@ class VisitState:
             self._proxy = proxy
 
         def __enter__(self):
+            self._visit_state.send_nodetree_links = False
             if not self._is_embedded_data:
                 self._visit_state.datablock_proxy = self._proxy
                 self._visit_state.datablock_string = self._datablock_string
 
         def __exit__(self, exc_type, exc_value, traceback):
+            self._visit_state.send_nodetree_links = False
             if not self._is_embedded_data:
                 self._visit_state.datablock_proxy = None
                 self._visit_state.datablock_string = None
@@ -184,6 +186,12 @@ class VisitState:
         into their MeshProxy.
 
         Global state
+        """
+
+        self.send_nodetree_links: bool = False
+        """NodeTree.nodes has been modified in a way that requires NodeTree.links to be resent.
+
+        Intra datablock state
         """
 
         self.datablock_string: Optional[str] = None
@@ -240,6 +248,8 @@ class Context:
 _creation_order = {
     # Libraries are needed to create all linked datablocks
     "libraries": -10,
+    # before materials
+    "node_groups": -10,
     # before curves
     "fonts": -5,
     # anything else: 0

@@ -147,7 +147,7 @@ class StructCollectionProxy(Proxy):
         # truncate_collection. This addresses an issue with Nodes, for which the order of default nodes (material
         # output and principled in collection) may not match the order of incoming nodes. Saving node data into a
         # node of the wrong type can lead to a crash.
-        clear_from = specifics.clear_from(collection, sequence)
+        clear_from = specifics.clear_from(collection, sequence, context)
         specifics.truncate_collection(collection, clear_from)
 
         # For collections like `IDMaterials`, the creation API (`.new(datablock_ref)`) also writes the value.
@@ -268,7 +268,7 @@ class StructCollectionProxy(Proxy):
 
             # items from clear_from index cannot be updated, most often because eir type has changed (e.g
             # ObjectModifier)
-            clear_from = specifics.clear_from(collection, sequence)
+            clear_from = specifics.clear_from(collection, sequence, context)
 
             # run a diff for the head, that can be updated in-place
             for i in range(clear_from):
