@@ -6,12 +6,13 @@
 - UI: add the list of users per room in the Selected Room Properties panel
 - UI: improved visibility of Connect and Disconnect buttons for existing rooms
 - UI: removed unused "Join" progress value
+- Geometry node tres: synchronization
 
 ## Fixes
 
 - Synchronization: ignore "select" attribute everywhere
 - UI: color for other users is now accurate
-
+- Node trees: fix missing connections
 
 # 0.22.0 (19-03-2021)
 
