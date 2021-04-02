@@ -451,7 +451,7 @@ class BpyDataProxy(Proxy):
 
         for datablock in sorted_updates:
             if not isinstance(datablock, safe_depsgraph_updates):
-                logger.info("depsgraph update: ignoring untracked type %s", datablock)
+                logger.info(f"depsgraph update: ignoring untracked type {datablock!r}")
                 continue
             if isinstance(datablock, T.Scene) and datablock.name == "_mixer_to_be_removed_":
                 logger.error(f"Skipping scene {datablock.name} uuid: '{datablock.mixer_uuid}'")
@@ -460,23 +460,23 @@ class BpyDataProxy(Proxy):
             if proxy is None:
                 # Not an error for embedded IDs.
                 if not datablock.is_embedded_data:
-                    logger.warning(f"depsgraph update for {datablock} : no proxy and not datablock.is_embedded_data")
+                    logger.warning(f"depsgraph update for {datablock!r} : no proxy and not datablock.is_embedded_data")
                 else:
                     # For instance Scene.node_tree is not a reference to a bpy.data collection element
                     # but a "pointer" to a NodeTree owned by Scene. In such a case, the update list contains
                     # scene.node_tree, then scene. We can ignore the scene.node_tree update since the
                     # processing of scene will process scene.node_tree.
                     # However, it is not obvious to detect the safe cases and remove the message in such cases
-                    logger.info("depsgraph update: Ignoring embedded %s", datablock)
+                    logger.info(f"depsgraph update: Ignoring embedded {datablock!r}")
                 continue
             delta = proxy.diff(datablock, datablock.name, None, context)
             if delta:
-                logger.info("depsgraph update: update %s", datablock)
+                logger.info(f"depsgraph update: update {datablock!r}")
                 # TODO add an apply mode to diff instead to avoid two traversals ?
                 proxy.apply_to_proxy(datablock, delta, context)
                 changeset.updates.append(delta)
             else:
-                logger.debug("depsgraph update: ignore empty delta %s", datablock)
+                logger.debug(f"depsgraph update: ignore empty delta {datablock!r}")
 
         return changeset
 
