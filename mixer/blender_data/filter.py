@@ -451,6 +451,7 @@ default_exclusions: FilterSet = {
         NameFilterOut(
             [
                 "internal_links",
+                "type",
                 # cannot be written: set by shader editor
                 "dimensions",
             ]
@@ -461,16 +462,21 @@ default_exclusions: FilterSet = {
         NameFilterOut(["is_hidden"])
     ],
     T.NodeSocket: [
+        # bl_idname may be forbidden with everything but XxxNodeGroup
+        # identifier is readonly but required to create ShaderNodeGroup sockets
+        NameFilterOut(["is_linked", "is_output", "label", "node", "type"])
+    ],
+    T.NodeSocketInterface: [
         # Currently synchronize builtin shading node sockets only, so assume these attributes are
         # managed only at the Node creation
-        # NameFilterOut(["identifier", "is_linked", "is_output", "link_limit", "name", "node", "type"])
-        NameFilterOut(["bl_idname", "is_linked", "is_output", "node"])
+        NameFilterOut(["identifier", "is_output", "type"])
     ],
     T.NodeTree: [
         NameFilterOut(
             [
                 # read only
                 "view_center",
+                "type",
             ]
         )
     ],

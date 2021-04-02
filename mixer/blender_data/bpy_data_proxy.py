@@ -218,8 +218,12 @@ class VisitState:
     def pop(self):
         self._attribute_path.pop()
 
-    def attribute(self, index: int) -> T.bpy_struct:
-        return self._attribute_path[index]
+    def attribute(self, i: int) -> T.bpy_struct:
+        """The i-th attribute visited, starting from the datablock.
+
+        More useful from the end, the attribute at -1 being the one that contains the attribute being processed.
+        """
+        return self._attribute_path[i][0]
 
     def path(self) -> Tuple[Union[int, str], ...]:
         """The path of the attribute being processed.

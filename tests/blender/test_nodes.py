@@ -213,9 +213,7 @@ node_tree.links.new(mix_node.outputs[0], nodes["Material Output"].inputs[1])
 
 
 class TestNodeGroups(TestCase):
-    def test_create_group(self):
-        self.send_string(create_material)
-        add_nodes = """
+    add_nodes = """
 import bpy
 node_tree = bpy.data.materials["mat0"].node_tree
 principled = node_tree.nodes["Principled BSDF"]
@@ -231,12 +229,10 @@ node_tree.links.new(rgb2.outputs["Color"], mix.inputs["Color2"])
 for node in node_tree.nodes:
     node.select = False
 """
-        self.send_string(add_nodes)
-
-        # https://blenderartists.org/t/best-way-to-group-nodes/576043/4
-        create_group = (
-            override_context
-            + """
+    # https://blenderartists.org/t/best-way-to-group-nodes/576043/4
+    create_group = (
+        override_context
+        + """
 import bpy
 node_tree = bpy.data.materials["mat0"].node_tree
 nodes = node_tree.nodes
@@ -245,8 +241,16 @@ nodes["RGB1"].select = True
 ctx = node_editor_context()
 bpy.ops.node.group_make(ctx)
 """
-        )
-        self.send_string(create_group)
+    )
+
+    def test_create_group(self):
+        self.send_string(create_material)
+        self.send_string(self.add_nodes)
+        self.send_string(self.create_group)
+        self.end_test()
+
+    def test_add_interface(self):
+        self.send_string(create_material + self.add_nodes + self.create_group)
         self.end_test()
 
 

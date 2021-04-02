@@ -102,6 +102,10 @@ soa_initializers: Dict[type, array.array] = {
     mathutils.Quaternion: array.array("f", [0.0]),
 }
 
+_node_groups = (T.ShaderNodeGroup, T.CompositorNodeGroup, T.TextureNodeGroup)
+if bpy.app.version >= (2, 92, 0):
+    _node_groups = _node_groups + (T.GeometryNodeGroup,)
+
 
 def dispatch_rna(no_rna_impl: Callable[..., Any]):
     """Decorator to select a function implementation according to the rna of its first argument
@@ -395,19 +399,45 @@ def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
 
     # not hidden: saving width_hidden is ignored
     filter_props = ["width_hidden"]
+
+    if isinstance(bpy_struct, T.NodeReroute):
+        filter_props.extend(
+            [
+                # cannot be set !!
+                "width"
+            ]
+        )
+
     return _filter_properties(properties, filter_props)
 
 
 @conditional_properties.register(T.NodeGroupInput)  # type: ignore[no-redef]
 @conditional_properties.register(T.NodeGroupOutput)  # type: ignore[no-redef]
 def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
-    # These must not be saved, they are created/updated via NodeTree.inputs and NoteTree.outputs
+    # For nodes of type NodeGroupInput and NodeGroupOutput, do not save inputs and outputs,
+    # which are created created/updated via NodeTree.inputs and NoteTree.outputs
     filter_props = ["inputs", "outputs"]
     if not bpy_struct.hide:
+        # same as for Node
         filter_props.append("width_hidden")
 
     filtered = {k: v for k, v in properties if k not in filter_props}
     return filtered.items()
+
+
+@conditional_properties.register(T.NodeSocket)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    # keep identifier for XxxNodeGroup only
+    if isinstance(bpy_struct.node, _node_groups):
+        return properties
+
+    filter_props = [
+        "identifier",
+        # saving bl_idname for NodeReroute (and others ?) cause havoc
+        "bl_idname",
+    ]
+
+    return _filter_properties(properties, filter_props)
 
 
 @conditional_properties.register(T.NodeTree)  # type: ignore[no-redef]
@@ -547,11 +577,19 @@ def _add_element_default(collection: T.bpy_prop_collection, proxy: Proxy, index:
 
 
 @add_element.register(T.NodeInputs)  # type: ignore[no-redef]
-@add_element.register(T.NodeOutputs)
+@add_element.register(T.NodeOutputs)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
-    socket_type = proxy.data("type")
+    node = context.visit_state.attribute(-1)
+    if not isinstance(node, _node_groups):
+        logger.warning(f"Unexpected add node input for {node} at {context.visit_path.path()}")
+
+    socket_type = proxy.data("bl_idname")
     name = proxy.data("name")
-    return collection.new(socket_type, name)
+    identifier = proxy.data("identifier")
+    socket = collection.new(socket_type, name, identifier=identifier)
+    if socket.identifier != identifier:
+        logger.warning(f"Identifier mismatch after socket {name!r} creation for {context.visit_path.path()}")
+    return socket
 
 
 @add_element.register(T.NodeTreeInputs)  # type: ignore[no-redef]
