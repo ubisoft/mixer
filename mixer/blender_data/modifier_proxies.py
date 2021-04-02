@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional, TYPE_CHECKING, Tuple, Union
 
+import bpy
 import bpy.types as T  # noqa
 
 from mixer.blender_data.json_codec import serialize
@@ -85,7 +86,17 @@ class NodesModifierProxy(StructProxy):
         key: Union[int, str],
         context: Context,
     ):
-        # the modifier is always created with a default geometry node with no relevant inputs.
+        # the modifier is always created with a default geometry node : remove it
+        node_group = modifier.node_group
+        if node_group is not None:
+            if node_group.users != 1:
+                logger.error(f"save(): default node group {node_group} has {node_group.users} users")
+                return
+            if node_group.mixer_uuid != "":
+                logger.error(f"save(): default node group {node_group} has uuid {node_group.mixer_uuid}")
+                return
+            bpy.data.node_groups.remove(node_group)
+
         # update the geometry node reference before updating the input entries
         super().save(modifier, parent, key, context)
         self.save_inputs(modifier)
@@ -110,10 +121,12 @@ class NodesModifierProxy(StructProxy):
         context: Context,
         to_blender: bool = True,
     ) -> Union[StructProxy, NonePtrProxy]:
+
         super().apply(modifier, parent, key, delta, context, to_blender)
         if not isinstance(delta, DeltaUpdate):
             logger.error(f"apply(): Internal error, unexpected delta type {type(delta)}")
             return self
+
         delta_inputs = getattr(delta.value, "_inputs", None)
         if delta_inputs is not None or "node_group" in delta.value._data:
             # also write inputs when the node_group changes
