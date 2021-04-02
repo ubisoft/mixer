@@ -1,0 +1,126 @@
+# GPLv3 License
+#
+# Copyright (C) 2020 Ubisoft
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+Utility proxy classes
+
+See synchronization.md
+"""
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, Optional, TYPE_CHECKING, Tuple, Union
+
+import bpy.types as T  # noqa
+
+from mixer.blender_data.json_codec import serialize
+from mixer.blender_data.proxy import Delta, DeltaUpdate
+from mixer.blender_data.struct_proxy import StructProxy
+
+if TYPE_CHECKING:
+    from mixer.blender_data.misc_proxies import NonePtrProxy
+    from mixer.blender_data.proxy import Context
+
+logger = logging.getLogger(__name__)
+
+
+@serialize
+class NodesModifierProxy(StructProxy):
+    _serialize: Tuple[str, ...] = StructProxy._serialize + ("_inputs",)
+
+    _non_inputs = set(("_RNA_UI",))
+    _non_inputs.update(T.NodesModifier.bl_rna.properties.keys())
+    """Identifiers of properties that are not inputs."""
+
+    def __init__(self):
+        self._inputs: Dict[int, Any] = {}
+        """{ index in geometry node group group input node : value }."""
+        super().__init__()
+
+    def load_inputs(self, modifier: T.bpy_struct) -> Dict[int, Any]:
+        input_names = set(modifier.keys()) - self._non_inputs
+        geometry_node_group = modifier.node_group
+        if geometry_node_group is None:
+            return {}
+        geometry_node_group_inputs = {
+            tree_input.identifier: i for i, tree_input in enumerate(geometry_node_group.inputs)
+        }
+        return {geometry_node_group_inputs[input_name]: modifier.get(input_name) for input_name in input_names}
+
+    def save_inputs(self, modifier: T.bpy_struct):
+        geometry_node_group = modifier.node_group
+        if geometry_node_group is None:
+            return {}
+        geometry_node_group_inputs = {
+            i: tree_input.identifier for i, tree_input in enumerate(geometry_node_group.inputs)
+        }
+        for input_index, value in self._inputs.items():
+            # default serialization transforms int keys into string
+            input_name = geometry_node_group_inputs[int(input_index)]
+            modifier[input_name] = value
+
+    def load(self, modifier: T.bpy_struct, key: Union[int, str], context: Context) -> NodesModifierProxy:
+        # The inputs are stored as "custom properties".
+        # The keys are the geometry node_group group input node outputs.
+        self._inputs = self.load_inputs(modifier)
+        return super().load(modifier, key, context)
+
+    def save(
+        self,
+        modifier: T.bpy_struct,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        context: Context,
+    ):
+        # the modifier is always created with a default geometry node with no relevant inputs.
+        # update the geometry node reference before updating the input entries
+        super().save(modifier, parent, key, context)
+        self.save_inputs(modifier)
+
+    def diff(self, modifier: T.bpy_struct, key: Union[int, str], prop: T.Property, context: Context) -> Optional[Delta]:
+
+        delta = super().diff(modifier, key, prop, context)
+        inputs = self.load_inputs(modifier)
+        if inputs != self._inputs:
+            if delta is None:
+                diff = self.__class__()
+                delta = DeltaUpdate(diff)
+            delta.value._inputs = inputs
+        return delta
+
+    def apply(
+        self,
+        modifier: T.bpy_struct,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        delta: Delta,
+        context: Context,
+        to_blender: bool = True,
+    ) -> Union[StructProxy, NonePtrProxy]:
+        super().apply(modifier, parent, key, delta, context, to_blender)
+        if not isinstance(delta, DeltaUpdate):
+            logger.error(f"apply(): Internal error, unexpected delta type {type(delta)}")
+            return self
+        delta_inputs = getattr(delta.value, "_inputs", None)
+        if delta_inputs is not None or "node_group" in delta.value._data:
+            # also write inputs when the node_group changes
+            self._inputs = delta_inputs
+            if to_blender:
+                ng = modifier.node_group
+                modifier.node_group = None
+                modifier.node_group = ng
+                self.save_inputs(modifier)
+        return self

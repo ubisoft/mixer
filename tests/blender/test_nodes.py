@@ -267,15 +267,13 @@ node_tree.links.new(sock, nodes["MIX"].inputs["Color1"])
 
 
 class TestGeometryNodes(TestCase):
-    def test_create(self):
-        action = """
+    create = """
 import bpy
 from bpy import context as C
 if bpy.app.version >= (2, 92, 0):
     bpy.ops.mesh.primitive_cube_add()
     cube = C.active_object
     cube.scale *= 0.1
-
     bpy.ops.mesh.primitive_plane_add()
     plane = C.active_object
     plane.scale *= 10
@@ -295,7 +293,9 @@ if bpy.app.version >= (2, 92, 0):
     ng.links.new(randomize.outputs["Geometry"], point_instance.inputs["Geometry"])
     ng.links.new(point_instance.outputs["Geometry"], out_.inputs["Geometry"])
 """
-        self.send_string(action, sleep=2.0)
+
+    def test_create(self):
+        self.send_string(self.create, sleep=2.0)
 
         hack = """
 import bpy
@@ -303,6 +303,24 @@ if bpy.app.version >= (2, 92, 0):
     bpy.data.objects[0].name = bpy.data.objects[0].name
 """
         self.send_string(hack, to=1, sleep=2.0)
+        self.end_test()
+
+    def test_input_int(self):
+        # Input float has a bug before 2.93 https://developer.blender.org/T86876
+        self.send_string(self.create)
+
+        update = """
+import bpy
+plane = bpy.data.objects["Plane"]
+modifier = plane.modifiers[0]
+ng = modifier.node_group
+sock = ng.inputs.new(name= "in_i", type = "NodeSocketInt")
+ng.links.new(ng.nodes["Group Input"].outputs["in_i"], ng.nodes["Point Distribute"].inputs["Density Max"])
+modifier[sock.identifier] = 10
+modifier.show_viewport = False
+modifier.show_viewport = True
+"""
+        self.send_string(update)
         self.end_test()
 
 

@@ -51,7 +51,7 @@ def _proxy_factory(attr):
 
         return NonePtrProxy()
     else:
-        return StructProxy()
+        return StructProxy.make(attr)
 
 
 @serialize
@@ -127,6 +127,9 @@ class StructCollectionProxy(Proxy):
             context.visit_state.push(v, i)
             try:
                 self._sequence.append(_proxy_factory(v).load(v, i, context))
+            except Exception as e:
+                logger.error(f"Exception during load at {context.visit_state.display_path()} ...")
+                logger.error(f"... {e!r}")
             finally:
                 context.visit_state.pop()
         return self

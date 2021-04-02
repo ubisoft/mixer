@@ -22,6 +22,7 @@ See synchronization.md
 """
 from __future__ import annotations
 
+from functools import lru_cache
 import logging
 from typing import Optional, Tuple, TYPE_CHECKING, Union
 
@@ -51,6 +52,20 @@ def _create_clear_animation_data(incoming_proxy: StructProxy, existing_struct: T
     return existing_struct.animation_data
 
 
+@lru_cache()
+def _proxy_types():
+    from mixer.blender_data.modifier_proxies import NodesModifierProxy
+
+    proxy_types = {}
+
+    try:
+        proxy_types[T.NodesModifier] = NodesModifierProxy
+    except AttributeError:
+        pass
+
+    return proxy_types
+
+
 @serialize
 class StructProxy(Proxy):
     """
@@ -68,6 +83,11 @@ class StructProxy(Proxy):
 
     def clear_data(self):
         self._data.clear()
+
+    @classmethod
+    def make(cls, bpy_struct: T.bpy_struct) -> StructProxy:
+        proxy_class = _proxy_types().get(type(bpy_struct), StructProxy)
+        return proxy_class()
 
     def load(self, attribute: T.bpy_struct, key: Union[int, str], context: Context) -> StructProxy:
         """
