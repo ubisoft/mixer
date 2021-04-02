@@ -1,3 +1,4 @@
+import logging
 import unittest
 
 from tests import files_folder
@@ -12,6 +13,7 @@ class TestCase(BlenderTestCase):
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
         blenderdescs = [sender, receiver]
+        self._log_level = logging.INFO
         super().setUp(blenderdescs=blenderdescs)
 
 
@@ -242,6 +244,14 @@ ctx = node_editor_context()
 bpy.ops.node.group_make(ctx)
 """
     )
+    add_input = """
+import bpy
+node_tree = bpy.data.node_groups[0]
+new_tree_input = node_tree.inputs.new("NodeSocketColor", "new_color")
+nodes = node_tree.nodes
+sock = node_tree.nodes["Group Input"].outputs[new_tree_input.name]
+node_tree.links.new(sock, nodes["MIX"].inputs["Color1"])
+"""
 
     def test_create_group(self):
         self.send_string(create_material)
@@ -254,15 +264,28 @@ bpy.ops.node.group_make(ctx)
         self.send_string(self.add_nodes)
         self.send_string(self.create_group)
 
-        add_input = """
+        self.send_string(self.add_input)
+        self.end_test()
+
+    # @unittest.skip("node group socked default value comparison fails")
+    def test_move_interface(self):
+        # after move_socket, the default value of on of the group input sockets do not match
+        self.send_string(create_material)
+        self.send_string(self.add_nodes)
+        self.send_string(self.create_group)
+        self.send_string(self.add_input)
+
+        # the node group is already open in the node editor
+        move_socket = """
 import bpy
 node_tree = bpy.data.node_groups[0]
-new_tree_input = node_tree.inputs.new("NodeSocketColor", "new_color")
-nodes = node_tree.nodes
-sock = node_tree.nodes["Group Input"].outputs[new_tree_input.name]
-node_tree.links.new(sock, nodes["MIX"].inputs["Color1"])
+print(node_tree)
+node_tree.active_input = 0
+bpy.ops.node.tree_socket_move(node_editor_context(), direction='DOWN', in_out='IN')
+bpy.data.materials[0].node_group.nodes.new("ShaderNodeRGB")
 """
-        self.send_string(add_input)
+        self.send_string(override_context + move_socket)
+
         self.end_test()
 
 
