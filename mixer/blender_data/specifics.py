@@ -585,11 +585,7 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
 
     socket_type = proxy.data("bl_idname")
     name = proxy.data("name")
-    identifier = proxy.data("identifier")
-    socket = collection.new(socket_type, name, identifier=identifier)
-    if socket.identifier != identifier:
-        logger.warning(f"Identifier mismatch after socket {name!r} creation for {context.visit_path.path()}")
-    return socket
+    return collection.new(socket_type, name)
 
 
 @add_element.register(T.NodeTreeInputs)  # type: ignore[no-redef]

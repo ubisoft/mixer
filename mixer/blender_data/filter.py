@@ -462,9 +462,18 @@ default_exclusions: FilterSet = {
         NameFilterOut(["is_hidden"])
     ],
     T.NodeSocket: [
-        # bl_idname may be forbidden with everything but XxxNodeGroup
-        # identifier is readonly but required to create ShaderNodeGroup sockets
-        NameFilterOut(["is_linked", "is_output", "label", "node", "type"])
+        NameFilterOut(
+            [
+                # XxxNodeGroup save will modify other XxxShaderNode socker identifier !
+                "identifier",
+                # readonly
+                "is_linked",
+                "is_output",
+                "label",
+                "node",
+                "type",
+            ]
+        )
     ],
     T.NodeSocketInterface: [
         # Currently synchronize builtin shading node sockets only, so assume these attributes are
