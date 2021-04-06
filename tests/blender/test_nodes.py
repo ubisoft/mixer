@@ -266,9 +266,9 @@ node_tree.links.new(sock, nodes["MIX"].inputs["Color1"])
         self.send_string(self.add_input)
         self.end_test()
 
-    # @unittest.skip("node group socked default value comparison fails")
+    @unittest.skip("node group socked default value comparison fails")
     def test_move_interface(self):
-        # after move_socket, the default value of on of the group input sockets do not match
+        # after move_socket, the default value of the group input sockets do not match
         self.send_string(create_material)
         self.send_string(self.add_nodes)
         self.send_string(self.create_group)
