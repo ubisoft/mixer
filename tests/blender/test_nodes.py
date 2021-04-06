@@ -1,4 +1,3 @@
-import logging
 import unittest
 
 from tests import files_folder
@@ -13,7 +12,7 @@ class TestCase(BlenderTestCase):
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
         blenderdescs = [sender, receiver]
-        self._log_level = logging.INFO
+        # self._log_level = logging.INFO
         super().setUp(blenderdescs=blenderdescs)
 
 
