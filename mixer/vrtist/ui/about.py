@@ -72,13 +72,11 @@ class Vrtist_OT_About(Operator):  # noqa 801
         #
         # Documentation
         # ##############
+        box.separator(factor=2)
         row = box.row()
-        row.label(text="Documentation:")
-        row = box.row()
-        row.separator()
         row.operator(
-            "mixer.open_documentation_url", text="Documentation, Download, Feedback..."
-        ).path = "https://gitlab.com/ubisoft-animation-studio/mixer#mixer"
+            "mixer.open_documentation_url", text="Documentation, Downloads, Feedback..."
+        ).path = "https://github.com/ubisoft/vrtist"
 
         box.separator()
 
