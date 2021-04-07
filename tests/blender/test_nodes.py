@@ -12,7 +12,6 @@ class TestCase(BlenderTestCase):
         sender = BlenderDesc(load_file=sender_blendfile, wait_for_debugger=False)
         receiver = BlenderDesc(load_file=receiver_blendfile, wait_for_debugger=False)
         blenderdescs = [sender, receiver]
-        # self._log_level = logging.INFO
         super().setUp(blenderdescs=blenderdescs)
 
 
@@ -84,9 +83,6 @@ bpy.data.materials["mat0"].name="mat0"
 
 class TestNodes(TestCase):
     def setUp(self):
-        import logging
-
-        self.log_level = logging.INFO
         super().setUp()
 
     def test_nodes_initial_sync(self):

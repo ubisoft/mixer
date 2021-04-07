@@ -11,9 +11,6 @@ class TestCase(BlenderTestCase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # import logging
-
-        # self.log_level = logging.INFO
 
     def setUp(self, sender_blendfile=files_folder() / "empty.blend"):
         receiver_blendfile = files_folder() / "empty.blend"

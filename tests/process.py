@@ -281,7 +281,7 @@ class ServerProcess(PythonProcess):
 
         args = ["-m", "mixer.broadcaster.apps.server"]
         args.extend(["--port", str(self.port)])
-        args.extend(["--log-level", "INFO"])
+        args.extend(["--log-level", "WARNING"])
         if server_args:
             args.extend(server_args)
         super().start(args)

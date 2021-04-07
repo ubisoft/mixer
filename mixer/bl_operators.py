@@ -147,7 +147,7 @@ class CreateRoomOperator(bpy.types.Operator):
 
         mixer_prefs = get_mixer_prefs()
         room = mixer_prefs.room
-        logger.warning(f"CreateRoomOperator.execute({room})")
+        logger.info(f"CreateRoomOperator.execute({room})")
 
         shared_folders = []
         for item in mixer_prefs.shared_folders:

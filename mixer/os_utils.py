@@ -50,6 +50,11 @@ def tech_infos() -> List[str]:
     date_string = f"({date})" if date is not None else ""
     lines.append(f"Mixer    : {mixer.display_version} {date_string}")
 
+    return lines
+
+
+def addons_infos() -> List[str]:
+    lines = []
     for bl_module in addon_utils.modules():
         name = bl_module.bl_info["name"]
         module = sys.modules.get(bl_module.__name__)

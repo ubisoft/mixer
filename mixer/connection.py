@@ -34,7 +34,7 @@ from pathlib import Path
 from mixer.draw_handlers import remove_draw_handlers
 from mixer.blender_client.client import SendSceneContentFailed, BlenderClient
 from mixer.handlers import HandlerManager
-from mixer.os_utils import tech_infos
+from mixer.os_utils import addons_infos, tech_infos
 
 
 logger = logging.getLogger(__name__)
@@ -57,10 +57,15 @@ def create_room(room_name: str, vrtist_protocol: bool = False, shared_folders=No
 
 def join_room(room_name: str, vrtist_protocol: bool = False, shared_folders=None, ignore_version_check: bool = False):
     prefs = get_mixer_prefs()
-    logger.warning(f"join: room: {room_name}, user: {prefs.user}")
+
+    protocol = "VRtist" if vrtist_protocol else "Generic"
+    logger.warning(f"join: room: {room_name}, user: {prefs.user}, protocol: {protocol}")
 
     for line in tech_infos():
         logger.warning(line)
+
+    for line in addons_infos():
+        logger.info(line)
 
     assert share_data.client.current_room is None
     share_data.session_id += 1

@@ -75,8 +75,6 @@ def register():
     from mixer.utils import utils_ui_operators
     from mixer import vrtist
 
-    print("\n ------ UAS: Loading Mixer Add-on ------- ")
-
     if len(logger.handlers) == 0:
         # Add the pid to the log. Just enough for the tests, that merge the logs and need to distinguish
         # two Blender on the same machine. Pids might collide during regular networked operation
