@@ -295,65 +295,6 @@ vl[1].pass_alpha_threshold = 0.1
         self.end_test()
 
 
-class TestMaterial(TestCase):
-    def test_duplicate_socket_name(self):
-        # see NodeLinksProxy._load()
-        # MixShader has sockets with duplicate name and the API get by name return the first only.
-        # This requires identifying them by index, not my name
-        action = """
-import bpy
-bpy.ops.mesh.primitive_plane_add()
-obj = bpy.data.objects[0]
-mat0 = bpy.data.materials.new("mat0")
-mat0.use_nodes=True
-bpy.ops.object.material_slot_add()
-obj.material_slots[0].material = mat0
-node_tree = mat0.node_tree
-nodes = node_tree.nodes
-mix_node = nodes.new("ShaderNodeMixShader")
-src =  nodes["Principled BSDF"].outputs["BSDF"]
-dst0 = mix_node.inputs[1]
-dst1 = mix_node.inputs[2]
-node_tree.links.new(src, dst0)
-node_tree.links.new(src, dst1)
-# needed to get a depsgraph update
-node_tree.links.new(mix_node.outputs[0], nodes["Material Output"].inputs[1])
-"""
-        self.send_string(action)
-        self.end_test()
-
-    def test_duplicate_node_name(self):
-        # see StructCollectionProxy.apply()
-        action = """
-import bpy
-bpy.ops.mesh.primitive_plane_add()
-obj = bpy.data.objects[0]
-mat0 = bpy.data.materials.new("mat0")
-mat0.use_nodes=True
-bpy.ops.object.material_slot_add()
-obj.material_slots[0].material = mat0
-"""
-
-        # see internal issue #465 and NonePtrProxy.apply() for why the action is split
-
-        action2 = """
-import bpy
-mat0 = bpy.data.materials["mat0"]
-node_tree = mat0.node_tree
-nodes = node_tree.nodes
-node1 = nodes.new("ShaderNodeTexImage")
-node2 = nodes.new("ShaderNodeTexImage")
-nodes.remove(node1)
-node3 = nodes.new("ShaderNodeTexImage")
-node_tree.links.new(node2.outputs[0], nodes["Principled BSDF"].inputs["Base Color"])
-node_tree.links.new(node3.outputs[0], nodes["Principled BSDF"].inputs["Subsurface Color"])
-"""
-
-        self.send_string(action)
-        self.send_string(action2)
-        self.end_test()
-
-
 class TestMesh(TestGenericJoinBefore):
     def test_bpy_ops_mesh_plane_add(self):
         # Same polygon sizes

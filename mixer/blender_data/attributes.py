@@ -111,7 +111,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
         if issubclass(attr_type, T.PropertyGroup):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy().load(attr, key, context)
+            return StructProxy.make(attr).load(attr, key, context)
 
         if issubclass(attr_type, T.ID):
             if attr.is_embedded_data:
@@ -119,7 +119,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
                 # for standalone datablocks
                 from mixer.blender_data.struct_proxy import StructProxy
 
-                return StructProxy().load(attr, key, context)
+                return StructProxy.make(attr).load(attr, key, context)
             else:
                 # Standalone databocks are loaded from DatablockCollectionProxy, so we can only encounter
                 # datablock references here
@@ -134,7 +134,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
         if issubclass(attr_type, T.bpy_struct):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy().load(attr, key, context)
+            return StructProxy.make(attr).load(attr, key, context)
 
         if attr is None:
             from mixer.blender_data.misc_proxies import NonePtrProxy
@@ -179,6 +179,10 @@ def write_attribute(
             context.visit_state.push(parent, key)
             try:
                 value.save(attribute_value, parent, key, context)
+            except Exception as e:
+                logger.error("write_attribute: exception for ...")
+                logger.error(f"... attribute: {context.visit_state.display_path()}.{key}, value: {value}")
+                logger.error(f" ...{e!r}")
             finally:
                 context.visit_state.pop()
 

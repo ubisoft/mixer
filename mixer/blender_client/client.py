@@ -812,6 +812,7 @@ class BlenderClient(Client):
         share_data.end_frame = bpy.context.scene.frame_end
 
     def override_context(self):
+        # see https://blender.stackexchange.com/questions/6101/poll-failed-context-incorrect-example-bpy-ops-view3d-background-image-add
         for window in bpy.context.window_manager.windows:
             for area in window.screen.areas:
                 if area.type == "VIEW_3D":
@@ -1240,6 +1241,7 @@ def clear_scene_content():
             "meshes",
             "metaballs",
             "movieclips",
+            "node_groups",
             "sounds",
             "texts",
             "textures",

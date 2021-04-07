@@ -43,11 +43,11 @@ Light           |Y|
 Light probe     |N|
 Line style      |N|
 Mask            |N|
-Material        |P|                 see [Nodes]_
+Material        |Y|                 
 Mesh            |P|                 except split normals, custom properties, see [Edit]_
 Metaball        |Y|                 See [Edit]_, [Convert]_
 Movie clip      |Y|                 See [Media]_
-Node group      |Y|                 Not extensively tested, see [Nodes]_
+Node group      |P|                 Not extensively tested, see [NodeGroups]_
 Object          |P|                 Except motion paths, particles and physics. See [Convert]_ 
 Paint curve     |N|
 Particles       |N|
@@ -94,8 +94,9 @@ World           |Y|
 .. [Media] 
     Media files are synchronized. The result of **reload** or media path modification are not synchronized.
 
-.. [Nodes]
-    Links synchronization sometimes fails. Some cases might cause crashes.
+.. [NodeGroups]
+
+   **Collection** sockets in geometry node groups cause synchronization failures and may crash
 
 .. _caveats:
 
