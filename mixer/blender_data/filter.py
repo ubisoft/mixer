@@ -285,6 +285,8 @@ _exclude_names = [
     "type_info",
     "users",
     "use_fake_user",
+    # TODO not implemented. Requires file handling
+    "point_cache",
 ]
 """Names of properties that are always excluded"""
 
@@ -569,7 +571,10 @@ default_exclusions: FilterSet = {
                 # Edited particles. How to save this ?
                 "particles",
                 "child_particles",
+                # UI
+                "active_index",
                 # read_only
+                "dt_frac",
                 "is_edited",
                 "is_editable",
             ]
@@ -640,6 +645,8 @@ default_exclusions: FilterSet = {
                 "display",
                 # TODO temporary, not implemented
                 "node_tree",
+                # TODO,
+                "rigidbody_world",
                 # TODO
                 # a view into builtin U keying_sets ?
                 "keying_sets_all",
@@ -724,6 +731,12 @@ property_order: PropertiesOrder = {
         "outputs",
         # must exist before links are saved
         "nodes",
+    },
+    T.ParticleSettings: {
+        "use_roughness_curve",
+    },
+    T.ParticleSystem: {
+        "use_hair_dynamics",
     },
     T.PoseBone: {
         "matrix",

@@ -179,13 +179,16 @@ class StructProxy(Proxy):
                     if isinstance(update, NonePtrProxy):
                         return NonePtrProxy()
             if attribute:
+                if isinstance(update, NonePtrProxy):
+                    logger.warning(f"Struct.apply(). set to None at {context.visit_state.display_path()}.{key}")
+                    return NonePtrProxy()
                 for k, member_delta in update._data.items():
                     current_value = self._data.get(k)
                     try:
                         self._data[k] = apply_attribute(attribute, k, current_value, member_delta, context, to_blender)
                     except Exception as e:
                         logger.warning(f"Struct.apply(). Processing {member_delta}")
-                        logger.warning(f"... for {attribute}.{k}")
+                        logger.warning(f"... for {attribute!r}.{k}")
                         logger.warning(f"... Exception: {e!r}")
                         logger.warning("... Update ignored")
                         continue

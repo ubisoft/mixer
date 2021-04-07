@@ -483,6 +483,25 @@ def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     return _filter_properties(properties, filter_props)
 
 
+@conditional_properties.register(T.ClothSettings)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    bending_model = bpy_struct.bending_model
+    if bending_model == "ANGULAR":
+        return properties
+
+    filter_props = [
+        "internal_spring_normal_check",
+        "internal_spring_max_length",
+        "internal_spring_max_diversion",
+        "internal_tension_stiffness",
+        "internal_tension_stiffness_max",
+        "internal_compression_stiffness",
+        "internal_compression_stiffness_max",
+        "vertex_group_intern",
+    ]
+    return _filter_properties(properties, filter_props)
+
+
 @conditional_properties.register(T.EffectSequence)  # type: ignore[no-redef]
 @conditional_properties.register(T.ImageSequence)
 @conditional_properties.register(T.MaskSequence)
