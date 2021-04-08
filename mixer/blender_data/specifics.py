@@ -565,7 +565,8 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
 
 @add_element.register(T.CurveSplines)  # type: ignore[no-redef]
 @add_element.register(T.FCurveModifiers)
-@add_element.register(T.ObjectConstraints)  # type: ignore[no-redef]
+@add_element.register(T.ObjectConstraints)
+@add_element.register(T.PoseBoneConstraints)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     type_ = proxy.data("type")
     return collection.new(type_)

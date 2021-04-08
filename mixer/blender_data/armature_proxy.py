@@ -89,18 +89,84 @@ class ArmatureProxy(DatablockProxy):
         ctx = override_context()
         ctx["active_object"] = obj
         previous_mode = ctx["mode"]
-        bpy.ops.object.mode_set(ctx, mode="EDIT")
+        # TODO logger les retours
+        ret = bpy.ops.object.mode_set(ctx, mode="EDIT")
         super().load(datablock, context)
-        bpy.ops.object.mode_set(ctx, mode=previous_mode)
+        ret = bpy.ops.object.mode_set(ctx, mode=previous_mode)
         return self
+
+    def _diff(self, armature: T.Armature, key: str, prop: T.Property, context: Context, diff: Proxy) -> Optional[Delta]:
+
+        # switch to edit mode
+        prev_active = bpy.context.view_layer.objects.active
+        prev_active_mode = prev_active.mode
+
+        obj = self.find_armature_parent_object(armature)
+        bpy.context.view_layer.objects.active = obj
+        prev_obj_mode = obj.mode
+        bpy.ops.object.mode_set(mode="EDIT")
+
+        res = super()._diff(armature, key, prop, context, diff)
+
+        # switch back to previous mode
+        bpy.ops.object.mode_set(mode=prev_obj_mode)
+        bpy.context.view_layer.objects.active = prev_active
+        bpy.ops.object.mode_set(mode=prev_active_mode)
+
+        return res
+
+    def apply(
+        self,
+        attribute: T.Armature,
+        parent: T.BlendDataObjects,
+        key: Union[int, str],
+        delta: Delta,
+        context: Context,
+        to_blender: bool = True,
+    ) -> StructProxy:
+        """
+        Apply delta to this proxy and optionally to the Blender attribute its manages.
+
+        Args:
+            attribute: the Object datablock to update
+            parent: the attribute that contains attribute (e.g. a bpy.data.objects)
+            key: the key that identifies attribute in parent.
+            delta: the delta to apply
+            context: proxy and visit state
+            to_blender: update the managed Blender attribute in addition to this Proxy
+        """
+        assert isinstance(key, str)
+
+        # switch to edit mode
+        if to_blender:
+            prev_active = bpy.context.view_layer.objects.active
+            prev_active_mode = prev_active.mode
+
+            obj = self.find_armature_parent_object(attribute)
+            bpy.context.view_layer.objects.active = obj
+            prev_obj_mode = obj.mode
+            bpy.ops.object.mode_set(mode="EDIT")
+
+        updated_proxy = super().apply(attribute, parent, key, delta, context, to_blender)
+
+        # switch back to previous mode
+        if to_blender:
+            bpy.ops.object.mode_set(mode=prev_obj_mode)
+            bpy.context.view_layer.objects.active = prev_active
+            bpy.ops.object.mode_set(mode=prev_active_mode)
+
+        return updated_proxy
 
     @staticmethod
     def apply_edit_bones(obj: T.Object, context: Context):
         if not isinstance(obj.data, T.Armature):
             return
         edit_bones = ArmatureProxy._edit_bones_map.get(obj.data.mixer_uuid)
-        if not edit_bones:
-            logging.error("No edit bones found")
+        if edit_bones is None:
+            logger.error("No edit bones found")
+            return
+
+        if len(edit_bones) == 0:
             return
 
         # hack: resolve collection -> object link
