@@ -135,11 +135,13 @@ class VisitState:
             self._proxy = proxy
 
         def __enter__(self):
+            self._visit_state.send_nodetree_links = False
             if not self._is_embedded_data:
                 self._visit_state.datablock_proxy = self._proxy
                 self._visit_state.datablock_string = self._datablock_string
 
         def __exit__(self, exc_type, exc_value, traceback):
+            self._visit_state.send_nodetree_links = False
             if not self._is_embedded_data:
                 self._visit_state.datablock_proxy = None
                 self._visit_state.datablock_string = None
@@ -186,6 +188,12 @@ class VisitState:
         Global state
         """
 
+        self.send_nodetree_links: bool = False
+        """NodeTree.nodes has been modified in a way that requires NodeTree.links to be resent.
+
+        Intra datablock state
+        """
+
         self.datablock_string: Optional[str] = None
         """"Current datablock display string, for logging"""
 
@@ -210,8 +218,12 @@ class VisitState:
     def pop(self):
         self._attribute_path.pop()
 
-    def attribute(self, index: int) -> T.bpy_struct:
-        return self._attribute_path[index]
+    def attribute(self, i: int) -> T.bpy_struct:
+        """The i-th attribute visited, starting from the datablock.
+
+        More useful from the end, the attribute at -1 being the one that contains the attribute being processed.
+        """
+        return self._attribute_path[i][0]
 
     def path(self) -> Tuple[Union[int, str], ...]:
         """The path of the attribute being processed.
@@ -240,6 +252,8 @@ class Context:
 _creation_order = {
     # Libraries are needed to create all linked datablocks
     "libraries": -10,
+    # before materials
+    "node_groups": -10,
     # before curves
     "fonts": -5,
     # anything else: 0
@@ -437,7 +451,7 @@ class BpyDataProxy(Proxy):
 
         for datablock in sorted_updates:
             if not isinstance(datablock, safe_depsgraph_updates):
-                logger.info("depsgraph update: ignoring untracked type %s", datablock)
+                logger.info(f"depsgraph update: ignoring untracked type {datablock!r}")
                 continue
             if isinstance(datablock, T.Scene) and datablock.name == "_mixer_to_be_removed_":
                 logger.error(f"Skipping scene {datablock.name} uuid: '{datablock.mixer_uuid}'")
@@ -446,23 +460,23 @@ class BpyDataProxy(Proxy):
             if proxy is None:
                 # Not an error for embedded IDs.
                 if not datablock.is_embedded_data:
-                    logger.warning(f"depsgraph update for {datablock} : no proxy and not datablock.is_embedded_data")
+                    logger.warning(f"depsgraph update for {datablock!r} : no proxy and not datablock.is_embedded_data")
                 else:
                     # For instance Scene.node_tree is not a reference to a bpy.data collection element
                     # but a "pointer" to a NodeTree owned by Scene. In such a case, the update list contains
                     # scene.node_tree, then scene. We can ignore the scene.node_tree update since the
                     # processing of scene will process scene.node_tree.
                     # However, it is not obvious to detect the safe cases and remove the message in such cases
-                    logger.info("depsgraph update: Ignoring embedded %s", datablock)
+                    logger.info(f"depsgraph update: Ignoring embedded {datablock!r}")
                 continue
             delta = proxy.diff(datablock, datablock.name, None, context)
             if delta:
-                logger.info("depsgraph update: update %s", datablock)
+                logger.info(f"depsgraph update: update {datablock!r}")
                 # TODO add an apply mode to diff instead to avoid two traversals ?
                 proxy.apply_to_proxy(datablock, delta, context)
                 changeset.updates.append(delta)
             else:
-                logger.debug("depsgraph update: ignore empty delta %s", datablock)
+                logger.debug(f"depsgraph update: ignore empty delta {datablock!r}")
 
         return changeset
 

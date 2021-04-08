@@ -51,7 +51,7 @@ def _proxy_factory(attr):
 
         return NonePtrProxy()
     else:
-        return StructProxy()
+        return StructProxy.make(attr)
 
 
 @serialize
@@ -127,6 +127,9 @@ class StructCollectionProxy(Proxy):
             context.visit_state.push(v, i)
             try:
                 self._sequence.append(_proxy_factory(v).load(v, i, context))
+            except Exception as e:
+                logger.error(f"Exception during load at {context.visit_state.display_path()} ...")
+                logger.error(f"... {e!r}")
             finally:
                 context.visit_state.pop()
         return self
@@ -147,7 +150,7 @@ class StructCollectionProxy(Proxy):
         # truncate_collection. This addresses an issue with Nodes, for which the order of default nodes (material
         # output and principled in collection) may not match the order of incoming nodes. Saving node data into a
         # node of the wrong type can lead to a crash.
-        clear_from = specifics.clear_from(collection, sequence)
+        clear_from = specifics.clear_from(collection, sequence, context)
         specifics.truncate_collection(collection, clear_from)
 
         # For collections like `IDMaterials`, the creation API (`.new(datablock_ref)`) also writes the value.
@@ -268,7 +271,7 @@ class StructCollectionProxy(Proxy):
 
             # items from clear_from index cannot be updated, most often because eir type has changed (e.g
             # ObjectModifier)
-            clear_from = specifics.clear_from(collection, sequence)
+            clear_from = specifics.clear_from(collection, sequence, context)
 
             # run a diff for the head, that can be updated in-place
             for i in range(clear_from):
@@ -276,13 +279,14 @@ class StructCollectionProxy(Proxy):
                 if delta is not None:
                     diff._diff_updates.append((i, delta))
 
-            # delete the existing tail that cannot be modified
-            diff._diff_deletions = len(sequence) - clear_from
+            if specifics.can_resize(collection, context):
+                # delete the existing tail that cannot be modified
+                diff._diff_deletions = len(sequence) - clear_from
 
-            # add the new tail
-            for i, item in enumerate(collection[clear_from:], clear_from):
-                value = read_attribute(item, i, item_property, collection, context)
-                diff._diff_additions.append(DeltaAddition(value))
+                # add the new tail
+                for i, item in enumerate(collection[clear_from:], clear_from):
+                    value = read_attribute(item, i, item_property, collection, context)
+                    diff._diff_additions.append(DeltaAddition(value))
 
             if diff._diff_updates or diff._diff_deletions or diff._diff_additions:
                 return DeltaUpdate(diff)
