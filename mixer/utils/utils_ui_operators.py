@@ -33,7 +33,7 @@ from bpy.props import StringProperty
 class Mixer_OT_Open_Documentation_Url(Operator):  # noqa 801
     bl_idname = "mixer.open_documentation_url"
     bl_label = "Open Documentation Web Page"
-    bl_description = "Open documentation.\nShift + Click: Copy the URL into the clipboard"
+    bl_description = "Open web page.\nShift + Click: Copy the URL into the clipboard"
 
     path: StringProperty()
 

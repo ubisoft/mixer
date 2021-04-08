@@ -74,11 +74,28 @@ class Mixer_OT_About(Operator):  # noqa 801
         # ##############
         row = box.row()
         row.label(text="Documentation:")
-        row = box.row()
         row.separator()
         row.operator(
-            "mixer.open_documentation_url", text="Documentation, Download, Feedback..."
-        ).path = "https://gitlab.com/ubisoft-animation-studio/mixer#mixer"
+            "mixer.open_documentation_url", text="Documentation, Tutorials..."
+        ).path = "https://ubisoft-mixer.readthedocs.io/en/latest/"
+
+        # Download
+        # ########
+        row = box.row()
+        row.label(text="Downloads:")
+        row.separator()
+        row.operator(
+            "mixer.open_documentation_url", text="Latest Release..."
+        ).path = "https://github.com/ubisoft/mixer/releases/latest/"
+
+        # Source code
+        # ###########
+        row = box.row()
+        row.label(text="Source Code:")
+        row.separator()
+        row.operator(
+            "mixer.open_documentation_url", text="Mixer on GitHub..."
+        ).path = "https://github.com/ubisoft/mixer/"
 
         box.separator()
 

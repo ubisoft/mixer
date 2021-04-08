@@ -8,13 +8,13 @@ Mixer is a Blender addon developed at Ubisoft for Real Time Collaboration in 3D 
 
 Refer to the online documentation for details about current [features and limitations](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/features.html).
 
-## Usage
+## Documentation and Usage
 
 Documentation is available at the web site https://ubisoft-mixer.readthedocs.io/ :
 
-- [download and install](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/install.html) Mixer
-- perform [local tests](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/first-steps.html)
-- [get connected](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/get-connected.html) and [work together](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/work-together.html)
+- [Download and install](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/install.html) Mixer
+- Perform [local tests](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/first-steps.html)
+- [Get connected](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/get-connected.html) and [work together](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/work-together.html)
 
 ## Updates
 
@@ -26,9 +26,11 @@ The active support repository is on Gitlab https://gitlab.com/ubisoft-animation-
 
 The [Mixer Github repository](https://github.com/ubisoft/mixer) is a mirror that is part of Github [Ubisoft open source](https://github.com/ubisoft) projects group.
 
-## Contributing
+## Feedback and contribution
 
-See [contributing](doc/README.md)
+Post your feedback and discuss your ideas with us on the [Mixer Blender chat](https://blender.chat/channel/mixer-addon).
+
+You can also get involved into the development of Mixer, discover how by reading these [contribution guidelines](doc/README.md).
 
 ## License and copyright
 

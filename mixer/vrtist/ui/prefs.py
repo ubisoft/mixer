@@ -39,9 +39,7 @@ class VRTIST_MT_prefs_main_menu(Menu):  # noqa 801
         row.operator("preferences.addon_show", text="Add-on Preferences...").module = "mixer"
 
         row = layout.row(align=True)
-        row.operator(
-            "mixer.open_documentation_url", text="Documentation"
-        ).path = "https://gitlab.com/ubisoft-animation-studio/mixer#mixer"
+        row.operator("mixer.open_documentation_url", text="Documentation").path = "https://github.com/ubisoft/vrtist"
 
         row = layout.row(align=True)
         row.operator("vrtist.about", text="About...")
