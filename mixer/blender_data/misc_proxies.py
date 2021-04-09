@@ -314,8 +314,12 @@ class PtrToCollectionItemProxy(Proxy):
         (T.ShapeKey, "relative_key"): ("key_blocks",),
         (T.FCurve, "group"): ("groups",),
         (T.EditBone, "parent"): ("edit_bones",),
+        (T.PoseBone, "bone_group"): ("pose", "bone_groups"),
     }
-    """ { struct member: path to the enclosing datablock collection}"""
+    """{ struct member: path to the enclosing datablock collection}.
+
+    For instance PoseBone.bone_group is a pointer to a pose.bone_groups element in the same datablock
+    """
 
     @classmethod
     def make(cls, attr_type: type, key: str) -> Optional[PtrToCollectionItemProxy]:
