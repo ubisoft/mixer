@@ -525,8 +525,18 @@ default_exclusions: FilterSet = {
     T.PoseBone: [
         NameFilterOut(
             [
+                # views into Armature.bones items
+                "bone",
                 "child",
                 "parent",
+                # computed from TRS, and vice versa
+                "matrix",
+                "matrix_basis",
+                # readonly
+                "head",
+                "length",
+                "matrix_channel",
+                "tail",
             ]
         )
     ],
