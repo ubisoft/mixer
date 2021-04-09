@@ -22,7 +22,7 @@ See synchronization.md
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import Optional, Union, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -32,7 +32,9 @@ from mixer.blender_data.json_codec import serialize
 from mixer.blender_data.attributes import write_attribute
 
 if TYPE_CHECKING:
-    from mixer.blender_data.bpy_data_proxy import Context
+    from mixer.blender_data.bpy_data_proxy import Context, Delta
+    from mixer.blender_data.proxy import Proxy
+    from mixer.blender_data.struct_proxy import StructProxy
 
 
 DEBUG = True
@@ -90,9 +92,9 @@ class ArmatureProxy(DatablockProxy):
         ctx["active_object"] = obj
         previous_mode = ctx["mode"]
         # TODO logger les retours
-        ret = bpy.ops.object.mode_set(ctx, mode="EDIT")
+        bpy.ops.object.mode_set(ctx, mode="EDIT")
         super().load(datablock, context)
-        ret = bpy.ops.object.mode_set(ctx, mode=previous_mode)
+        bpy.ops.object.mode_set(ctx, mode=previous_mode)
         return self
 
     def _diff(self, armature: T.Armature, key: str, prop: T.Property, context: Context, diff: Proxy) -> Optional[Delta]:
@@ -137,23 +139,21 @@ class ArmatureProxy(DatablockProxy):
         """
         assert isinstance(key, str)
 
-        # switch to edit mode
-        if to_blender:
-            prev_active = bpy.context.view_layer.objects.active
-            prev_active_mode = prev_active.mode
+        # change mode is needed even for proxy only update to have access to edit_bones
+        prev_active = bpy.context.view_layer.objects.active
+        prev_active_mode = prev_active.mode
 
-            obj = self.find_armature_parent_object(attribute)
-            bpy.context.view_layer.objects.active = obj
-            prev_obj_mode = obj.mode
-            bpy.ops.object.mode_set(mode="EDIT")
+        obj = self.find_armature_parent_object(attribute)
+        bpy.context.view_layer.objects.active = obj
+        prev_obj_mode = obj.mode
+        bpy.ops.object.mode_set(mode="EDIT")
 
         updated_proxy = super().apply(attribute, parent, key, delta, context, to_blender)
 
         # switch back to previous mode
-        if to_blender:
-            bpy.ops.object.mode_set(mode=prev_obj_mode)
-            bpy.context.view_layer.objects.active = prev_active
-            bpy.ops.object.mode_set(mode=prev_active_mode)
+        bpy.ops.object.mode_set(mode=prev_obj_mode)
+        bpy.context.view_layer.objects.active = prev_active
+        bpy.ops.object.mode_set(mode=prev_active_mode)
 
         return updated_proxy
 
