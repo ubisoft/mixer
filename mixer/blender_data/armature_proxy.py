@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import functools
 import logging
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Any, Callable, List, Optional, Union, TYPE_CHECKING
 
 import bpy
 import bpy.types as T  # noqa
@@ -50,6 +50,46 @@ if TYPE_CHECKING:
 DEBUG = True
 
 logger = logging.getLogger(__name__)
+
+
+class Command:
+    """Rudimentary command to handle Blender state changes."""
+
+    def __init__(self, do: Callable[[], None], undo: Callable[[], None], text: str):
+        self._do = do
+        self._undo = undo
+        self._text = text
+
+    def do(self):
+        logger.info("DO   " + self._text)
+        self._do()
+
+    def undo(self):
+        logger.info("UNDO " + self._text)
+        self._undo()
+
+
+class Commands:
+    """Rudimentary command stack to handle Blender state changes."""
+
+    def __init__(self, text: str = ""):
+        self._text = text
+        self._commands: List[Command] = []
+
+    def append(self, command: Command):
+        self._commands.append(command)
+
+    def do(self):
+        if self._text:
+            logger.info("DO   -- begin " + self._text)
+        for command in self._commands:
+            command.do()
+
+    def undo(self):
+        for command in reversed(self._commands):
+            command.undo()
+        if self._text:
+            logger.info("UNDO -- end    " + self._text)
 
 
 def override_context():
@@ -71,7 +111,7 @@ def override_context():
     return None
 
 
-def _restore_active_object(obj: T.Object):
+def _set_active_object(obj: T.Object):
     bpy.context.view_layer.objects.active = obj
 
 
@@ -223,65 +263,59 @@ class ArmatureProxy(DatablockProxy):
 
         armature_data_proxy._access_edit_bones(armature_object, _write_attribute, context)
 
-    def _access_edit_bones(self, object: T.Object, func, context: Context):
+    def _access_edit_bones(self, object: T.Object, access: Callable[[], Any], context: Context) -> Any:
         # TODO why don't wee need a context override here ?
 
-        cleanup = []
+        update_state_commands = Commands("access_edit_bones")
 
         # 1/ only one object can be in non edit mode : reset active object mode to OBJECT
         previous_mode = bpy.context.mode
         if previous_mode != "OBJECT":
-            logger.info(f"_access_edit_bones: DO   set mode to OBJECT for {bpy.context.active_object!r}")
-            bpy.ops.object.mode_set(mode="OBJECT")
-            cleanup.append(
-                (
-                    lambda: bpy.ops.object.mode_set(mode=previous_mode),
-                    f"_access_edit_bones: UNDO reset mode to {previous_mode} for {bpy.context.active_object!r}",
-                )
+            command = Command(
+                lambda: bpy.ops.object.mode_set(mode="OBJECT"),
+                lambda: bpy.ops.object.mode_set(mode=previous_mode),
+                f"set mode to OBJECT for {bpy.context.active_object!r}",
             )
+            update_state_commands.append(command)
+
+        if object not in bpy.context.view_layer.objects.values():
+            # 2/ (optional) link armature Object to scene collection
+
+            # the Armature object is not linked to the view layer. Possible reasons:
+            # - it is not linked in the source blender data
+            # - the code path that created the Armature on the source has not yet linked it to a collection
+            # - it is only linked to collections excluded from the view_layer
+            # Temporarily link to the current view layer
+
+            objects = bpy.context.view_layer.layer_collection.collection.objects
+            command = Command(
+                lambda: objects.link(object),
+                lambda: objects.unlink(object),
+                f"temp link {object!r} to view_layer collection",
+            )
+            update_state_commands.append(command)
+
+        # 3/ set armature Object as active
+        previous_active_object = bpy.context.view_layer.objects.active
+        if previous_active_object is not object:
+            command = Command(
+                functools.partial(_set_active_object, object),
+                functools.partial(_set_active_object, previous_active_object),
+                f"change active_object from {previous_active_object!r} to {object!r}",
+            )
+            update_state_commands.append(command)
+
+        # 4/ change armature Object mode to EDIT
+        command = Command(
+            lambda: bpy.ops.object.mode_set(mode="EDIT"),
+            lambda: bpy.ops.object.mode_set(mode="OBJECT"),
+            f"set mode to 'EDIT' for {object!r}",
+        )
+        update_state_commands.append(command)
 
         try:
-            if object not in bpy.context.view_layer.objects.values():
-                # the Armature object is not linked to the view layer. Possible reasons:
-                # - it is not linked in the source blender data
-                # - the code path that created the Armature on the source has not yet linked it to a collection
-                # - it is only linked to collections excluded from the view_layer
-                # Temporarily link to the current view layer
-
-                # 2/ (optional) link armature Object to scene collection
-                objects = bpy.context.view_layer.layer_collection.collection.objects
-                logger.info(f"_access_edit_bones: DO   temp link {object!r} to view_layer collection")
-                objects.link(object)
-                assert object in bpy.context.view_layer.objects.values()
-                cleanup.append(
-                    (
-                        lambda: objects.unlink(object),
-                        f"_access_edit_bones: UNDO unlink {object!r} from view_layer collection",
-                    )
-                )
-
-            # 3/ set armature Object as active
-            previous_active_object = bpy.context.view_layer.objects.active
-            logger.info(f"_access_edit_bones: DO   change active_object from {previous_active_object!r} to {object!r}")
-            bpy.context.view_layer.objects.active = object
-            cleanup.append(
-                (
-                    functools.partial(_restore_active_object, previous_active_object),
-                    f"_access_edit_bones: UNDO change active_object from {object!r} to {previous_active_object!r}",
-                )
-            )
-
-            # 4/ set armature Object to EDIT mode
-            logger.info(f"_access_edit_bones: DO   set mode to 'EDIT' for {bpy.context.active_object!r}")
-            bpy.ops.object.mode_set(mode="EDIT")
-            cleanup.append(
-                (
-                    lambda: bpy.ops.object.mode_set(mode="OBJECT"),
-                    f"_access_edit_bones: UNDO reset mode to 'OBJECT' for {bpy.context.active_object!r}",
-                )
-            )
-
-            result = func()
+            update_state_commands.do()
+            result = access()
 
         except Exception as e:
             logger.warning(f"update_edit_bones: at {context.visit_state.display_path()}...")
@@ -290,10 +324,8 @@ class ArmatureProxy(DatablockProxy):
             return result
 
         finally:
-            for f, text in reversed(cleanup):
-                try:
-                    logger.info(text)
-                    f()
-                except Exception as e:
-                    logger.warning("update_edit_bones: cleanup exception ...")
-                    logger.warning(f"... {e!r}")
+            try:
+                update_state_commands.undo()
+            except Exception as e:
+                logger.error("update_edit_bones: cleanup exception ...")
+                logger.error(f"... {e!r}")
