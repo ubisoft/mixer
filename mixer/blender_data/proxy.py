@@ -76,7 +76,7 @@ class UnresolvedRefs:
         if dst_uuid in self._refs:
             for src_link, display_string in self._refs[dst_uuid]:
                 src_link(dst_datablock)
-                logger.info(f"resolving reference to {dst_datablock} {dst_uuid}: {display_string}")
+                logger.info(f"resolving reference to {dst_datablock!r} {dst_uuid}: {display_string}")
             del self._refs[dst_uuid]
 
 

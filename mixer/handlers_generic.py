@@ -28,9 +28,9 @@ def send_scene_data_to_server(scene, dummy):
 
     depsgraph = bpy.context.evaluated_depsgraph_get()
     if depsgraph.updates:
-        logger.debug("DG updates for {depsgraph.scene} {depsgraph.view_layer}")
+        logger.debug(f"DG updates for {depsgraph.scene} {depsgraph.view_layer}")
         for update in depsgraph.updates:
-            logger.debug(" ......%s", update.id.original)
+            logger.debug(" ......%r", update.id.original)
     else:
         # FIXME Possible missed update :
         # If an updated datablock is not linked in the current scene/view_layer, the update triggers
@@ -86,7 +86,7 @@ def send_scene_data_to_server(scene, dummy):
         bpy_data_proxy.append_delayed_updates(delayed_updates)
         logger.info("send_scene_data_to_server. Delaying updates ")
         for update in delayed_updates:
-            logger.info("... %s", update)
+            logger.info("... %r", update)
 
     # Compute the difference between the proxy state and the Blender state
     # It is a coarse difference at the ID level(created, removed, renamed)
