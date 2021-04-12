@@ -576,6 +576,7 @@ default_exclusions: FilterSet = {
             [
                 # Let each participant play his own time
                 "frame_current",
+                "frame_current_final",
                 "frame_float",
                 # messy in tests because setting either may reset the other to frame_start or frame_end
                 # would require
