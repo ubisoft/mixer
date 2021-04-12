@@ -61,12 +61,22 @@ class Command:
         self._text = text
 
     def do(self):
-        logger.info("DO   " + self._text)
-        self._do()
+        logger.info("DO      " + self._text)
+        try:
+            self._do()
+        except Exception as e:
+            logger.error(f"DO exception ...")
+            logger.error(f"... {self._text}")
+            logger.error(f"... {e!r}")
 
     def undo(self):
-        logger.info("UNDO " + self._text)
-        self._undo()
+        logger.info("UNDO    " + self._text)
+        try:
+            self._undo()
+        except Exception as e:
+            logger.error(f"UNDO exception ...")
+            logger.error(f"... {self._text}")
+            logger.error(f"... {e!r}")
 
 
 class Commands:
@@ -80,7 +90,7 @@ class Commands:
         self._commands.append(command)
 
     def do(self):
-        if self._text:
+        if self._commands and self._text:
             logger.info("DO   -- begin " + self._text)
         for command in self._commands:
             command.do()
@@ -88,7 +98,7 @@ class Commands:
     def undo(self):
         for command in reversed(self._commands):
             command.undo()
-        if self._text:
+        if self._commands and self._text:
             logger.info("UNDO -- end    " + self._text)
 
 
@@ -267,18 +277,10 @@ class ArmatureProxy(DatablockProxy):
 
         update_state_commands = Commands("access_edit_bones")
 
-        # 1/ only one object can be in non edit mode : reset active object mode to OBJECT
-        previous_mode = bpy.context.mode
-        if previous_mode != "OBJECT":
-            command = Command(
-                lambda: bpy.ops.object.mode_set(mode="OBJECT"),
-                lambda: bpy.ops.object.mode_set(mode=previous_mode),
-                f"set mode to OBJECT for {bpy.context.active_object!r}",
-            )
-            update_state_commands.append(command)
-
         if object not in bpy.context.view_layer.objects.values():
-            # 2/ (optional) link armature Object to scene collection
+            #
+            # link armature Object to scene collection
+            #
 
             # the Armature object is not linked to the view layer. Possible reasons:
             # - it is not linked in the source blender data
@@ -294,9 +296,24 @@ class ArmatureProxy(DatablockProxy):
             )
             update_state_commands.append(command)
 
-        # 3/ set armature Object as active
         previous_active_object = bpy.context.view_layer.objects.active
+
         if previous_active_object is not object:
+            #
+            # only one object can be in non edit mode : reset active object mode to OBJECT
+            #
+            if previous_active_object is not None:
+                if previous_active_object.mode != "OBJECT":
+                    command = Command(
+                        lambda: bpy.ops.object.mode_set(mode="OBJECT"),
+                        lambda: bpy.ops.object.mode_set(mode=previous_active_object.mode),
+                        f"set mode to OBJECT for {previous_active_object!r}",
+                    )
+                    update_state_commands.append(command)
+
+            #
+            # set armature Object as active
+            #
             command = Command(
                 functools.partial(_set_active_object, object),
                 functools.partial(_set_active_object, previous_active_object),
@@ -304,13 +321,17 @@ class ArmatureProxy(DatablockProxy):
             )
             update_state_commands.append(command)
 
-        # 4/ change armature Object mode to EDIT
-        command = Command(
-            lambda: bpy.ops.object.mode_set(mode="EDIT"),
-            lambda: bpy.ops.object.mode_set(mode="OBJECT"),
-            f"set mode to 'EDIT' for {object!r}",
-        )
-        update_state_commands.append(command)
+        #
+        # change armature Object mode to EDIT
+        #
+        object_mode = object.mode
+        if object_mode != "EDIT":
+            command = Command(
+                lambda: bpy.ops.object.mode_set(mode="EDIT"),
+                lambda: bpy.ops.object.mode_set(mode=object_mode),
+                f"set mode to 'EDIT' for {object!r}",
+            )
+            update_state_commands.append(command)
 
         try:
             update_state_commands.do()
