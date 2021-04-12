@@ -33,7 +33,6 @@ from mixer.blender_data.mesh_proxy import VertexGroups
 from mixer.blender_data.proxy import Delta, DeltaReplace
 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 from mixer.blender_data.armature_proxy import ArmatureProxy
-from mixer.blender_data.attributes import write_attribute
 
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context, Proxy
@@ -63,10 +62,15 @@ class ObjectProxy(DatablockProxy):
     def _save(self, datablock: T.Object, context: Context) -> T.Object:
         # TODO remove extra work done here. The vertex groups array is created in super()._save(), then cleared in
         # _update_vertex_groups(), because diff() requires clear().
+
+        # Object.pose.bones can be saved only after Armature.bones.
+        if isinstance(datablock.data, T.Armature):
+            ArmatureProxy.update_edit_bones(datablock, context)
+
         self._fit_material_slots(datablock, self._data["material_slots"], context)
         super()._save(datablock, context)
         self._update_vertex_groups(datablock, self._data["vertex_groups"], context)
-        self._update_armature_edit_bones(datablock, context)
+
         return datablock
 
     def _fit_material_slots(
@@ -173,12 +177,6 @@ class ObjectProxy(DatablockProxy):
             for index, weight in zip(indices, weights):
                 vertex_group.add([index], weight, "ADD")
 
-    def _update_armature_edit_bones(self, object_datablock: T.Object, context: Context):
-        if not isinstance(object_datablock.data, T.Armature):
-            return
-        ArmatureProxy.apply_edit_bones(object_datablock, context)
-        write_attribute(object_datablock.pose, "bones", self.data("pose").data("bones"), context)
-
     def _diff(self, struct: T.Object, key: str, prop: T.Property, context: Context, diff: Proxy) -> Optional[Delta]:
         from mixer.blender_data.attributes import diff_attribute
 
@@ -209,7 +207,7 @@ class ObjectProxy(DatablockProxy):
 
     def apply(
         self,
-        attribute: T.Object,
+        datablock: T.Object,
         parent: T.BlendDataObjects,
         key: Union[int, str],
         delta: Delta,
@@ -231,12 +229,23 @@ class ObjectProxy(DatablockProxy):
         update = delta.value
 
         if to_blender:
-            incoming_material_slots = update.data("material_slots")
-            self._fit_material_slots(attribute, incoming_material_slots, context)
+            if isinstance(datablock.data, T.Armature):
+                try:
+                    _ = update._data["pose"].value._data["bones"]
+                except KeyError:
+                    pass
+                else:
+                    # Update Armature.edit_bones before Object.pose.bones
+                    ArmatureProxy.update_edit_bones(datablock, context)
 
-        updated_proxy = super().apply(attribute, parent, key, delta, context, to_blender)
+            incoming_material_slots = update.data("material_slots")
+            self._fit_material_slots(datablock, incoming_material_slots, context)
+
+        updated_proxy = super().apply(datablock, parent, key, delta, context, to_blender)
+        assert isinstance(updated_proxy, ObjectProxy)
 
         if to_blender:
             incoming_vertex_groups = update.data("vertex_groups")
-            updated_proxy._update_vertex_groups(attribute, incoming_vertex_groups, context)
+            updated_proxy._update_vertex_groups(datablock, incoming_vertex_groups, context)
+
         return updated_proxy

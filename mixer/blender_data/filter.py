@@ -306,7 +306,16 @@ default_exclusions: FilterSet = {
             ]
         )
     ],
-    T.Armature: [NameFilterOut(["bones"])],
+    T.Armature: [
+        NameFilterOut(
+            [
+                # A non editable view of edit_bones
+                "bones",
+                # hardcoded in ArmatureProxy
+                "edit_bones",
+            ]
+        )
+    ],
     T.BezierSplinePoint: [
         NameFilterOut(
             [
@@ -328,6 +337,16 @@ default_exclusions: FilterSet = {
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
     T.Curve: [NameFilterOut(["shape_keys"])],
     T.DecimateModifier: [NameFilterOut(["face_count"])],
+    T.EditBone: [
+        NameFilterOut(
+            [
+                # UI
+                "select",
+                "select_head",
+                "select_tail",
+            ]
+        )
+    ],
     T.FaceMap: [NameFilterOut(["index"])],
     T.Keyframe: [
         NameFilterOut(
@@ -649,7 +668,7 @@ property_order: PropertiesOrder = {
     },
     T.Pose: {
         # before bones
-        "groups",
+        "bone_groups",
     },
     T.Scene: {
         # Required to save view_layers
