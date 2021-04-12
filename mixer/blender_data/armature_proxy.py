@@ -115,15 +115,21 @@ def _set_active_object(obj: T.Object):
     bpy.context.view_layer.objects.active = obj
 
 
-def _find_armature_parent_object(datablock: T.Armature) -> Optional[T.Object]:
-    # TODO what if the same Armature is linked to several Object datablocks
-    objects = [object for object in bpy.data.objects if object.data == datablock]
-    if len(objects) > 1:
-        logger.warning(f"multiple parents for {datablock!r}")
-    try:
-        return objects[0]
-    except IndexError:
+def _armature_object(armature_data: T.Armature, context: Context) -> Optional[T.Object]:
+    """Returns an Object that uses datablock"""
+    objects = context.proxy_state.objects_using_data(armature_data)
+    if not objects:
+        # Armature without Object (orphan Armature)
+        # TODO ensure that the Armature data is synced after being referenced by an Object
+        logger.error(f"load: no Object for {armature_data!r} at {context.visit_state.display_path()} ...")
+        logger.error(".. Armature data not synchronized")
         return None
+
+    # TODO what if the same Armature is linked to several Object datablocks
+    if len(objects) > 1:
+        logger.warning(f"multiple parents for {armature_data!r}")
+
+    return objects[0]
 
 
 @serialize
@@ -139,8 +145,9 @@ class ArmatureProxy(DatablockProxy):
         proxy = super().load(armature_data, context)
         assert proxy is self
 
-        armature_object = _find_armature_parent_object(armature_data)
-        if not armature_object:
+        # Do not use _armature_object as the user Object has not yet been registered in ProxyState
+        armature_objects = [object for object in bpy.data.objects if object.data is armature_data]
+        if not armature_objects:
             # Armature without Object (orphan Armature)
             # TODO ensure that the Armature data is synced after being referenced by an Object
             logger.error(f"load: no Object for {armature_data!r} at {context.visit_state.display_path()} ...")
@@ -152,13 +159,13 @@ class ArmatureProxy(DatablockProxy):
                 armature_data.edit_bones, "edit_bones", self._edit_bones_property, armature_data, context
             )
 
-        self._access_edit_bones(armature_object, _read_attribute, context)
+        self._access_edit_bones(armature_objects[0], _read_attribute, context)
         return self
 
     def _save(self, armature_data: T.ID, context: Context) -> T.ID:
         # This is called when the Armature datablock is created. However, edit_bones can only be edited after the
         # armature Object is created and in EDIT mode.
-        # So skip edit_bones now and ObjectProxy will call update_edit_bones() later
+        # So skip edit_bones now and ObjectProxy will call write_edit_bones() later
         edit_bones_proxy = self._data.pop("edit_bones")
         datablock = super()._save(armature_data, context)
         self._data["edit_bones"] = edit_bones_proxy
@@ -170,12 +177,8 @@ class ArmatureProxy(DatablockProxy):
 
         delta = super()._diff(armature_data, key, prop, context, diff)
 
-        armature_object = _find_armature_parent_object(armature_data)
+        armature_object = _armature_object(armature_data, context)
         if not armature_object:
-            # Armature without Object (orphan Armature)
-            # TODO ensure that the Armature data is synced after being referenced by an Object
-            logger.error(f"load: no Object for {armature_data!r} at {context.visit_state.display_path()} ...")
-            logger.error(".. Armature data not synchronized")
             return delta
 
         def _diff_attribute():
@@ -227,12 +230,8 @@ class ArmatureProxy(DatablockProxy):
 
         update._data["edit_bones"] = edit_bones_proxy
 
-        armature_object = _find_armature_parent_object(armature_data)
+        armature_object = _armature_object(armature_data, context)
         if not armature_object:
-            # Armature without Object (orphan Armature)
-            # TODO ensure that the Armature data is synced after being referenced by an Object
-            logger.error(f"load: no Object for {armature_data!r} at {context.visit_state.display_path()} ...")
-            logger.error(".. Armature data not synchronized")
             return self
 
         def _apply_attribute():
@@ -318,7 +317,7 @@ class ArmatureProxy(DatablockProxy):
             result = access()
 
         except Exception as e:
-            logger.warning(f"update_edit_bones: at {context.visit_state.display_path()}...")
+            logger.warning(f"_access_edit_bones: at {context.visit_state.display_path()}...")
             logger.warning(f"... {e!r}")
         else:
             return result
@@ -327,5 +326,5 @@ class ArmatureProxy(DatablockProxy):
             try:
                 update_state_commands.undo()
             except Exception as e:
-                logger.error("update_edit_bones: cleanup exception ...")
+                logger.error("_access_edit_bones: cleanup exception ...")
                 logger.error(f"... {e!r}")

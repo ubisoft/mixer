@@ -107,6 +107,10 @@ class ProxyState:
     def remove_datablock(self, uuid: Uuid):
         del self._datablocks[uuid]
 
+    def objects_using_data(self, data_datablock: T.ID) -> List[T.ID]:
+        objects = [self.datablock(uuid) for uuid in self.objects[data_datablock.mixer_uuid]]
+        return [object for object in objects if object is not None]
+
 
 class VisitState:
     """
