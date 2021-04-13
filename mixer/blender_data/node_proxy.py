@@ -45,20 +45,20 @@ class NodeLinksProxy(StructCollectionProxy):
     """Proxy for bpy.types.NodeLinks"""
 
     def _load(self, links: T.NodeLinks) -> List[Dict[str, str]]:
-        seq = []
-        for link in links:
-            # TODO change to a tuple
-            item = {}
+        # NodeLink contain pointers to Node and NodeSocket.
+        # Just keep the names to restore the links in ShaderNodeTreeProxy.save
+        # Nodes names are unique in a node_tree.
+        # Node socket names are *not* unique in a node_tree, so use index in array
+        seq = [
+            [
+                link.from_node.name,
+                _find_socket(link.from_node.outputs, link.from_socket.identifier),
+                link.to_node.name,
+                _find_socket(link.to_node.inputs, link.to_socket.identifier),
+            ]
+            for link in links
+        ]
 
-            # NodeLink contain pointers to Node and NodeSocket.
-            # Just keep the names to restore the links in ShaderNodeTreeProxy.save
-            # Nodes names are unique in a node_tree.
-            # Node socket names are *not* unique in a node_tree, so use index in array
-            item["from_node"] = link.from_node.name
-            item["from_socket"] = _find_socket(link.from_node.outputs, link.from_socket.identifier)
-            item["to_node"] = link.to_node.name
-            item["to_socket"] = _find_socket(link.to_node.inputs, link.to_socket.identifier)
-            seq.append(item)
         return seq
 
     def load(self, links: T.NodeLinks, key: str, _, context: Context) -> NodeLinksProxy:
@@ -74,11 +74,7 @@ class NodeLinksProxy(StructCollectionProxy):
             return
 
         node_tree.links.clear()
-        for link_proxy in self._sequence:
-            from_node_name = link_proxy["from_node"]
-            from_socket_index = link_proxy["from_socket"]
-            to_node_name = link_proxy["to_node"]
-            to_socket_index = link_proxy["to_socket"]
+        for from_node_name, from_socket_index, to_node_name, to_socket_index in self._sequence:
 
             from_node = node_tree.nodes.get(from_node_name)
             if from_node is None:
@@ -142,7 +138,7 @@ class NodeLinksProxy(StructCollectionProxy):
     def diff(self, links: T.NodeLinks, key, prop, context: Context) -> Optional[DeltaUpdate]:
         # always complete updates
         blender_links = self._load(links)
-        if blender_links == self._sequence:
+        if blender_links == self._sequence and not context.visit_state.send_nodetree_links:
             return None
 
         diff = self.__class__()

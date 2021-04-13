@@ -18,8 +18,8 @@ See :ref:`work-together` for more details.
 What is synchronized
 --------------------
 
-This table described the status of synchronization for the main Blender data types.
-The custom properties of all datablocks are also synchronized
+Most of the elements contained in a scene, the data types, are synchronized, as well as the custom properties of all datablocks.
+The following table summarizes the covered features and a note indicates when synchronization is not available because the feature has not been implemented yet.
 
 .. |Y| replace:: Yes
 .. |N| replace:: No
@@ -43,11 +43,11 @@ Light           |Y|
 Light probe     |N|
 Line style      |N|
 Mask            |N|
-Material        |P|                 see [Nodes]_
-Mesh            |P|                 except split normals, custom properties, see [Edit]_
+Material        |Y|                 See [Nodes]_
+Mesh            |P|                 Except split normals, custom properties, see [Edit]_
 Metaball        |Y|                 See [Edit]_, [Convert]_
 Movie clip      |Y|                 See [Media]_
-Node group      |Y|                 Not extensively tested, see [Nodes]_
+Node group      |P|                 Not extensively tested, see [Nodes]_
 Object          |P|                 Except motion paths, particles and physics. See [Convert]_ 
 Paint curve     |N|
 Particles       |N|
@@ -58,7 +58,6 @@ Text            |N|
 Texture         |Y|
 Volume          |N|
 VSE             |P|                 Except meta strips. Not extensively tested
-Workspace       |N|
 World           |Y|
 ==============  ==================  ==============================================
 
@@ -96,6 +95,46 @@ World           |Y|
 
 .. [Nodes]
     Links synchronization sometimes fails. Some cases might cause crashes.
+
+
+.. _not-synchronized:
+
+What is NOT synchronized
+------------------------
+
+In order to provide to all participants a collaborative experience with as much freedom as they have during a solo session some features are deliberately not synchronized.
+This is the case for most User Interface elements, user preferences and configuration.
+
+=====================  =====================================================
+UI and Settings          Comments
+=====================  =====================================================
+User preferences       
+Key mapping            
+Installed add-ons      
+Workspace              
+=====================  =====================================================
+
+=====================  =====================================================
+Scene Manipulation       Comments
+=====================  =====================================================
+Object Editing Mode     
+Active tool             Eg: Move, Rotate, Scale...
+3D cursor               
+Scene display mode      Show gizmos, overlays...
+Viewport shading        
+Play mode               
+=====================  =====================================================
+
+=====================  =====================================================
+Scene Properties       Comments
+=====================  =====================================================
+Scene current camera   See [SceneCurrentCamera]_
+Render engine          See [RenderEngine]_
+=====================  =====================================================
+
+.. [SceneCurrentCamera] Although belonging to the scene properties, preventing the current camera to be synchronized allows each user to view and render the scene from the camera of her choice
+
+.. [RenderEngine] Each user can render either with Eevee, Cycle or another avaiable engine of her choice
 
 .. _caveats:
 

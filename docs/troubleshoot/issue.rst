@@ -1,5 +1,14 @@
+Feedback and Issues
+===================
+
+Feedback
+--------
+
+For feedback, suggestions and to discuss ideas around Mixer you can directly contact us on Blender Chat:
+https://blender.chat/channel/mixer-addon
+
 Reporting an issue
-==================
+------------------
 
 Before reporting an issue, please make sure that are using the :ref:`latest version <installing>` and check :
 
@@ -13,6 +22,6 @@ If you think you have found a bug or would like to propose a new feature, please
 
 Please consider attaching the Mixer log file:
 
-- Open the Mixer preferences using the Mixer panel title bar settings icon
+- open the Mixer preferences using the Mixer panel title bar settings icon
 - in the preferences window, go to the **Connection Settings** group and click on **Open Log Folder**.
 - attach the relevant file to the issue.

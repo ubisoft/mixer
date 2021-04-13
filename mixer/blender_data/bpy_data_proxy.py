@@ -139,11 +139,13 @@ class VisitState:
             self._proxy = proxy
 
         def __enter__(self):
+            self._visit_state.send_nodetree_links = False
             if not self._is_embedded_data:
                 self._visit_state.datablock_proxy = self._proxy
                 self._visit_state.datablock_string = self._datablock_string
 
         def __exit__(self, exc_type, exc_value, traceback):
+            self._visit_state.send_nodetree_links = False
             if not self._is_embedded_data:
                 self._visit_state.datablock_proxy = None
                 self._visit_state.datablock_string = None
@@ -190,6 +192,12 @@ class VisitState:
         Global state
         """
 
+        self.send_nodetree_links: bool = False
+        """NodeTree.nodes has been modified in a way that requires NodeTree.links to be resent.
+
+        Intra datablock state
+        """
+
         self.datablock_string: Optional[str] = None
         """"Current datablock display string, for logging"""
 
@@ -214,8 +222,12 @@ class VisitState:
     def pop(self):
         self._attribute_path.pop()
 
-    def attribute(self, index: int) -> T.bpy_struct:
-        return self._attribute_path[index]
+    def attribute(self, i: int) -> T.bpy_struct:
+        """The i-th attribute visited, starting from the datablock.
+
+        More useful from the end, the attribute at -1 being the one that contains the attribute being processed.
+        """
+        return self._attribute_path[i][0]
 
     def path(self) -> Tuple[Union[int, str], ...]:
         """The path of the attribute being processed.
@@ -244,6 +256,8 @@ class Context:
 _creation_order = {
     # Libraries are needed to create all linked datablocks
     "libraries": -10,
+    # before materials
+    "node_groups": -10,
     # before curves
     "fonts": -5,
     # anything else: 0

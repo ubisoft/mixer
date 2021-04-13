@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 import logging
+import sys
 from typing import Any, Dict, ItemsView, Iterable, List, Optional, Set, Union
 
 from bpy import types as T  # noqa
@@ -199,15 +200,20 @@ class SynchronizedProperties:
         return {k.bl_rna: v for k, v in self._properties_order.items()}
 
     def _sort(self, bl_rna, properties: List[T.Property]):
-        try:
-            order = self._order[bl_rna]
-        except KeyError:
+
+        for class_ in bases(bl_rna):
+            bl_rna = None if class_ is None else class_.bl_rna
+            ordered_identifiers = self._order.get(bl_rna)
+            if ordered_identifiers is not None:
+                break
+
+        if not ordered_identifiers:
             return properties
 
+        identifier_order = {identifier: i for i, identifier in enumerate(ordered_identifiers)}
+
         def predicate(prop: T.Property):
-            if prop.identifier in order:
-                return 0
-            return 1
+            return identifier_order.get(prop.identifier, sys.maxsize)
 
         return sorted(properties, key=predicate)
 
@@ -487,6 +493,7 @@ default_exclusions: FilterSet = {
         NameFilterOut(
             [
                 "internal_links",
+                "type",
                 # cannot be written: set by shader editor
                 "dimensions",
             ]
@@ -497,16 +504,30 @@ default_exclusions: FilterSet = {
         NameFilterOut(["is_hidden"])
     ],
     T.NodeSocket: [
+        NameFilterOut(
+            [
+                # XxxNodeGroup save will modify other XxxShaderNode socker identifier !
+                "identifier",
+                # readonly
+                "is_linked",
+                "is_output",
+                "label",
+                "node",
+                "type",
+            ]
+        )
+    ],
+    T.NodeSocketInterface: [
         # Currently synchronize builtin shading node sockets only, so assume these attributes are
         # managed only at the Node creation
-        # NameFilterOut(["identifier", "is_linked", "is_output", "link_limit", "name", "node", "type"])
-        NameFilterOut(["bl_idname", "is_linked", "is_output", "node"])
+        NameFilterOut(["identifier", "is_output", "type"])
     ],
     T.NodeTree: [
         NameFilterOut(
             [
                 # read only
                 "view_center",
+                "type",
             ]
         )
     ],
@@ -590,6 +611,8 @@ default_exclusions: FilterSet = {
     T.Scene: [
         NameFilterOut(
             [
+                # each user should be able to view and render through the scene camera she chooses
+                "camera",
                 # Let each participant play his own time
                 "frame_current",
                 "frame_current_final",
@@ -629,6 +652,14 @@ default_exclusions: FilterSet = {
         )
     ],
     T.SequenceEditor: [NameFilterOut(["active_strip", "sequences_all"])],
+    T.ShaderNodeTree: [
+        NameFilterOut(
+            [
+                # UI
+                "active_input",
+            ]
+        )
+    ],
     T.ShapeKey: [
         NameFilterOut(
             [
@@ -662,6 +693,7 @@ Per-type property exclusions
 
 
 property_order: PropertiesOrder = {
+    # Match closest parent type (e.g. NodeTree for ShaderNodeTree)
     T.Action: {
         # before fcurves
         "groups",
@@ -677,8 +709,12 @@ property_order: PropertiesOrder = {
         "use_nodes",
     },
     T.NodeTree: {
+        # creating inputs and output create sockets on input and output nodes
+        # https://blender.stackexchange.com/questions/184447/how-to-update-nodesocketstring-value-inside-a-node-group-in-a-attribute-node-usi
+        "inputs",
+        "outputs",
         # must exist before links are saved
-        "nodes"
+        "nodes",
     },
     T.PoseBone: {
         "matrix",
@@ -754,6 +790,7 @@ safe_blenddata_collections = [
     "meshes",
     "metaballs",
     "movieclips",
+    "node_groups",
     "objects",
     "scenes",
     "shape_keys",

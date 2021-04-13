@@ -26,6 +26,7 @@ try:
     import mixer.blender_data.datablock_ref_proxy
     import mixer.blender_data.library_proxies
     import mixer.blender_data.mesh_proxy
+    import mixer.blender_data.modifier_proxies
     import mixer.blender_data.misc_proxies
     import mixer.blender_data.node_proxy
     import mixer.blender_data.object_proxy
