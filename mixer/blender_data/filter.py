@@ -316,6 +316,14 @@ default_exclusions: FilterSet = {
             ]
         )
     ],
+    T.AttributeGroup: [
+        NameFilterOut(
+            [
+                # UI
+                "active",
+            ]
+        )
+    ],
     T.BezierSplinePoint: [
         NameFilterOut(
             [
@@ -337,6 +345,14 @@ default_exclusions: FilterSet = {
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
     T.Curve: [NameFilterOut(["shape_keys"])],
     T.DecimateModifier: [NameFilterOut(["face_count"])],
+    T.DriverTarget: [
+        NameFilterOut(
+            [
+                # readonly
+                "id_type"
+            ]
+        )
+    ],
     T.EditBone: [
         NameFilterOut(
             [

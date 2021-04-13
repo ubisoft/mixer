@@ -426,6 +426,15 @@ def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     return _filter_properties(properties, filter_props)
 
 
+@conditional_properties.register(T.UnitSettings)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if bpy_struct.system != "NONE":
+        return properties
+
+    filter_props = ["length_unit", "mass_unit", "time_unit", "temperature_unit"]
+    return _filter_properties(properties, filter_props)
+
+
 @conditional_properties.register(T.EffectSequence)  # type: ignore[no-redef]
 @conditional_properties.register(T.ImageSequence)
 @conditional_properties.register(T.MaskSequence)
@@ -668,6 +677,14 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
 @add_element.register(T.FCurveKeyframePoints)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     return collection.add(1)
+
+
+@add_element.register(T.AttributeGroup)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
+    name = proxy.data("name")
+    type_ = proxy.data("type")
+    domain = proxy.data("domain")
+    return collection.new(name, type_, domain)
 
 
 _non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}
