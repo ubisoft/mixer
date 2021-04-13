@@ -364,7 +364,9 @@ class DatablockRefCollectionProxy(Proxy):
             if datablock:
                 collection.link(datablock)
             else:
-                logger.info(f"unresolved reference {parent!r}.{key} -> {ref_proxy.display_string} {ref_proxy.mixer_uuid}")
+                logger.info(
+                    f"unresolved reference {parent!r}.{key} -> {ref_proxy.display_string} {ref_proxy.mixer_uuid}"
+                )
                 add_element = collection.link
                 context.proxy_state.unresolved_refs.append(
                     ref_proxy.mixer_uuid, add_element, f"{collection!r}.link({ref_proxy.display_string})"

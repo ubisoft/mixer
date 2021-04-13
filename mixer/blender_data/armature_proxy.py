@@ -65,7 +65,7 @@ class Command:
         try:
             self._do()
         except Exception as e:
-            logger.error(f"DO exception ...")
+            logger.error("DO exception ...")
             logger.error(f"... {self._text}")
             logger.error(f"... {e!r}")
 
@@ -74,7 +74,7 @@ class Command:
         try:
             self._undo()
         except Exception as e:
-            logger.error(f"UNDO exception ...")
+            logger.error("UNDO exception ...")
             logger.error(f"... {self._text}")
             logger.error(f"... {e!r}")
 
