@@ -552,14 +552,11 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
 def add_element(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
     """Add an element to a bpy_prop_collection using the collection specific API"""
     try:
-        collection.bl_rna
-    except AttributeError:
-        return
-
-    try:
         collection.add()
-    except Exception:
-        logger.error(f"add_element: failed for {collection}")
+    except Exception as e:
+        logger.error(f"add_element: call to add() failed for {context.visit_state.display_path()} ...")
+        logger.error(f"... {e!r}")
+        raise AddElementFailed from None
 
 
 @add_element.register_default()
