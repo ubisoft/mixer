@@ -92,6 +92,9 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
 
                 return AosProxy().load(attr, key, attr_property, context)
             else:
+                # This code path is taken for collections that have an rna and collections that do not
+                # There should probably be different proxies for collection with and without rna.
+                # See comment in add_element()
                 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
                 return StructCollectionProxy.make(attr_property).load(attr, key, attr_property, context)

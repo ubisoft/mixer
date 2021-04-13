@@ -550,13 +550,29 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
 #
 @dispatch_rna
 def add_element(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
-    """Add an element to a bpy_prop_collection using the collection specific API"""
-    try:
-        collection.add()
-    except Exception as e:
-        logger.error(f"add_element: call to add() failed for {context.visit_state.display_path()} ...")
-        logger.error(f"... {e!r}")
-        raise AddElementFailed from None
+    """Add an element to a bpy_prop_collection using the collection specific API.s"""
+
+    if hasattr(collection, "add"):
+        # either a bpy_prop_collection  with an rna or a bpy_prop_collection_idprop
+        try:
+            collection.add()
+            return
+        except Exception as e:
+            logger.error(f"add_element: call to add() failed for {context.visit_state.display_path()} ...")
+            logger.error(f"... {e!r}")
+            raise AddElementFailed from None
+
+    if not hasattr(collection, "bl_rna"):
+        # a bpy.types.bpy_prop_collection, e.g Pose.bones
+        # We should not even attempt to add elements in these collections since they do not allow it at all.
+        # However bpy_prop_collection and collections with an rna both managed by StructCollectionProxy. We need
+        # proxy update to update the contents of existing elements, but it should not attempt to add/remove elements.
+        # As a consequence, for attributes that fall into this category we trigger updates with additions and
+        # deletions that are meaningless. Ignore them.
+        # The right design could be to have different proxies for bpy_prop_collection and bpy_struct that behave like
+        # collections.
+        # see Proxy construction in  read_attribute()
+        return
 
 
 @add_element.register_default()
