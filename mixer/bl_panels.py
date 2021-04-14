@@ -504,7 +504,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                     row.prop(mixer_props, "upload_room_name", text="Name")
                     row.prop(
                         mixer_props,
-                        "upload_room_filepath",
+                        "internal_upload_room_filepath",
                         text="File",
                         icon=("ERROR" if not os.path.exists(mixer_props.upload_room_filepath) else "NONE"),
                     )
