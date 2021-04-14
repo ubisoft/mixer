@@ -230,13 +230,16 @@ class ObjectProxy(DatablockProxy):
 
         if to_blender:
             if isinstance(datablock.data, T.Armature):
-                try:
-                    _ = update._data["pose"].value._data["bones"]
-                except KeyError:
-                    pass
-                else:
-                    # Update Armature.edit_bones before Object.pose.bones
-                    ArmatureProxy.update_edit_bones(datablock, context)
+                pose = update.data("pose")
+                if pose:
+                    if isinstance(pose, Delta):
+                        bones = pose.value.data("bones")
+                    else:
+                        # delta may be a full Object replace, thus pose is a StructProxy
+                        bones = pose.data("bones")
+                    if bones:
+                        # Update Armature.edit_bones before Object.pose.bones
+                        ArmatureProxy.update_edit_bones(datablock, context)
 
             incoming_material_slots = update.data("material_slots")
             self._fit_material_slots(datablock, incoming_material_slots, context)
