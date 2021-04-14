@@ -250,7 +250,6 @@ class ArmatureProxy(DatablockProxy):
             )
 
         self._access_edit_bones(armature_object, _apply_attribute, context)
-
         return self
 
     @staticmethod
@@ -332,20 +331,26 @@ class ArmatureProxy(DatablockProxy):
                 f"set mode to 'EDIT' for {object!r}",
             )
             update_state_commands.append(command)
-
+        edit_bones_length = 0
         try:
             update_state_commands.do()
             result = access()
+            edit_bones_length = len(object.data.edit_bones)
 
         except Exception as e:
             logger.warning(f"_access_edit_bones: at {context.visit_state.display_path()}...")
             logger.warning(f"... {e!r}")
         else:
             return result
-
         finally:
             try:
                 update_state_commands.undo()
+                if len(object.data.bones) != edit_bones_length:
+                    # some partial updates with rigify caused loss of bones after exiting EDIT mode.
+                    # This was hacked around by sending full updated for bones (see diff_must_replace)
+                    logger.error(
+                        f"bones length doe not match: edit {edit_bones_length}, object: {len(object.data.bones)}"
+                    )
             except Exception as e:
                 logger.error("_access_edit_bones: cleanup exception ...")
                 logger.error(f"... {e!r}")

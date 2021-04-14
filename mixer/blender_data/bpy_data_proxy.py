@@ -277,9 +277,14 @@ def _creation_order_predicate(item: Tuple[str, Any]) -> int:
 
 
 _updates_order = {
-    T.Key: 5,  # before Mesh for shape keys
-    T.Mesh: 10,  # before Object for vertex_groups
-    T.Collection: 15  # Before Scene since LayerCollection.children are available when the collection is created
+    # before Mesh for shape keys
+    T.Key: 5,
+    # before Object for vertex_groups
+    T.Mesh: 10,
+    # before Object. Object.bones update require Armature bones to be updated first
+    T.Armature: 12,
+    # Before Scene since LayerCollection.children are available when the collection is created
+    T.Collection: 15
     # anything else last
 }
 

@@ -932,6 +932,15 @@ def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collect
     return True
 
 
+@diff_must_replace.register(T.ArmatureEditBones)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
+    # HACK
+    # Without forcing a full update, using rigify addon, to create a basic human, then use rigify button
+    # causes some bones to be lost after leaving edit mode (bones number drops from 218 to 217).
+    # Not cause of the lost bone problem has not yet been found.
+    return True
+
+
 @diff_must_replace.register(T.VertexGroups)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
     # Full replace if anything has changed is easier to cope with in ObjectProxy._update_vertex_groups()
