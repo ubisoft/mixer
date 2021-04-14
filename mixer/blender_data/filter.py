@@ -590,6 +590,7 @@ default_exclusions: FilterSet = {
                 "matrix_basis",
                 # readonly
                 "head",
+                "is_in_ik_chain",
                 "length",
                 "matrix_channel",
                 "tail",
