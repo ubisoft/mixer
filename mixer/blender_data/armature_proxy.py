@@ -61,7 +61,7 @@ class Command:
         self._text = text
 
     def do(self):
-        logger.info("DO      " + self._text)
+        # logger.info("DO      " + self._text)
         try:
             self._do()
         except Exception as e:
@@ -70,7 +70,7 @@ class Command:
             logger.error(f"... {e!r}")
 
     def undo(self):
-        logger.info("UNDO    " + self._text)
+        # logger.info("UNDO    " + self._text)
         try:
             self._undo()
         except Exception as e:
@@ -90,16 +90,16 @@ class Commands:
         self._commands.append(command)
 
     def do(self):
-        if self._commands and self._text:
-            logger.info("DO   -- begin " + self._text)
+        # if self._commands and self._text:
+        #     logger.info("DO   -- begin " + self._text)
         for command in self._commands:
             command.do()
 
     def undo(self):
         for command in reversed(self._commands):
             command.undo()
-        if self._commands and self._text:
-            logger.info("UNDO -- end    " + self._text)
+        # if self._commands and self._text:
+        #     logger.info("UNDO -- end    " + self._text)
 
 
 def override_context():

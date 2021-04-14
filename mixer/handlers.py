@@ -151,7 +151,8 @@ processing_depsgraph_handler = False
 def handler_send_scene_data_to_server(scene, dummy):
     global processing_depsgraph_handler
     if processing_depsgraph_handler:
-        logger.error("Depsgraph handler recursion attempt")
+        # this happens when an operator is called during the depsgraph handler processing, which is common with armatures
+        logger.debug("Depsgraph handler recursion attempt (safe with armatures)")
         return
 
     processing_depsgraph_handler = True
