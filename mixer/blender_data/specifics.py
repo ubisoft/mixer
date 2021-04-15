@@ -468,6 +468,18 @@ def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     return _filter_properties(properties, filter_props)
 
 
+@conditional_properties.register(T.FCurve)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if bpy_struct.group is not None:
+        return properties
+
+    # FCurve.group = None
+    # triggers noisy message
+    # ERROR: one of the ID's for the groups to assign to is invalid (ptr=0000028B55B0C038, val=0000000000000000)
+    filter_props = ["group"]
+    return _filter_properties(properties, filter_props)
+
+
 @conditional_properties.register(T.EffectSequence)  # type: ignore[no-redef]
 @conditional_properties.register(T.ImageSequence)
 @conditional_properties.register(T.MaskSequence)
