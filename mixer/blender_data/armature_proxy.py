@@ -151,8 +151,17 @@ class ArmatureProxy(DatablockProxy):
 
     _edit_bones_property = T.Armature.bl_rna.properties["edit_bones"]
 
+    _require_context_state = (
+        # requires EDIT mode
+        "edit_bones",
+        # requires bpy.context.object. State stage will be too much, never mind
+        "rigify_layers",
+    )
+    """These members require proper state change."""
+
     def load(self, armature_data: T.Armature, context: Context) -> ArmatureProxy:
         proxy = super().load(armature_data, context)
+        self._custom_properties.load(armature_data)
         assert proxy is self
 
         # Do not use _armature_object as the user Object has not yet been registered in ProxyState
@@ -175,10 +184,15 @@ class ArmatureProxy(DatablockProxy):
     def _save(self, armature_data: T.ID, context: Context) -> T.ID:
         # This is called when the Armature datablock is created. However, edit_bones can only be edited after the
         # armature Object is created and in EDIT mode.
-        # So skip edit_bones now and ObjectProxy will call write_edit_bones() later
-        edit_bones_proxy = self._data.pop("edit_bones")
+        # So skip proxies that need proper state and ObjectProxy will call update_edit_bones() later
+        proxies_needing_state = {
+            name: self._data.pop(name, None) for name in self._require_context_state if name in self._data
+        }
         datablock = super()._save(armature_data, context)
-        self._data["edit_bones"] = edit_bones_proxy
+
+        # restore the bypassed proxies and apply them with context change
+        self._data.update(proxies_needing_state)
+
         return datablock
 
     def _diff(
@@ -231,23 +245,35 @@ class ArmatureProxy(DatablockProxy):
         """
         assert isinstance(key, str)
 
+        if not to_blender:
+            return super().apply(armature_data, parent, key, delta, context, to_blender)
+
         update = delta.value
-        edit_bones_proxy = update._data.pop("edit_bones", None)
+
+        # find proxies that need proper state and keep them aside for _access_edit_bones
+        proxies_needing_state = {
+            name: update._data.pop(name, None) for name in self._require_context_state if name in update._data
+        }
         updated_proxy = super().apply(armature_data, parent, key, delta, context, to_blender)
         assert updated_proxy is self
-        if edit_bones_proxy is None:
-            return self
 
-        update._data["edit_bones"] = edit_bones_proxy
+        if not proxies_needing_state:
+            # no update requires state change
+            return self
 
         armature_object = _armature_object(armature_data, context)
         if not armature_object:
+            # TOD0 how is it possible ?
             return self
 
+        # restore the bypassed proxies and apply them with context change
+        update._data.update(proxies_needing_state)
+
         def _apply_attribute():
-            self._data["edit_bones"] = apply_attribute(
-                armature_data, "edit_bones", self._data["edit_bones"], update._data["edit_bones"], context, to_blender
-            )
+            for name in proxies_needing_state.keys():
+                self._data[name] = apply_attribute(
+                    armature_data, name, self._data[name], update._data[name], context, to_blender
+                )
 
         self._access_edit_bones(armature_object, _apply_attribute, context)
         return self
@@ -264,10 +290,10 @@ class ArmatureProxy(DatablockProxy):
         armature_data_uuid = armature_object.data.mixer_uuid
         armature_data_proxy = context.proxy_state.proxies[armature_data_uuid]
         assert isinstance(armature_data_proxy, ArmatureProxy)
-        edit_bones_proxy = armature_data_proxy.data("edit_bones")
 
         def _write_attribute():
-            write_attribute(armature_object.data, "edit_bones", edit_bones_proxy, context)
+            for name in armature_data_proxy._require_context_state:
+                write_attribute(armature_object.data, name, armature_data_proxy._data[name], context)
 
         armature_data_proxy._access_edit_bones(armature_object, _write_attribute, context)
 
