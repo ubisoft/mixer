@@ -61,6 +61,12 @@ def redraw_if(condition: bool):
 
 def update_ui_lists():
     update_room_list(do_redraw=False)
+    props = get_mixer_props()
+    if len(props.rooms):
+        if props.room_index >= len(props.rooms):
+            props.room_index = max(0, len(props.rooms) - 1)
+    else:
+        props.room_index = 0
     update_user_list()
 
 
@@ -539,6 +545,27 @@ class MixerSettingsPanel(bpy.types.Panel):
             return False
 
         layout.separator(factor=0.5)
+        # row = box.row()
+        # row.separator(factor=2)
+        collapsable_panel(layout, mixer_prefs, "users_list_panel_opened", text="Users in the Room")
+        if mixer_prefs.users_list_panel_opened:
+            box = layout.box()
+            col = box.column()
+
+            users_in_room = [user for user in mixer_props.users if user_belongs_to_selected_room(user)]
+
+            if not len(users_in_room):
+                col.label(text="No users in the room")
+            else:
+                for user in users_in_room:
+                    user_split = col.split()
+                    sub_row = user_split.row()
+                    user_sub_split = sub_row.split(factor=0.8)
+                    user_sub_split.label(text=f"{user.name}", icon="USER" if user.is_me else "BLANK1")
+                    user_sub_split.prop(user, "color", text="")
+                    sub_row.label(text=f"{user.ip_port}")
+
+        layout.separator(factor=0.5)
         collapsable_panel(layout, mixer_prefs, "display_selected_room_properties", text="Selected Room Properties")
         if mixer_prefs.display_selected_room_properties:
             box = layout.box()
@@ -616,23 +643,6 @@ class MixerSettingsPanel(bpy.types.Panel):
                 sub_row.label(text="Keep Open:")
 
                 split.prop(current_room, "keep_open", text="")
-
-                row = box.row()
-                row.separator(factor=2)
-                collapsable_panel(row, mixer_prefs, "users_list_panel_opened", text="Users in the Room")
-                if mixer_prefs.users_list_panel_opened:
-                    sub_row = box.row()
-                    sub_row.separator(factor=7)
-                    sub_box = sub_row.box()
-                    col = sub_box.column()
-
-                    for user in (user for user in mixer_props.users if user_belongs_to_selected_room(user)):
-                        user_split = col.split()
-                        sub_row = user_split.row()
-                        user_sub_split = sub_row.split(factor=0.8)
-                        user_sub_split.label(text=f"{user.name}", icon="USER" if user.is_me else "BLANK1")
-                        user_sub_split.prop(user, "color", text="")
-                        sub_row.label(text=f"{user.ip_port}")
 
 
 class VRtistSettingsPanel(bpy.types.Panel):

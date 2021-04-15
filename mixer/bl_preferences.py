@@ -134,7 +134,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
         name="Room Properties", description="Display the properties of the selected room", default=False
     )
     users_list_panel_opened: bpy.props.BoolProperty(
-        name="Users List", description="Display the list of the users in the selected room", default=False
+        name="Users List", description="Display the list of the users in the selected room", default=True
     )
 
     def get_log_level(self):
