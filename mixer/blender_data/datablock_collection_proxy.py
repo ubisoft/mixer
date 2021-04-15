@@ -222,7 +222,7 @@ class DatablockCollectionProxy(Proxy):
         """
         Rename a bpy.data collection item and update the proxy state (receiver side)
         """
-        logger.info("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
+        logger.info("rename_datablock proxy %s datablock %r into %s", proxy, datablock, new_name)
         datablock.name = new_name
         proxy._data["name"] = new_name
 

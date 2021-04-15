@@ -202,12 +202,13 @@ def write_attribute(
                 try:
                     setattr(parent, key, value)
                 except TypeError as e:
-                    # common for enum that have unsupported default values, such as FFmpegSettings.ffmpeg_preset,
-                    # which seems initialized at "" and triggers :
-                    #   TypeError('bpy_struct: item.attr = val: enum "" not found in (\'BEST\', \'GOOD\', \'REALTIME\')')
-                    logger.info("write_attribute: exception for ...")
-                    logger.info(f"... attribute: {context.visit_state.display_path()}.{key}, value: {value}")
-                    logger.info(f" ...{e!r}")
+                    if value != "":
+                        # common for enum that have unsupported default values, such as FFmpegSettings.ffmpeg_preset,
+                        # which seems initialized at "" and triggers :
+                        #   TypeError('bpy_struct: item.attr = val: enum "" not found in (\'BEST\', \'GOOD\', \'REALTIME\')')
+                        logger.warning("write_attribute: exception for ...")
+                        logger.warning(f"... attribute: {context.visit_state.display_path()}.{key}, value: {value}")
+                        logger.warning(f" ...{e!r}")
 
     except (IndexError, AttributeError) as e:
         if (

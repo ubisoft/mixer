@@ -398,8 +398,19 @@ class PtrToCollectionItemProxy(Proxy):
             pointee = None
         else:
             collection = self._collection(parent.id_data)
-            pointee = collection[self._index]
-        write_attribute(parent, key, pointee, context)
+            try:
+                pointee = collection[self._index]
+            except IndexError:
+                # TODO Fails if an array member references an element not yet created, like bones with parenting reversed
+                # Could be solved with a delayed reference resolution:
+                # - keep a reference to the collection proxy
+                # - store the assignment closure in the collection proxy
+                # - when the collection proxy creates the item, call the closure
+                logger.error("save(): Unimplemented: reference an item not yet created ...")
+                logger.error(f"... {parent!r}.{key}")
+                logger.error(f"... references {collection!r}[{self._index}]")
+            else:
+                write_attribute(parent, key, pointee, context)
 
     def apply(
         self,

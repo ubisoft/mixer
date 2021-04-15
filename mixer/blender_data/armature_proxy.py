@@ -104,6 +104,7 @@ class Commands:
 
 def override_context():
     # TODO what to do if there is no VIEW_3D
+    # TODO not used. Not useful as long are we are in a 3D view
     for window in bpy.context.window_manager.windows:
         for area in window.screen.areas:
             if area.type == "VIEW_3D":
@@ -191,6 +192,7 @@ class ArmatureProxy(DatablockProxy):
         datablock = super()._save(armature_data, context)
 
         # restore the bypassed proxies and apply them with context change
+        # WARNING: this reorders proxy items
         self._data.update(proxies_needing_state)
 
         return datablock
@@ -298,7 +300,6 @@ class ArmatureProxy(DatablockProxy):
         armature_data_proxy._access_edit_bones(armature_object, _write_attribute, context)
 
     def _access_edit_bones(self, object: T.Object, access: Callable[[], Any], context: Context) -> Any:
-        # TODO why don't wee need a context override here ?
 
         update_state_commands = Commands("access_edit_bones")
 
@@ -351,6 +352,13 @@ class ArmatureProxy(DatablockProxy):
         #
         object_mode = object.mode
         if object_mode != "EDIT":
+            # During ObjectProxy.save(), setting mode to EDIT will trigger a depsgraph update that includes
+            # an Armature drivers evaluation, but we have not yet saved the bones. This triggers errors like
+            #
+            #   WARN (bke.anim_sys): C:\...\anim_sys.c:2991 BKE_animsys_eval_driver: invalid driver - bones["DEF-upper_arm.R.001"].bbone_easein[0]
+            #
+            # TODO: Avoiding the error would require to save Armature.animation_data after Armature.edit_bones
+            # TODO: Find out if the error message is a problem or if the computation will anyway be correct next time
             command = Command(
                 lambda: bpy.ops.object.mode_set(mode="EDIT"),
                 lambda: bpy.ops.object.mode_set(mode=object_mode),
