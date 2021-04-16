@@ -164,6 +164,7 @@ class UserItem(bpy.types.PropertyGroup):
         max=1.0,
         precision=2,
     )
+    mode: bpy.props.StringProperty(name="User Mode")
 
     def _get_color(self):
         return self.internal_color
