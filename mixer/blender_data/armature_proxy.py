@@ -15,15 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
-Proxy for Armature datablock
-
-
-TODO
-- [] bbone_custom_handle_end
-- [] handler recursion attempt on edit mode change during armature diff. Is it save to remove the view later from the context ?
-- [X] child transformation seems applied twice (once at the parent level, once at the child level)
-- [X] bone group
-- [] custom_shape_transform
+Proxy for Armature datablock.
 
 See synchronization.md
 """
@@ -100,26 +92,6 @@ class Commands:
             command.undo()
         # if self._commands and self._text:
         #     logger.info("UNDO -- end    " + self._text)
-
-
-def override_context():
-    # TODO what to do if there is no VIEW_3D
-    # TODO not used. Not useful as long are we are in a 3D view
-    for window in bpy.context.window_manager.windows:
-        for area in window.screen.areas:
-            if area.type == "VIEW_3D":
-                override = bpy.context.copy()
-                override.update(
-                    {
-                        "window": window,
-                        "screen": window.screen,
-                        "area": area,
-                    }
-                )
-                return override
-
-    logger.warning("Not 3D_VIEW for armature update")
-    return None
 
 
 def _set_active_object(obj: T.Object):
@@ -288,7 +260,6 @@ class ArmatureProxy(DatablockProxy):
         # this implements the update
         assert isinstance(armature_object.data, T.Armature)
 
-        # do we need this at all
         armature_data_uuid = armature_object.data.mixer_uuid
         armature_data_proxy = context.proxy_state.proxies[armature_data_uuid]
         assert isinstance(armature_data_proxy, ArmatureProxy)
@@ -300,6 +271,9 @@ class ArmatureProxy(DatablockProxy):
         armature_data_proxy._access_edit_bones(armature_object, _write_attribute, context)
 
     def _access_edit_bones(self, object: T.Object, access: Callable[[], Any], context: Context) -> Any:
+
+        # The operators used here do not require a context override, and work even if there is no VIEW_3D when
+        # the received update is processed
 
         update_state_commands = Commands("access_edit_bones")
 
@@ -313,6 +287,9 @@ class ArmatureProxy(DatablockProxy):
             # - the code path that created the Armature on the source has not yet linked it to a collection
             # - it is only linked to collections excluded from the view_layer
             # Temporarily link to the current view layer
+
+            # TODO this code would be simpler with full Command implementations, such as
+            # command = ObjectsLinkCommand(objects, object)
 
             objects = bpy.context.view_layer.layer_collection.collection.objects
             command = Command(

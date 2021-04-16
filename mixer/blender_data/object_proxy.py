@@ -68,6 +68,11 @@ class ObjectProxy(DatablockProxy):
             ArmatureProxy.update_edit_bones(datablock, context)
 
         self._fit_material_slots(datablock, self._data["material_slots"], context)
+
+        # TODO pose_bone probably needs to be in POSE mode. In Object mode, the following error is triggered on
+        # rigify's basic human rig :
+        # on attribute: bpy.data.objects['rig'].pose.bones.201.constraints.0.target_space, value: POSE
+        # TypeError('bpy_struct: item.attr = val: enum "POSE" not found in (\'WORLD\', \'CUSTOM\', \'LOCAL\')')
         super()._save(datablock, context)
         self._update_vertex_groups(datablock, self._data["vertex_groups"], context)
 
