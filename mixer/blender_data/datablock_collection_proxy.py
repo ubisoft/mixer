@@ -222,7 +222,7 @@ class DatablockCollectionProxy(Proxy):
         """
         Rename a bpy.data collection item and update the proxy state (receiver side)
         """
-        logger.info("rename_datablock proxy %s datablock %s into %s", proxy, datablock, new_name)
+        logger.info("rename_datablock proxy %s datablock %r into %s", proxy, datablock, new_name)
         datablock.name = new_name
         proxy._data["name"] = new_name
 
@@ -364,7 +364,10 @@ class DatablockRefCollectionProxy(Proxy):
             if datablock:
                 collection.link(datablock)
             else:
-                logger.info(f"unresolved reference {parent}.{key} -> {ref_proxy.display_string} {ref_proxy.mixer_uuid}")
+                logger.info(
+                    f"unresolved reference {parent!r}.{key} -> {ref_proxy.display_string} {ref_proxy.mixer_uuid}"
+                )
+                # TODO use Resolver class instead
                 add_element = collection.link
                 context.proxy_state.unresolved_refs.append(
                     ref_proxy.mixer_uuid, add_element, f"{collection!r}.link({ref_proxy.display_string})"

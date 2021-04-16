@@ -283,6 +283,7 @@ def draw_developer_settings_ui(layout: bpy.types.UILayout):
         box.prop(mixer_prefs, "commands_send_interval")
         box.prop(mixer_prefs, "display_own_gizmos")
         box.prop(mixer_prefs, "display_ids_gizmos")
+        box.prop(mixer_prefs, "display_debugging_tools")
 
 
 def draw_gizmos_settings_ui(layout: bpy.types.UILayout):
@@ -490,21 +491,23 @@ class MixerSettingsPanel(bpy.types.Panel):
             if len(mixer_props.rooms):
                 self.draw_current_room_properties(layout)
 
-            # if collapsable_panel(layout, mixer_props, "display_advanced_room_control", text="Advanced Room Controls"):
-            #     box = layout.box()
-            #     col = box.column()
-            #     col.operator(bl_operators.DeleteRoomOperator.bl_idname)
-            #     col.operator(bl_operators.DownloadRoomOperator.bl_idname)
-            #     subbox = col.box()
-            #     subbox.row().operator(bl_operators.UploadRoomOperator.bl_idname)
-            #     row = subbox.row()
-            #     row.prop(mixer_props, "upload_room_name", text="Name")
-            #     row.prop(
-            #         mixer_props,
-            #         "upload_room_filepath",
-            #         text="File",
-            #         icon=("ERROR" if not os.path.exists(mixer_props.upload_room_filepath) else "NONE"),
-            #     )
+            prefs = get_mixer_prefs()
+            if prefs.display_debugging_tools:
+                if collapsable_panel(layout, mixer_props, "display_advanced_room_control", text="Room Debugging Tools"):
+                    box = layout.box()
+                    col = box.column()
+                    col.operator(bl_operators.DeleteRoomOperator.bl_idname)
+                    col.operator(bl_operators.DownloadRoomOperator.bl_idname)
+                    subbox = col.box()
+                    subbox.row().operator(bl_operators.UploadRoomOperator.bl_idname)
+                    row = subbox.row()
+                    row.prop(mixer_props, "upload_room_name", text="Name")
+                    row.prop(
+                        mixer_props,
+                        "internal_upload_room_filepath",
+                        text="File",
+                        icon=("ERROR" if not os.path.exists(mixer_props.upload_room_filepath) else "NONE"),
+                    )
 
     def draw_shared_folders_options(self, layout):
         mixer_props = get_mixer_props()

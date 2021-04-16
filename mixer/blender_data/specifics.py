@@ -459,6 +459,27 @@ def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     return _filter_properties(properties, filter_props)
 
 
+@conditional_properties.register(T.UnitSettings)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if bpy_struct.system != "NONE":
+        return properties
+
+    filter_props = ["length_unit", "mass_unit", "time_unit", "temperature_unit"]
+    return _filter_properties(properties, filter_props)
+
+
+@conditional_properties.register(T.FCurve)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if bpy_struct.group is not None:
+        return properties
+
+    # FCurve.group = None
+    # triggers noisy message
+    # ERROR: one of the ID's for the groups to assign to is invalid (ptr=0000028B55B0C038, val=0000000000000000)
+    filter_props = ["group"]
+    return _filter_properties(properties, filter_props)
+
+
 @conditional_properties.register(T.EffectSequence)  # type: ignore[no-redef]
 @conditional_properties.register(T.ImageSequence)
 @conditional_properties.register(T.MaskSequence)
@@ -541,16 +562,29 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
 #
 @dispatch_rna
 def add_element(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context):
-    """Add an element to a bpy_prop_collection using the collection specific API"""
-    try:
-        collection.bl_rna
-    except AttributeError:
-        return
+    """Add an element to a bpy_prop_collection using the collection specific API.s"""
 
-    try:
-        collection.add()
-    except Exception:
-        logger.error(f"add_element: failed for {collection}")
+    if hasattr(collection, "add"):
+        # either a bpy_prop_collection  with an rna or a bpy_prop_collection_idprop
+        try:
+            collection.add()
+            return
+        except Exception as e:
+            logger.error(f"add_element: call to add() failed for {context.visit_state.display_path()} ...")
+            logger.error(f"... {e!r}")
+            raise AddElementFailed from None
+
+    if not hasattr(collection, "bl_rna"):
+        # a bpy.types.bpy_prop_collection, e.g Pose.bones
+        # We should not even attempt to add elements in these collections since they do not allow it at all.
+        # However bpy_prop_collection and collections with an rna both managed by StructCollectionProxy. We need
+        # proxy update to update the contents of existing elements, but it should not attempt to add/remove elements.
+        # As a consequence, for attributes that fall into this category we trigger updates with additions and
+        # deletions that are meaningless. Ignore them.
+        # The right design could be to have different proxies for bpy_prop_collection and bpy_struct that behave like
+        # collections.
+        # see Proxy construction in  read_attribute()
+        return
 
 
 @add_element.register_default()
@@ -608,7 +642,8 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
 
 @add_element.register(T.CurveSplines)  # type: ignore[no-redef]
 @add_element.register(T.FCurveModifiers)
-@add_element.register(T.ObjectConstraints)  # type: ignore[no-redef]
+@add_element.register(T.ObjectConstraints)
+@add_element.register(T.PoseBoneConstraints)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     type_ = proxy.data("type")
     return collection.new(type_)
@@ -653,6 +688,12 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     name = proxy.data("name")
     return collection.new(name=name)
+
+
+@add_element.register(T.ArmatureEditBones)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
+    name = proxy.data("name")
+    return collection.new(name)
 
 
 @add_element.register(T.GreasePencilLayers)  # type: ignore[no-redef]
@@ -704,6 +745,14 @@ def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Cont
 @add_element.register(T.FCurveKeyframePoints)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
     return collection.add(1)
+
+
+@add_element.register(T.AttributeGroup)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, proxy: Proxy, index: int, context: Context) -> T.bpy_struct:
+    name = proxy.data("name")
+    type_ = proxy.data("type")
+    domain = proxy.data("domain")
+    return collection.new(name, type_, domain)
 
 
 _non_effect_sequences = {"IMAGE", "SOUND", "META", "SCENE", "MOVIE", "MOVIECLIP", "MASK"}
@@ -892,6 +941,15 @@ def diff_must_replace(
 
 @diff_must_replace.register(T.CurveSplines)  # type: ignore[no-redef]
 def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
+    return True
+
+
+@diff_must_replace.register(T.ArmatureEditBones)  # type: ignore[no-redef]
+def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collection_property: T.Property) -> bool:
+    # HACK
+    # Without forcing a full update, using rigify addon, to create a basic human, then use rigify button
+    # causes some bones to be lost after leaving edit mode (bones number drops from 218 to 217).
+    # Not cause of the lost bone problem has not yet been found.
     return True
 
 

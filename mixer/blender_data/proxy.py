@@ -76,7 +76,7 @@ class UnresolvedRefs:
         if dst_uuid in self._refs:
             for src_link, display_string in self._refs[dst_uuid]:
                 src_link(dst_datablock)
-                logger.info(f"resolving reference to {dst_datablock} {dst_uuid}: {display_string}")
+                logger.info(f"resolving reference to {dst_datablock!r} {dst_uuid}: {display_string}")
             del self._refs[dst_uuid]
 
 
@@ -172,21 +172,34 @@ class Proxy:
     def init(self, _):
         pass
 
-    def data(self, key: str, resolve_delta=True) -> Any:
-        """Return the data at key, which may be a struct member, a dict value or an array value,
+    def data(
+        self, key_or_path: Union[int, str, List[Union[int, str]], Tuple[Union[int, str], ...]], resolve_delta=True
+    ) -> Any:
+        """Return the item identified by key_or_path in this proxy hierarchy.
 
         Args:
-            key: Integer or string to be used as index or key to the data
+            key_or_path: Integer or string or sequence of integer or string to be used as index or key to the data
             resolve_delta: If True, and the data is a Delta, will return the delta value
         """
 
-        try:
-            data = self._data[key]
-        except KeyError:
-            return None
+        if not isinstance(key_or_path, (list, tuple)):
+            key_or_path = (key_or_path,)
 
-        if isinstance(data, Delta) and resolve_delta:
-            return data.value
+        data = self
+        for item in key_or_path:
+            try:
+                data = data[item]
+            except IndexError:
+                return None
+            except TypeError:
+                try:
+                    data = data._data[item]
+                except KeyError:
+                    return None
+
+            if isinstance(data, Delta) and resolve_delta:
+                data = data.value
+
         return data
 
     def save(

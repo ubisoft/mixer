@@ -184,6 +184,7 @@ class MixerPreferences(bpy.types.AddonPreferences):
 
     display_own_gizmos: bpy.props.BoolProperty(default=False, name="Display Own Gizmos")
     display_ids_gizmos: bpy.props.BoolProperty(default=False, name="Display ID Gizmos")
+    display_debugging_tools: bpy.props.BoolProperty(default=False, name="Display Debugging Tools")
 
     display_frustums_gizmos: bpy.props.BoolProperty(default=True, name="Display Frustums Gizmos")
     display_frustums_names_gizmos: bpy.props.BoolProperty(default=True, name="Display Frustums User Names")

@@ -33,6 +33,7 @@ from mixer.blender_data.proxy import Delta, DeltaReplace, DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
+    from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ class NonePtrProxy(Proxy):
         key: Union[str, int],
         prop: T.Property,
         context: Context,
-    ) -> Optional[DeltaUpdate]:
+    ) -> Optional[Delta]:
         attr = read_attribute(container, key, prop, None, context)
         if isinstance(attr, NonePtrProxy):
             return None
@@ -310,8 +311,18 @@ class PtrToCollectionItemProxy(Proxy):
 
     _serialize = ("_path", "_index")
 
-    _ctors = {(T.ShapeKey, "relative_key"): ("key_blocks",), (T.FCurve, "group"): ("groups",)}
-    """ { struct member: path to the enclosing datablock collection}"""
+    _ctors = {
+        (T.ShapeKey, "relative_key"): ("key_blocks",),
+        (T.FCurve, "group"): ("groups",),
+        (T.EditBone, "parent"): ("edit_bones",),
+        (T.EditBone, "bbone_custom_handle_start"): ("edit_bones",),
+        (T.EditBone, "bbone_custom_handle_end"): ("edit_bones",),
+        (T.PoseBone, "bone_group"): ("pose", "bone_groups"),
+    }
+    """{ struct member: path to the enclosing datablock collection}.
+
+    For instance PoseBone.bone_group is a pointer to a pose.bone_groups element in the same datablock.
+    """
 
     @classmethod
     def make(cls, attr_type: type, key: str) -> Optional[PtrToCollectionItemProxy]:
@@ -321,8 +332,8 @@ class PtrToCollectionItemProxy(Proxy):
             return None
         return cls(collection_path)
 
-    def __init__(self, path: Tuple[Union[int, str]] = ()):
-        self._path: Tuple[Union[int, str]] = path
+    def __init__(self, path: Tuple[Union[int, str], ...] = ()):
+        self._path = path
         """Path of the collection that contains the pointed to item in the enclosing standalone datablock."""
 
         self._index: int = -1
@@ -334,17 +345,23 @@ class PtrToCollectionItemProxy(Proxy):
     def __eq__(self, other):
         return (self._path, self._index) == (other._path, other._index)
 
-    def _collection(self, datablock) -> T.bpy_prop_collection:
+    def _collection(self, datablock: T.ID) -> T.bpy_prop_collection:
         """Returns the bpy_prop_collection that contains the pointees referenced by the attribute managed by this proxy
         (e.g. returns Key.key_blocks, if this proxy manages Skape_key.relative_key)."""
         collection = datablock
-        for i in self._path:
-            try:
-                collection = getattr(collection, i)
-            except (TypeError, AttributeError):
-                collection = collection[i]
+        for item in self._path:
+            if isinstance(item, str):
+                collection = getattr(collection, item)
+            else:
+                collection = collection[item]
 
         return collection
+
+    def _collection_proxy(self, datablock: T.ID, context: Context) -> StructCollectionProxy:
+        """Returns the StructCollectionProxy that is expected to contain the pointee."""
+        datablock_proxy = context.proxy_state.proxies[datablock.mixer_uuid]
+        collection_proxy = datablock_proxy.data(self._path)
+        return collection_proxy
 
     def _compute_index(self, attribute: T.bpy_struct):
         """Returns the index in the pointee bpy_prop_collection (e.g Key.key_blocks) that contains the item referenced
@@ -388,8 +405,24 @@ class PtrToCollectionItemProxy(Proxy):
             pointee = None
         else:
             collection = self._collection(parent.id_data)
-            pointee = collection[self._index]
-        write_attribute(parent, key, pointee, context)
+            try:
+                pointee = collection[self._index]
+            except IndexError:
+                collection_proxy = self._collection_proxy(parent.id_data, context)
+                collection_proxy.register_unresolved(
+                    self._index, lambda: write_attribute(parent, key, collection[self._index], context)
+                )
+
+                # TODO Fails if an array member references an element not yet created, like bones with parenting reversed
+                # Could be solved with a delayed reference resolution:
+                # - keep a reference to the collection proxy
+                # - store the assignment closure in the collection proxy
+                # - when the collection proxy creates the item, call the closure
+                logger.error("save(): Unimplemented: reference an item not yet created ...")
+                logger.error(f"... {parent!r}.{key}")
+                logger.error(f"... references {collection!r}[{self._index}]")
+            else:
+                write_attribute(parent, key, pointee, context)
 
     def apply(
         self,

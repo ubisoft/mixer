@@ -23,8 +23,9 @@ See synchronization.md
 """
 from __future__ import annotations
 
+from collections import defaultdict
 import logging
-from typing import List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, TypeVar, Union
 
 import bpy.types as T  # noqa
 
@@ -54,6 +55,39 @@ def _proxy_factory(attr):
         return StructProxy.make(attr)
 
 
+T_ = TypeVar("T_")
+
+
+class Resolver:
+    """Helper to defer item reference resolution after the referenced item creation.
+
+    An array element may reference an item with a larger index. As the arrays are created depth wise, the item
+    with the larger index does not exist when the item with the smaller item stored a reference. This situation
+    occurs when bone parenting is reversed.
+
+    TODO use this class for DatablockRefCollectionProxy as well
+    """
+
+    def __init__(self):
+        self._items: Dict[T_, List[Callable[[], None]]] = defaultdict(list)
+
+    def __bool__(self):
+        return bool(self._items)
+
+    def append(self, key: T_, func: Callable[[], None]):
+        """Add func() to be called by resolve() for item at key"""
+        self._items[key].append(func)
+
+    def resolve(self, key: T_):
+        """Resolve the references to item identified by key by calling the closures registered for it."""
+        try:
+            funcs = self._items.pop(key)
+        except IndexError:
+            return
+        for f in funcs:
+            f()
+
+
 @serialize
 class StructCollectionProxy(Proxy):
     """
@@ -66,10 +100,11 @@ class StructCollectionProxy(Proxy):
     _serialize = ("_sequence", "_diff_additions", "_diff_deletions", "_diff_updates")
 
     def __init__(self):
-        self._diff_updates: List[Tuple[int, DeltaUpdate]] = []
+        self._diff_updates: List[Tuple[int, Delta]] = []
         self._diff_deletions: int = 0
         self._diff_additions: List[DeltaAddition] = []
         self._sequence: List[DatablockProxy] = []
+        self._resolver: Optional[Resolver] = None
 
     @classmethod
     def make(cls, attr_property: T.Property):
@@ -89,7 +124,12 @@ class StructCollectionProxy(Proxy):
     def length(self) -> int:
         return len(self._sequence)
 
-    def data(self, key: int, resolve_delta=True) -> Optional[Union[DeltaUpdate, DeltaAddition, DatablockProxy]]:
+    def register_unresolved(self, i: int, func: Callable[[], None]):
+        if self._resolver is None:
+            self._resolver = Resolver()
+        self._resolver.append(i, func)
+
+    def data(self, key: int, resolve_delta=True) -> Optional[Union[Delta, DatablockProxy]]:
         """Return the data at key, which may be a struct member, a dict value or an array value,
 
         Args:
@@ -162,6 +202,8 @@ class StructCollectionProxy(Proxy):
         for i, item_proxy in enumerate(sequence[collection_length:], collection_length):
             try:
                 specifics.add_element(collection, item_proxy, i, context)
+                if self._resolver:
+                    self._resolver.resolve(i)
             except AddElementFailed:
                 break
             # Must write at once, otherwise the default item name might conflit with a later item name
@@ -225,6 +267,8 @@ class StructCollectionProxy(Proxy):
                         item_proxy = delta_addition.value
                         try:
                             specifics.add_element(collection, item_proxy, i, context)
+                            if self._resolver:
+                                self._resolver.resolve(i)
                         except AddElementFailed:
                             break
                         write_attribute(collection, i, item_proxy, context)

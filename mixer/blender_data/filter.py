@@ -312,6 +312,24 @@ default_exclusions: FilterSet = {
             ]
         )
     ],
+    T.Armature: [
+        NameFilterOut(
+            [
+                # A non editable view of edit_bones
+                "bones",
+                # hardcoded in ArmatureProxy
+                "edit_bones",
+            ]
+        )
+    ],
+    T.AttributeGroup: [
+        NameFilterOut(
+            [
+                # UI
+                "active",
+            ]
+        )
+    ],
     T.BezierSplinePoint: [
         NameFilterOut(
             [
@@ -322,11 +340,27 @@ default_exclusions: FilterSet = {
         )
     ],
     T.BlendData: [NameFilterOut(blenddata_exclude), TypeFilterIn(T.CollectionProperty)],  # selected collections
-    T.Bone: [NameFilterOut(["parent"])],
+    T.Bone: [
+        NameFilterOut(
+            [
+                "parent",
+            ]
+        )
+    ],
     T.Collection: [NameFilterOut(["all_objects"])],
     T.CompositorNodeRLayers: [NameFilterOut(["scene"])],
     T.Curve: [NameFilterOut(["shape_keys"])],
     T.DecimateModifier: [NameFilterOut(["face_count"])],
+    T.EditBone: [
+        NameFilterOut(
+            [
+                # UI
+                "select",
+                "select_head",
+                "select_tail",
+            ]
+        )
+    ],
     T.FaceMap: [NameFilterOut(["index"])],
     T.Keyframe: [
         NameFilterOut(
@@ -511,7 +545,6 @@ default_exclusions: FilterSet = {
                 "particle_systems",
                 # unsupported
                 "motion_path",
-                "pose",
                 "proxy_collection",
                 "proxy",
                 "soft_body",
@@ -537,6 +570,25 @@ default_exclusions: FilterSet = {
             ]
         )
     ],
+    T.PoseBone: [
+        NameFilterOut(
+            [
+                # views into Armature.bones items
+                "bone",
+                "child",
+                "parent",
+                # computed from TRS, and vice versa
+                "matrix",
+                "matrix_basis",
+                # readonly
+                "head",
+                "is_in_ik_chain",
+                "length",
+                "matrix_channel",
+                "tail",
+            ]
+        )
+    ],
     T.RenderSettings: [
         NameFilterOut(
             [
@@ -556,6 +608,7 @@ default_exclusions: FilterSet = {
                 "camera",
                 # Let each participant play his own time
                 "frame_current",
+                "frame_current_final",
                 "frame_float",
                 # messy in tests because setting either may reset the other to frame_start or frame_end
                 # would require
@@ -656,6 +709,13 @@ property_order: PropertiesOrder = {
         # must exist before links are saved
         "nodes",
     },
+    T.PoseBone: {
+        "matrix",
+    },
+    T.Pose: {
+        # before bones
+        "bone_groups",
+    },
     T.Scene: {
         # Required to save view_layers
         # LayerCollection.children is a view into the corresponding Collection with additional visibility
@@ -678,6 +738,7 @@ test_properties = SynchronizedProperties(test_filter, property_order)
 
 safe_depsgraph_updates = (
     T.Action,
+    T.Armature,
     T.Camera,
     T.Collection,
     T.Curve,
@@ -709,6 +770,7 @@ See synchronization.md
 safe_filter = FilterStack()
 safe_blenddata_collections = [
     "actions",
+    "armatures",
     "cameras",
     "collections",
     "curves",

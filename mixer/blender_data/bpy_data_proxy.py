@@ -107,6 +107,10 @@ class ProxyState:
     def remove_datablock(self, uuid: Uuid):
         del self._datablocks[uuid]
 
+    def objects_using_data(self, data_datablock: T.ID) -> List[T.ID]:
+        objects = [self.datablock(uuid) for uuid in self.objects[data_datablock.mixer_uuid]]
+        return [object for object in objects if object is not None]
+
 
 class VisitState:
     """
@@ -273,9 +277,14 @@ def _creation_order_predicate(item: Tuple[str, Any]) -> int:
 
 
 _updates_order = {
-    T.Key: 5,  # before Mesh for shape keys
-    T.Mesh: 10,  # before Object for vertex_groups
-    T.Collection: 15  # Before Scene since LayerCollection.children are available when the collection is created
+    # before Mesh for shape keys
+    T.Key: 5,
+    # before Object for vertex_groups
+    T.Mesh: 10,
+    # before Object. Object.bones update require Armature bones to be updated first
+    T.Armature: 12,
+    # Before Scene since LayerCollection.children are available when the collection is created
+    T.Collection: 15
     # anything else last
 }
 
@@ -451,7 +460,7 @@ class BpyDataProxy(Proxy):
 
         for datablock in sorted_updates:
             if not isinstance(datablock, safe_depsgraph_updates):
-                logger.info(f"depsgraph update: ignoring untracked type {datablock!r}")
+                logger.info("depsgraph update: ignoring untracked type %r", datablock)
                 continue
             if isinstance(datablock, T.Scene) and datablock.name == "_mixer_to_be_removed_":
                 logger.error(f"Skipping scene {datablock.name} uuid: '{datablock.mixer_uuid}'")
@@ -467,16 +476,16 @@ class BpyDataProxy(Proxy):
                     # scene.node_tree, then scene. We can ignore the scene.node_tree update since the
                     # processing of scene will process scene.node_tree.
                     # However, it is not obvious to detect the safe cases and remove the message in such cases
-                    logger.info(f"depsgraph update: Ignoring embedded {datablock!r}")
+                    logger.info("depsgraph update: Ignoring embedded %r", datablock)
                 continue
             delta = proxy.diff(datablock, datablock.name, None, context)
             if delta:
-                logger.info(f"depsgraph update: update {datablock!r}")
+                logger.info("depsgraph update: update %r", datablock)
                 # TODO add an apply mode to diff instead to avoid two traversals ?
                 proxy.apply_to_proxy(datablock, delta, context)
                 changeset.updates.append(delta)
             else:
-                logger.debug(f"depsgraph update: ignore empty delta {datablock!r}")
+                logger.debug("depsgraph update: ignore empty delta %r", datablock)
 
         return changeset
 

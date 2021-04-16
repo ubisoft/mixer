@@ -233,7 +233,22 @@ class MixerProperties(bpy.types.PropertyGroup):
 
     display_advanced_room_control: bpy.props.BoolProperty(default=False)
     upload_room_name: bpy.props.StringProperty(default=f"{getuser()}_uploaded_room", name="Upload Room Name")
-    upload_room_filepath: bpy.props.StringProperty(default="", subtype="FILE_PATH", name="Upload Room File")
+
+    internal_upload_room_filepath: bpy.props.StringProperty(
+        default="",
+        subtype="FILE_PATH",
+        name="Upload Room File",
+    )
+
+    def _get_room_filepath(self):
+        return bpy.path.abspath(self.internal_upload_room_filepath)
+
+    upload_room_filepath: bpy.props.StringProperty(
+        default="",
+        subtype="FILE_PATH",
+        name="Upload Room File",
+        get=_get_room_filepath,
+    )
 
     joining_percentage: bpy.props.FloatProperty(default=0, name="Joining Percentage")
 

@@ -138,6 +138,10 @@ class DatablockProxy(StructProxy):
 
             proxy = DatablockLinkProxy()
 
+        elif isinstance(datablock, T.Armature):
+            from mixer.blender_data.armature_proxy import ArmatureProxy
+
+            proxy = ArmatureProxy()
         elif isinstance(datablock, T.Library):
             from mixer.blender_data.library_proxies import LibraryProxy
 
