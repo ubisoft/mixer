@@ -75,6 +75,27 @@ a_obj.pose.bones[1].scale.z = 3.
 
         self.end_test()
 
+    def test_reverse_bones_parenting(self):
+        create = """
+import bpy
+
+ctx = view_3d_context()
+
+bpy.ops.object.armature_add(view_3d_context())
+
+bpy.ops.object.editmode_toggle(view_3d_context())
+a_obj = bpy.data.objects["Armature"]
+bones = a_obj.data.edit_bones
+bones[0].select=True
+bpy.ops.armature.subdivide(view_3d_context())
+bones[1].parent = None
+bones[0].parent = bones[1]
+bpy.ops.object.editmode_toggle(view_3d_context())
+"""
+        command = override_context + create
+        self.send_string(command, sleep=1)
+        self.end_test()
+
 
 if __name__ == "__main__":
     unittest.main()
