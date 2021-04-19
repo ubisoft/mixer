@@ -7,7 +7,7 @@
 - Geometry node tres: synchronization
 - Synchronization: ignore scene camera
 - UI: add a prefix to default room name based on user name
-- UI: add the list of users per room in the Selected Room Properties panel
+- UI: add the list of users per room
 - UI: improved visibility of Connect and Disconnect buttons for existing rooms
 - UI: removed unused "Join" progress value
 

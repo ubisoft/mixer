@@ -205,6 +205,7 @@ class ClientAttributes:
     USERSCENES_VIEWS_SCREEN_CORNERS = (
         "screen_corners"  # type = list[float3], 4 elements, bottom_left, bottom_right, top_right, top_left
     )
+    USERMODE = "user_mode"  # type = str
 
 
 class RoomAttributes:

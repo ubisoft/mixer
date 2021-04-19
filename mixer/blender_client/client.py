@@ -886,7 +886,11 @@ class BlenderClient(Client):
                 windows.append({"scene": scene, "view_layer": view_layer, "screen": screen, "areas_3d": areas_3d})
 
         # Documentation to update if you change "blender_windows": doc/protocol.md
-        return {"blender_windows": windows, common.ClientAttributes.USERSCENES: scene_attributes}
+        return {
+            "blender_windows": windows,
+            ClientAttributes.USERSCENES: scene_attributes,
+            ClientAttributes.USERMODE: bpy.context.mode,
+        }
 
     def network_consumer(self):
         """

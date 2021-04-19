@@ -43,6 +43,28 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+user_modes = {
+    "EDIT_MESH": ("Edit", "EDITMODE_HLT"),
+    "EDIT_CURVE": ("Curve", "EDITMODE_HLT"),
+    "EDIT_SURFACE": ("Surface", "EDITMODE_HLT"),
+    "EDIT_TEXT": ("Text", "EDITMODE_HLT"),
+    "EDIT_ARMATURE": ("Armature", "EDITMODE_HLT"),
+    "EDIT_METABALL": ("Metaball", "EDITMODE_HLT"),
+    "EDIT_LATTICE": ("Lattice", "EDITMODE_HLT"),
+    "POSE": ("Pose", "POSE_HLT"),
+    "SCULPT": ("Sculpt", "SCULPTMODE_HLT"),
+    "PAINT_WEIGHT": ("Weight", "WPAINT_HLT"),
+    "PAINT_VERTEX": ("Vertex", "VPAINT_HLT"),
+    "PAINT_TEXTURE": ("Texture", "TPAINT_HLT"),
+    "PARTICLE": ("Particle", "PARTICLEMODE"),
+    "OBJECT": ("Object", "OBJECT_DATAMODE"),
+    "PAINT_GPENCIL": ("GP Paint", "USER"),
+    "EDIT_GPENCIL": ("GP Edit", "EDITMODE_HLT"),
+    "SCULPT_GPENCIL": ("GP Sculpt", "SCULPTMODE_HLT"),
+    "WEIGHT_GPENCIL": ("GP Weight", "WPAINT_HLT"),
+    "VERTEX_GPENCIL": ("GP Vertex", "VPAINT_HLT"),
+}
+
 
 def redraw():
     for window in bpy.context.window_manager.windows:
@@ -61,6 +83,12 @@ def redraw_if(condition: bool):
 
 def update_ui_lists():
     update_room_list(do_redraw=False)
+    props = get_mixer_props()
+    if len(props.rooms):
+        if props.room_index >= len(props.rooms):
+            props.room_index = max(0, len(props.rooms) - 1)
+    else:
+        props.room_index = 0
     update_user_list()
 
 
@@ -93,6 +121,7 @@ def update_user_list(do_redraw=True):
                 scene_item.scene = scene_name
                 if ClientAttributes.USERSCENES_FRAME in scene_dict:
                     scene_item.frame = scene_dict[ClientAttributes.USERSCENES_FRAME]
+        item.mode = client.get(ClientAttributes.USERMODE, "-")
 
     redraw_if(do_redraw)
 
@@ -410,7 +439,6 @@ class MixerSettingsPanel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout.column()
-
         mixer_prefs = get_mixer_prefs()
 
         draw_user_settings_ui(layout.row())
@@ -542,6 +570,34 @@ class MixerSettingsPanel(bpy.types.Panel):
             return False
 
         layout.separator(factor=0.5)
+
+        collapsable_panel(layout, mixer_prefs, "users_list_panel_opened", text="Selected Room Users")
+        if mixer_prefs.users_list_panel_opened:
+            box = layout.box()
+            col = box.column()
+
+            users_in_room = [user for user in mixer_props.users if user_belongs_to_selected_room(user)]
+
+            if not len(users_in_room):
+                col.label(text="No users in the room")
+            else:
+                for user in users_in_room:
+                    user_split = col.split()
+                    sub_row = user_split.row()
+                    user_sub_split = sub_row.split(factor=0.5)
+                    user_sub_split.label(text=f"{user.name}", icon="USER" if user.is_me else "BLANK1")
+
+                    color_row = user_sub_split.row()
+                    color_sub_row = color_row.row()
+                    color_sub_row.scale_x = 0.34
+                    color_sub_row.prop(user, "color", text="")
+
+                    user_mode, user_icon = user_modes.get(user.mode, (user.mode, "DOT"))
+                    mode_row = color_row.split(factor=0.6)
+                    mode_row.label(text=f"{user_mode}", icon=user_icon)
+                    mode_row.label(text=f"{user.ip_port}")
+
+        layout.separator(factor=0.5)
         collapsable_panel(layout, mixer_prefs, "display_selected_room_properties", text="Selected Room Properties")
         if mixer_prefs.display_selected_room_properties:
             box = layout.box()
@@ -577,7 +633,7 @@ class MixerSettingsPanel(bpy.types.Panel):
                     split.label(text=str(value))
 
                 _display_property(col, "Room Name:", current_room.name)
-                _display_property(col, "Room Size:", f"{current_room.mega_byte_size:.2} MB")
+                _display_property(col, "Room Size:", f"{current_room.mega_byte_size:.2f} MB")
 
                 blender_warning = bpy.app.version_string != current_room.blender_version
                 if blender_warning:
@@ -620,23 +676,6 @@ class MixerSettingsPanel(bpy.types.Panel):
 
                 split.prop(current_room, "keep_open", text="")
 
-                row = box.row()
-                row.separator(factor=2)
-                collapsable_panel(row, mixer_prefs, "users_list_panel_opened", text="Users in the Room")
-                if mixer_prefs.users_list_panel_opened:
-                    sub_row = box.row()
-                    sub_row.separator(factor=7)
-                    sub_box = sub_row.box()
-                    col = sub_box.column()
-
-                    for user in (user for user in mixer_props.users if user_belongs_to_selected_room(user)):
-                        user_split = col.split()
-                        sub_row = user_split.row()
-                        user_sub_split = sub_row.split(factor=0.8)
-                        user_sub_split.label(text=f"{user.name}", icon="USER" if user.is_me else "BLANK1")
-                        user_sub_split.prop(user, "color", text="")
-                        sub_row.label(text=f"{user.ip_port}")
-
 
 class VRtistSettingsPanel(bpy.types.Panel):
     bl_label = f"VRtist   V. {display_version or '(Unknown version)'}"
@@ -666,18 +705,26 @@ class VRtistSettingsPanel(bpy.types.Panel):
         row.separator(factor=1.0)
 
     def draw(self, context):
-        layout = self.layout
+        layout = self.layout.column()
         mixer_prefs = get_mixer_prefs()
 
         draw_user_settings_ui(layout.row())
-        layout.prop(mixer_prefs, "host", text="Host")
-        layout.prop(mixer_prefs, "room", text="Room")
+
+        layout.separator(factor=0.2)
+        split = layout.split(factor=0.258, align=False)
+        split.label(text="Host:")
+        split.prop(mixer_prefs, "host", text="")
+
+        split = layout.split(factor=0.258, align=False)
+        split.label(text="Room:")
+        split.prop(mixer_prefs, "room", text="")
         layout.separator(factor=1.0)
 
         row = layout.row()
         row.scale_y = 1.5
         row.operator(bl_operators.LaunchVRtistOperator.bl_idname, text="Launch VRTist")
 
+        layout.separator(factor=1)
         layout.prop(
             mixer_prefs, "VRtist", text="Path", icon=("ERROR" if not os.path.exists(mixer_prefs.VRtist) else "NONE")
         )
