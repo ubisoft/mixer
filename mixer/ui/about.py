@@ -19,8 +19,6 @@
 This module defines the About panel.
 """
 
-import time
-
 import bpy
 from bpy.types import Operator
 
