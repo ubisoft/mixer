@@ -89,7 +89,7 @@ class StructProxy(Proxy):
         proxy_class = _proxy_types().get(type(bpy_struct), StructProxy)
         return proxy_class()
 
-    def load(self, attribute: T.bpy_struct, key: Union[int, str], context: Context) -> StructProxy:
+    def load(self, attribute: T.bpy_struct, context: Context) -> StructProxy:
         """
         Load the attribute Blender struct into this proxy
 

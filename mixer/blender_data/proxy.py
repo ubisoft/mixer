@@ -35,6 +35,7 @@ from mixer.blender_data.json_codec import serialize
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+    from mixer.blender_data.types import Path
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +249,7 @@ class Proxy:
         raise NotImplementedError(f"diff for {container}[{key}]")
 
     def find_by_path(
-        self, bl_item: Union[T.bpy_struct, T.bpy_prop_collection], path: List[Union[int, str]]
+        self, bl_item: Union[T.bpy_struct, T.bpy_prop_collection], path: Path
     ) -> Optional[Tuple[Union[T.bpy_struct, T.bpy_prop_collection], Proxy]]:
         head, *tail = path
         if isinstance(bl_item, T.bpy_struct):

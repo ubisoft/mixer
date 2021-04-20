@@ -86,7 +86,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
             ):
                 from mixer.blender_data.datablock_collection_proxy import DatablockRefCollectionProxy
 
-                return DatablockRefCollectionProxy().load(attr, key, context)
+                return DatablockRefCollectionProxy().load(attr, context)
             elif is_soable_collection(attr_property):
                 from mixer.blender_data.aos_proxy import AosProxy
 
@@ -97,13 +97,13 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
                 # See comment in add_element()
                 from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
-                return StructCollectionProxy.make(attr_property).load(attr, key, attr_property, context)
+                return StructCollectionProxy.make(attr_property).load(attr, context)
 
         # TODO merge with previous case
         if isinstance(attr_property, T.CollectionProperty):
             from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 
-            return StructCollectionProxy().load(attr, key, attr_property, context)
+            return StructCollectionProxy().load(attr, context)
 
         bl_rna = attr_property.bl_rna
         if bl_rna is None:
@@ -114,7 +114,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
         if issubclass(attr_type, T.PropertyGroup):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy.make(attr).load(attr, key, context)
+            return StructProxy.make(attr).load(attr, context)
 
         if issubclass(attr_type, T.ID):
             if attr.is_embedded_data:
@@ -122,13 +122,13 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
                 # for standalone datablocks
                 from mixer.blender_data.struct_proxy import StructProxy
 
-                return StructProxy.make(attr).load(attr, key, context)
+                return StructProxy.make(attr).load(attr, context)
             else:
                 # Standalone databocks are loaded from DatablockCollectionProxy, so we can only encounter
                 # datablock references here
                 from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
-                return DatablockRefProxy().load(attr, key, context)
+                return DatablockRefProxy().load(attr, context)
 
         proxy = PtrToCollectionItemProxy.make(type(parent), key)
         if proxy is not None:
@@ -137,7 +137,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
         if issubclass(attr_type, T.bpy_struct):
             from mixer.blender_data.struct_proxy import StructProxy
 
-            return StructProxy.make(attr).load(attr, key, context)
+            return StructProxy.make(attr).load(attr, context)
 
         if attr is None:
             from mixer.blender_data.misc_proxies import NonePtrProxy

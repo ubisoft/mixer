@@ -332,19 +332,15 @@ class DatablockRefCollectionProxy(Proxy):
     def __len__(self):
         return len(self._data)
 
-    def load(self, bl_collection: bpy.types.bpy_prop_collection, key: Union[int, str], context: Context):  # noqa N802
+    def load(self, bl_collection: bpy.types.bpy_prop_collection, context: Context):  # noqa N802
         """
         Load bl_collection elements as references to bpy.data collections
         """
-
         for item in bl_collection:
-            if item is not None:
-                proxy = DatablockRefProxy()
-                uuid = item.mixer_uuid
-                proxy.load(item, item.name, context)
-                self._data[uuid] = proxy
-            else:
-                logger.error(f"unexpected None in {bl_collection}.{key}")
+            proxy = DatablockRefProxy()
+            uuid = item.mixer_uuid
+            proxy.load(item, context)
+            self._data[uuid] = proxy
         return self
 
     def save(self, collection: T.bpy_prop_collection, parent: T.bpy_struct, key: str, context: Context):

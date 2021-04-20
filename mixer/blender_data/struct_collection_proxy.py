@@ -37,12 +37,14 @@ from mixer.blender_data.struct_proxy import StructProxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.datablock_proxy import DatablockProxy
+    from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+    from mixer.blender_data.misc_proxies import NonePtrProxy
     from mixer.blender_data.proxy import Context
 
 logger = logging.getLogger(__name__)
 
 
-def _proxy_factory(attr):
+def _proxy_factory(attr) -> Union[DatablockRefProxy, NonePtrProxy, StructProxy]:
     if isinstance(attr, T.ID) and not attr.is_embedded_data:
         from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
 
@@ -158,15 +160,13 @@ class StructCollectionProxy(Proxy):
     def load(
         self,
         bl_collection: T.bpy_prop_collection,
-        key: Union[int, str],
-        bl_collection_property: T.Property,
         context: Context,
     ):
         self._sequence.clear()
         for i, v in enumerate(bl_collection.values()):
             context.visit_state.push(v, i)
             try:
-                self._sequence.append(_proxy_factory(v).load(v, i, context))
+                self._sequence.append(_proxy_factory(v).load(v, context))
             except Exception as e:
                 logger.error(f"Exception during load at {context.visit_state.display_path()} ...")
                 logger.error(f"... {e!r}")
@@ -307,7 +307,7 @@ class StructCollectionProxy(Proxy):
             #   When swapping layers A and B in a GreasePencilLayers, renaming layer 0 into B cause an unsolicited
             #   rename of layer 0 into B.001
             # Send a replacement for the whole collection
-            self.load(collection, key, collection_property, context)
+            self.load(collection, context)
             return DeltaReplace(self)
         else:
             item_property = collection_property.fixed_type

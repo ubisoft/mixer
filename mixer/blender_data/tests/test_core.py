@@ -132,7 +132,7 @@ class TestCore(unittest.TestCase):
 
     def test_skip_ShaderNodeTree(self):  # noqa N802
         world = D.worlds["World"]
-        proxy = StructProxy().load(world, "", self._context)
+        proxy = StructProxy().load(world, self._context)
         self.assertTrue("color" in proxy._data)
         # self.assertFalse("node_tree" in proxy._data)
 

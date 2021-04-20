@@ -72,7 +72,7 @@ class DatablockRefProxy(Proxy):
     def mixer_uuid(self) -> Uuid:
         return self._datablock_uuid
 
-    def load(self, datablock: T.ID, key: Union[int, str], context: Context) -> DatablockRefProxy:
+    def load(self, datablock: T.ID, context: Context) -> DatablockRefProxy:
         """
         Load a reference to a standalone datablock into this proxy
         """

@@ -235,6 +235,8 @@ class ObjectProxy(DatablockProxy):
 
         if to_blender:
             if isinstance(datablock.data, T.Armature):
+                # TODO replace with update.data(("pose", "bones"))
+                # or update["pose"]["bones"]
                 pose = update.data("pose")
                 if pose:
                     if isinstance(pose, Delta):

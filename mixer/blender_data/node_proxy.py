@@ -63,7 +63,7 @@ class NodeLinksProxy(StructCollectionProxy):
 
         return seq
 
-    def load(self, links: T.NodeLinks, key: str, _, context: Context) -> NodeLinksProxy:
+    def load(self, links: T.NodeLinks, unused_context: Context) -> NodeLinksProxy:
         self._sequence = self._load(links)
         return self
 
