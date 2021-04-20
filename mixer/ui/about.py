@@ -19,10 +19,12 @@
 This module defines the About panel.
 """
 
+import time
+
 import bpy
 from bpy.types import Operator
 
-from mixer import display_version
+from mixer import display_version, about_date
 
 
 class Mixer_OT_About(Operator):  # noqa 801
@@ -43,7 +45,7 @@ class Mixer_OT_About(Operator):  # noqa 801
         row = box.row()
         row.separator()
         row.label(
-            text=f"Version: {display_version or '(Unknown version)'}   -   ({'March 2021'})   -    Ubisoft Animation Studio"
+            text=f"Version: {display_version or '(Unknown version)'}   -   {about_date()}   -    Ubisoft Animation Studio"
         )
 
         # Authors
