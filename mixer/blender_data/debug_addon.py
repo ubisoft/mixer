@@ -27,9 +27,9 @@ default_test = "test_module.TestCase.test_name"
 
 
 class DebugDataProperties(bpy.types.PropertyGroup):
-    profile_cumulative: bpy.props.BoolProperty(name="ProfileCumulative", default=False)
-    profile_callers: bpy.props.BoolProperty(name="ProfileCallers", default=False)
-    test_names: bpy.props.StringProperty(name="TestNames", default=default_test)
+    profile_cumulative: bpy.props.BoolProperty(name="ProfileCumulative", default=False)  # type: ignore
+    profile_callers: bpy.props.BoolProperty(name="ProfileCallers", default=False)  # type: ignore
+    test_names: bpy.props.StringProperty(name="TestNames", default=default_test)  # type: ignore
 
 
 proxy = None

@@ -66,7 +66,7 @@ class AosElement(Proxy):
     _serialize = ("_data",)
 
     def __init__(self):
-        self._data: Dict[str, List] = {}
+        self._data: Dict[int, List] = {}
 
     def load(
         self,

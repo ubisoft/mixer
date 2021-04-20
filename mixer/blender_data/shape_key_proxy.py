@@ -62,9 +62,10 @@ class ShapeKeyProxy(DatablockProxy):
             return None
         object_uuid = next(iter(objects))
         object_datablock = context.proxy_state.datablock(object_uuid)
+        assert object_datablock  # make mypy happy. TODO ProxyState.datablock() should raise ?
 
         # update the Key datablock using the Object API
-        key_blocks_proxy = self.data("key_blocks")
+        key_blocks_proxy = self._data["key_blocks"]
         shape_key_uuid = self.mixer_uuid
         if object_datablock.data.shape_keys:
             object_datablock.shape_key_clear()  # removes the Key datablock

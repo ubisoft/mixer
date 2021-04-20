@@ -24,7 +24,6 @@ shared with the VRtist protocol.
 """
 from __future__ import annotations
 
-import array
 import json
 import logging
 import traceback
@@ -165,7 +164,7 @@ class BlenderDataMessage:
     def __init__(self):
         self.proxy_string: str = ""
         self.soas: List[Soa] = []
-        self.arrays: List[str, array.array] = {}
+        self.arrays: ArrayGroups = {}
 
     def __lt__(self, other):
         # for sorting by the tests

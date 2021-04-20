@@ -32,7 +32,7 @@ SoaMember = Tuple[str, array.array]
 - Data to be loaded with foreach_set()
 """
 
-Path = List[Union[str, int]]
+Path = Tuple[Union[str, int]]
 """A data path starting from the datablock e.g. ["curves", 0, "bezier_points"]"""
 
 

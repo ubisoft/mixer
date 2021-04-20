@@ -83,7 +83,7 @@ class NodesModifierProxy(StructProxy):
             input_name = inputs[int(input_index)]
             modifier[input_name] = value
 
-    def load(self, modifier: T.bpy_struct, key: Union[int, str], context: Context) -> NodesModifierProxy:
+    def load(self, modifier: T.bpy_struct, key: Union[int, str], context: Context) -> StructProxy:
         # The inputs are stored as "custom properties".
         # The keys are the geometry node_group group input node outputs.
         self._inputs = self._load_inputs(modifier)

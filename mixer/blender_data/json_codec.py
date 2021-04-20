@@ -45,7 +45,7 @@ _registry: Dict[str, Tuple[type, Tuple[str]]] = {}
 """
 
 
-def serialize(_cls=None, *, ctor_args: Tuple[str] = ()):
+def serialize(_cls=None, *, ctor_args: Tuple[str, ...] = ()):
     """Class decorator to register a Proxy class for serialization"""
 
     global _registry

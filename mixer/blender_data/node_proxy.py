@@ -44,6 +44,8 @@ def _find_socket(sockets: Union[T.NodeInputs, T.NodeOutputs], identifier: str) -
 class NodeLinksProxy(StructCollectionProxy):
     """Proxy for bpy.types.NodeLinks"""
 
+    # TODO should not be a StructCollectionProxy since all updates are now replaces
+
     def _load(self, links: T.NodeLinks) -> List[Dict[str, str]]:
         # NodeLink contain pointers to Node and NodeSocket.
         # Just keep the names to restore the links in ShaderNodeTreeProxy.save

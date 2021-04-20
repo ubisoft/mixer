@@ -61,15 +61,13 @@ class UnresolvedRefs:
     (e.g. bpy.types.Collection.children)
     """
 
-    SrcLink = Callable[[], None]
-
     def __init__(self):
-        self._refs: Dict[Uuid, List[Tuple[self.Func, str]]] = defaultdict(list)
+        self._refs: Dict[Uuid, List[Tuple[Callable[[T.ID], None], str]]] = defaultdict(list)
 
     def __bool__(self):
         return bool(self._refs)
 
-    def append(self, dst_uuid: Uuid, src_link: SrcLink, display_string: str = ""):
+    def append(self, dst_uuid: Uuid, src_link: Callable[[T.ID], None], display_string: str = ""):
         self._refs[dst_uuid].append((src_link, display_string))
 
     def resolve(self, dst_uuid: Uuid, dst_datablock: T.ID):

@@ -30,7 +30,7 @@ import array
 from functools import lru_cache
 import logging
 from pathlib import Path
-from typing import Any, Callable, cast, Dict, ItemsView, List, Optional, TYPE_CHECKING, Union
+from typing import Any, Callable, cast, Dict, ItemsView, List, Optional, Tuple, TYPE_CHECKING, Union
 
 from mixer.blender_data.proxy import AddElementFailed, ExternalFileFailed
 
@@ -102,7 +102,7 @@ soa_initializers: Dict[type, array.array] = {
     mathutils.Quaternion: array.array("f", [0.0]),
 }
 
-_node_groups = (T.ShaderNodeGroup, T.CompositorNodeGroup, T.TextureNodeGroup)
+_node_groups: Tuple[type, ...] = (T.ShaderNodeGroup, T.CompositorNodeGroup, T.TextureNodeGroup)
 if bpy.app.version is not None and bpy.app.version >= (2, 92, 0):
     _node_groups = _node_groups + (T.GeometryNodeGroup,)
 
@@ -518,8 +518,12 @@ def pre_save_datablock(proxy: DatablockProxy, target: T.ID, context: Context) ->
 
     #  animation_data is handled in StructProxy (parent class of DatablockProxy)
 
-    if isinstance(target, T.Mesh) and proxy.requires_clear_geometry(target):
-        target.clear_geometry()
+    if isinstance(target, T.Mesh):
+        from mixer.blender_data.mesh_proxy import MeshProxy
+
+        assert isinstance(proxy, MeshProxy)
+        if proxy.requires_clear_geometry(target):
+            target.clear_geometry()
     elif isinstance(target, T.Material):
         is_grease_pencil = proxy.data("is_grease_pencil")
         # will be None for a DeltaUpdate that does not modify "is_grease_pencil"

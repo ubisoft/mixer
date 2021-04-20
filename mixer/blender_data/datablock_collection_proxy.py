@@ -92,7 +92,7 @@ class DatablockCollectionProxy(Proxy):
         collection = getattr(bpy.data, self._name)
         self._snapshot_undo_pre = {datablock.name_full: datablock.mixer_uuid for datablock in collection}
 
-    def snapshot_undo_post(self) -> Dict[str, Uuid]:
+    def snapshot_undo_post(self) -> Optional[Tuple[str, Dict[str, Uuid]]]:
         """Compare post undo uuid state to recover undone uuids."""
         collection = getattr(bpy.data, self._name)
         undo_post = {datablock.name_full for datablock in collection if datablock.mixer_uuid == ""}
