@@ -58,7 +58,7 @@ user_modes = {
     "PAINT_TEXTURE": ("Texture", "TPAINT_HLT"),
     "PARTICLE": ("Particle", "PARTICLEMODE"),
     "OBJECT": ("Object", "OBJECT_DATAMODE"),
-    "PAINT_GPENCIL": ("GP Paint", "USER"),
+    "PAINT_GPENCIL": ("GP Paint", "GREASEPENCIL"),
     "EDIT_GPENCIL": ("GP Edit", "EDITMODE_HLT"),
     "SCULPT_GPENCIL": ("GP Sculpt", "SCULPTMODE_HLT"),
     "WEIGHT_GPENCIL": ("GP Weight", "WPAINT_HLT"),
@@ -163,6 +163,7 @@ def collapsable_panel(
     )
     if alert:
         row.alert = True
+        row.label(text="", icon="ERROR")
     row.label(**kwargs)
     return getattr(data, property)
 
@@ -171,24 +172,25 @@ class ROOM_UL_ItemRenderer(bpy.types.UIList):  # noqa
     @classmethod
     def draw_header(cls, layout):
         box = layout.box()
+        box.scale_y = 0.7
         split = box.split()
         split.alignment = "LEFT"
 
         row = split.row()
         row.scale_x = 0.9
         row.label(text="", icon="BLANK1")  # BLANK1
-        row.label(text="Room Name")
+        row.label(text="Room:")
 
-        split.label(text="Users")
+        split.label(text="Users:")
         if get_mixer_props().display_rooms_details:
-            split.label(text="Blender Version")
-            split.label(text="Mixer Version")
-            split.label(text="Keep Open")
-            split.label(text="No Version Check")
-            split.label(text="Protocol")
-            split.label(text="Command Count")
-            split.label(text="Size (MB)")
-            split.label(text="Joinable")
+            split.label(text="Blender Version:")
+            split.label(text="Mixer Version:")
+            split.label(text="Keep Open:")
+            split.label(text="No Version Check:")
+            split.label(text="Protocol:")
+            split.label(text="Command Count:")
+            split.label(text="Size (MB):")
+            split.label(text="Joinable:")
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.split()
@@ -506,6 +508,12 @@ class MixerSettingsPanel(bpy.types.Panel):
         mixer_props = get_mixer_props()
 
         if collapsable_panel(layout, mixer_props, "display_rooms", text="Server Rooms"):
+
+            # main box should probably be removed
+            # layout = layout.row()
+            # layout.separator(factor=1.2)
+            # layout = layout.column()
+
             layout = layout.box().column()
             ROOM_UL_ItemRenderer.draw_header(layout)
             layout.template_list("ROOM_UL_ItemRenderer", "", mixer_props, "rooms", mixer_props, "room_index", rows=2)
@@ -573,6 +581,26 @@ class MixerSettingsPanel(bpy.types.Panel):
 
         collapsable_panel(layout, mixer_prefs, "users_list_panel_opened", text="Selected Room Users")
         if mixer_prefs.users_list_panel_opened:
+            # header
+            box = layout.box()
+            box.scale_y = 0.7
+            col = box.column()
+
+            user_split = col.split()
+            sub_row = user_split.row()
+            user_sub_split = sub_row.split(factor=0.5)
+            user_sub_split.label(text="User:", icon="BLANK1")
+
+            color_row = user_sub_split.row()
+            color_sub_row = color_row.row()
+            color_sub_row.scale_x = 0.34
+            color_sub_row.label(text=" ")
+
+            mode_row = color_row.split(factor=0.6)
+            mode_row.label(text="Edit Mode:")
+            mode_row.label(text="IP:")
+
+            # users list
             box = layout.box()
             col = box.column()
 
@@ -598,7 +626,17 @@ class MixerSettingsPanel(bpy.types.Panel):
                     mode_row.label(text=f"{user.ip_port}")
 
         layout.separator(factor=0.5)
-        collapsable_panel(layout, mixer_prefs, "display_selected_room_properties", text="Selected Room Properties")
+
+        has_warnings = False
+        if len(mixer_props.rooms):
+            current_room = mixer_props.rooms[mixer_props.room_index]
+            blender_warning = bpy.app.version_string != current_room.blender_version
+            mixer_warning = display_version != current_room.mixer_version
+            has_warnings = blender_warning or mixer_warning
+
+        collapsable_panel(
+            layout, mixer_prefs, "display_selected_room_properties", text="Selected Room Properties", alert=has_warnings
+        )
         if mixer_prefs.display_selected_room_properties:
             box = layout.box()
             if not len(mixer_props.rooms):

@@ -14,6 +14,7 @@
 - UI: add the list of users per room
 - UI: improved visibility of Connect and Disconnect buttons for existing rooms
 - UI: removed unused "Join" progress value
+- UI: improve warning feedback when Blender or Mixer versions are not the same as the room ones
 
 ## Fixes
 
