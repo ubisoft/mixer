@@ -163,6 +163,7 @@ def collapsable_panel(
     )
     if alert:
         row.alert = True
+        row.label(text="", icon="ERROR")
     row.label(**kwargs)
     return getattr(data, property)
 
@@ -625,7 +626,17 @@ class MixerSettingsPanel(bpy.types.Panel):
                     mode_row.label(text=f"{user.ip_port}")
 
         layout.separator(factor=0.5)
-        collapsable_panel(layout, mixer_prefs, "display_selected_room_properties", text="Selected Room Properties")
+
+        has_warnings = False
+        if len(mixer_props.rooms):
+            current_room = mixer_props.rooms[mixer_props.room_index]
+            blender_warning = bpy.app.version_string != current_room.blender_version
+            mixer_warning = display_version != current_room.mixer_version
+            has_warnings = blender_warning or mixer_warning
+
+        collapsable_panel(
+            layout, mixer_prefs, "display_selected_room_properties", text="Selected Room Properties", alert=has_warnings
+        )
         if mixer_prefs.display_selected_room_properties:
             box = layout.box()
             if not len(mixer_props.rooms):
