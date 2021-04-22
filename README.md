@@ -1,5 +1,3 @@
-![Blender version 2.92](docs/img/chat-mixer--addon-brightgreen.svg)
-
 # Mixer
 
 Mixer is a Blender addon for real time collaboration in Blender. It allows multiple Blender users to work on the same scene at the same time and is developed by the R&D department of Ubisoft Animation Studio.
