@@ -46,7 +46,11 @@ _registry: Dict[str, Tuple[type, Tuple[str]]] = {}
 
 
 def serialize(_cls=None, *, ctor_args: Tuple[str, ...] = ()):
-    """Class decorator to register a Proxy class for serialization"""
+    """Class decorator to register a Proxy class for serialization.
+
+    Args:
+        - ctor_args: names of the attributes to pass to the constructor when deserializing
+    """
 
     global _registry
 

@@ -20,12 +20,11 @@ Proxies for bpy.types.NodeTree and bpy.types.NodeLinks
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, TYPE_CHECKING, Union
+from typing import List, Optional, Tuple, TYPE_CHECKING, Union
 import bpy.types as T  # noqa
 
 from mixer.blender_data.json_codec import serialize
-from mixer.blender_data.proxy import Delta, DeltaUpdate
-from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
+from mixer.blender_data.proxy import Delta, DeltaUpdate, Proxy
 
 if TYPE_CHECKING:
     from mixer.blender_data.proxy import Context
@@ -41,33 +40,35 @@ def _find_socket(sockets: Union[T.NodeInputs, T.NodeOutputs], identifier: str) -
 
 
 @serialize
-class NodeLinksProxy(StructCollectionProxy):
+class NodeLinksProxy(Proxy):
     """Proxy for bpy.types.NodeLinks"""
 
     # TODO should not be a StructCollectionProxy since all updates are now replaces
+    _serialize = ("_sequence",)
 
-    def _load(self, links: T.NodeLinks) -> List[Dict[str, str]]:
+    def __init__(self):
+        self._sequence: List[Tuple[str, int, str, int]] = []
+
+    def _load(self, links: T.NodeLinks) -> List[Tuple[str, int, str, int]]:
         # NodeLink contain pointers to Node and NodeSocket.
         # Just keep the names to restore the links in ShaderNodeTreeProxy.save
         # Nodes names are unique in a node_tree.
         # Node socket names are *not* unique in a node_tree, so use index in array
-        seq = [
-            [
+        return [
+            (
                 link.from_node.name,
                 _find_socket(link.from_node.outputs, link.from_socket.identifier),
                 link.to_node.name,
                 _find_socket(link.to_node.inputs, link.to_socket.identifier),
-            ]
+            )
             for link in links
         ]
-
-        return seq
 
     def load(self, links: T.NodeLinks, unused_context: Context) -> NodeLinksProxy:
         self._sequence = self._load(links)
         return self
 
-    def save(self, unused_attribute, node_tree: T.NodeTree, unused_key: str, context: Context):
+    def save(self, unused_attribute, node_tree: T.NodeTree, unused_key, context: Context):
         """Saves this proxy into node_tree.links"""
         if not isinstance(node_tree, T.NodeTree):
             logger.error(f"save(): attribute {context.visit_state.display_path()} ...")
@@ -88,7 +89,7 @@ class NodeLinksProxy(StructCollectionProxy):
             from_socket = from_node.outputs[from_socket_index]
             if from_socket is None:
                 logger.error(
-                    f"save(): from_socket is None for {context.visit_state.display_path()}.nodes[{from_node_name}].ouputs[{from_socket_index}]"
+                    f"save(): from_socket is None for {context.visit_state.display_path()}.nodes[{from_node_name}].outputs[{from_socket_index}]"
                 )
                 return
 
@@ -139,11 +140,11 @@ class NodeLinksProxy(StructCollectionProxy):
 
     def diff(self, links: T.NodeLinks, key, prop, context: Context) -> Optional[DeltaUpdate]:
         # always complete updates
-        blender_links = self._load(links)
-        if blender_links == self._sequence and not context.visit_state.send_nodetree_links:
+        links = self._load(links)
+        if links == self._sequence and not context.visit_state.send_nodetree_links:
             return None
 
         diff = self.__class__()
         diff.init(None)
-        diff._sequence = blender_links
+        diff._sequence = links
         return DeltaUpdate(diff)

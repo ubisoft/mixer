@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Optional, Iterable, Tuple, TYPE_CHECKING, Union
 from uuid import uuid4
 
 import bpy
@@ -171,9 +171,7 @@ class Proxy:
     def init(self, _):
         pass
 
-    def data(
-        self, key_or_path: Union[int, str, List[Union[int, str]], Tuple[Union[int, str], ...]], resolve_delta=True
-    ) -> Any:
+    def data(self, key_or_path: Union[int, str, Iterable[Union[int, str]]], resolve_delta=True) -> Any:
         """Return the item identified by key_or_path in this proxy hierarchy.
 
         Args:
@@ -181,7 +179,7 @@ class Proxy:
             resolve_delta: If True, and the data is a Delta, will return the delta value
         """
 
-        if not isinstance(key_or_path, (list, tuple)):
+        if isinstance(key_or_path, (int, str)):
             key_or_path = (key_or_path,)
 
         data = self

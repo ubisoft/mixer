@@ -83,7 +83,8 @@ class TypeFilter(Filter):
     def __init__(self, types: Union[Any, Iterable[Any]]):
         self._types = types if isinstance(types, Iterable) else [types]
 
-    @property
+    # use cached_property in 3.8
+    @property  # type: ignore
     @lru_cache()
     def _rnas(self):
         return [t.bl_rna for t in self._types]
@@ -143,7 +144,6 @@ class FilterStack:
     def __init__(self):
         self._filter_sets: List[FilterSet] = []
 
-    @property
     @lru_cache()
     def _filter_stack(self):
         filters = []
@@ -155,7 +155,7 @@ class FilterStack:
         properties = list(bl_rna.properties)
         for class_ in bases(bl_rna):
             bl_rna = None if class_ is None else class_.bl_rna
-            for filter_set in self._filter_stack:
+            for filter_set in self._filter_stack():
                 filters = filter_set.get(bl_rna, [])
                 for filter_ in filters:
                     properties, error = filter_.apply(properties)
@@ -194,7 +194,6 @@ class SynchronizedProperties:
         self._unhandled_bpy_data_collection_names: Optional[List[str]] = None
         self._properties_order = properties_order
 
-    @property
     @lru_cache()
     def _order(self):
         return {k.bl_rna: v for k, v in self._properties_order.items()}
@@ -203,7 +202,7 @@ class SynchronizedProperties:
 
         for class_ in bases(bl_rna):
             bl_rna = None if class_ is None else class_.bl_rna
-            ordered_identifiers = self._order.get(bl_rna)
+            ordered_identifiers = self._order().get(bl_rna)
             if ordered_identifiers is not None:
                 break
 

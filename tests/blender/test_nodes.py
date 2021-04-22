@@ -338,7 +338,7 @@ modifier[sock.identifier] = 10
 modifier.show_viewport = False
 modifier.show_viewport = True
 """
-        self.send_string(update)
+        self.send_string(update, sleep=5)
         self.end_test()
 
 

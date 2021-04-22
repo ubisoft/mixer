@@ -105,7 +105,7 @@ class StructCollectionProxy(Proxy):
         self._diff_updates: List[Tuple[int, Delta]] = []
         self._diff_deletions: int = 0
         self._diff_additions: List[DeltaAddition] = []
-        self._sequence: List[DatablockProxy] = []
+        self._sequence: List[Proxy] = []
         self._resolver: Optional[Resolver] = None
 
     @classmethod
@@ -131,7 +131,7 @@ class StructCollectionProxy(Proxy):
             self._resolver = Resolver()
         self._resolver.append(i, func)
 
-    def data(self, key: int, resolve_delta=True) -> Optional[Union[Delta, DatablockProxy]]:
+    def data(self, key: int, resolve_delta=True) -> Optional[Union[Delta, Proxy]]:
         """Return the data at key, which may be a struct member, a dict value or an array value,
 
         Args:
@@ -336,10 +336,3 @@ class StructCollectionProxy(Proxy):
                 return DeltaUpdate(diff)
 
         return None
-
-    def find(self, path: List[Union[int, str]]) -> Proxy:
-        if not path:
-            return self
-
-        head, *tail = path
-        return self._data[head].find(tail)

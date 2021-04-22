@@ -94,7 +94,7 @@ class DatablockRefProxy(Proxy):
         self,
         unused_attribute,
         parent: Union[T.bpy_struct, T.bpy_prop_collection],
-        key: Union[int, str],
+        key: str,
         context: Context,
     ):
         """

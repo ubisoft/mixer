@@ -104,7 +104,7 @@ class AosElement(Proxy):
             write_attribute(parent[int(index)], key, item, context)
 
 
-@serialize
+@serialize(ctor_args=("_member_name",))
 class SoaElement(Proxy):
     """
     A structure member inside a bpy_prop_collection loaded as a structure of array element
@@ -114,19 +114,19 @@ class SoaElement(Proxy):
 
     _serialize = ("_member_name",)
 
-    def __init__(self):
-        self._array: Optional[array.array] = None
-        self._member_name: Optional[str] = None
+    def __init__(self, member_name: str):
+        self._array = array.array("b", [])
+        self._member_name = member_name
 
-    def array_attr(self, aos: T.bpy_prop_collection, member_name: str, bl_rna: T.bpy_struct) -> Tuple[int, type]:
-        prototype_item = getattr(aos[0], member_name)
+    def array_attr(self, aos: T.bpy_prop_collection, bl_rna: T.bpy_struct) -> Tuple[int, type]:
+        prototype_item = getattr(aos[0], self._member_name)
         member_type = type(prototype_item)
 
         if is_vector(member_type):
             array_size = len(aos) * len(prototype_item)
         elif member_type is T.bpy_prop_array:
             member_type = type(prototype_item[0])
-            if isinstance(bl_rna, T.MeshPolygon) and member_name == "vertices":
+            if isinstance(bl_rna, T.MeshPolygon) and self._member_name == "vertices":
                 # polygon sizes can differ
                 array_size = sum((len(polygon.vertices) for polygon in aos))
             else:
@@ -136,18 +136,17 @@ class SoaElement(Proxy):
 
         return array_size, member_type
 
-    def load(self, aos: bpy.types.bpy_prop_collection, member_name: str, bl_rna: T.bpy_struct, context: Context):
+    def load(self, aos: bpy.types.bpy_prop_collection, bl_rna: T.bpy_struct, context: Context):
         """
         Args:
             aos : The array or structures collection that contains this member (e.g.  a_mesh.vertices, a_mesh.edges, ...)
             member_name : The name of this aos member (e.g, "co", "normal", ...)
             prototype_item : an element of parent collection
         """
-        self._member_name = member_name
         if len(aos) == 0:
             self._array = array.array("b", [])
         else:
-            array_size, member_type = self.array_attr(aos, member_name, bl_rna)
+            array_size, member_type = self.array_attr(aos, bl_rna)
             typecode = soa_initializers[member_type].typecode
             buffer = self._array
             if buffer is None or buffer.buffer_info()[1] != array_size or buffer.typecode != typecode:
@@ -156,7 +155,7 @@ class SoaElement(Proxy):
             # if foreach_get() raises "RuntimeError: internal error setting the array"
             # it means that the array is ill-formed.
             # Check rna_access.c:rna_raw_access()
-            aos.foreach_get(member_name, self._array)
+            aos.foreach_get(self._member_name, self._array)
         self._attach(context)
         return self
 
@@ -177,9 +176,10 @@ class SoaElement(Proxy):
         Args:
             key: the name of the structure member (e.g "co")
         """
-        self._member_name = key
+        assert self._member_name == key
 
     def save_array(self, aos: T.bpy_prop_collection, member_name, array_: array.array):
+        assert member_name == self._member_name
         if logger.isEnabledFor(logging.DEBUG):
             message = f"save_array {aos}.{member_name}"
             if self._array is not None:
@@ -227,7 +227,7 @@ class SoaElement(Proxy):
         if len(aos) == 0:
             return None
 
-        array_size, member_type = self.array_attr(aos, self._member_name, prop.bl_rna)
+        array_size, member_type = self.array_attr(aos, prop.bl_rna)
         typecode = self._array.typecode
         tmp_array = array.array(typecode, soa_initializer(member_type, array_size))
         if logger.isEnabledFor(logging.DEBUG):
@@ -246,8 +246,7 @@ class SoaElement(Proxy):
         if self._array == tmp_array:
             return None
 
-        diff = self.__class__()
-        diff._member_name = self._member_name
+        diff = self.__class__(self._member_name)
         diff._array = tmp_array
         diff._attach(context)
         return DeltaUpdate(diff)

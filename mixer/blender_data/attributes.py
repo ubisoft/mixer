@@ -90,7 +90,7 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
             elif is_soable_collection(attr_property):
                 from mixer.blender_data.aos_proxy import AosProxy
 
-                return AosProxy().load(attr, key, attr_property, context)
+                return AosProxy().load(attr, attr_property, context)
             else:
                 # This code path is taken for collections that have an rna and collections that do not
                 # There should probably be different proxies for collection with and without rna.
