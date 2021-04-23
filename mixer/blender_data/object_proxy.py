@@ -35,7 +35,7 @@ from mixer.blender_data.struct_collection_proxy import StructCollectionProxy
 from mixer.blender_data.armature_proxy import ArmatureProxy
 
 if TYPE_CHECKING:
-    from mixer.blender_data.bpy_data_proxy import Context, Proxy
+    from mixer.blender_data.bpy_data_proxy import Context
     from mixer.blender_data.struct_proxy import StructProxy
 
 
@@ -133,7 +133,7 @@ class ObjectProxy(DatablockProxy):
             return
 
         try:
-            mesh_proxy = context.proxy_state.proxies.get(datablock_ref_proxy.mixer_uuid)
+            mesh_proxy = context.proxy_state.proxies[datablock_ref_proxy.mixer_uuid]
         except KeyError:
             logger.error(
                 f"_save(): internal error: {object_datablock} has vertex groups, but its data datablock has None"
@@ -167,7 +167,7 @@ class ObjectProxy(DatablockProxy):
         vertex_groups.clear()
         groups_data = []
         for i in range(vertex_groups_proxy.length):
-            item = vertex_groups_proxy.data(i)
+            item = vertex_groups_proxy[i]
             groups_data.append((item.data("index"), item.data("lock_weight"), item.data("name")))
 
         for index, lock_weight, name in groups_data:
@@ -182,7 +182,9 @@ class ObjectProxy(DatablockProxy):
             for index, weight in zip(indices, weights):
                 vertex_group.add([index], weight, "ADD")
 
-    def _diff(self, struct: T.Object, key: str, prop: T.Property, context: Context, diff: Proxy) -> Optional[Delta]:
+    def _diff(
+        self, struct: T.Object, key: str, prop: T.Property, context: Context, diff: StructProxy
+    ) -> Optional[Delta]:
         from mixer.blender_data.attributes import diff_attribute
 
         must_replace = False

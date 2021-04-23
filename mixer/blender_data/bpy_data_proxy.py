@@ -77,7 +77,7 @@ class ProxyState:
         """indirect libraries that were received but not yet registered because no datablock they provide were processed
         yet"""
 
-        self.shared_folders: List[str] = []
+        self.shared_folders: List[pathlib.Path] = []
 
     def register_object(self, datablock: T.Object):
         if datablock.data is not None:

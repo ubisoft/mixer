@@ -251,7 +251,7 @@ class Proxy:
     ) -> Optional[Tuple[Union[T.bpy_struct, T.bpy_prop_collection], Proxy]]:
         head, *tail = path
         if isinstance(bl_item, T.bpy_struct):
-            bl = getattr(bl_item, head)
+            bl = getattr(bl_item, head)  # type: ignore
         elif isinstance(bl_item, T.bpy_prop_collection):
             try:
                 bl = bl_item[head]

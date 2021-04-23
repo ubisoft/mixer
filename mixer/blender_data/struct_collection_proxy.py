@@ -36,7 +36,6 @@ from mixer.blender_data.proxy import AddElementFailed, Delta, DeltaAddition, Del
 from mixer.blender_data.struct_proxy import StructProxy
 
 if TYPE_CHECKING:
-    from mixer.blender_data.datablock_proxy import DatablockProxy
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
     from mixer.blender_data.misc_proxies import NonePtrProxy
     from mixer.blender_data.proxy import Context
@@ -121,6 +120,9 @@ class StructCollectionProxy(Proxy):
 
     def __iter__(self):
         return iter(self._sequence)
+
+    def __getitem__(self, i: int):
+        return self._sequence[i]
 
     @property
     def length(self) -> int:

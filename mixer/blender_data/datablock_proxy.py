@@ -240,8 +240,8 @@ class DatablockProxy(StructProxy):
                 logger.warning(f"... source:   '{path_string}'")
             self._filepath_raw = str(path)
 
-    def matches_shared_folder(self, filepath: str, context: Context):
-        filepath = pathlib.Path(filepath)
+    def matches_shared_folder(self, filepath_str: str, context: Context):
+        filepath = pathlib.Path(filepath_str)
         for shared_folder in context.proxy_state.shared_folders:
             try:
                 relative_path = filepath.relative_to(shared_folder)
@@ -291,14 +291,14 @@ class DatablockProxy(StructProxy):
         #
         if hasattr(datablock, "packed_file"):
             self._is_in_shared_folder = False
+            if self._filepath_raw is None:
+                return
+
             packed_file = datablock.packed_file
             data = None
             if packed_file is not None:
                 data = packed_file.data
                 self._media = (get_source_file_path(self._filepath_raw), data)
-                return
-
-            if self._filepath_raw is None:
                 return
 
             relative_to_shared_folder_path = self.matches_shared_folder(self._filepath_raw, context)
