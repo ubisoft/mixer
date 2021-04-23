@@ -1,8 +1,15 @@
 # Mixer
 
-Mixer is a Blender addon developed at Ubisoft for Real Time Collaboration in 3D edition. It allows multiple Blender users to work on the same scene at the same time.
+Mixer is a Blender addon for real time collaboration in Blender. It allows multiple Blender users to work on the same scene at the same time and is developed by the R&D department of Ubisoft Animation Studio.
 
-**Disclaimer**: This project is in alpha state and actively developed. Do not use it to edit your production assets without a backup or you might break them.
+![Mixer screenshot](docs/img/home_mixer.png)
+
+**Disclaimer**: Although designed to be used in a production context it is still an experimental tool and,
+In spite of all our efforts to make it reliable, it may in some circumstances corrupt you Blender scenes data.
+Be aware that neither Ubisoft nor Ubisoft employees can be taken as responsible in such cases. Use it at your own risks.
+
+**This said, we will do our best to improve Mixer thanks to your feedback in order to provide a memorable creative collaborative experience.
+Have fun !**
 
 ## Features
 
@@ -10,11 +17,11 @@ Refer to the online documentation for details about current [features and limita
 
 ## Documentation and Usage
 
-Documentation is available at the web site https://ubisoft-mixer.readthedocs.io/ :
+Documentation is available at the web site https://ubisoft-mixer.readthedocs.io/ to :
 
-- [Download and install](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/install.html) Mixer
-- Perform [local tests](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/first-steps.html)
-- [Get connected](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/get-connected.html) and [work together](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/work-together.html)
+- [download and install](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/install.html), 
+- [test](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/first-steps.html) locally,
+- then [get connected](https://ubisoft-mixer.readthedocs.io/en/latest/.collaborate/get-connected.html) and [work together](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/work-together.html)
 
 ## Updates
 

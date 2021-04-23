@@ -1,8 +1,12 @@
-# 0.23.0 (Wip)
+# 1.0.0 (2021-04-21)
+
+## Documentation
+
+- Online user [documentation](https://ubisoft-mixer.readthedocs.io/en/latest/)
+- Video [tutorials](https://www.youtube.com/channel/UCVfQBSBBvo8GMndYy2TzQHw)
 
 ## Features
 
-- Online user documentation
 - Armatures: synchronization
 - Geometry node tres: synchronization
 - Synchronization: ignore scene camera
@@ -10,12 +14,14 @@
 - UI: add the list of users per room
 - UI: improved visibility of Connect and Disconnect buttons for existing rooms
 - UI: removed unused "Join" progress value
+- UI: improve warning feedback when Blender or Mixer versions are not the same as the room ones
 
 ## Fixes
 
 - Synchronization: ignore "select" attribute everywhere
 - UI: color for other users is now accurate
 - Node trees: fix missing connections
+- Readme fixes (thanks [bangseongbeom](https://github.com/bangseongbeom))
 
 # 0.22.0 (19-03-2021)
 

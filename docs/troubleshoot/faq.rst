@@ -6,11 +6,6 @@ Frequently asked questions
 General
 -------
 
-Why is Mixer still in a 0. version?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Mixer is still in active development. Using it may cause data loss. Save your work regularly and make sure that you have backups.
-
 Can I control access to the server or a room?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -20,6 +15,7 @@ Can I control access to parts os a scene?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 No. All room users can edit all the Blender data without restriction.
+If two users edit simultaneously the very same elements data corruption will occur.
 
 
 .. _saves-not-identical:
@@ -43,9 +39,11 @@ Mixer handles these simultaneous and conflicting modifications:
 - renaming datablocks with different names
 - linking different objects to the same collection
 
-The following conflicting modifications are not handled:
+The following conflicting modifications are not handled, and in these cases, the participants will end up with 
+different attribute values:
 
-- modification of an attribute with different values. Participants will end up with different attribute values.
+- setting an attribute with different values.
+- adding or removing array elements, like in object modifier or grease pencil layers
 
 
 How many users can collaborate in a session?
@@ -104,7 +102,7 @@ Why does my update fail to appear on other participant Blender?
 
 Check the following :
 
-- are you and the other participants actually connected to the server? The Mixer panel should display the **Disconnect** button in blue.
+- are you and the other participants actually connected to the server? When you are connected, the Mixer panel should display the **Disconnect** button in blue.
 - are you attempting to synchronize data that is not or partially supported? See the list of :ref:`synchronized data <synchronized>` and their restrictions.
 
 If you think you have found a bug, please :doc:`report an issue <issue>`.
