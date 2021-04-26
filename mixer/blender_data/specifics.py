@@ -996,7 +996,6 @@ def _(collection: T.bpy_prop_collection, sequence: List[DatablockProxy], collect
 
     for proxy, item in zip(sequence, collection):
         group_proxy = cast(PtrToCollectionItemProxy, proxy.data("group"))
-        assert group_proxy is not None
         if item.group is None:
             if group_proxy:
                 # not None -> None
