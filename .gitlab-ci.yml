@@ -14,6 +14,17 @@ flake8:
     - pip install black flake8 flake8-black pep8-naming flake8-bugbear --constraint requirements-dev.txt
     - flake8 -v mixer tests extra
 
+mypy:
+  extends:
+    - .except_nightly_test
+  tags:
+    - docker
+  image: python:3
+  stage: pre_release
+  script:
+    - pip install mypy --constraint requirements-dev.txt
+    - mypy mixer
+  allow_failure: true
 
 doc:
   stage: pre_release

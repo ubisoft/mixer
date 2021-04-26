@@ -55,7 +55,7 @@ def is_instance(rna_property: T.Property, base: T.Property) -> bool:
     return base in bases_of(rna_property)
 
 
-def is_pointer_to(rna_property: T.Property, base: type) -> bool:
+def is_pointer_to(rna_property: T.Property, base: Any) -> bool:
     return is_pointer(rna_property) and is_instance(rna_property.fixed_type, base.bl_rna)
 
 

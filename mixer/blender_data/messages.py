@@ -24,13 +24,12 @@ shared with the VRtist protocol.
 """
 from __future__ import annotations
 
-import array
 import json
 import logging
 import traceback
-from typing import List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import List, Optional, Tuple, TYPE_CHECKING
 
-from mixer.blender_data.types import ArrayGroup, ArrayGroups, Soa
+from mixer.blender_data.types import ArrayGroup, ArrayGroups, Path, Soa
 
 from mixer.broadcaster.common import (
     decode_int,
@@ -128,7 +127,7 @@ def decode_arrays(buffer: bytes, index) -> Tuple[ArrayGroups, int]:
 
 
 def _decode_soas(buffer: bytes, index: int) -> Tuple[List[Soa], int]:
-    path: List[Union[int, str]] = ["unknown"]
+    path: Path = []
     name = "unknown"
     soas: List[Soa] = []
     try:
@@ -156,7 +155,7 @@ def _decode_soas(buffer: bytes, index: int) -> Tuple[List[Soa], int]:
         for line in traceback.format_exc().splitlines():
             logger.error(line)
         logger.error("ignored")
-        return []
+        raise
 
     return soas, index
 
@@ -165,7 +164,7 @@ class BlenderDataMessage:
     def __init__(self):
         self.proxy_string: str = ""
         self.soas: List[Soa] = []
-        self.arrays: List[str, array.array] = {}
+        self.arrays: ArrayGroups = {}
 
     def __lt__(self, other):
         # for sorting by the tests

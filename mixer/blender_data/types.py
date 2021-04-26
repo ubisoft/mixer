@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import array
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, Iterable, List, Tuple, Union
 
 
 SoaMember = Tuple[str, array.array]
@@ -32,7 +32,7 @@ SoaMember = Tuple[str, array.array]
 - Data to be loaded with foreach_set()
 """
 
-Path = List[Union[str, int]]
+Path = Iterable[Union[str, int]]
 """A data path starting from the datablock e.g. ["curves", 0, "bezier_points"]"""
 
 

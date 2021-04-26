@@ -63,9 +63,7 @@ class AosProxy(Proxy):
     def length(self) -> int:
         return self._aos_length
 
-    def load(
-        self, bl_collection: T.bpy_prop_collection, key: str, bl_collection_property: T.Property, context: Context
-    ):
+    def load(self, bl_collection: T.bpy_prop_collection, bl_collection_property: T.Property, context: Context):
 
         # Must process the Soa elements, even if empty, because we may we called when a diff detects that
         # a replace is required (e.g. geometry vertext count change) and we must ensure that the soas are updated.
@@ -83,7 +81,7 @@ class AosProxy(Proxy):
                     # Since this dies no use read_attribute, pugh the current item by hand
                     context.visit_state.push(bl_collection, attr_name)
                     try:
-                        self._data[attr_name] = SoaElement().load(bl_collection, attr_name, item_bl_rna, context)
+                        self._data[attr_name] = SoaElement(attr_name).load(bl_collection, item_bl_rna, context)
                     finally:
                         context.visit_state.pop()
         else:
@@ -94,7 +92,7 @@ class AosProxy(Proxy):
                     if is_soable_property(bl_rna_property):
                         # element supported by foreach_get()/foreach_set(), e.g. MeshVertices.co
                         # The collection is loaded as an array.array and encoded as a binary buffer
-                        self._data[attr_name] = SoaElement().load(bl_collection, attr_name, item_bl_rna, context)
+                        self._data[attr_name] = SoaElement(attr_name).load(bl_collection, item_bl_rna, context)
                     else:
                         # element not supported by foreach_get()/foreach_set(), e.g. BezierSplinePoint.handle_left_type,
                         # which is an enum, loaded as string
@@ -179,7 +177,7 @@ class AosProxy(Proxy):
 
         for member_name in member_names:
             # co, normals, ...
-            proxy_data = self._data.get(member_name, SoaElement())
+            proxy_data = self._data.get(member_name, SoaElement(member_name))
             delta = diff_attribute(aos, member_name, item_bl_rna, proxy_data, context)
             if delta is not None:
                 diff._data[member_name] = delta

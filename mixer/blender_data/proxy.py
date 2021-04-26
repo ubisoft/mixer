@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import Any, Callable, Dict, List, Optional, Iterable, Tuple, TYPE_CHECKING, Union
 from uuid import uuid4
 
 import bpy
@@ -35,6 +35,7 @@ from mixer.blender_data.json_codec import serialize
 if TYPE_CHECKING:
     from mixer.blender_data.bpy_data_proxy import Context
     from mixer.blender_data.datablock_ref_proxy import DatablockRefProxy
+    from mixer.blender_data.types import Path
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +62,13 @@ class UnresolvedRefs:
     (e.g. bpy.types.Collection.children)
     """
 
-    SrcLink = Callable[[], None]
-
     def __init__(self):
-        self._refs: Dict[Uuid, List[Tuple[self.Func, str]]] = defaultdict(list)
+        self._refs: Dict[Uuid, List[Tuple[Callable[[T.ID], None], str]]] = defaultdict(list)
 
     def __bool__(self):
         return bool(self._refs)
 
-    def append(self, dst_uuid: Uuid, src_link: SrcLink, display_string: str = ""):
+    def append(self, dst_uuid: Uuid, src_link: Callable[[T.ID], None], display_string: str = ""):
         self._refs[dst_uuid].append((src_link, display_string))
 
     def resolve(self, dst_uuid: Uuid, dst_datablock: T.ID):
@@ -172,9 +171,7 @@ class Proxy:
     def init(self, _):
         pass
 
-    def data(
-        self, key_or_path: Union[int, str, List[Union[int, str]], Tuple[Union[int, str], ...]], resolve_delta=True
-    ) -> Any:
+    def data(self, key_or_path: Union[int, str, Iterable[Union[int, str]]], resolve_delta=True) -> Any:
         """Return the item identified by key_or_path in this proxy hierarchy.
 
         Args:
@@ -182,7 +179,7 @@ class Proxy:
             resolve_delta: If True, and the data is a Delta, will return the delta value
         """
 
-        if not isinstance(key_or_path, (list, tuple)):
+        if isinstance(key_or_path, (int, str)):
             key_or_path = (key_or_path,)
 
         data = self
@@ -250,11 +247,11 @@ class Proxy:
         raise NotImplementedError(f"diff for {container}[{key}]")
 
     def find_by_path(
-        self, bl_item: Union[T.bpy_struct, T.bpy_prop_collection], path: List[Union[int, str]]
+        self, bl_item: Union[T.bpy_struct, T.bpy_prop_collection], path: Path
     ) -> Optional[Tuple[Union[T.bpy_struct, T.bpy_prop_collection], Proxy]]:
         head, *tail = path
         if isinstance(bl_item, T.bpy_struct):
-            bl = getattr(bl_item, head)
+            bl = getattr(bl_item, head)  # type: ignore
         elif isinstance(bl_item, T.bpy_prop_collection):
             try:
                 bl = bl_item[head]
