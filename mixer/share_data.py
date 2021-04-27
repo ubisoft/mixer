@@ -22,15 +22,19 @@ This module defines global state of the addon. It is encapsulated in a ShareData
 from collections import namedtuple
 from datetime import datetime
 import logging
-from typing import Dict, List, Mapping, Optional, Set
+from typing import Dict, List, Mapping, Optional, Set, TYPE_CHECKING
 from uuid import uuid4
 
 from mixer.blender_data.bpy_data_proxy import BpyDataProxy
+from mixer.blender_data.interface import Interface
 
 import bpy
 import bpy.types as T  # noqa N812
 
 from mixer.shot_manager_data import ShotManager
+
+if TYPE_CHECKING:
+    from mixer.blender_client.client import BlenderClient
 
 logger = logging.getLogger(__name__)
 ObjectVisibility = namedtuple("ObjectVisibility", ["hide_viewport", "hide_select", "hide_render", "hide_get"])
@@ -100,7 +104,7 @@ class ShareData:
     def __init__(self):
         self.run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.session_id = 0  # For logging and debug
-        self.client = None
+        self.client: Optional[BlenderClient] = None
 
         self.local_server_process = None
         self.selected_objects_names = []
@@ -109,6 +113,7 @@ class ShareData:
 
         self.clear_room_data()
         self.shot_manager = ShotManager()
+        self.proxy_interface: Optional[Interface] = None
 
     def clear_room_data(self):
         self.objects_added: Set(str) = set()
@@ -184,7 +189,7 @@ class ShareData:
         self.start_frame = 0
         self.end_frame = 0
 
-        self.bpy_data_proxy: Optional[BpyDataProxy] = None
+        self.proxy_interface = None
 
     def leave_current_room(self):
         if self.client is not None:
@@ -424,23 +429,23 @@ class ShareData:
     def init_protocol(self, vrtist_protocol: bool, shared_folders: List):
         if not vrtist_protocol:
             logger.warning("Generic protocol sync is ON")
-            self.bpy_data_proxy = BpyDataProxy()
+            self.proxy_interface = Interface(share_data.client, BpyDataProxy())
             if shared_folders is not None:
                 logger.warning("Setting shared folders: " + str(shared_folders))
             else:
                 logger.warning("No shared folder set")
-            self.bpy_data_proxy.set_shared_folders(shared_folders)
+            self.proxy_interface.proxy.set_shared_folders(shared_folders)
         else:
             logger.warning("VRtist protocol sync is ON")
-            if self.bpy_data_proxy:
-                self.bpy_data_proxy = None
+            if self.proxy_interface:
+                self.proxy_interface = None
 
     def use_vrtist_protocol(self):
-        return self.bpy_data_proxy is None
+        return self.proxy_interface is None
 
     def receive_sanity_check(self):
-        if self.bpy_data_proxy:
-            self.bpy_data_proxy.sanity_check()
+        if self.proxy_interface:
+            self.proxy_interface.proxy.sanity_check()
 
 
 share_data = ShareData()  # Instance storing addon state, is used by most of the sub-modules.

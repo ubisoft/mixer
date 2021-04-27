@@ -51,7 +51,6 @@ from mixer.broadcaster.common import ClientAttributes, MessageType, RoomAttribut
 from mixer.broadcaster.client import Client
 from mixer.blender_client import camera as camera_api
 from mixer.blender_client import collection as collection_api
-from mixer.blender_client import data as data_api
 from mixer.blender_client import grease_pencil as grease_pencil_api
 from mixer.blender_client import light as light_api
 from mixer.blender_client import material as material_api
@@ -59,7 +58,6 @@ from mixer.blender_client import mesh as mesh_api
 from mixer.blender_client import object_ as object_api
 from mixer.blender_client import scene as scene_api
 from mixer.blender_client import constraint as constraint_api
-from mixer.blender_data.proxy import ensure_uuid
 import mixer.shot_manager as shot_manager
 import mixer.asset_bank as asset_bank
 from mixer.draw_handlers import set_draw_handlers
@@ -581,17 +579,12 @@ class BlenderClient(Client):
     def send_mesh(self, obj):
         logger.info("send_mesh %s", obj.name_full)
         mesh = obj.data
-        if not share_data.use_vrtist_protocol():
-            # see build_mesh_generic()
-            path = ensure_uuid(mesh)
-            mesh_name = mesh.name
-        else:
-            path = self.get_object_path(obj)
-            mesh_name = self.get_mesh_name(mesh)
+        path = self.get_object_path(obj)
+        mesh_name = self.get_mesh_name(mesh)
 
-            # objects may share mesh but baked mesh may be different in instances with different modifiers
-            if len(obj.modifiers) > 0:
-                mesh_name = obj.name_full + "_" + mesh_name
+        # objects may share mesh but baked mesh may be different in instances with different modifiers
+        if len(obj.modifiers) > 0:
+            mesh_name = obj.name_full + "_" + mesh_name
 
         binary_buffer = common.encode_string(path) + common.encode_string(mesh_name)
 
@@ -993,7 +986,10 @@ class BlenderClient(Client):
                     # because it can lead to ignoring real updates when a false positive is encountered
                     command_triggers_depsgraph_update = True
 
-                    if command.type == MessageType.GREASE_PENCIL_MESH:
+                    if share_data.proxy_interface is not None and share_data.proxy_interface.process(command):
+                        # Generic is enabled and processed the message
+                        pass
+                    elif command.type == MessageType.GREASE_PENCIL_MESH:
                         grease_pencil_api.build_grease_pencil_mesh(command.data)
                     elif command.type == MessageType.GREASE_PENCIL_MATERIAL:
                         grease_pencil_api.build_grease_pencil_material(command.data)
@@ -1101,17 +1097,6 @@ class BlenderClient(Client):
                         delayed_messages.append(delayed_message_call(asset_bank.receive_message, command.data))
                     elif command.type == MessageType.SAVE:
                         self.build_save(command.data)
-
-                    elif command.type == MessageType.BLENDER_DATA_UPDATE:
-                        data_api.build_data_update(command.data)
-                    elif command.type == MessageType.BLENDER_DATA_REMOVE:
-                        data_api.build_data_remove(command.data)
-                    elif command.type == MessageType.BLENDER_DATA_CREATE:
-                        data_api.build_data_create(command.data)
-                    elif command.type == MessageType.BLENDER_DATA_RENAME:
-                        data_api.build_data_rename(command.data)
-                    elif command.type == MessageType.BLENDER_DATA_MEDIA:
-                        data_api.build_data_media(command.data)
 
                     else:
                         # Command is ignored, so no depsgraph update can be triggered

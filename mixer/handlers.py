@@ -845,7 +845,7 @@ def handler_on_undo_redo_pre(scene):
     if share_data.use_vrtist_protocol():
         send_scene_data_to_server(scene, None)
     else:
-        share_data.bpy_data_proxy.snapshot_undo_pre()
+        share_data.interface.proxy.snapshot_undo_pre()
 
 
 def remap_objects_info():
@@ -888,7 +888,7 @@ def handler_on_undo_redo_post(scene, dummy):
         # Generic sync: reload all datablocks
         undone = share_data.bpy_data_proxy.snapshot_undo_post()
         logger.warning(f"undone uuids : {undone}")
-        share_data.bpy_data_proxy.reload_datablocks()
+        share_data.interface.proxy.reload_datablocks()
     else:
         share_data.set_dirty()
         share_data.clear_lists()

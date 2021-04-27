@@ -16,6 +16,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """Package for Blender generic synchronization."""
 
+import logging
+import traceback
+
 # import triggers Proxy classes registration into json_codec
 try:
     import mixer.blender_data.aos_proxy
@@ -35,8 +38,11 @@ try:
     import mixer.blender_data.struct_collection_proxy
     import mixer.blender_data.struct_proxy  # noqa: 401
 except (ImportError, AttributeError):
-    # Import is not possible when not run within Blender (unittest)
-    pass
+    # Probably a Blender type import while not executing inside Blender (server, tests)
+    logger = logging.getLogger(__name__)
+    logger.error("Import error")
+    for line in traceback.format_exc().splitlines():
+        logger.error(f"   {line}")
 
 
 def register():

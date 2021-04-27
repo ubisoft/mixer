@@ -21,6 +21,7 @@ See synchronization.md
 """
 from __future__ import annotations
 
+from functools import lru_cache
 import logging
 from typing import Any, Dict, Optional, TYPE_CHECKING, Tuple, Union
 
@@ -38,6 +39,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@lru_cache(None)
+def _non_inputs():
+    """Identifiers of properties that are not modifier inputs."""
+
+    non_inputs = set(("_RNA_UI",))
+
+    # cannot be executed at module level outside Blender
+    non_inputs.update(T.NodesModifier.bl_rna.properties.keys())
+    return non_inputs
+
+
 @serialize
 class NodesModifierProxy(StructProxy):
     """Proxy for NodesModifier.
@@ -48,10 +60,6 @@ class NodesModifierProxy(StructProxy):
 
     _serialize: Tuple[str, ...] = StructProxy._serialize + ("_inputs",)
 
-    _non_inputs = set(("_RNA_UI",))
-    _non_inputs.update(T.NodesModifier.bl_rna.properties.keys())
-    """Identifiers of properties that are not inputs."""
-
     def __init__(self):
         self._inputs: Dict[int, Any] = {}
         """{ index in geometry node group group input node : value }."""
@@ -61,7 +69,7 @@ class NodesModifierProxy(StructProxy):
     def _load_inputs(self, modifier: T.bpy_struct) -> Dict[int, Any]:
         """Returns a dict containing {input_index_in_node_group_inputs: value_in_nodes_modifier} """
 
-        input_names = set(modifier.keys()) - self._non_inputs
+        input_names = set(modifier.keys()) - _non_inputs()
         node_group = modifier.node_group
         if node_group is None:
             return {}

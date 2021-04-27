@@ -28,7 +28,8 @@ import logging
 from typing import Dict, Tuple, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from mixer.blender_data.proxy import Delta, Proxy
+    from mixer.blender_data.proxy import Delta
+    from mixer.blender_data.datablock_proxy import DatablockProxy
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +126,7 @@ class Codec:
     def encode(self, obj) -> str:
         return json.dumps(obj, default=default)
 
-    def decode(self, message: str) -> Union[Proxy, Delta]:
+    def decode(self, message: str) -> Union[DatablockProxy, Delta]:
         decoded = json.loads(message, object_hook=decode_hook)
         if isinstance(decoded, dict):
             raise DecodeError("decode failure", decoded)

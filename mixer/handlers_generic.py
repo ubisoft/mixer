@@ -9,7 +9,6 @@ from typing import Set, Tuple
 import bpy
 import bpy.types as T  # noqa N812
 
-from mixer.blender_client import data as data_api
 from mixer.blender_data.diff import BpyBlendDiff
 from mixer.blender_data.filter import safe_properties
 
@@ -108,7 +107,8 @@ def send_scene_data_to_server(scene, dummy):
         return
 
     share_data.pending_test_update = False
-    bpy_data_proxy = share_data.bpy_data_proxy
+    proxy_interface = share_data.proxy_interface
+    bpy_data_proxy = proxy_interface.proxy
     depsgraph = bpy.context.evaluated_depsgraph_get()
 
     updates, delayed_updates = updates_to_check(depsgraph)
@@ -128,9 +128,9 @@ def send_scene_data_to_server(scene, dummy):
     changeset = bpy_data_proxy.update(diff, updates, process_delayed_updates, safe_properties)
 
     # Send creations before update so that collection updates for new object have a valid target
-    data_api.send_data_creations(changeset.creations)
-    data_api.send_data_removals(changeset.removals)
-    data_api.send_data_renames(changeset.renames)
-    data_api.send_data_updates(changeset.updates)
+    proxy_interface.send_data_creations(changeset.creations)
+    proxy_interface.send_data_removals(changeset.removals)
+    proxy_interface.send_data_renames(changeset.renames)
+    proxy_interface.send_data_updates(changeset.updates)
 
     logger.debug("send_scene_data_to_server: end")

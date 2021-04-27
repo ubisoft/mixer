@@ -33,7 +33,6 @@ import pathlib
 import bpy
 import bpy.types as T  # noqa
 
-from mixer.blender_data.bpy_data import collections_names
 from mixer.blender_data.changeset import Changeset, RenameChangeset
 from mixer.blender_data.datablock_collection_proxy import DatablockCollectionProxy
 from mixer.blender_data.datablock_proxy import DatablockProxy
@@ -317,7 +316,8 @@ def retain(arg):
             def func():
                 return f(*args, **kwargs)
 
-            if bpy.context.mode != "OBJECT":
+            if bpy.context.mode not in (None, "OBJECT"):
+                # TODO is None with fake bpy
                 bpy_data_proxy = args[0]
                 bpy_data_proxy._delayed_remote_updates.append(func)
                 return arg
@@ -327,6 +327,13 @@ def retain(arg):
         return wrapper
 
     return retain_
+
+
+class _DatablockCollectionDict(dict):
+    def __missing__(self, key):
+        value = DatablockCollectionProxy(key)
+        self[key] = value
+        return value
 
 
 class BpyDataProxy(Proxy):
@@ -339,7 +346,8 @@ class BpyDataProxy(Proxy):
 
         self.state: ProxyState = ProxyState()
 
-        self._data = {name: DatablockCollectionProxy(name) for name in collections_names()}
+        self._data: Dict[str, DatablockCollectionProxy] = _DatablockCollectionDict()
+        """Has one member per bpy.data collection, e.g objects, meshes, ..."""
 
         self._delayed_local_updates: Set[Uuid] = set()
         """Local datablock updates retained until returning to Object mode.
@@ -498,11 +506,7 @@ class BpyDataProxy(Proxy):
         """
         Process a received datablock creation command, creating the datablock and updating the proxy state
         """
-        bpy_data_collection_proxy = self._data.get(incoming_proxy.collection_name)
-        if bpy_data_collection_proxy is None:
-            logger.error(f"create_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} ")
-            return None, None
-
+        bpy_data_collection_proxy = self._data[incoming_proxy.collection_name]
         context = self.context(synchronized_properties)
         return bpy_data_collection_proxy.create_datablock(incoming_proxy, context)
 
@@ -513,13 +517,7 @@ class BpyDataProxy(Proxy):
         """
         assert isinstance(update, (DeltaUpdate, DeltaReplace))
         incoming_proxy: DatablockProxy = update.value
-        bpy_data_collection_proxy = self._data.get(incoming_proxy.collection_name)
-        if bpy_data_collection_proxy is None:
-            logger.warning(
-                f"update_datablock: no bpy_data_collection_proxy with name {incoming_proxy.collection_name} "
-            )
-            return None
-
+        bpy_data_collection_proxy = self._data[incoming_proxy.collection_name]
         context = self.context(synchronized_properties)
         bpy_data_collection_proxy.update_datablock(update, context)
 
@@ -533,11 +531,7 @@ class BpyDataProxy(Proxy):
             logger.error(f"remove_datablock(): no proxy for {uuid}")
             return
 
-        bpy_data_collection_proxy = self._data.get(proxy.collection_name)
-        if bpy_data_collection_proxy is None:
-            logger.warning(f"remove_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
-            return None
-
+        bpy_data_collection_proxy = self._data[proxy.collection_name]
         datablock = self.state.datablock(uuid)
 
         if isinstance(datablock, T.Object) and datablock.data is not None:
@@ -573,11 +567,7 @@ class BpyDataProxy(Proxy):
                 logger.error(f"rename_datablocks(): no proxy for {uuid} (debug info)")
                 return []
 
-            bpy_data_collection_proxy = self._data.get(proxy.collection_name)
-            if bpy_data_collection_proxy is None:
-                logger.warning(f"rename_datablock: no bpy_data_collection_proxy with name {proxy.collection_name} ")
-                continue
-
+            bpy_data_collection_proxy = self._data[proxy.collection_name]
             datablock = self.state.datablock(uuid)
             tmp_name = f"_mixer_tmp_{uuid}"
             if datablock.name != new_name and datablock.name != old_name:

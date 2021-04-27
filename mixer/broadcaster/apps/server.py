@@ -188,7 +188,7 @@ class Connection:
                     command_handlers[command.type](command)
                 elif command.type.value > common.MessageType.COMMAND.value:
                     if self.room is not None:
-                        self.room.add_command(command, self)
+                        self.room.process_command(command, self)
                     else:
                         logger.warning(
                             "%s:%s - %s received but no room was joined",
@@ -260,14 +260,12 @@ class Room:
         blender_version: str,
         mixer_version: str,
         ignore_version_check: bool,
-        generic_protocol: bool,
         creator: Connection,
     ):
         self.name = room_name
         self.blender_version = blender_version
         self.mixer_version = mixer_version
         self.ignore_version_check = ignore_version_check
-        self.generic_protocol = generic_protocol
         self.keep_open = False  # Should the room remain open when no more clients are inside ?
         self.byte_size = 0
         self.joinable = False  # A room becomes joinable when its first client has send all the initial content
@@ -284,6 +282,7 @@ class Room:
         # Server is responsible of increasing / decreasing join_count, with mutex protection
 
         creator.room = self
+
         creator.send_command(common.Command(common.MessageType.JOIN_ROOM, common.encode_string(self.name)))
         creator.send_command(
             common.Command(common.MessageType.CONTENT)
@@ -299,6 +298,11 @@ class Room:
         logger.info(f"Add Client {connection.unique_id} to Room {self.name}")
 
         connection.send_command(common.Command(common.MessageType.CLEAR_CONTENT))  # todo temporary size stored here
+
+        # TODO send proxy scene
+        # lock the proxy, send all datablock creations
+        # Store the datablock count (command count)
+        # and the byte size (how ?)
 
         offset = 0
 
@@ -348,7 +352,26 @@ class Room:
             common.RoomAttributes.JOINABLE: self.joinable,
         }
 
-    def add_command(self, command, sender: Connection):
+    def process_command(self, command: common.Command, sender: Connection):
+        raise NotImplementedError("process_command(): not implemented")
+
+
+class VRtistRoom(Room):
+    def __init__(
+        self,
+        server: Server,
+        room_name: str,
+        blender_version: str,
+        mixer_version: str,
+        ignore_version_check: bool,
+        generic_protocol: bool,
+        creator: Connection,
+    ):
+
+        self.generic_protocol = generic_protocol
+        super().__init__(server, room_name, blender_version, mixer_version, ignore_version_check, creator)
+
+    def process_command(self, command, sender: Connection):
         def merge_command():
             """
             Add the command to the room list, possibly merge with the previous command.
@@ -394,6 +417,34 @@ class Room:
                     connection.add_command(command)
 
 
+class GenericRoom(Room):
+    def __init__(
+        self,
+        server: Server,
+        room_name: str,
+        blender_version: str,
+        mixer_version: str,
+        ignore_version_check: bool,
+        generic_protocol: bool,  # TODO temporary
+        creator: Connection,
+    ):
+        from mixer.blender_data.bpy_data_proxy import BpyDataProxy
+        from mixer.blender_data.interface import Interface
+
+        self.generic_protocol = generic_protocol
+        super().__init__(server, room_name, blender_version, mixer_version, ignore_version_check, creator)
+        self.proxy_interface = Interface(None, BpyDataProxy())
+
+    def process_command(self, command: common.Command, sender: Connection):
+        processed = self.proxy_interface.process(command)
+        if not processed:
+            logger.info(f"not processed locally {command.type!s}")
+
+        for connection in self._connections:
+            if connection != sender:
+                connection.add_command(command)
+
+
 class Server:
     def __init__(self):
         self._rooms: Dict[str, Room] = {}
@@ -431,7 +482,12 @@ class Server:
 
         def _create_room():
             logger.info(f"Room {room_name} does not exist. Creating it.")
-            room = Room(
+            if generic_protocol:
+                room_class = GenericRoom
+                room_class = VRtistRoom
+            else:
+                room_class = VRtistRoom
+            room = room_class(
                 self, room_name, blender_version, mixer_version, ignore_version_check, generic_protocol, connection
             )
             self._rooms[room_name] = room

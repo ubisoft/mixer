@@ -115,14 +115,17 @@ def _armature_object(armature_data: T.Armature, context: Context) -> Optional[T.
     return objects[0]
 
 
+@functools.lru_cache(None)
+def _edit_bones_property():
+    return T.Armature.bl_rna.properties["edit_bones"]
+
+
 @serialize
 class ArmatureProxy(DatablockProxy):
     """Proxy for an Armature datablock.
 
     This specialization is required to switch between current mode and edit mode in order to read/write edit_bones.
     """
-
-    _edit_bones_property = T.Armature.bl_rna.properties["edit_bones"]
 
     _require_context_state = (
         # requires EDIT mode
@@ -148,7 +151,7 @@ class ArmatureProxy(DatablockProxy):
 
         def _read_attribute():
             self._data["edit_bones"] = read_attribute(
-                armature_data.edit_bones, "edit_bones", self._edit_bones_property, armature_data, context
+                armature_data.edit_bones, "edit_bones", _edit_bones_property(), armature_data, context
             )
 
         self._access_edit_bones(armature_objects[0], _read_attribute, context)
@@ -181,7 +184,7 @@ class ArmatureProxy(DatablockProxy):
 
         def _diff_attribute():
             return diff_attribute(
-                armature_data.edit_bones, "edit_bones", self._edit_bones_property, self.data("edit_bones"), context
+                armature_data.edit_bones, "edit_bones", _edit_bones_property(), self.data("edit_bones"), context
             )
 
         edit_bones_delta = self._access_edit_bones(armature_object, _diff_attribute, context)
