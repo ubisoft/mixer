@@ -106,7 +106,7 @@ class DatablockCollectionProxy(Proxy):
 
         return None
 
-    def save(self, attribute: bpy.type.Collection, parent: Any, key: str, context: Context):
+    def save(self, attribute: bpy.type.Collection, parent: Any, key: str, to_blender: bool, context: Context):
         """
         OBSOLETE Save this Proxy a Blender collection that may be a collection of standalone datablocks in bpy.data
         or a collection of referenced datablocks like bpy.type.Collection.children
@@ -116,13 +116,13 @@ class DatablockCollectionProxy(Proxy):
 
         # collection of standalone datablocks
         for k, v in self._data.items():
-            write_attribute(attribute, k, v, context)
+            write_attribute(attribute, k, v, to_blender, context)
 
     def find(self, key: str):
         return self._data.get(key)
 
     def create_datablock(
-        self, incoming_proxy: DatablockProxy, context: Context
+        self, incoming_proxy: DatablockProxy, to_blender: bool, context: Context
     ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """Create a bpy.data datablock from a received DatablockProxy and update the proxy structures accordingly
 
@@ -130,37 +130,39 @@ class DatablockCollectionProxy(Proxy):
             incoming_proxy : this proxy contents is used to update the bpy.data collection item
         """
 
-        datablock, renames = incoming_proxy.create_standalone_datablock(context)
+        datablock, renames = incoming_proxy.create_standalone_datablock(to_blender, context)
         # returned datablock is None for ShapeKey and Library. Datablock creation is deferred until :
         # - ShapeKey : Object update
         # - Library : creation of a link datablock
 
-        if incoming_proxy.collection_name == "scenes":
-            logger.info(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}'")
+        if to_blender:
+            if incoming_proxy.collection_name == "scenes":
+                logger.info(f"Creating scene '{incoming_proxy.data('name')}' uuid: '{incoming_proxy.mixer_uuid}'")
 
-            # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
-            # Remove it now
-            scenes = bpy.data.scenes
-            if len(scenes) == 2 and ("_mixer_to_be_removed_" in scenes):
-                from mixer.blender_client.scene import delete_scene
+                # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
+                # Remove it now
+                scenes = bpy.data.scenes
+                if len(scenes) == 2 and ("_mixer_to_be_removed_" in scenes):
+                    from mixer.blender_client.scene import delete_scene
 
-                scene_to_remove = scenes["_mixer_to_be_removed_"]
-                logger.info(
-                    f"After create scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}''"
-                )
-                logger.info(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
-                delete_scene(scene_to_remove)
+                    scene_to_remove = scenes["_mixer_to_be_removed_"]
+                    logger.info(
+                        f"After create scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}''"
+                    )
+                    logger.info(f"... delete {scene_to_remove} uuid '{scene_to_remove.mixer_uuid}'")
+                    delete_scene(scene_to_remove)
 
         uuid = incoming_proxy.mixer_uuid
         self._data[uuid] = incoming_proxy
         context.proxy_state.proxies[uuid] = incoming_proxy
 
-        if datablock is not None:
+        if to_blender and datablock is not None:
             context.proxy_state.unresolved_refs.resolve(uuid, datablock)
 
         return datablock, renames
 
-    def update_datablock(self, delta: DeltaUpdate, context: Context):
+    def update_datablock(self, delta: DeltaUpdate, to_blender: bool, context: Context):
+
         """Update a bpy.data item from a received DatablockProxy and update the proxy state"""
         incoming_proxy = delta.value
         uuid = incoming_proxy.mixer_uuid
@@ -178,52 +180,60 @@ class DatablockCollectionProxy(Proxy):
             )
             return
 
-        # the ID will have changed if the object has been morphed (change light type, for instance)
-        existing_id = context.proxy_state.datablock(uuid)
-        if existing_id is None:
-            logger.warning(f"Non existent uuid {uuid} while updating {proxy.collection_name}[{proxy.data('name')}]")
+        if to_blender:
+            # the ID will have changed if the object has been morphed (change light type, for instance)
+            existing_id = context.proxy_state.datablock(uuid)
+            if existing_id is None:
+                logger.warning(f"Non existent uuid {uuid} while updating {proxy.collection_name}[{proxy.data('name')}]")
+                return None
+
+            id_ = proxy.update_standalone_datablock(existing_id, delta, to_blender, context)
+            if existing_id != id_:
+                # Not a problem for light morphing
+                logger.warning(f"Update_datablock changes datablock {existing_id} to {id_}")
+                context.proxy_state.add_datablock(uuid, id_)
+
+            return id_
+        else:
+            proxy.update_standalone_datablock(None, delta, to_blender, context)
             return None
 
-        id_ = proxy.update_standalone_datablock(existing_id, delta, context)
-        if existing_id != id_:
-            # Not a problem for light morphing
-            logger.warning(f"Update_datablock changes datablock {existing_id} to {id_}")
-            context.proxy_state.add_datablock(uuid, id_)
-
-        return id_
-
-    def remove_datablock(self, proxy: DatablockProxy, datablock: Optional[T.ID]):
+    def remove_datablock(self, proxy: DatablockProxy, datablock: Optional[T.ID], to_blender: bool):
         """Remove a bpy.data collection item and update the proxy state"""
         logger.info("Perform removal for %s", proxy)
-        try:
-            if datablock is None:
-                from mixer.blender_data.library_proxies import DatablockLinkProxy
+        if to_blender:
+            try:
+                if datablock is None:
+                    from mixer.blender_data.library_proxies import DatablockLinkProxy
 
-                if not isinstance(proxy, DatablockLinkProxy):
-                    logger.error(f"remove_datablock. Unexpected None datablock for uuid {proxy}")
+                    if not isinstance(proxy, DatablockLinkProxy):
+                        logger.error(f"remove_datablock. Unexpected None datablock for uuid {proxy}")
+                    else:
+                        # the datablock loading probably failed because the library was missing locally because of a shared
+                        # folders misconfiguration bu the user
+                        logger.info(f"remove_datablock(None) for unloaded {proxy}")
                 else:
-                    # the datablock loading probably failed because the library was missing locally because of a shared
-                    # folders misconfiguration bu the user
-                    logger.info(f"remove_datablock(None) for unloaded {proxy}")
-            else:
-                try:
-                    specifics.remove_datablock(proxy.collection, datablock)
-                except ReferenceError as e:
-                    # We probably have processed previously the deletion of a datablock referenced by Object.data (e.g.
-                    # Light). On both sides it deletes the Object as well. This is a failure in properly orderring
-                    # delete messages on the sender
-                    logger.warning(f"Exception during remove_datablock for {proxy}")
-                    logger.warning(f"... {e!r}")
-        finally:
-            uuid = proxy.mixer_uuid
-            del self._data[uuid]
+                    try:
+                        specifics.remove_datablock(proxy.collection, datablock)
+                    except ReferenceError as e:
+                        # We probably have processed previously the deletion of a datablock referenced by Object.data (e.g.
+                        # Light). On both sides it deletes the Object as well. This is a failure in properly orderring
+                        # delete messages on the sender
+                        logger.warning(f"Exception during remove_datablock for {proxy}")
+                        logger.warning(f"... {e!r}")
+            except Exception:
+                pass
 
-    def rename_datablock(self, proxy: DatablockProxy, new_name: str, datablock: T.ID):
+        uuid = proxy.mixer_uuid
+        del self._data[uuid]
+
+    def rename_datablock(self, proxy: DatablockProxy, new_name: str, datablock: Optional[T.ID], to_blender: bool):
         """
         Rename a bpy.data collection item and update the proxy state (receiver side)
         """
         logger.info("rename_datablock proxy %s datablock %r into %s", proxy, datablock, new_name)
-        datablock.name = new_name
+        if to_blender and datablock is not None:
+            datablock.name = new_name
         proxy._data["name"] = new_name
 
     def update(self, diff: BpyDataCollectionDiff, context: Context) -> Changeset:
@@ -343,7 +353,9 @@ class DatablockRefCollectionProxy(Proxy):
             self._data[uuid] = proxy
         return self
 
-    def save(self, collection: T.bpy_prop_collection, parent: T.bpy_struct, key: str, context: Context):
+    def save(
+        self, collection: T.bpy_prop_collection, parent: T.bpy_struct, key: str, to_blender: bool, context: Context
+    ):
         """
         Saves this proxy into collection
 
@@ -354,6 +366,9 @@ class DatablockRefCollectionProxy(Proxy):
             key: the name of the bpy_collection (e.g "objects")
             context:
         """
+        if not to_blender:
+            return
+
         for _, ref_proxy in self._data.items():
             assert isinstance(ref_proxy, DatablockRefProxy)
             datablock = ref_proxy.target(context)

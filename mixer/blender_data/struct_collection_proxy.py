@@ -176,7 +176,9 @@ class StructCollectionProxy(Proxy):
                 context.visit_state.pop()
         return self
 
-    def save(self, collection: T.bpy_prop_collection, parent: T.bpy_struct, key: str, context: Context):
+    def save(
+        self, collection: T.bpy_prop_collection, parent: T.bpy_struct, key: str, to_blender: bool, context: Context
+    ):
         """
         Save this proxy into collection
 
@@ -192,24 +194,26 @@ class StructCollectionProxy(Proxy):
         # truncate_collection. This addresses an issue with Nodes, for which the order of default nodes (material
         # output and principled in collection) may not match the order of incoming nodes. Saving node data into a
         # node of the wrong type can lead to a crash.
-        clear_from = specifics.clear_from(collection, sequence, context)
-        specifics.truncate_collection(collection, clear_from)
+        if to_blender:
+            clear_from = specifics.clear_from(collection, sequence, context)
+            specifics.truncate_collection(collection, clear_from)
 
         # For collections like `IDMaterials`, the creation API (`.new(datablock_ref)`) also writes the value.
         # For collections like `Nodes`, the creation API (`.new(name)`) does not write the item value.
         # So the value must always be written for all collection types.
         collection_length = len(collection)
         for i, item_proxy in enumerate(sequence[:collection_length]):
-            write_attribute(collection, i, item_proxy, context)
+            write_attribute(collection, i, item_proxy, to_blender, context)
         for i, item_proxy in enumerate(sequence[collection_length:], collection_length):
-            try:
-                specifics.add_element(collection, item_proxy, i, context)
-                if self._resolver:
-                    self._resolver.resolve(i)
-            except AddElementFailed:
-                break
+            if to_blender:
+                try:
+                    specifics.add_element(collection, item_proxy, i, context)
+                    if self._resolver:
+                        self._resolver.resolve(i)
+                except AddElementFailed:
+                    break
             # Must write at once, otherwise the default item name might conflit with a later item name
-            write_attribute(collection, i, item_proxy, context)
+            write_attribute(collection, i, item_proxy, to_blender, context)
 
     def apply(
         self,
@@ -241,7 +245,7 @@ class StructCollectionProxy(Proxy):
             self._sequence = update._sequence
             if to_blender:
                 specifics.truncate_collection(collection, 0)
-                self.save(collection, parent, key, context)
+                self.save(collection, parent, key, to_blender, context)
         else:
             # a sparse update
             try:
@@ -265,15 +269,15 @@ class StructCollectionProxy(Proxy):
                     sequence[i] = apply_attribute(collection, i, sequence[i], delta_update, context, to_blender)
 
                 for i, delta_addition in enumerate(update._diff_additions, len(sequence)):
+                    item_proxy = delta_addition.value
                     if to_blender:
-                        item_proxy = delta_addition.value
                         try:
                             specifics.add_element(collection, item_proxy, i, context)
                             if self._resolver:
                                 self._resolver.resolve(i)
                         except AddElementFailed:
                             break
-                        write_attribute(collection, i, item_proxy, context)
+                    write_attribute(collection, i, item_proxy, to_blender, context)
                     sequence.append(delta_addition.value)
 
             except Exception as e:

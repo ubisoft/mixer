@@ -64,8 +64,11 @@ class NonePtrProxy(Proxy):
     def load(self, *_):
         return self
 
-    def save(self, unused_attribute, parent: T.bpy_struct, key: Union[int, str], context: Context):
+    def save(self, unused_attribute, parent: T.bpy_struct, key: Union[int, str], to_blender: bool, context: Context):
         """Save None into parent.key or parent[key]"""
+
+        if not to_blender:
+            return
 
         if isinstance(key, int):
             parent[key] = None
@@ -117,7 +120,7 @@ class NonePtrProxy(Proxy):
             else:
                 # This branch is taken when animation_data or node_tree instance animation_data are set from None to a
                 # valid value, after animation_data_create() has been called or use_nodes is set to True
-                write_attribute(parent, key, replace, context)
+                write_attribute(parent, key, replace, to_blender, context)
 
         return replace
 
@@ -170,6 +173,7 @@ class SetProxy(Proxy):
         attribute: Set[Any],
         parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: Union[int, str],
+        to_blender: bool,
         context: Context,
     ):
         """Save this proxy into attribute, which is contained in parent[key] or parent.key
@@ -179,6 +183,9 @@ class SetProxy(Proxy):
             parent: the attribute that contains attribute
             key: the string or index that identifies attribute in parent
         """
+        if not to_blender:
+            return
+
         try:
             if isinstance(key, int):
                 parent[key] = set(self.items)
@@ -212,7 +219,7 @@ class SetProxy(Proxy):
         assert isinstance(delta, DeltaReplace)
         self.items = delta.value.items
         if to_blender:
-            self.save(attribute, parent, key, context)
+            self.save(attribute, parent, key, to_blender, context)
         return self
 
     def diff(
@@ -267,8 +274,12 @@ class CustomPropertiesProxy:
         self._rna_ui = rna_ui.to_dict()
         self._dict = {name: datablock.get(name) for name in keys}
 
-    def save(self, datablock: T.ID):
+    def save(self, datablock: T.ID, to_blender: bool):
         """Overwrite all the custom properties in datablock, including the UI"""
+
+        if not to_blender:
+            raise NotImplementedError("customproperties.save")
+
         if self._rna_ui:
             datablock["_RNA_UI"] = self._rna_ui
         else:
@@ -390,6 +401,7 @@ class PtrToCollectionItemProxy(Proxy):
         attribute: T.bpy_struct,
         parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: Union[int, str],
+        to_blender: bool,
         context: Context,
     ):
         """Save this proxy into attribute, which is contained in parent[key] or parent.key
@@ -400,6 +412,8 @@ class PtrToCollectionItemProxy(Proxy):
             key: the string or index that identifies attribute in parent
             context: proxy and visit state
         """
+        if not to_blender:
+            return
 
         if self._index == -1:
             pointee = None
@@ -410,7 +424,7 @@ class PtrToCollectionItemProxy(Proxy):
             except IndexError:
                 collection_proxy = self._collection_proxy(parent.id_data, context)
                 collection_proxy.register_unresolved(
-                    self._index, lambda: write_attribute(parent, key, collection[self._index], context)
+                    self._index, lambda: write_attribute(parent, key, collection[self._index], to_blender, context)
                 )
 
                 # TODO Fails if an array member references an element not yet created, like bones with parenting reversed
@@ -422,7 +436,7 @@ class PtrToCollectionItemProxy(Proxy):
                 logger.error(f"... {parent!r}.{key}")
                 logger.error(f"... references {collection!r}[{self._index}]")
             else:
-                write_attribute(parent, key, pointee, context)
+                write_attribute(parent, key, pointee, to_blender, context)
 
     def apply(
         self,
@@ -446,7 +460,7 @@ class PtrToCollectionItemProxy(Proxy):
         """
         self._index = delta.value._index
         if to_blender:
-            self.save(attribute, parent, key, context)
+            self.save(attribute, parent, key, to_blender, context)
         return self
 
     def diff(

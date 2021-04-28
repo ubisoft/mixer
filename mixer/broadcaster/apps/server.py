@@ -433,7 +433,7 @@ class GenericRoom(Room):
 
         self.generic_protocol = generic_protocol
         super().__init__(server, room_name, blender_version, mixer_version, ignore_version_check, creator)
-        self.proxy_interface = Interface(None, BpyDataProxy())
+        self.proxy_interface = Interface(None, BpyDataProxy(), to_blender=False)
 
     def process_command(self, command: common.Command, sender: Connection):
         processed = self.proxy_interface.process(command)

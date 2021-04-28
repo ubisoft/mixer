@@ -151,6 +151,10 @@ def read_attribute(attr: Any, key: Union[int, str], attr_property: T.Property, p
 
 
 def get_attribute_value(parent, key):
+    if parent is None:
+        # when not running within Blender (in server)
+        return None
+
     if isinstance(key, int):
         target = parent[key]
     elif isinstance(parent, T.bpy_prop_collection):
@@ -161,7 +165,11 @@ def get_attribute_value(parent, key):
 
 
 def write_attribute(
-    parent: Union[T.bpy_struct, T.bpy_prop_collection], key: Union[str, int], value: Any, context: Context
+    parent: Union[T.bpy_struct, T.bpy_prop_collection],
+    key: Union[str, int],
+    value: Any,
+    to_blender: bool,
+    context: Context,
 ):
     """
     Write value into parent.key or parent[key].
@@ -181,7 +189,7 @@ def write_attribute(
             attribute_value = get_attribute_value(parent, key)
             context.visit_state.push(parent, key)
             try:
-                value.save(attribute_value, parent, key, context)
+                value.save(attribute_value, parent, key, to_blender, context)
             except Exception as e:
                 logger.error("write_attribute: exception for ...")
                 logger.error(f"... attribute: {context.visit_state.display_path()}.{key}, value: {value}")
@@ -189,7 +197,7 @@ def write_attribute(
             finally:
                 context.visit_state.pop()
 
-        else:
+        elif to_blender:
             assert isinstance(key, str)
 
             prop = parent.bl_rna.properties.get(key)

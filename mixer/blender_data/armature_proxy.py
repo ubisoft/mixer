@@ -157,14 +157,14 @@ class ArmatureProxy(DatablockProxy):
         self._access_edit_bones(armature_objects[0], _read_attribute, context)
         return self
 
-    def _save(self, armature_data: T.ID, context: Context) -> T.ID:
+    def _save(self, armature_data: T.ID, to_blender: bool, context: Context) -> T.ID:
         # This is called when the Armature datablock is created. However, edit_bones can only be edited after the
         # armature Object is created and in EDIT mode.
         # So skip proxies that need proper state and ObjectProxy will call update_edit_bones() later
         proxies_needing_state = {
             name: self._data.pop(name, None) for name in self._require_context_state if name in self._data
         }
-        datablock = super()._save(armature_data, context)
+        datablock = super()._save(armature_data, to_blender, context)
 
         # restore the bypassed proxies and apply them with context change
         # WARNING: this reorders proxy items
@@ -256,7 +256,7 @@ class ArmatureProxy(DatablockProxy):
         return self
 
     @staticmethod
-    def update_edit_bones(armature_object: T.Object, context: Context):
+    def update_edit_bones(armature_object: T.Object, to_blender: bool, context: Context):
         # The Armature datablock is required to create an armature Object, so it has already been received and
         # created. When the Armature datablock was created, its edit_bones member could not be updated since it
         # requires an Object in EDIT mode to be accessible.
@@ -269,7 +269,7 @@ class ArmatureProxy(DatablockProxy):
 
         def _write_attribute():
             for name in armature_data_proxy._require_context_state:
-                write_attribute(armature_object.data, name, armature_data_proxy._data[name], context)
+                write_attribute(armature_object.data, name, armature_data_proxy._data[name], to_blender, context)
 
         armature_data_proxy._access_edit_bones(armature_object, _write_attribute, context)
 

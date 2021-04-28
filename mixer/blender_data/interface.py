@@ -38,7 +38,6 @@ from mixer.blender_data.messages import (
 )
 from mixer.broadcaster.common import Command, MessageType
 from mixer.local_data import get_local_or_create_cache_file
-from mixer.share_data import share_data
 
 if TYPE_CHECKING:
     from mixer.blender_client.client import BlenderClient
@@ -60,12 +59,15 @@ class Interface:
     To reuse the Blender proxies for another application, this class should be replaced, like the handlers.
     """
 
-    def __init__(self, client: Optional[BlenderClient], bpy_data_proxy: BpyDataProxy):
+    def __init__(self, client: Optional[BlenderClient], bpy_data_proxy: BpyDataProxy, to_blender=True):
         self._client = client
         """BlenderClient used to send messages."""
 
         self._bpy_data_proxy = bpy_data_proxy
         """BpyDataProxy to update."""
+
+        self._to_blender = to_blender
+        """Must this Interface update Blender?"""
 
         self._codec = Codec()
 
@@ -176,7 +178,7 @@ class Interface:
             assert isinstance(datablock_proxy, DatablockProxy)
             logger.info("%s %s", "build_data_create", datablock_proxy)
             datablock_proxy.arrays = message.arrays
-            _, rename_changeset = self._bpy_data_proxy.create_datablock(datablock_proxy)
+            _, rename_changeset = self._bpy_data_proxy.create_datablock(datablock_proxy, to_blender=self._to_blender)
             self._build_soas(datablock_proxy.mixer_uuid, message.soas)
         except DecodeError as e:
             logger.error(f"Decode error for {str(e.args[1])[:100]} ...")
@@ -200,7 +202,7 @@ class Interface:
         update = False
         try:
             for soa in soas:
-                update |= share_data.proxy_interface.proxy.update_soa(uuid, soa.path, soa.members)
+                update |= self._bpy_data_proxy.update_soa(uuid, soa.path, soa.members, to_blender=self._to_blender)
         except Exception:
             # Partial update of arrays may cause data length mismatch between array elements (co, normals, ...)
             logger.error(f"Exception during update_soa for {uuid} {soa.path}")
@@ -226,7 +228,7 @@ class Interface:
             assert isinstance(delta, Delta)
             logger.debug("%s: %s", "build_data_update", delta)
             delta.value.arrays = message.arrays
-            self._bpy_data_proxy.update_datablock(delta)
+            self._bpy_data_proxy.update_datablock(delta, to_blender=self._to_blender)
 
             datablock_proxy = delta.value
             if datablock_proxy is not None:
@@ -250,7 +252,7 @@ class Interface:
         message = BlenderRemoveMessage()
         message.decode(buffer)
         logger.info("build_data_remove: %s (%s)", message.uuid, message.debug_info)
-        self._bpy_data_proxy.remove_datablock(message.uuid)
+        self._bpy_data_proxy.remove_datablock(message.uuid, to_blender=self._to_blender)
 
     def build_data_rename(self, buffer: bytes):
         message = BlenderRenamesMessage()
@@ -265,7 +267,7 @@ class Interface:
         for uuid, old_name, new_name in items:
             logger.info("build_data_rename: %s (%s) into %s", uuid, old_name, new_name)
 
-        rename_changeset = self._bpy_data_proxy.rename_datablocks(items)
+        rename_changeset = self._bpy_data_proxy.rename_datablocks(items, to_blender=self._to_blender)
 
         if self._client and rename_changeset:
             self.send_data_renames(rename_changeset)

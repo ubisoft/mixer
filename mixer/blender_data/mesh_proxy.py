@@ -238,7 +238,7 @@ class MeshProxy(DatablockProxy):
             if to_blender:
                 attribute.clear_geometry()
                 # WARNING ensure that parent is not queried for key, which would fail with libraries and duplicate names
-                self.save(attribute, parent, key, context)
+                self.save(attribute, parent, key, to_blender, context)
         else:
             # vertex groups are always replaced as a whole
             vertex_groups_arrays = struct_update._arrays.get("vertex_groups", None)

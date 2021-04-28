@@ -200,7 +200,12 @@ class Proxy:
         return data
 
     def save(
-        self, attribute: Any, parent: Union[T.bpy_struct, T.bpy_prop_collection], key: Union[int, str], context: Context
+        self,
+        attribute: Any,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        to_blender: bool,
+        context: Context,
     ):
         """Save this proxy into attribute, which is contained in parent[key] or parent.key
 

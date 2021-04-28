@@ -75,7 +75,9 @@ class ShapeKeyProxy(DatablockProxy):
             object_datablock.shape_key_add()
 
         new_shape_key_datablock = object_datablock.data.shape_keys
-        self.save(new_shape_key_datablock, bpy.data.shape_keys, new_shape_key_datablock.name, context)
+
+        # TODO to_blender == False
+        self.save(new_shape_key_datablock, bpy.data.shape_keys, new_shape_key_datablock.name, True, context)
 
         new_shape_key_datablock.mixer_uuid = shape_key_uuid
         context.proxy_state.add_datablock(shape_key_uuid, new_shape_key_datablock)

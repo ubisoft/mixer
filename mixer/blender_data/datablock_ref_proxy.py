@@ -95,6 +95,7 @@ class DatablockRefProxy(Proxy):
         unused_attribute,
         parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: str,
+        to_blender: bool,
         context: Context,
     ):
         """
@@ -106,6 +107,10 @@ class DatablockRefProxy(Proxy):
             key: the name of the bpy_collection (e.g "camera")
             context: the proxy and visit state
         """
+
+        if not to_blender:
+            return
+
         ref_target = self.target(context)
 
         try:

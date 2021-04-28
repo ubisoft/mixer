@@ -99,9 +99,13 @@ class LibraryProxy(DatablockProxy):
         self._unregistered_datablocks[identifier] = uuid
         return None
 
-    def create_standalone_datablock(self, context: Context):
+    def create_standalone_datablock(self, to_blender: bool, context: Context):
         # No datablock is created at this point.
         # The Library datablock will be created when the linked datablock is loaded (see load_library_item)
+
+        if not to_blender:
+            # resolved_filepath uses bpy.path
+            raise NotImplementedError("create_standalone_datablock")
 
         resolved_filepath = self.resolved_filepath(context)
         self._data["filepath"] = resolved_filepath
@@ -199,7 +203,7 @@ class LibraryProxy(DatablockProxy):
         super().load(datablock, context)
         return self
 
-    def save(self, unused_attribute, parent: T.bpy_struct, key: Union[int, str], context: Context):
+    def save(self, unused_attribute, parent: T.bpy_struct, key: Union[int, str], to_blender: bool, context: Context):
         """"""
         # Nothing to save to Blender when the LibraryProxy is received.
         # The Library datablock will be created when the linked datablock is loaded (see load_library_item)
@@ -269,10 +273,12 @@ class DatablockLinkProxy(DatablockProxy):
     def is_library_indirect(self):
         return self._is_library_indirect
 
-    def create_standalone_datablock(self, context: Context) -> Tuple[Optional[T.ID], None]:
+    def create_standalone_datablock(self, to_blender: bool, context: Context) -> Tuple[Optional[T.ID], None]:
         """Save this proxy into its target standalone datablock."""
 
         # Some parts must be kept in sync with DatablockProxy.create_standalone_datablock()
+        if not to_blender:
+            return None, None
 
         from mixer.blender_data.library_proxies import LibraryProxy
 

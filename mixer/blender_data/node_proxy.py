@@ -68,8 +68,12 @@ class NodeLinksProxy(Proxy):
         self._sequence = self._load(links)
         return self
 
-    def save(self, unused_attribute, node_tree: T.NodeTree, unused_key, context: Context):
+    def save(self, unused_attribute, node_tree: T.NodeTree, unused_key, to_blender: bool, context: Context):
         """Saves this proxy into node_tree.links"""
+
+        if not to_blender:
+            return
+
         if not isinstance(node_tree, T.NodeTree):
             logger.error(f"save(): attribute {context.visit_state.display_path()} ...")
             logger.error(f"... has type {type(node_tree)}")
@@ -134,7 +138,7 @@ class NodeLinksProxy(Proxy):
 
         # update Blender
         if to_blender:
-            self.save(attribute, parent, key, context)
+            self.save(attribute, parent, key, to_blender, context)
 
         return self
 

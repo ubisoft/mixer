@@ -102,8 +102,14 @@ class NodesModifierProxy(StructProxy):
         modifier: T.bpy_struct,
         parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: Union[int, str],
+        to_blender: bool,
         context: Context,
     ):
+
+        if not to_blender:
+            super().save(modifier, parent, key, to_blender, context)
+            return
+
         # the modifier is always created with a default geometry node : remove it
         node_group = modifier.node_group
         if node_group is not None:
@@ -116,7 +122,7 @@ class NodesModifierProxy(StructProxy):
             bpy.data.node_groups.remove(node_group)
 
         # update the geometry node reference before updating the input entries
-        super().save(modifier, parent, key, context)
+        super().save(modifier, parent, key, to_blender, context)
         self._save_inputs(modifier)
 
     def diff(self, modifier: T.bpy_struct, key: Union[int, str], prop: T.Property, context: Context) -> Optional[Delta]:

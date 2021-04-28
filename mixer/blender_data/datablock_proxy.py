@@ -337,116 +337,131 @@ class DatablockProxy(StructProxy):
         """Returns the datablock proxified by this proxy"""
         return context.proxy_state.datablock(self.mixer_uuid)
 
-    def create_standalone_datablock(self, context: Context) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
+    def create_standalone_datablock(
+        self, to_blender: bool, context: Context
+    ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """
         Save this proxy into its target standalone datablock
         """
-        if self.target(context):
-            logger.warning(f"create_standalone_datablock: datablock already registered : {self}")
-            logger.warning("... update ignored")
-            return None, None
         renames: RenameChangeset = []
-        incoming_name = self.data("name")
 
-        # Detect a conflicting creation by look for a datablock with the wanted name.
-        # Ignore the duplicate name if it is from a library, it is not a name clash
-        existing_datablock = self.collection.get(incoming_name)
-        if existing_datablock and not existing_datablock.library:
-            # The correct assertion is
-            #   assert existing_datablock.mixer_uuid
-            # but it causes a visible failure in a test that formerly failed silently (internal issue #396)
-            if not existing_datablock.mixer_uuid:
-                # A datablock created by VRtist command in the same command batch
-                # Not an error, we will make it ours by adding the uuid and registering it
-
-                # TODO this branch should be obsolete as VRtist commands are no more processed in generic mode
-                logger.info(f"create_standalone_datablock for {self} found existing datablock from VRtist")
-                datablock = existing_datablock
-            else:
-                if existing_datablock.mixer_uuid != self.mixer_uuid:
-                    # TODO LIB
-
-                    # local has a datablock with the same name as remote wants to create, but a different uuid.
-                    # It is a simultaneous creation : rename local's datablock. Remote will do the same thing on its side
-                    # and we will end up will all renamed datablocks
-                    unique_name = f"{existing_datablock.name}_{existing_datablock.mixer_uuid}"
-                    logger.warning(
-                        f"create_standalone_datablock: Creation name conflict. Renamed existing bpy.data.{self.collection_name}[{existing_datablock.name}] into {unique_name}"
-                    )
-
-                    # Rename local's and issue a rename command
-                    renames.append(
-                        (
-                            existing_datablock.mixer_uuid,
-                            existing_datablock.name,
-                            unique_name,
-                            f"Conflict bpy.data.{self.collection_name}[{self.data('name')}] into {unique_name}",
-                        )
-                    )
-                    existing_datablock.name = unique_name
-
-                    datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
-                else:
-                    # a creation for a datablock that we already have. This should not happen
-                    logger.error(f"create_standalone_datablock: unregistered uuid for {self}")
-                    logger.error("... update ignored")
-                    return None, None
-        else:
-            try:
-                datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
-            except ExternalFileFailed:
+        if to_blender:
+            if self.target(context):
+                logger.warning(f"create_standalone_datablock: datablock already registered : {self}")
+                logger.warning("... update ignored")
                 return None, None
 
-        if datablock is None:
-            if self.collection_name != "shape_keys":
-                logger.warning(f"Cannot create bpy.data.{self.collection_name}[{self.data('name')}]")
-            return None, None
+            # Detect a conflicting creation by look for a datablock with the wanted name.
+            # Ignore the duplicate name if it is from a library, it is not a name clash
+            incoming_name = self.data("name")
+            existing_datablock = self.collection.get(incoming_name)
+            if existing_datablock and not existing_datablock.library:
+                # The correct assertion is
+                #   assert existing_datablock.mixer_uuid
+                # but it causes a visible failure in a test that formerly failed silently (internal issue #396)
+                if not existing_datablock.mixer_uuid:
+                    # A datablock created by VRtist command in the same command batch
+                    # Not an error, we will make it ours by adding the uuid and registering it
 
-        if DEBUG:
-            # TODO LIB
-            # Detect a failure to avoid spontaneous renames ??
-            name = self.data("name")
-            if self.collection.get(name).name != datablock.name:
-                logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
+                    # TODO this branch should be obsolete as VRtist commands are no more processed in generic mode
+                    logger.info(f"create_standalone_datablock for {self} found existing datablock from VRtist")
+                    datablock = existing_datablock
+                else:
+                    if existing_datablock.mixer_uuid != self.mixer_uuid:
+                        # TODO LIB
 
-        self._has_datablock = True
-        uuid = self.mixer_uuid
-        datablock.mixer_uuid = uuid
-        context.proxy_state.add_datablock(uuid, datablock)
-        if isinstance(datablock, T.Object):
-            context.proxy_state.register_object(datablock)
+                        # local has a datablock with the same name as remote wants to create, but a different uuid.
+                        # It is a simultaneous creation : rename local's datablock. Remote will do the same thing on its side
+                        # and we will end up will all renamed datablocks
+                        unique_name = f"{existing_datablock.name}_{existing_datablock.mixer_uuid}"
+                        logger.warning(
+                            f"create_standalone_datablock: Creation name conflict. Renamed existing bpy.data.{self.collection_name}[{existing_datablock.name}] into {unique_name}"
+                        )
 
-        datablock = self._save(datablock, context)
+                        # Rename local's and issue a rename command
+                        renames.append(
+                            (
+                                existing_datablock.mixer_uuid,
+                                existing_datablock.name,
+                                unique_name,
+                                f"Conflict bpy.data.{self.collection_name}[{self.data('name')}] into {unique_name}",
+                            )
+                        )
+                        existing_datablock.name = unique_name
+
+                        datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
+                    else:
+                        # a creation for a datablock that we already have. This should not happen
+                        logger.error(f"create_standalone_datablock: unregistered uuid for {self}")
+                        logger.error("... update ignored")
+                        return None, None
+            else:
+                try:
+                    datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
+                except ExternalFileFailed:
+                    return None, None
+
+            if datablock is None:
+                if self.collection_name != "shape_keys":
+                    logger.warning(f"Cannot create bpy.data.{self.collection_name}[{self.data('name')}]")
+                return None, None
+
+            if DEBUG:
+                # TODO LIB
+                # Detect a failure to avoid spontaneous renames ??
+                name = self.data("name")
+                if self.collection.get(name).name != datablock.name:
+                    logger.error(f"Name mismatch after creation of bpy.data.{self.collection_name}[{name}] ")
+
+            self._has_datablock = True
+            uuid = self.mixer_uuid
+            datablock.mixer_uuid = uuid
+            context.proxy_state.add_datablock(uuid, datablock)
+            if isinstance(datablock, T.Object):
+                context.proxy_state.register_object(datablock)
+        else:
+            datablock = None
+
+        datablock = self._save(datablock, to_blender, context)
         return datablock, renames
 
-    def _save(self, datablock: T.ID, context: Context) -> T.ID:
-        datablock = self._pre_save(datablock, context)
-        if datablock is None:
-            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
-            return None, None
+    def _save(self, datablock: T.ID, to_blender: bool, context: Context) -> T.ID:
+        if to_blender:
+            datablock = self._pre_save(datablock, context)
+            if datablock is None:
+                logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
+                return None, None
 
         with context.visit_state.enter_datablock(self, datablock):
             for k, v in self._data.items():
-                write_attribute(datablock, k, v, context)
+                write_attribute(datablock, k, v, to_blender, context)
 
-        self._custom_properties.save(datablock)
+        self._custom_properties.save(datablock, to_blender)
         return datablock
 
-    def update_standalone_datablock(self, datablock: T.ID, delta: Delta, context: Context) -> T.ID:
+    def update_standalone_datablock(self, datablock: T.ID, delta: Delta, to_blender: bool, context: Context) -> T.ID:
         """
         Update this proxy and datablock according to delta
         """
-        datablock = delta.value._pre_save(datablock, context)
-        if datablock is None:
-            logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
-            return None
+        if to_blender:
+            datablock = delta.value._pre_save(datablock, context)
+            if datablock is None:
+                logger.warning(f"DatablockProxy.update_standalone_datablock() {self} pre_save returns None")
+                return None
 
         with context.visit_state.enter_datablock(self, datablock):
-            self.apply(datablock, self.collection, datablock.name, delta, context)
+            self.apply(datablock, self.collection, datablock.name, delta, context, to_blender)
 
         return datablock
 
-    def save(self, attribute: T.ID, unused_parent: T.bpy_struct, unused_key: Union[int, str], context: Context) -> T.ID:
+    def save(
+        self,
+        attribute: T.ID,
+        unused_parent: T.bpy_struct,
+        unused_key: Union[int, str],
+        to_blender: bool,
+        context: Context,
+    ) -> T.ID:
         """
         Save this proxy into an embedded datablock
 
@@ -460,14 +475,15 @@ class DatablockProxy(StructProxy):
             The saved datablock
         """
 
-        datablock = self._pre_save(attribute, context)
-        if datablock is None:
-            logger.error(f"DatablockProxy.save() get None after _pre_save({attribute})")
-            return None
+        if to_blender:
+            datablock = self._pre_save(attribute, context)
+            if datablock is None:
+                logger.error(f"DatablockProxy.save() get None after _pre_save({attribute})")
+                return None
 
         with context.visit_state.enter_datablock(self, datablock):
             for k, v in self._data.items():
-                write_attribute(datablock, k, v, context)
+                write_attribute(datablock, k, v, to_blender, context)
 
         return datablock
 
@@ -495,7 +511,7 @@ class DatablockProxy(StructProxy):
         if custom_properties_update is not None:
             self._custom_properties = custom_properties_update
             if to_blender:
-                custom_properties_update.save(attribute)
+                custom_properties_update.save(attribute, to_blender)
 
         return super().apply(attribute, parent, key, delta, context, to_blender)
 
@@ -519,7 +535,7 @@ class DatablockProxy(StructProxy):
         collection = getattr(bpy.data, self.collection_name)
         self.apply(attribute, collection, attribute.name, delta, context, to_blender=False)
 
-    def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember]) -> bool:
+    def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember], to_blender: bool):
 
         r = self.find_by_path(bl_item, path)
         if r is None:
@@ -528,7 +544,10 @@ class DatablockProxy(StructProxy):
         container, container_proxy = r
         for soa_member in soa_members:
             soa_proxy = container_proxy.data(soa_member[0])
-            soa_proxy.save_array(container, soa_member[0], soa_member[1])
+            soa_proxy.save_array(container, soa_member[0], soa_member[1], to_blender)
+
+        if not to_blender:
+            return
 
         # HACK force updates : unsure what is strictly required
         # specifying refresh is not compatible with Grease Pencil and causes a crash

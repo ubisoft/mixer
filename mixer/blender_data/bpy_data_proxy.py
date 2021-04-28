@@ -131,9 +131,14 @@ class VisitState:
     class CurrentDatablockContext:
         """Context manager to keep track of the current standalone datablock"""
 
-        def __init__(self, visit_state: VisitState, proxy: DatablockProxy, datablock: T.ID):
+        def __init__(self, visit_state: VisitState, proxy: DatablockProxy, datablock: Optional[T.ID]):
             self._visit_state = visit_state
-            self._is_embedded_data = datablock.is_embedded_data
+            if isinstance(proxy, DatablockProxy):
+                assert datablock is not None
+                self._is_embedded_data = datablock.is_embedded_data
+            else:
+                self._is_embedded_data = False
+
             self._datablock_string = repr(datablock)
             self._proxy = proxy
 
@@ -501,17 +506,22 @@ class BpyDataProxy(Proxy):
         (None, None),
     )
     def create_datablock(
-        self, incoming_proxy: DatablockProxy, synchronized_properties: SynchronizedProperties = safe_properties
+        self,
+        incoming_proxy: DatablockProxy,
+        to_blender: bool,
+        synchronized_properties: SynchronizedProperties = safe_properties,
     ) -> Tuple[Optional[T.ID], Optional[RenameChangeset]]:
         """
         Process a received datablock creation command, creating the datablock and updating the proxy state
         """
         bpy_data_collection_proxy = self._data[incoming_proxy.collection_name]
         context = self.context(synchronized_properties)
-        return bpy_data_collection_proxy.create_datablock(incoming_proxy, context)
+        return bpy_data_collection_proxy.create_datablock(incoming_proxy, to_blender, context)
 
     @retain(None)
-    def update_datablock(self, update: DeltaUpdate, synchronized_properties: SynchronizedProperties = safe_properties):
+    def update_datablock(
+        self, update: DeltaUpdate, to_blender: bool, synchronized_properties: SynchronizedProperties = safe_properties
+    ):
         """
         Process a received datablock update command, updating the datablock and the proxy state
         """
@@ -519,12 +529,15 @@ class BpyDataProxy(Proxy):
         incoming_proxy: DatablockProxy = update.value
         bpy_data_collection_proxy = self._data[incoming_proxy.collection_name]
         context = self.context(synchronized_properties)
-        bpy_data_collection_proxy.update_datablock(update, context)
+        bpy_data_collection_proxy.update_datablock(update, to_blender, context)
 
     @retain(None)
-    def remove_datablock(self, uuid: str):
-        """
-        Process a received datablock removal command, removing the datablock and updating the proxy state
+    def remove_datablock(self, uuid: str, to_blender: bool):
+        """Remove the datablock proxy identified by uuid, and delete the Blender datablock if to_blender is True.
+
+        Args:
+            uuid: the datablock/proxy uuid
+            to_blender: if True, also remove the Blender datablock
         """
         proxy = self.state.proxies.get(uuid)
         if proxy is None:
@@ -532,74 +545,86 @@ class BpyDataProxy(Proxy):
             return
 
         bpy_data_collection_proxy = self._data[proxy.collection_name]
-        datablock = self.state.datablock(uuid)
 
-        if isinstance(datablock, T.Object) and datablock.data is not None:
-            data_uuid = datablock.data.mixer_uuid
+        if to_blender:
+            datablock = self.state.datablock(uuid)
+
+            if isinstance(datablock, T.Object) and datablock.data is not None:
+                data_uuid = datablock.data.mixer_uuid
+            else:
+                data_uuid = None
+
+            bpy_data_collection_proxy.remove_datablock(proxy, datablock, to_blender)
+
+            if data_uuid is not None:
+                # removed an Object
+                self.state.objects[data_uuid].remove(uuid)
+            else:
+                try:
+                    # maybe removed an Object.data pointee
+                    del self.state.objects[uuid]
+                except KeyError:
+                    pass
+            del self.state._datablocks[uuid]
         else:
-            data_uuid = None
+            bpy_data_collection_proxy.remove_datablock(proxy, None, to_blender)
 
-        bpy_data_collection_proxy.remove_datablock(proxy, datablock)
-
-        if data_uuid is not None:
-            # removed an Object
-            self.state.objects[data_uuid].remove(uuid)
-        else:
-            try:
-                # maybe removed an Object.data pointee
-                del self.state.objects[uuid]
-            except KeyError:
-                pass
         del self.state.proxies[uuid]
-        del self.state._datablocks[uuid]
 
     @retain([])
-    def rename_datablocks(self, items: List[Tuple[str, str, str]]) -> RenameChangeset:
-        """
-        Process a received datablock rename command, renaming the datablocks and updating the proxy state.
-        (receiver side)
+    def rename_datablocks(self, items: List[Tuple[str, str, str]], to_blender: bool) -> RenameChangeset:
+        """Rename the datablock proxies, and the Blender datablocks if to_blender is True.
+
+        This method is to be called when a remote rename message is received.
+
+        Args:
+            items: a sequence of (uuid, old_name, new_name)
+            to_blender: if True, also remove the Blender datablock
         """
         rename_changeset_to_send: RenameChangeset = []
-        renames = []
+        renames: List[Tuple[DatablockCollectionProxy, DatablockProxy, str, str, str, Optional[T.ID]]] = []
         for uuid, old_name, new_name in items:
             proxy = self.state.proxies.get(uuid)
             if proxy is None:
                 logger.error(f"rename_datablocks(): no proxy for {uuid} (debug info)")
                 return []
 
-            bpy_data_collection_proxy = self._data[proxy.collection_name]
-            datablock = self.state.datablock(uuid)
-            tmp_name = f"_mixer_tmp_{uuid}"
-            if datablock.name != new_name and datablock.name != old_name:
-                # local receives a rename, but its datablock name does not match the remote datablock name before
-                # the rename. This means that one of these happened:
-                # - local has renamed the datablock and remote will receive the rename command later on
-                # - local has processed a rename command that remote had not yet processed, but will process later on
-                # ensure that everyone renames its datablock with the **same** name
-                new_name = new_name = f"_mixer_rename_conflict_{uuid}"
-                logger.warning(f"rename_datablocks: conflict for existing {datablock}")
-                logger.warning(f'... incoming old name "{old_name}" new name "{new_name}"')
-                logger.warning(f"... using {new_name}")
+            if to_blender:
+                datablock = self.state.datablock(uuid)
+                bpy_data_collection_proxy = self._data[proxy.collection_name]
+                tmp_name = f"_mixer_tmp_{uuid}"
+                if datablock.name != new_name and datablock.name != old_name:
+                    # local receives a rename, but its datablock name does not match the remote datablock name before
+                    # the rename. This means that one of these happened:
+                    # - local has renamed the datablock and remote will receive the rename command later on
+                    # - local has processed a rename command that remote had not yet processed, but will process later on
+                    # ensure that everyone renames its datablock with the **same** name
+                    new_name = new_name = f"_mixer_rename_conflict_{uuid}"
+                    logger.warning(f"rename_datablocks: conflict for existing {datablock}")
+                    logger.warning(f'... incoming old name "{old_name}" new name "{new_name}"')
+                    logger.warning(f"... using {new_name}")
 
-                # Strangely, for collections not everyone always detect a conflict, so rename for everyone
-                rename_changeset_to_send.append(
-                    (
-                        datablock.mixer_uuid,
-                        datablock.name,
-                        new_name,
-                        f"Conflict bpy.data.{proxy.collection_name}[{datablock.name}] into {new_name}",
+                    # Strangely, for collections not everyone always detect a conflict, so rename for everyone
+                    rename_changeset_to_send.append(
+                        (
+                            datablock.mixer_uuid,
+                            datablock.name,
+                            new_name,
+                            f"Conflict bpy.data.{proxy.collection_name}[{datablock.name}] into {new_name}",
+                        )
                     )
-                )
+            else:
+                datablock = None
 
-            renames.append([bpy_data_collection_proxy, proxy, old_name, tmp_name, new_name, datablock])
+            renames.append((bpy_data_collection_proxy, proxy, old_name, tmp_name, new_name, datablock))
 
         # The rename process is handled in two phases to avoid spontaneous renames from Blender
         # see DatablockCollectionProxy.update() for explanation
         for bpy_data_collection_proxy, proxy, _, tmp_name, _, datablock in renames:
-            bpy_data_collection_proxy.rename_datablock(proxy, tmp_name, datablock)
+            bpy_data_collection_proxy.rename_datablock(proxy, tmp_name, datablock, to_blender)
 
         for bpy_data_collection_proxy, proxy, _, _, new_name, datablock in renames:
-            bpy_data_collection_proxy.rename_datablock(proxy, new_name, datablock)
+            bpy_data_collection_proxy.rename_datablock(proxy, new_name, datablock, to_blender)
 
         return rename_changeset_to_send
 
@@ -621,7 +646,7 @@ class BpyDataProxy(Proxy):
         return None
 
     @retain(False)
-    def update_soa(self, uuid: Uuid, path: Path, soa_members: List[SoaMember]) -> bool:
+    def update_soa(self, uuid: Uuid, path: Path, soa_members: List[SoaMember], to_blender: bool):
         """Update the arrays if the proxy identified by uuid.
 
         Returns:
@@ -629,7 +654,7 @@ class BpyDataProxy(Proxy):
         """
         datablock_proxy = self.state.proxies[uuid]
         datablock = self.state.datablock(uuid)
-        return datablock_proxy.update_soa(datablock, path, soa_members)
+        datablock_proxy.update_soa(datablock, path, soa_members, to_blender)
 
     def append_delayed_updates(self, delayed_updates: Set[T.ID]):
         self._delayed_local_updates |= {update.mixer_uuid for update in delayed_updates}

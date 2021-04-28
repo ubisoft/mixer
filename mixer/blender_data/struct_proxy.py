@@ -115,6 +115,7 @@ class StructProxy(Proxy):
         attribute: T.bpy_struct,
         parent: Union[T.bpy_struct, T.bpy_prop_collection],
         key: Union[int, str],
+        to_blender: bool,
         context: Context,
     ):
         """
@@ -126,15 +127,16 @@ class StructProxy(Proxy):
             key: (e.g. "display)
             context: the proxy and visit state
         """
-        if key == "animation_data" and (attribute is None or isinstance(attribute, T.AnimData)):
-            attribute = _create_clear_animation_data(self, parent)
+        if to_blender:
+            if key == "animation_data" and (attribute is None or isinstance(attribute, T.AnimData)):
+                attribute = _create_clear_animation_data(self, parent)
 
-        if attribute is None:
-            logger.info(f"save: attribute is None for {context.visit_state.display_path()}.{key}")
-            return
+            if attribute is None:
+                logger.info(f"save: attribute is None for {context.visit_state.display_path()}.{key}")
+                return
 
         for k, v in self._data.items():
-            write_attribute(attribute, k, v, context)
+            write_attribute(attribute, k, v, to_blender, context)
 
     def apply(
         self,
@@ -165,7 +167,7 @@ class StructProxy(Proxy):
             # TODO explain when this occurs
             self.copy_data(update)
             if to_blender:
-                self.save(attribute, parent, key, context)
+                self.save(attribute, parent, key, to_blender, context)
         else:
             # the structure is updated
             if key == "animation_data" and (attribute is None or isinstance(attribute, T.AnimData)):

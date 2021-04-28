@@ -91,7 +91,9 @@ class AosElement(Proxy):
 
         return self
 
-    def save(self, unused_attribute, parent: bpy.types.bpy_prop_collection, key: str, context: Context):
+    def save(
+        self, unused_attribute, parent: bpy.types.bpy_prop_collection, key: str, to_blender: bool, context: Context
+    ):
         """Saves this proxy into all parent[i].key
 
         Args:
@@ -101,7 +103,7 @@ class AosElement(Proxy):
         """
         for index, item in self._data.items():
             # serialization turns all dict keys to strings
-            write_attribute(parent[int(index)], key, item, context)
+            write_attribute(parent[int(index)], key, item, to_blender, context)
 
 
 @serialize(ctor_args=("_member_name",))
@@ -170,7 +172,7 @@ class SoaElement(Proxy):
         root = visit_state.datablock_proxy
         root._soas[parent_path].append((self._member_name, self))
 
-    def save(self, unused_attribute, unused_parent, key: str, context: Context):
+    def save(self, unused_attribute, unused_parent, key: str, to_blender: bool, context: Context):
         """Saves he name of the structure member managed by the proxy. Saving the values occurs in save_array()
 
         Args:
@@ -178,8 +180,13 @@ class SoaElement(Proxy):
         """
         assert self._member_name == key
 
-    def save_array(self, aos: T.bpy_prop_collection, member_name, array_: array.array):
+    def save_array(self, aos: T.bpy_prop_collection, member_name, array_: array.array, to_blender: bool):
         assert member_name == self._member_name
+        self._array = array_
+
+        if not to_blender:
+            return
+
         if logger.isEnabledFor(logging.DEBUG):
             message = f"save_array {aos}.{member_name}"
             if self._array is not None:
@@ -188,7 +195,6 @@ class SoaElement(Proxy):
             message += f" blender_length ({len(aos)})"
             logger.debug(message)
 
-        self._array = array_
         try:
             aos.foreach_set(member_name, array_)
         except RuntimeError as e:

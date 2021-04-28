@@ -59,13 +59,17 @@ class ObjectProxy(DatablockProxy):
     with an API instead of data read /write, such as vertex groups
     """
 
-    def _save(self, datablock: T.Object, context: Context) -> T.Object:
+    def _save(self, datablock: T.Object, to_blender: bool, context: Context) -> T.Object:
         # TODO remove extra work done here. The vertex groups array is created in super()._save(), then cleared in
         # _update_vertex_groups(), because diff() requires clear().
 
+        if not to_blender:
+            super()._save(datablock, to_blender, context)
+            return
+
         # Object.pose.bones can be saved only after Armature.bones.
         if isinstance(datablock.data, T.Armature):
-            ArmatureProxy.update_edit_bones(datablock, context)
+            ArmatureProxy.update_edit_bones(datablock, to_blender, context)
 
         self._fit_material_slots(datablock, self._data["material_slots"], context)
 
@@ -73,7 +77,7 @@ class ObjectProxy(DatablockProxy):
         # rigify's basic human rig :
         # on attribute: bpy.data.objects['rig'].pose.bones.201.constraints.0.target_space, value: POSE
         # TypeError('bpy_struct: item.attr = val: enum "POSE" not found in (\'WORLD\', \'CUSTOM\', \'LOCAL\')')
-        super()._save(datablock, context)
+        super()._save(datablock, to_blender, context)
         self._update_vertex_groups(datablock, self._data["vertex_groups"], context)
 
         return datablock
@@ -248,7 +252,7 @@ class ObjectProxy(DatablockProxy):
                         bones = pose.data("bones")
                     if bones:
                         # Update Armature.edit_bones before Object.pose.bones
-                        ArmatureProxy.update_edit_bones(datablock, context)
+                        ArmatureProxy.update_edit_bones(datablock, to_blender, context)
 
             incoming_material_slots = update.data("material_slots")
             self._fit_material_slots(datablock, incoming_material_slots, context)

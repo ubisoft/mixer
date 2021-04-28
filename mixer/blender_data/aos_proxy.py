@@ -103,7 +103,14 @@ class AosProxy(Proxy):
 
         return self
 
-    def save(self, attribute: T.bpy_prop_collection, parent: T.bpy_struct, key: Union[int, str], context: Context):
+    def save(
+        self,
+        attribute: T.bpy_prop_collection,
+        parent: T.bpy_struct,
+        key: Union[int, str],
+        to_blender: bool,
+        context: Context,
+    ):
         """
         Save this proxy into attribute.
 
@@ -113,15 +120,15 @@ class AosProxy(Proxy):
             key: the name of the bpy_collection in parent (e.g "vertices")
             context: proxy and visit state
         """
-
-        specifics.fit_aos(attribute, self, context)
+        if to_blender:
+            specifics.fit_aos(attribute, self, context)
 
         # nothing to do save here. The buffers that contains vertices and co are serialized apart from the json
         # that contains the Mesh members. The children of this are SoaElement and have no child.
         # They are updated directly bu SoaElement.save_array()
 
         for k, v in self._data.items():
-            write_attribute(attribute, k, v, context)
+            write_attribute(attribute, k, v, to_blender, context)
 
     def apply(
         self,
