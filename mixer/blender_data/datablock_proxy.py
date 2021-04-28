@@ -519,22 +519,29 @@ class DatablockProxy(StructProxy):
         collection = getattr(bpy.data, self.collection_name)
         self.apply(attribute, collection, attribute.name, delta, context, to_blender=False)
 
-    def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember]):
+    def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember]) -> bool:
 
         r = self.find_by_path(bl_item, path)
         if r is None:
             logger.error(f"update_soa: {path} not found in {bl_item}")
-            return
+            return False
         container, container_proxy = r
         for soa_member in soa_members:
             soa_proxy = container_proxy.data(soa_member[0])
             soa_proxy.save_array(container, soa_member[0], soa_member[1])
 
-        # HACK force updates :
+        # HACK force updates : unsure what is strictly required
+        # specifying refresh is not compatible with Grease Pencil and causes a crash
+        update = False
         if isinstance(bl_item, T.Mesh):
             bl_item.update()
         elif isinstance(bl_item, T.Curve):
             bl_item.twist_mode = bl_item.twist_mode
+        elif isinstance(bl_item, T.GreasePencil):
+            bl_item.update_tag()
+            update = True
+
+        return update
 
     def diff(self, attribute: T.ID, key: Union[int, str], prop: T.Property, context: Context) -> Optional[Delta]:
         """

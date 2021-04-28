@@ -630,11 +630,16 @@ class BpyDataProxy(Proxy):
             return diff
         return None
 
-    @retain(None)
-    def update_soa(self, uuid: Uuid, path: Path, soa_members: List[SoaMember]):
+    @retain(False)
+    def update_soa(self, uuid: Uuid, path: Path, soa_members: List[SoaMember]) -> bool:
+        """Update the arrays if the proxy identified by uuid.
+
+        Returns:
+            True if the view layer should be updated
+        """
         datablock_proxy = self.state.proxies[uuid]
         datablock = self.state.datablock(uuid)
-        datablock_proxy.update_soa(datablock, path, soa_members)
+        return datablock_proxy.update_soa(datablock, path, soa_members)
 
     def append_delayed_updates(self, delayed_updates: Set[T.ID]):
         self._delayed_local_updates |= {update.mixer_uuid for update in delayed_updates}

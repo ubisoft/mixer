@@ -25,6 +25,8 @@ import logging
 import traceback
 from typing import List, TYPE_CHECKING
 
+import bpy
+
 from mixer.blender_data.json_codec import Codec, DecodeError, EncodeError
 from mixer.blender_data.messages import (
     BlenderDataMessage,
@@ -145,14 +147,24 @@ def build_data_create(buffer):
 
 
 def _build_soas(uuid: Uuid, soas: List[Soa]):
+    update = False
     try:
         for soa in soas:
-            share_data.bpy_data_proxy.update_soa(uuid, soa.path, soa.members)
+            update |= share_data.bpy_data_proxy.update_soa(uuid, soa.path, soa.members)
     except Exception:
+        # Partial update of arrays may cause data length mismatch between array elements (co, normals, ...)
         logger.error(f"Exception during update_soa for {uuid} {soa.path}")
+        logger.error(" -------  This may cause a Blender crash ---------")
         for line in traceback.format_exc().splitlines():
             logger.error(line)
-        logger.error("ignored")
+
+    if update:
+        # TODO this is skipped if the proxy update call is retained until returning into OBJECT mode
+        try:
+            # needed for Grease Pencil.
+            bpy.context.view_layer.update()
+        except Exception:
+            pass
 
 
 def build_data_update(buffer: bytes):
