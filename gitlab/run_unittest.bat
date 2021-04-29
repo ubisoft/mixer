@@ -8,7 +8,14 @@ tscon 5 /dest:console
 set ERROR=0
 set CURRENT_DIR=%~dp0
 
-set
+REM Detect nasty cases where the working copy is not correctly updated
+git log -n 1
+echo %CI_COMMIT_SHA%
+set GIT=git log -n 1 --oneline --no-abbrev-commit         
+for /f "tokens=1 USEBACKQ" %%F in (`%GIT%`) do (set COMMIT_SHA=%%F)
+if %COMMIT_SHA% NEQ %CI_COMMIT_SHA% (exit /B 1)
+
+SET
 
 REM create local folders if required
 if not exist %CURRENT_DIR%\blender mkdir %CURRENT_DIR%\blender
