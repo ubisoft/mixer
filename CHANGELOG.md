@@ -1,3 +1,10 @@
+# 1.0.1 (2021-04-30)
+
+## Fixes
+
+- Grease pencil: received updated not displayed until EDIT mode is entered
+
+
 # 1.0.0 (2021-04-21)
 
 ## Documentation
