@@ -13,9 +13,23 @@ _set_log_level = """
 from mixer.bl_preferences import set_log_level
 set_log_level(None, {log_level})
 """
+
+# wait a bit for the server to get started
 _connect = """
 import bpy
-bpy.ops.mixer.connect()
+import time
+timeout = 10
+end_time = time.monotonic() + timeout
+while True:
+    try:
+        bpy.ops.mixer.connect()
+    except RuntimeError as e:
+        print ("Connect failed, retry", repr(e))
+        if time.monotonic() > end_time:
+            raise
+        time.sleep(0.1)
+    else:
+        break
 """
 
 _disconnect = """
