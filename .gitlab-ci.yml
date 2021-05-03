@@ -1,7 +1,6 @@
 stages:
   - pre_release # a single stage allows test to run even if flake8 fails and makes it possible to get all the errors at once
   - release
-  - deploy
 
 flake8:
   extends:
@@ -174,45 +173,46 @@ test_2.83.13_manual:
     - .except_on_gitlab.com
   when: manual
 
-.test_version_2.91.2:
-  extends:
-    - .test_base
-  variables:
-    MIXER_BLENDER_VERSION_BASE: "2.91"
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.91.2-windows64
-    MIXER_BLENDER_DOWNLOAD: "release"
-
-test_2.91.2:
-  extends:
-    - .test_version_2.91.2
-    - .only_nightly_test
-    - .except_on_gitlab.com
-
-test_2.91.2_manual:
-  extends:
-    - .test_version_2.91.2
-    - .except_nightly_test
-    - .except_on_gitlab.com
-  when: manual
-
-.test_version_2.93.alpha:
+.test_version_2.93.beta:
   extends:
     - .test_base
   variables:
     MIXER_BLENDER_VERSION_BASE: "2.93"
     # from https://builder.blender.org/download/
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.93.${blender_alpha}-windows64
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.93.${blender_2_93_beta}-windows64
     MIXER_BLENDER_DOWNLOAD: "builder"
 
-test_2.93.alpha:
+test_2.93.beta:
   extends:
-    - .test_version_2.93.alpha
+    - .test_version_2.93.beta
     - .only_nightly_test
     - .except_on_gitlab.com
 
-test_2.93.alpha_manual:
+test_2.93.beta_manual:
   extends:
-    - .test_version_2.93.alpha
+    - .test_version_2.93.beta
+    - .except_nightly_test
+    - .except_on_gitlab.com
+  when: manual
+
+.test_version_3.0.alpha:
+  extends:
+    - .test_base
+  variables:
+    MIXER_BLENDER_VERSION_BASE: "3.0"
+    # from https://builder.blender.org/download/
+    MIXER_BLENDER_ZIP_BASENAME: blender-3.0.${blender_3_0_alpha}-windows64
+    MIXER_BLENDER_DOWNLOAD: "builder"
+
+test_3.0.alpha:
+  extends:
+    - .test_version_3.0.alpha
+    - .only_nightly_test
+    - .except_on_gitlab.com
+
+test_3.0.alpha_manual:
+  extends:
+    - .test_version_3.0.alpha
     - .except_nightly_test
     - .except_on_gitlab.com
   when: manual
@@ -224,40 +224,3 @@ test_gitlab.com:
     - .only_version_tag
     - .only_on_gitlab.com
 
-#########################################################################################
-
-.deploy_network_folder:
-  stage: deploy
-  extends:
-    - .only_version_tag
-    - .except_on_gitlab.com
-    - .except_nightly_test
-  tags:
-    - linux
-    - uas_network_drive
-  script:
-    - bash gitlab/deploy_in_network_folder.sh mixer-${CI_COMMIT_REF_NAME}.zip
-  when: manual
-
-.deploy_perforce_folder:
-  stage: deploy
-  extends:
-    - .only_version_tag
-    - .except_on_gitlab.com
-    - .except_nightly_test
-  tags:
-    - linux
-    - uas_perforce_client
-  script:
-    - bash gitlab/deploy_in_perforce_folder.sh mixer-${CI_COMMIT_REF_NAME}.zip
-  when: manual
-
-deploy:incubator:
-  extends: .deploy_network_folder
-  environment:
-    name: incubator
-
-deploy:rr_special:
-  extends: .deploy_perforce_folder
-  environment:
-    name: rr_special
