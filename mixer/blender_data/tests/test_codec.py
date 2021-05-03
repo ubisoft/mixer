@@ -69,7 +69,7 @@ class TestCodec(unittest.TestCase):
 
         # save into blender
         cam_proxy_received._datablock_uuid = "__" + cam_proxy_received._datablock_uuid
-        cam_received, _ = cam_proxy_received.create_standalone_datablock(self.proxy.context())
+        cam_received, _ = cam_proxy_received.create_standalone_datablock(to_blender=True, context=self.proxy.context())
 
         self.assertEqual(cam_sent, cam_received)
         pass

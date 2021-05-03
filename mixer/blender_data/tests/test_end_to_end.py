@@ -68,7 +68,7 @@ class TestWorld(unittest.TestCase):
             #######################
             # receiver side
             decoded = codec.decode(encoded)
-            created, _ = self.bpy_data_proxy.create_datablock(decoded)
+            created, _ = self.bpy_data_proxy.create_datablock(decoded, to_blender=True)
             self.assertEqual(created, sent_id)
 
     def test_non_existing(self):
@@ -105,5 +105,5 @@ class TestWorld(unittest.TestCase):
             #######################
             # receiver side
             decoded = codec.decode(encoded)
-            created, _ = self.bpy_data_proxy.create_datablock(decoded)
+            created, _ = self.bpy_data_proxy.create_datablock(decoded, to_blender=True)
             self.assertEqual(created, sent_id)

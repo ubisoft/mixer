@@ -61,7 +61,7 @@ class TestWriteAttribute(unittest.TestCase):
             (object_, "matrix_world", Matrix(matrix2)),
         ]
         for bl_instance, name, value in values:
-            write_attribute(bl_instance, name, value, self.proxy.context())
+            write_attribute(bl_instance, name, value, True, self.proxy.context())
             stored_value = getattr(bl_instance, name)
             stored_type = type(stored_value)
             self.assertEqual(stored_type(value), stored_value)
@@ -70,7 +70,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene = D.scenes[0]
         eevee_proxy = self.proxy._data["scenes"].search_one("Scene_0")._data["eevee"]
         eevee_proxy._data["gi_cubemap_resolution"] = "64"
-        eevee_proxy.save(scene.eevee, scene, "eevee", self.proxy.context())
+        eevee_proxy.save(scene.eevee, scene, "eevee", to_blender=True, context=self.proxy.context())
         self.assertEqual("64", scene.eevee.gi_cubemap_resolution)
 
     def test_write_bpy_property_group_scene_cycles(self):
@@ -78,7 +78,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene = D.scenes[0]
         cycles_proxy = self.proxy._data["scenes"].search_one("Scene_0")._data["cycles"]
         cycles_proxy._data["shading_system"] = True
-        cycles_proxy.save(scene.cycles, scene, "cycles", self.proxy.context())
+        cycles_proxy.save(scene.cycles, scene, "cycles", to_blender=True, context=self.proxy.context())
         self.assertEqual(True, scene.cycles.shading_system)
 
     @unittest.skip("Mesh currently restricted to Mesh.name")
@@ -110,7 +110,7 @@ class TestWriteAttribute(unittest.TestCase):
         light_bak = D.lights["light_bak"]
 
         light_proxy._datablock_uuid = "__" + light_proxy._datablock_uuid
-        datablock, _ = light_proxy.create_standalone_datablock(self.proxy.context())
+        datablock, _ = light_proxy.create_standalone_datablock(to_blender=True, context=self.proxy.context())
         self.assertEqual(datablock, light_bak)
 
     def test_write_datablock_world(self):
@@ -125,7 +125,7 @@ class TestWriteAttribute(unittest.TestCase):
         world = D.worlds.new(world_name)
 
         world_proxy._datablock_uuid = "__" + world_proxy._datablock_uuid
-        datablock, _ = world_proxy.create_standalone_datablock(self.proxy.context())
+        datablock, _ = world_proxy.create_standalone_datablock(to_blender=True, context=self.proxy.context())
 
         self.assertEqual(datablock, world_bak)
 
@@ -148,7 +148,7 @@ class TestWriteAttribute(unittest.TestCase):
 
         light_proxy = self.proxy.data("lights").search_one(light_name)
         light_proxy._datablock_uuid = "__" + light_proxy._datablock_uuid
-        light, _ = light_proxy.create_standalone_datablock(self.proxy.context())
+        light, _ = light_proxy.create_standalone_datablock(to_blender=True, context=self.proxy.context())
         curve = light.falloff_curve.curves[0]
         for i, point in enumerate(points):
             for clone, expected in zip(curve.points[i].location, point):
@@ -174,7 +174,7 @@ class TestWriteAttribute(unittest.TestCase):
 
         light_proxy = self.proxy.data("lights").search_one(light_name)
         light_proxy._datablock_uuid = "__" + light_proxy._datablock_uuid
-        light, _ = light_proxy.create_standalone_datablock(self.proxy.context())
+        light, _ = light_proxy.create_standalone_datablock(to_blender=True, context=self.proxy.context())
 
         dst_curve = light.falloff_curve.curves[0]
         self.assertEqual(len(src_points), len(dst_curve.points))
@@ -189,7 +189,7 @@ class TestWriteAttribute(unittest.TestCase):
 
         # restore again, save needs to shrink
         light_proxy._datablock_uuid = "__" + light_proxy._datablock_uuid
-        light, _ = light_proxy.create_standalone_datablock(self.proxy.context())
+        light, _ = light_proxy.create_standalone_datablock(to_blender=True, context=self.proxy.context())
 
         dst_curve = light.falloff_curve.curves[0]
         self.assertEqual(len(src_points), len(dst_curve.points))
@@ -219,7 +219,7 @@ class TestWriteAttribute(unittest.TestCase):
         # save() needs to extend
         light_proxy = self.proxy.data("lights").search_one(light_name)
         light_proxy._datablock_uuid = "__" + light_proxy._datablock_uuid
-        light, _ = light_proxy.create_standalone_datablock(self.proxy.context())
+        light, _ = light_proxy.create_standalone_datablock(to_blender=True, context=self.proxy.context())
 
         dst_curve = light.falloff_curve.curves[0]
         self.assertEqual(len(src_points), len(dst_curve.points))
@@ -245,7 +245,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene_bak = D.scenes["scene_bak"]
 
         scene_proxy._datablock_uuid = "__" + scene_proxy._datablock_uuid
-        datablock, _ = scene_proxy.create_standalone_datablock(self.proxy.context())
+        datablock, _ = scene_proxy.create_standalone_datablock(to_blender=True, context=self.proxy.context())
         self.assertEqual(datablock, scene_bak)
 
     def test_write_datablock_reference_scene_world(self):
@@ -261,7 +261,7 @@ class TestWriteAttribute(unittest.TestCase):
         scene.world = None
         assert scene.world != expected_world
 
-        world_ref_proxy.save(scene.world, scene, "world", self.proxy.context())
+        world_ref_proxy.save(scene.world, scene, "world", True, self.proxy.context())
         self.assertEqual(scene.world, expected_world)
 
     def test_write_datablock_with_reference_camera_dof_target(self):
@@ -280,5 +280,5 @@ class TestWriteAttribute(unittest.TestCase):
 
         camera_proxy = self.proxy.data("cameras").search_one(camera_name)
         camera_proxy._datablock_uuid = "__" + camera_proxy._datablock_uuid
-        datablock, _ = camera_proxy.create_standalone_datablock(self.proxy.context())
+        datablock, _ = camera_proxy.create_standalone_datablock(to_blender=True, context=self.proxy.context())
         self.assertEqual(datablock.dof.focus_object, focus_object)
