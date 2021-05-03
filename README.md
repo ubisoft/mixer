@@ -33,6 +33,10 @@ The active support repository is on Gitlab https://gitlab.com/ubisoft-animation-
 
 The [Mixer Github repository](https://github.com/ubisoft/mixer) is a mirror that is part of Github [Ubisoft open source](https://github.com/ubisoft) projects group.
 
+## Community
+
+The online documentation lists the [YouTube videos](https://ubisoft-mixer.readthedocs.io/en/latest/community/on_youtube.html) posted by community members.
+
 ## Feedback and contribution
 
 Post your feedback and discuss your ideas with us on the [Mixer Blender chat](https://blender.chat/channel/mixer-addon).
