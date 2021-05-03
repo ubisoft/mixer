@@ -174,45 +174,46 @@ test_2.83.13_manual:
     - .except_on_gitlab.com
   when: manual
 
-.test_version_2.91.2:
-  extends:
-    - .test_base
-  variables:
-    MIXER_BLENDER_VERSION_BASE: "2.91"
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.91.2-windows64
-    MIXER_BLENDER_DOWNLOAD: "release"
-
-test_2.91.2:
-  extends:
-    - .test_version_2.91.2
-    - .only_nightly_test
-    - .except_on_gitlab.com
-
-test_2.91.2_manual:
-  extends:
-    - .test_version_2.91.2
-    - .except_nightly_test
-    - .except_on_gitlab.com
-  when: manual
-
-.test_version_2.93.alpha:
+.test_version_2.93.beta:
   extends:
     - .test_base
   variables:
     MIXER_BLENDER_VERSION_BASE: "2.93"
     # from https://builder.blender.org/download/
-    MIXER_BLENDER_ZIP_BASENAME: blender-2.93.${blender_alpha}-windows64
+    MIXER_BLENDER_ZIP_BASENAME: blender-2.93.${blender_2_93_beta}-windows64
     MIXER_BLENDER_DOWNLOAD: "builder"
 
-test_2.93.alpha:
+test_2.93.beta:
   extends:
-    - .test_version_2.93.alpha
+    - .test_version_2.93.beta
     - .only_nightly_test
     - .except_on_gitlab.com
 
-test_2.93.alpha_manual:
+test_2.93.beta_manual:
   extends:
-    - .test_version_2.93.alpha
+    - .test_version_2.93.beta
+    - .except_nightly_test
+    - .except_on_gitlab.com
+  when: manual
+
+.test_version_3.0.alpha:
+  extends:
+    - .test_base
+  variables:
+    MIXER_BLENDER_VERSION_BASE: "3.0"
+    # from https://builder.blender.org/download/
+    MIXER_BLENDER_ZIP_BASENAME: blender-3.0.${blender_3_0_alpha}-windows64
+    MIXER_BLENDER_DOWNLOAD: "builder"
+
+test_3.0.alpha:
+  extends:
+    - .test_version_3.0.alpha
+    - .only_nightly_test
+    - .except_on_gitlab.com
+
+test_3.0.alpha_manual:
+  extends:
+    - .test_version_3.0.alpha
     - .except_nightly_test
     - .except_on_gitlab.com
   when: manual
