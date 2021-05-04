@@ -109,10 +109,15 @@ class StructCollectionProxy(Proxy):
 
     @classmethod
     def make(cls, attr_property: T.Property):
-        if attr_property.srna == T.NodeLinks.bl_rna:
-            from mixer.blender_data.node_proxy import NodeLinksProxy
+        try:
+            srna = attr_property.srna
+        except AttributeError:
+            pass
+        else:
+            if attr_property.srna == T.NodeLinks.bl_rna:
+                from mixer.blender_data.node_proxy import NodeLinksProxy
 
-            return NodeLinksProxy()
+                return NodeLinksProxy()
         return StructCollectionProxy()
 
     def __len__(self):

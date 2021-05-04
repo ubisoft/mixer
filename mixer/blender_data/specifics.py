@@ -63,6 +63,9 @@ def soable_collection_properties():
         T.MeshFaceMapLayer.bl_rna.properties["data"],
         T.MeshLoopColorLayer.bl_rna.properties["data"],
         T.MeshUVLoopLayer.bl_rna.properties["data"],
+        T.Particle.bl_rna.properties["hair_keys"],
+        T.ParticleSystem.bl_rna.properties["child_particles"],
+        T.ParticleSystem.bl_rna.properties["particles"],
         T.ShapeKey.bl_rna.properties["data"],
         T.Spline.bl_rna.properties["bezier_points"],
     }

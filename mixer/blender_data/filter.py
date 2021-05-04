@@ -555,6 +555,26 @@ default_exclusions: FilterSet = {
         # send by a BLENDER_DATA_MEDIA command, not serialized with proxies
         NameFilterOut(["data"])
     ],
+    T.ParticleSettings: [
+        NameFilterOut(
+            [
+                # not implemented
+                "texture_slots",
+            ]
+        )
+    ],
+    T.ParticleSystem: [
+        NameFilterOut(
+            [
+                # Edited particles. How to save this ?
+                "particles",
+                "child_particles",
+                # read_only
+                "is_edited",
+                "is_editable",
+            ]
+        )
+    ],
     T.PointCache: [
         NameFilterOut(
             [
