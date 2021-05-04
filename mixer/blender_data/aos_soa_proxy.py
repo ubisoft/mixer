@@ -79,9 +79,9 @@ class AosElement(Proxy):
         - bl_collection: a collection of structure, e.g. a SplineBezierPoints instance
         - attr_name: the name of the member to load, such as "handle_left_type"
         """
-
+        prop = attr_property.properties[attr_name]
         for index, item in enumerate(bl_collection):
-            self._data[index] = read_attribute(getattr(item, attr_name), index, attr_property, bl_collection, context)
+            self._data[index] = read_attribute(getattr(item, attr_name), index, prop, bl_collection, context)
 
         try:
             if not isinstance(self._data[0], str):
