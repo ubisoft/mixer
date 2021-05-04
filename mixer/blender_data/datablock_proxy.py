@@ -535,7 +535,7 @@ class DatablockProxy(StructProxy):
         collection = getattr(bpy.data, self.collection_name)
         self.apply(attribute, collection, attribute.name, delta, context, to_blender=False)
 
-    def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember], to_blender: bool):
+    def update_soa(self, bl_item, path: Path, soa_members: List[SoaMember], to_blender: bool) -> bool:
 
         r = self.find_by_path(bl_item, path)
         if r is None:
@@ -547,7 +547,7 @@ class DatablockProxy(StructProxy):
             soa_proxy.save_array(container, soa_member[0], soa_member[1], to_blender)
 
         if not to_blender:
-            return
+            return False
 
         # HACK force updates : unsure what is strictly required
         # specifying refresh is not compatible with Grease Pencil and causes a crash

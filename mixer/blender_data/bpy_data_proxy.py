@@ -646,7 +646,7 @@ class BpyDataProxy(Proxy):
         return None
 
     @retain(False)
-    def update_soa(self, uuid: Uuid, path: Path, soa_members: List[SoaMember], to_blender: bool):
+    def update_soa(self, uuid: Uuid, path: Path, soa_members: List[SoaMember], to_blender: bool) -> bool:
         """Update the arrays if the proxy identified by uuid.
 
         Returns:
@@ -654,7 +654,7 @@ class BpyDataProxy(Proxy):
         """
         datablock_proxy = self.state.proxies[uuid]
         datablock = self.state.datablock(uuid)
-        datablock_proxy.update_soa(datablock, path, soa_members, to_blender)
+        return datablock_proxy.update_soa(datablock, path, soa_members, to_blender)
 
     def append_delayed_updates(self, delayed_updates: Set[T.ID]):
         self._delayed_local_updates |= {update.mixer_uuid for update in delayed_updates}
