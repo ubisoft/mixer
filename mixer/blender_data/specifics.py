@@ -483,6 +483,16 @@ def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     return _filter_properties(properties, filter_props)
 
 
+@conditional_properties.register(T.FieldSettings)  # type: ignore[no-redef]
+def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
+    if bpy_struct.texture_nabla != 0.0:
+        return properties
+
+    # the default value 0. is outside of allowed values and writing 0. sets the value to 1e-4 !
+    filter_props = ["texture_nabla"]
+    return _filter_properties(properties, filter_props)
+
+
 @conditional_properties.register(T.ClothSettings)  # type: ignore[no-redef]
 def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
     bending_model = bpy_struct.bending_model
