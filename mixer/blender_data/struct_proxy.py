@@ -55,11 +55,13 @@ def _create_clear_animation_data(incoming_proxy: StructProxy, existing_struct: T
 @lru_cache()
 def _proxy_types():
     from mixer.blender_data.modifier_proxies import NodesModifierProxy
+    from mixer.blender_data.modifier_proxies import ParticleSystemModifierProxy
 
     proxy_types = {}
 
     try:
         proxy_types[T.NodesModifier] = NodesModifierProxy
+        proxy_types[T.ParticleSystemModifier] = ParticleSystemModifierProxy
     except AttributeError:
         pass
 

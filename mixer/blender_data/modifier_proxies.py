@@ -97,6 +97,7 @@ class NodesModifierProxy(StructProxy):
         context: Context,
     ):
         # the modifier is always created with a default geometry node : remove it
+        # This part was written before ParticlesSettings modifier and has less strict requirements
         node_group = modifier.node_group
         if node_group is not None:
             if node_group.users != 1:
@@ -147,3 +148,36 @@ class NodesModifierProxy(StructProxy):
                 modifier.node_group = ng
                 self._save_inputs(modifier)
         return self
+
+
+@serialize
+class ParticleSystemModifierProxy(StructProxy):
+    """Proxy for ParticleSystemModifier.
+
+    Requires special processing to remove the default ParticleSettings.
+    """
+
+    def save(
+        self,
+        modifier: T.bpy_struct,
+        parent: Union[T.bpy_struct, T.bpy_prop_collection],
+        key: Union[int, str],
+        context: Context,
+    ):
+        settings = modifier.particle_system.settings
+
+        # The ParticleSettings datablock creation has been received first and the datablock has been created.
+        # Creating the modifier creates another ParticlesSettings datablock.
+        # It is not allowed to reset particle_system.settings to None and removing the datablock causes a crash.
+        # let save() update particle_system.settings to the reference to the received datablock
+        super().save(modifier, parent, key, context)
+
+        # Now remove the default ParticlesSettings datablock
+        if settings is not None:
+            if settings.mixer_uuid != "":
+                logger.error(f"save(): default particle system {settings} has uuid {settings.mixer_uuid}")
+                return
+            if settings.users != 0:
+                logger.error(f"save(): default particle system {settings} has {settings.users} users")
+                return
+            bpy.data.particles.remove(settings)
