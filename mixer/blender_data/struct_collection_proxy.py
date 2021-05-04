@@ -110,7 +110,7 @@ class StructCollectionProxy(Proxy):
     @classmethod
     def make(cls, attr_property: T.Property):
         try:
-            srna = attr_property.srna
+            _ = attr_property.srna
         except AttributeError:
             pass
         else:
