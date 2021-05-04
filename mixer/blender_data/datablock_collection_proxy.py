@@ -141,10 +141,10 @@ class DatablockCollectionProxy(Proxy):
             # One existing scene from the document loaded at join time could not be removed during clear_scene_conten().
             # Remove it now
             scenes = bpy.data.scenes
-            if len(scenes) == 2 and ("_mixer_to_be_removed_" in scenes):
+            if len(scenes) == 2 and ("_mixer_will_remove_this" in scenes):
                 from mixer.blender_client.scene import delete_scene
 
-                scene_to_remove = scenes["_mixer_to_be_removed_"]
+                scene_to_remove = scenes["_mixer_will_remove_this"]
                 logger.info(
                     f"After create scene '{incoming_proxy.data('name_full')}' uuid: '{incoming_proxy.mixer_uuid}''"
                 )

@@ -462,7 +462,7 @@ class BpyDataProxy(Proxy):
             if not isinstance(datablock, safe_depsgraph_updates):
                 logger.info("depsgraph update: ignoring untracked type %r", datablock)
                 continue
-            if isinstance(datablock, T.Scene) and datablock.name == "_mixer_to_be_removed_":
+            if isinstance(datablock, T.Scene) and datablock.name == "_mixer_will_remove_this":
                 logger.error(f"Skipping scene {datablock.name} uuid: '{datablock.mixer_uuid}'")
                 continue
             proxy = self.state.proxies.get(datablock.mixer_uuid)

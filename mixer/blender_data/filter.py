@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 def _skip_scene(item):
-    return item.name == "_mixer_to_be_removed_"
+    return item.name == "_mixer_will_remove_this"
 
 
 def _skip_image(item):
