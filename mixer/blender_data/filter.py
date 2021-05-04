@@ -562,6 +562,16 @@ default_exclusions: FilterSet = {
             [
                 # not implemented
                 "texture_slots",
+                # not implemented
+                # saving instance_weights requires instance_collection objects to be fully linked.
+                # this causes a dependency loop (Object->ParticleSettings->Object) via
+                # Object.modifiers.particle_settings -> ParticleSettings.instance_collection.objects.
+                # This requires to save instance_weights after all objects have been linked
+                "instance_weights",
+                # UI
+                "active_instanceweight",
+                "active_instanceweight_index",
+                "active_texture_index",
             ]
         )
     ],
