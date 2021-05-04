@@ -538,9 +538,7 @@ default_exclusions: FilterSet = {
                 "active_material_index",
                 "active_shape_key",
                 "active_shape_key_index",
-                # TODO temporary, has a seed member that makes some tests fail
-                "field",
-                # TODO
+                # view into ParticleSystemModifier
                 "particle_systems",
                 # unsupported
                 "motion_path",
@@ -562,7 +560,7 @@ default_exclusions: FilterSet = {
             [
                 # read_only
                 "info",
-                "is_backed",
+                "is_baked",
                 "is_baking",
                 "is_frame_skip",
                 "is_outdated",
@@ -622,7 +620,6 @@ default_exclusions: FilterSet = {
                 "display",
                 # TODO temporary, not implemented
                 "node_tree",
-                "rigidbody_world",
                 # TODO
                 # a view into builtin U keying_sets ?
                 "keying_sets_all",
@@ -753,6 +750,7 @@ safe_depsgraph_updates = (
     T.MetaBall,
     T.MovieClip,
     T.NodeTree,
+    T.ParticleSettings,
     T.Object,
     T.Scene,
     T.Sound,
@@ -783,6 +781,7 @@ safe_blenddata_collections = [
     "metaballs",
     "movieclips",
     "node_groups",
+    "particles",
     "objects",
     "scenes",
     "shape_keys",

@@ -1247,6 +1247,7 @@ def clear_scene_content():
             "movieclips",
             "node_groups",
             "sounds",
+            "particles",
             "texts",
             "textures",
             "worlds",

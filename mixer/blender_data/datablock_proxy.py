@@ -388,7 +388,7 @@ class DatablockProxy(StructProxy):
                     datablock = specifics.bpy_data_ctor(self.collection_name, self, context)
                 else:
                     # a creation for a datablock that we already have. This should not happen
-                    logger.error(f"create_standalone_datablock: unregistered uuid for {self}")
+                    logger.error(f"create_standalone_datablock: already registered uuid for {self}")
                     logger.error("... update ignored")
                     return None, None
         else:
