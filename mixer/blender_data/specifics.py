@@ -485,11 +485,18 @@ def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
 
 @conditional_properties.register(T.FieldSettings)  # type: ignore[no-redef]
 def _(bpy_struct: T.Struct, properties: ItemsView) -> ItemsView:
-    if bpy_struct.texture_nabla != 0.0:
+    filter_props = []
+    if bpy_struct.texture_nabla == 0.0:
+        # the default value 0. is outside of allowed values and writing 0. sets the value to the min allowed value 1e-4
+        filter_props.append("texture_nabla")
+
+    if bpy_struct.seed == 0:
+        # the default value 0 is outside of allowed values and writing 0 sets the value to the min allowed value 1
+        filter_props.append("seed")
+
+    if not filter_props:
         return properties
 
-    # the default value 0. is outside of allowed values and writing 0. sets the value to 1e-4 !
-    filter_props = ["texture_nabla"]
     return _filter_properties(properties, filter_props)
 
 

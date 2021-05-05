@@ -1,8 +1,9 @@
-# 1.1.0-alpha1 (2021-05-05)
+# WIP
 
 ## Features
 
 - Particles: synchronization (partial)
+- Force fields: synchronization
 
 ## Fixes
 
