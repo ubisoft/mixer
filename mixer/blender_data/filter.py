@@ -742,6 +742,12 @@ property_order: PropertiesOrder = {
         # must exist before links are saved
         "nodes",
     },
+    T.Object: {
+        # before empty_diplay_type (WTF ???)
+        # saving field after empty_diplay_type changes empty_display_type and causes a test failure on a camera
+        # in vrtist.test_collection.TestCollection_Generic.test_create_object
+        "field",
+    },
     T.ParticleSettings: {
         "use_roughness_curve",
     },
