@@ -1,3 +1,19 @@
+# 1.1.0-alpha1 (2021-05-05)
+
+## Features
+
+- Particles: synchronization (partial)
+
+## Fixes
+
+- Grease pencil: received update not displayed until EDIT mode is entered
+- Animation: possible failure when setting a keyframe
+
+## CI
+
+- Add a mypy check
+- Cleanup
+
 # 1.0.0 (2021-04-21)
 
 ## Documentation
