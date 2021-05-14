@@ -21,7 +21,7 @@ Documentation is available at the web site https://ubisoft-mixer.readthedocs.io/
 
 - [download and install](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/install.html), 
 - [test](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/first-steps.html) locally,
-- then [get connected](https://ubisoft-mixer.readthedocs.io/en/latest/.collaborate/get-connected.html) and [work together](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/work-together.html)
+- then [get connected](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/get-connected.html) and [work together](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/work-together.html)
 
 ## Updates
 
