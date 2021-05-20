@@ -1,3 +1,9 @@
+# 1.1.0 (WIP)
+
+## Docmentation
+
+- Fix README.txt (thanks @XenioxYT)
+
 # 1.0.0 (2021-04-21)
 
 ## Documentation
