@@ -266,11 +266,8 @@ _creation_order = {
     "scenes": 20,
     # Object.data is required to create Object
     "objects": 30,
-    #
-    # TODO particles_settings.material slot require that objects.materials_slots is saved before
-    # but ParticlesSettingsModifier requires particles
-    # -> use deferred resolution from branch _wip_particles_instance_weights
-    #
+    # see ParticleSystemModifierProxy for why after Object
+    "particles": 35,
     # Key creation require Object API
     "shape_keys": 40,
 }

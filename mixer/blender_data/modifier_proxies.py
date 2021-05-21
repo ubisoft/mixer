@@ -164,20 +164,45 @@ class ParticleSystemModifierProxy(StructProxy):
         key: Union[int, str],
         context: Context,
     ):
-        settings = modifier.particle_system.settings
+        # This is called either :
+        # - during the creation of an Object with a ParticleSystemModifier (initial sync).
+        #   In this case the ParticleSystemModifier is not yet created. This is because the Objects must be saved before
+        #   particle systems can be saved, since particle systems contain references to objects (instance_object,
+        #   vertex_group_xxx, ...). Creating a ParticleSystemModifier creates a ParticleSystem by default, and
+        #   attempting to remove it may cause a crash.
+        #   --> rename the default ParticleSystem as a safety measure so so that it cannot be confused with the actual
+        #       one
+        #   --> defer the save after the ParticleSystem is created. During save, remove the default ParticleSystem
+        # - during the creation of a ParticleSystemModifier to an existing Object.
+        #   In this case the ParticleSystem creation is received before the Object update and the ParticleSystem
+        #   reference can be saved at once
 
-        # The ParticleSettings datablock creation has been received first and the datablock has been created.
-        # Creating the modifier creates another ParticlesSettings datablock.
-        # It is not allowed to reset particle_system.settings to None and removing the datablock causes a crash.
-        # let save() update particle_system.settings to the reference to the received datablock
-        super().save(modifier, parent, key, context)
+        particles_uuid = self._data["particle_system"]._data["settings"].mixer_uuid
+        existing_particles_datablock = context.proxy_state.datablock(particles_uuid)
 
-        # Now remove the default ParticlesSettings datablock
-        if settings is not None:
-            if settings.mixer_uuid != "":
-                logger.error(f"save(): default particle system {settings} has uuid {settings.mixer_uuid}")
-                return
-            if settings.users != 0:
-                logger.error(f"save(): default particle system {settings} has {settings.users} users")
-                return
-            bpy.data.particles.remove(settings)
+        def _save(particles_datablock):
+            previous_particles_datablock = modifier.particle_system.settings
+            modifier.particle_system.settings = particles_datablock
+            StructProxy.save(self, modifier, parent, key, context)
+
+            # Now remove the default ParticlesSettings datablock
+            if previous_particles_datablock is not None:
+                if previous_particles_datablock.mixer_uuid != "":
+                    logger.error(
+                        f"save(): default particle system {previous_particles_datablock} has uuid {previous_particles_datablock.mixer_uuid}"
+                    )
+                    return
+                if previous_particles_datablock.users != 0:
+                    logger.error(
+                        f"save(): default particle system {previous_particles_datablock} has {previous_particles_datablock.users} users"
+                    )
+                    return
+                bpy.data.particles.remove(previous_particles_datablock)
+
+        if existing_particles_datablock:
+            # during the creation of a ParticleSystemModifier to an existing Object.
+            _save(existing_particles_datablock)
+        else:
+            # during the creation of an Object with a ParticleSystemModifier (initial sync)
+            modifier.particle_system.settings.name = "_mixer_default"
+            context.proxy_state.unresolved_refs.append(particles_uuid, _save)
