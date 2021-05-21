@@ -568,6 +568,8 @@ default_exclusions: FilterSet = {
                 # Object.modifiers.particle_settings -> ParticleSettings.instance_collection.objects.
                 # This requires to save instance_weights after all objects have been linked
                 "instance_weights",
+                # actual data is material_index
+                "material_slot",
                 # UI
                 "active_instanceweight",
                 "active_instanceweight_index",
