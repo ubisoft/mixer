@@ -91,15 +91,18 @@ VPN software like Hamachi, Zerotier and others can be used to execute a Mixer se
 Hamachi
 """""""
 
-Follow this tutorial to easily install and configurate an Hamachi server:
+Follow this tutorial to easily install and configure an Hamachi server:
 
 .. raw:: html
 
    <div style="position: relative; padding-bottom: 45%; height: 0; overflow: hidden; max-width: 80%; border:solid 0.1em; border-color:#4d4d4d; align=center; margin: auto;">
       <iframe width="560" height="315" src="https://www.youtube.com/embed/07ifLm0K0mI" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
    </div>
+   <br>
    
-| 
+
+If the connection to the server fails, see the :ref:`networking FAQ <faq-network>`.
+
 
 Other VPN software
 """"""""""""""""""""

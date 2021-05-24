@@ -3,6 +3,12 @@ On YouTube
 
 Many thanks to community members who published YouTube videos about Mixer.
 
+May 2021
+--------
+- askNK: `Blender Mixer Released! - Multi-User Addon -Walkthrough & Lessons! <https://www.youtube.com/watch?v=fYx3b0i0ons>`_
+- Gamefromscratch: `UBISOFT Mixer for Blender Released! Blender now has Multiplayer Support! <https://www.youtube.com/watch?v=TvgmSxi5RWs>`_
+- JuanyBabas: `Ubisoft Mixer para Blender, trabaja en línea, colabora con el mundo <https://www.youtube.com/watch?v=La3oJuPVT-4>`_
+
 October 2020
 ------------
 - Brainy Man: `МУЛЬТИПЛЕЕР В BLENDER | Аддон Mixer от Ubisoft <https://www.youtube.com/watch?v=EvwSxwCjHUo>`_ 
