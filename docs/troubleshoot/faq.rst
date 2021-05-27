@@ -64,6 +64,8 @@ Why is room join sometimes so long?
 The server room records all modifications performed by all participants and does not store the current Blender state.
 A new user who joins the room receives all the modifications since the room creation.
 
+.. _faq-network:
+
 Networking
 ----------
 
@@ -75,6 +77,12 @@ The machine with the address listed in the **Host** text box cannot be reached f
 * the address is misspelled
 * the machine is not up or the server is not started
 * the machine cannot be reached because of a network configuration error. See the documentations for connecting in a :ref:`LAN <lan>` or over the :ref:`Internet <Internet>`.
+
+How can I fix a Hamachi connection failure?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The Hamachi setup may have configured your Hamachi network in public mode instead of private.
+An Hamachi community discussion explains how to `change to private network <https://community.logmein.com/t5/LogMeIn-Hamachi-Discussions/Changing-to-a-private-network/m-p/196116/highlight/true#M16898>`_.
+
 
 .. _ip-address:
 
@@ -106,6 +114,16 @@ Check the following :
 - are you attempting to synchronize data that is not or partially supported? See the list of :ref:`synchronized data <synchronized>` and their restrictions.
 
 If you think you have found a bug, please :doc:`report an issue <issue>`.
+
+Other users seem not to have the same scene content than I do
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+During a session it may appear that one or more participants mention they don't see the same things as you do.
+This usually appends because of one of these reasons:
+
+- a participant used a feature of Blender that is not yet covered by Mixer. See :ref:`Features <synchronized>`
+- a participant called an undo action. See :ref:`Caveats - Undo / Redo <caveats>`
+- or there is a bug that went through our quality check process. Please repport it using these guidelines: :doc:`Report an issue <issue>`.
 
 ..
     TODO

@@ -4,7 +4,7 @@ Mixer is a Blender addon for real time collaboration in Blender. It allows multi
 
 ![Mixer screenshot](docs/img/home_mixer.png)
 
-**Disclaimer**: Although designed to be used in a production context it is still an experimental tool and,
+**Disclaimer**: Although designed to be used in a production context it is still an experimental tool.
 In spite of all our efforts to make it reliable, it may in some circumstances corrupt your Blender scenes data.
 Be aware that neither Ubisoft nor Ubisoft employees can be taken as responsible in such cases. Use it at your own risks.
 

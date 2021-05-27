@@ -3,6 +3,7 @@
 ## Documentation
 
 - Fix README.md (thanks @XenioxYT, @b4zz4)
+- Explicit warning about undo limitations.
 
 # 1.0.0 (2021-04-21)
 

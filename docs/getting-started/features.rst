@@ -1,17 +1,24 @@
+.. _features:
+
 Key Features
 ============
-
-.. _features:
 
 Overview
 --------
 
 Mixer synchronizes in real time the modifications done to the scene and the objects it contains. During a collaboration session, Mixer displays the position of other participants and highlights their selections. 
+See :ref:`work-together` for more details.
 
 .. image:: /img/select.png
    :align: center
 
-See :ref:`work-together` for more details.
+In the sections bellow we listed the features of Blender that are synchronized and those which are volontary not, as well as what is currently supported and what is not.
+
+.. warning::
+    **Undo / Redo is a important pitfall at the moment** for technical as well as paradigm reasons.
+    It is strongly adviced **not to use it**, it may destabilize the running collaborative session.
+    
+    See :ref:`caveats` for more details.
 
 .. _synchronized:
 
@@ -144,7 +151,32 @@ Render engine          See [RenderEngine]_
 Caveats
 -------
 
-In addition to the limitations listed in the previous section, you should be aware of the following :
+In addition to the limitations listed in the previous section, you should be aware of the following limitations:
 
-* using undo may cause unexpected behavior and cause crashes. Using undo while in **Object** mode may undo other participants changes.
-* the files saved by all participants are :ref:`not exactly identical <saves-not-identical>`.
+Undo / Redo
+***********
+
+Using undo may cause data desynchronisation between users, unexpected behaviors and possibly some crashes. Using undo while in **Object** mode may undo other participants changes.
+**It is then strongly adviced not to use the undo feature during a collaborative session.**
+
+The undo action rises several paradigm questions such as:
+
+- What happens in the scene when an action is undone and some work dependent on it has been done by other users, such as a mesh edit, a constraint, etc?
+- What should be undone? The last action of the user doing the step backward or the last action made by any user of the session? Or all the actions of everyone up to the last action of the considered user?
+- Should a redo be possible?
+- ...
+
+Once the expected behavior clearly defined there is a technological challenge to face in order to address it.
+
+Currently the undo and redo actions are "possible" as part of the default behavior of Blender.
+For the reasons mentioned above doing one of them can very likely, according to the context, lead to an unstable environment.
+It can be noticed from error messages in the terminal or more obviously from differences in terms of data in the shared scene.
+
+**At this point a synchronisation recover is unlikely and it is adviced that one of the users save the scene on her computer, everyone leaves the room and a new session is started.**
+
+In order to minimize the chances of doing an undo action we thought about blocking this feature during a session. We don't know if this is possible and have not gone further in that direction at the moment.
+
+File saving
+***********
+
+The files saved by all participants are :ref:`not exactly identical <saves-not-identical>`.

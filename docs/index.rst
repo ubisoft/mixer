@@ -33,9 +33,10 @@ Getting started
 
 Watch the video tutorial or dive into this step-by-step process:
 
-* :ref:`download <download>` the Mixer zip file,
-* :ref:`install <installing>` Mixer as a Blender addon,
-* then :ref:`try out<first-steps>` your installation
+* :ref:`Download <download>` the Mixer zip file,
+* :ref:`Install <installing>` Mixer as a Blender addon,
+* Mind the :ref:`features and pitfalls <features>`,
+* Then :ref:`try out<first-steps>` your installation !
 
 .. toctree::
    :maxdepth: 2
