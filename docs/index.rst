@@ -8,7 +8,7 @@ With Mixer, several Blender users can work together on the same data and collabo
    :align: center
 
 
-Disclaimer
+   Disclaimer
 ----------
 
 Mixer is an open source project developed by the R&D department of Ubisoft Animation Studio.
@@ -33,9 +33,10 @@ Getting started
 
 Watch the video tutorial or dive into this step-by-step process:
 
-* :ref:`download <download>` the Mixer zip file,
-* :ref:`install <installing>` Mixer as a Blender addon,
-* then :ref:`try out<first-steps>` your installation
+* :ref:`Download <download>` the Mixer zip file,
+* :ref:`Install <installing>` Mixer as a Blender addon,
+* Mind the :ref:`Features and pitfalls <features>`,
+* Then :ref:`try out<first-steps>` your installation !
 
 .. toctree::
    :maxdepth: 2

@@ -115,6 +115,16 @@ Check the following :
 
 If you think you have found a bug, please :doc:`report an issue <issue>`.
 
+Other users seem not to have the same scene content than I do
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+During a session it may appear that one or more participants mention they don't see the same things as you do.
+This usually appends because of one of these reasons:
+
+- a participant used a feature of Blender that is not yet covered by Mixer. See :ref:`Features <synchronized>`
+- a participant called an undo action. See :ref:`Caveats - Undo / Redo <caveats>`
+- or there is a bug that went through our quality check process. Please repport it using these guidelines: :doc:`Report an issue <issue>`.
+
 ..
     TODO
     Blender has crashed. What happened?
