@@ -28,7 +28,6 @@ mypy:
 doc:
   stage: pre_release
   extends:
-    - .except_on_gitlab.com
     - .except_nightly_test
   tags:
     - docker
@@ -59,20 +58,6 @@ zip:
     paths:
       - mixer
     expire_in: 1 week
-
-# Note: you cannot extend this job with another only: variables job
-# If you need that, you should rewrite and combine the rules
-.only_on_gitlab.com:
-  only:
-    variables:
-      - $CI_SERVER_URL == "https://gitlab.com"
-
-# Note: you cannot extend this job with another except: variables job
-# If you need that, you should rewrite and combine the rules
-.except_on_gitlab.com:
-  except:
-    variables:
-      - $CI_SERVER_URL == "https://gitlab.com"
 
 # Note: you cannot extend this job with another only: variables job
 # If you need that, you should rewrite and combine the rules
@@ -112,8 +97,6 @@ release:
       - mixer-${CI_COMMIT_REF_NAME}.zip
 
 ####################################################################################
-
-# https://gitlab-ncsa.ubisoft.org/help/ci/yaml/README.md
 
 
 .test_base:
@@ -164,13 +147,11 @@ test_2.83.13:
   extends:
     - .test_version_2.83.13
     - .only_nightly_test
-    - .except_on_gitlab.com
 
 test_2.83.13_manual:
   extends:
     - .test_version_2.83.13
     - .except_nightly_test
-    - .except_on_gitlab.com
   when: manual
 
 .test_version_2.93.beta:
@@ -186,13 +167,11 @@ test_2.93.beta:
   extends:
     - .test_version_2.93.beta
     - .only_nightly_test
-    - .except_on_gitlab.com
 
 test_2.93.beta_manual:
   extends:
     - .test_version_2.93.beta
     - .except_nightly_test
-    - .except_on_gitlab.com
   when: manual
 
 .test_version_3.0.alpha:
@@ -208,19 +187,10 @@ test_3.0.alpha:
   extends:
     - .test_version_3.0.alpha
     - .only_nightly_test
-    - .except_on_gitlab.com
 
 test_3.0.alpha_manual:
   extends:
     - .test_version_3.0.alpha
     - .except_nightly_test
-    - .except_on_gitlab.com
   when: manual
-
-test_gitlab.com:
-  extends:
-    - .test_base
-    - .test_version_dev
-    - .only_version_tag
-    - .only_on_gitlab.com
 
