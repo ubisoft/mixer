@@ -15,10 +15,10 @@ Before reporting an issue, please make sure that are using the :ref:`latest vers
 - the :ref:`faq <FAQ>`,
 - restrictions in :ref:`synchronized` ,
 - known problems in :ref:`caveats`,
-- current Gitlab `issue list <https://gitlab.com/ubisoft-animation-studio/mixer/-/issues/>`_ .
+- current GitHub `issue list <https://github.com/ubisoft/mixer/issues/>`_ .
 
 
-If you think you have found a bug or would like to propose a new feature, please report an `issue <https://gitlab.com/ubisoft-animation-studio/mixer/-/issues>`_ on Gitlab.
+If you think you have found a bug or would like to propose a new feature, please report an `issue <https://github.com/ubisoft/mixer/issues/>`_ on Gitlab.
 
 Please consider attaching the Mixer log file:
 
