@@ -19,19 +19,17 @@ Refer to the online documentation for details about current [features and limita
 
 Documentation is available at the web site https://ubisoft-mixer.readthedocs.io/ to :
 
-- [download and install](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/install.html), 
+- [download and install](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/install.html),
 - [test](https://ubisoft-mixer.readthedocs.io/en/latest/getting-started/first-steps.html) locally,
 - then [get connected](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/get-connected.html) and [work together](https://ubisoft-mixer.readthedocs.io/en/latest/collaborate/work-together.html)
 
 ## Updates
 
-Updates are announced in the [mixer-addon Blender Chat](https://blender.chat/channel/mixer-addon) channel and as a Gitlab [announcement issues](https://gitlab.com/ubisoft-animation-studio/mixer/-/issues?label_name%5B%5D=Information).
+Updates are announced in the [mixer-addon Blender Chat](https://blender.chat/channel/mixer-addon) channel.
 
 ## Support
 
-The active support repository is on Gitlab https://gitlab.com/ubisoft-animation-studio/mixer.
-
-The [Mixer Github repository](https://github.com/ubisoft/mixer) is a mirror that is part of Github [Ubisoft open source](https://github.com/ubisoft) projects group.
+The active support repository is on the [Mixer Github repository](https://github.com/ubisoft/mixer) which is part of the [Ubisoft open source](https://github.com/ubisoft) projects group.
 
 ## Community
 
