@@ -16,7 +16,7 @@ Download
 Open the `latest release <https://github.com/ubisoft/mixer/releases/latest>`__  page from the Mixer Gihub `releases page <https://github.com/ubisoft/mixer/releases>`_.
 Download the zip file listed in **Assets** that has the package icon: |package-icon|.
 
-.. |package-icon| image:: /img/package-icon.png
+.. |package-icon| image:: /docs/img/package-icon.png
 
 .. _installing:
 
@@ -29,7 +29,7 @@ zip file you previously downloaded and validate.
 The add-on will be installed. Click on the checkbox at the left side of its name to enable it.
 
 
-.. image:: /img/install.png
+.. image:: /docs/img/install.png
    :align: center
 
 Once the addon is enabled, a Mixer tab is displayed in the 3D viewport N-Panel.
