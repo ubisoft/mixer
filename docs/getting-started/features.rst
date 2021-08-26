@@ -9,7 +9,7 @@ Overview
 Mixer synchronizes in real time the modifications done to the scene and the objects it contains. During a collaboration session, Mixer displays the position of other participants and highlights their selections. 
 See :ref:`work-together` for more details.
 
-.. image:: /img/select.png
+.. image:: /docs/img/select.png
    :align: center
 
 In the sections bellow we listed the features of Blender that are synchronized and those which are volontary not, as well as what is currently supported and what is not.
