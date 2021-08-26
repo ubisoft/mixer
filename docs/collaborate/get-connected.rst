@@ -20,14 +20,14 @@ Host a Server
 
 Open the Mixer panel in the 3D editor, check that the **Host** text box contains ``localhost`` then click on the **Connect** button.
 
-.. image:: /img/connect-localhost.png
+.. image:: /docs/img/connect-localhost.png
    :align: center
    :alt: Connect to localhost
 
 If you are using Windows and starting a server for the first time,
 the firewall will prompt you to allow access for Python like in the image below.
     
-.. image:: /img/firewall.png
+.. image:: /docs/img/firewall.png
    :align: center
 
 .. important::
@@ -35,7 +35,7 @@ the firewall will prompt you to allow access for Python like in the image below.
 
 Your machine is now hosting a Mixer server and the panel changes to :
 
-.. image:: /img/create-room-localhost.png
+.. image:: /docs/img/create-room-localhost.png
    :align: center
 
 The server is now ready. Find out the :ref:`IP address <ip-address>` of your machine and communicate it to the other participants.
@@ -50,12 +50,12 @@ Start Blender and open the Mixer panel in the 3D editor.
 
 In the **Host** text box, replace ``localhost`` by the IP address of the machine that hosts the server,, which is ``192.168.0.48`` in the example below, then click on the **Connect** button.
 
-.. image:: /img/connect-ip.png
+.. image:: /docs/img/connect-ip.png
    :align: center
 
 The panel now lists the room created on the server. Click on **Join Room**. 
 
-.. image:: /img/join-room.png
+.. image:: /docs/img/join-room.png
    :align: center
 
 You are ready to :ref:`collaborate <work-together-page>` with your colleagues or friends.
@@ -153,19 +153,19 @@ Start Blender and open the Mixer panel in the 3D editor.
 * In the **Host** text box, replace ``localhost`` by  the *public* address of the router on the server location,
   (``203.0.113.17`` in our example).
 
-.. image:: /img/connect-port-forward.png
+.. image:: /docs/img/connect-port-forward.png
    :align: center
 
 * *If the public forwarded port is not* ``12800``:
  
    * Open the Mixer preferences using the Mixer panel title bar setings icon
   
-   .. image:: /img/open-preferences-internet.png
+   .. image:: /docs/img/open-preferences-internet.png
       :align: center
 
    * in the **Port** text box type the public forwarded port number, ``9090`` in our example
   
-   .. image:: /img/preferences-internet-port.png
+   .. image:: /docs/img/preferences-internet-port.png
         :align: center
 
    * close the preferences windows
