@@ -4,7 +4,7 @@ Mixer: a Blender Addon for Collaborative Editing
 With Mixer, several Blender users can work together on the same data and collaborate in real time.
 
 
-.. image:: /img/home_mixer.png
+.. image:: /docs/img/home_mixer.png
    :align: center
 
 
