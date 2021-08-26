@@ -12,13 +12,13 @@ Create a Server
 
 On one of the Blender (say the left one), click on the **Connect** button.
 
-.. image:: /img/connect-localhost.png
+.. image:: /docs/img/connect-localhost.png
    :align: center
 
 If you are using Windows, the firewall will likely prompt you to allow access for Python.
 
 
-.. image:: /img/firewall.png
+.. image:: /docs/img/firewall.png
    :align: center
 
 .. warning::
@@ -28,14 +28,14 @@ If you are using Windows, the firewall will likely prompt you to allow access fo
 
 This launches a :term:`Mixer server<server>` in the background. After the server is started and Mixer is connected to the server, the panel changes.
 
-.. image:: /img/create-room-localhost.png
+.. image:: /docs/img/create-room-localhost.png
    :align: center
 
 Now click on **Create Room** to create a :term:`room`. 
 After the room is created, the **Server rooms** section of the Mixer panel displays the room name, which is *Local* in
 the picture below.
 
-.. image:: /img/room-created-localhost.png
+.. image:: /docs/img/room-created-localhost.png
    :align: center
 
 This Blender is connected to the server, which is now ready to accept a connection from a new client.
@@ -45,12 +45,12 @@ Connect to a Server
 
 On the other Blender (say the right one), open the Mixer panel and click on the **Connect** button.
 
-.. image:: /img/connect-localhost.png
+.. image:: /docs/img/connect-localhost.png
    :align: center
 
 This connects Mixer to the server we have just setup before. The **Server Rooms** section lists the room name.
 
-.. image:: /img/join-room.png
+.. image:: /docs/img/join-room.png
    :align: center
 
 .. warning::
