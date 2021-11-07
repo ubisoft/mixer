@@ -36,9 +36,9 @@ We recommand Visual Studio Code, with Python and Blender VSCode extensions.
 
 If you have a python file open in VSCode, it should automatically detect the virtual env, activate it when prompted. Note that VSCode never detect your python unless you open a Python file. When your python is detected, you should see it in your status bar and any new terminal open should have the virtual env activated ("(.venv)" should appear on the prompt line).
 
-The file `.vscode/settings.shared.json` gives an exemple of settings to fill your own `.vscode/settings.json`. The important parts are `editor`, `python` and `blender` settings.
+The file `.vscode/settings.shared.json` gives an example of settings to fill your own `.vscode/settings.json`. The important parts are `editor`, `python` and `blender` settings.
 
-Similarly you can copy `.vscode/launch.shared.json` and `.vscode/tasks.shared.json` for exemples of debug configurations and tasks to run from VSCode.
+Similarly you can copy `.vscode/launch.shared.json` and `.vscode/tasks.shared.json` for examples of debug configurations and tasks to run from VSCode.
 
 ## VSCode "configuration"
 
