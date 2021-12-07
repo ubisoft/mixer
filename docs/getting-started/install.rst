@@ -6,7 +6,8 @@ Supported versions
 
 Mixer is developed and actively tested on Windows 10. Community users reported successful usage on Linux platform. 
 
-The currently supported Blender version is 2.92.0.
+The currently supported Blender version is 2.93.x. Blender 3.0 will be supported soon.
+
 
 .. _download:
 

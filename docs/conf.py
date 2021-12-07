@@ -17,9 +17,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = "Mixer"
-copyright = "2021, Ubisoft Animation Studio"
-author = "Ubisoft Animation Studio"
+project = "Ubisoft Mixer"
+copyright = "2021, Ubisoft"
+author = "Ubisoft"
 
 
 # -- General configuration ---------------------------------------------------
