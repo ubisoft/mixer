@@ -466,7 +466,7 @@ def decode_baked_mesh(obj: Optional[bpy.types.Object], data, index):
                     face.loops[0][uv_layer].uv = uvs[current_uv_index]
                     face.loops[1][uv_layer].uv = uvs[current_uv_index + 1]
                     face.loops[2][uv_layer].uv = uvs[current_uv_index + 2]
-                    current_uv_index = current_uv_index + 3
+                    current_uv_index += 3
             except Exception:
                 pass
 

@@ -373,7 +373,7 @@ def encode_string_array(values):
 
 def decode_string_array(data, index):
     count = bytes_to_int(data[index : index + 4])
-    index = index + 4
+    index += 4
     values = []
     for _ in range(count):
         string, index = decode_string(data, index)
