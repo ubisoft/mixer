@@ -1,6 +1,6 @@
 ## Summary
 
-(Use the [issue ckecklist](https://ubisoft-mixer.readthedocs.io/en/latest/troubleshoot/issue.html) to find out if your problem is known.)
+(Use the [issue checklist](https://ubisoft-mixer.readthedocs.io/en/latest/troubleshoot/issue.html) to find out if your problem is known.)
 
 (Summarize the bug encountered concisely)
 
