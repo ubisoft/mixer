@@ -104,7 +104,7 @@ soa_initializers: Dict[type, array.array] = {
 
 _node_groups: Tuple[type, ...] = (T.ShaderNodeGroup, T.CompositorNodeGroup, T.TextureNodeGroup)
 if bpy.app.version is not None and bpy.app.version >= (2, 92, 0):
-    _node_groups = _node_groups + (T.GeometryNodeGroup,)
+    _node_groups += (T.GeometryNodeGroup,)
 
 
 def dispatch_rna(no_rna_impl: Callable[..., Any]):

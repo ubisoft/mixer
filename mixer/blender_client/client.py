@@ -547,7 +547,7 @@ class BlenderClient(Client):
     def build_save(self, data):
         filename, file_extension = os.path.splitext(bpy.data.filepath)
         if get_mixer_prefs().VRtist_suffix not in filename:
-            filename = filename + get_mixer_prefs().VRtist_suffix + file_extension
+            filename += get_mixer_prefs().VRtist_suffix + file_extension
         bpy.ops.wm.save_as_mainfile(filepath=filename, copy=True)
 
     def build_montage_mode(self, data):
