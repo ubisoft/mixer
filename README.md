@@ -1,14 +1,37 @@
-# Mixer
+<img align="left" width="auto" height="auto" src="doc/images/Logo_90_A.png">
 
-Mixer is a Blender addon for real time collaboration in Blender. It allows multiple Blender users to work on the same scene at the same time and is developed by the R&D department of Ubisoft Animation Studio.
+# Ubisoft Mixer - Blender Add-on
+
+</br>
+
+**Mixer is a Blender addon for real time collaboration in Blender. It allows multiple Blender users to work on the same scene at the same time and is developed by the R&D department of Ubisoft Animation Studio.**
+
+<p align="center">
+  <a href="https://ubisoft-mixer.readthedocs.io" title="Consult the online documentation" target="_blank">
+  <img src="doc/images/Documentation.png" width="160" />
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/ubisoft/mixer/releases/latest" title="Download latest version">
+  <img src="doc/images/Download.png" width="160" />
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/ubisoft/mixer/issues" title="Report and follow issues">
+  <img src="doc/images/Issues.png" width="160" />
+  </a>
+</p>
+
+
 
 ![Mixer screenshot](docs/img/home_mixer.png)
 
-**Disclaimer**: Although designed to be used in a production context it is still an experimental tool.
+**Disclaimer**
+>**This tool is currently supported for LTS version of Blender 2.93 and up to Blender 3.0**
+>
+>Although designed to be used in a production context it is still an experimental tool.
 In spite of all our efforts to make it reliable, it may in some circumstances corrupt your Blender scenes data.
 Be aware that neither Ubisoft nor Ubisoft employees can be taken as responsible in such cases. Use it at your own risks.
-
-**This said, we will do our best to improve Mixer thanks to your feedback in order to provide a memorable creative collaborative experience.
+>
+>**This said, we will do our best to improve Mixer thanks to your feedback in order to provide a memorable creative collaborative experience.
 Have fun !**
 
 ## Features
