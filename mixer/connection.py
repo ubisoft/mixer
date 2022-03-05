@@ -21,6 +21,7 @@ It updates the addon state according to this connection.
 """
 
 import logging
+import sys
 
 import bpy
 import mixer
@@ -102,7 +103,7 @@ def is_joined():
 
 def wait_for_server(host, port):
     attempts = 0
-    max_attempts = 10
+    max_attempts = 100
     while not create_main_client(host, port) and attempts < max_attempts:
         attempts += 1
         time.sleep(0.2)
@@ -120,7 +121,7 @@ def start_local_server():
         args = {}
 
     share_data.local_server_process = subprocess.Popen(
-        [bpy.app.binary_path_python, "-m", "mixer.broadcaster.apps.server", "--port", str(get_mixer_prefs().port)],
+        [sys.executable, "-m", "mixer.broadcaster.apps.server", "--port", str(get_mixer_prefs().port)],
         cwd=dir_path,
         shell=False,
         **args,
