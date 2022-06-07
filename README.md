@@ -4,7 +4,8 @@
 
 </br>
 
-**Mixer is a Blender addon for real time collaboration in Blender. It allows multiple Blender users to work on the same scene at the same time and is developed by the R&D department of Ubisoft Animation Studio.**
+**Mixer is a Blender addon for real time collaboration in Blender. It allows multiple Blender users to work on the same scene at the same time.
+ It was developed by the R&D department of Ubisoft Animation Studio.**
 
 <p align="center">
   <a href="https://ubisoft-mixer.readthedocs.io" title="Consult the online documentation" target="_blank">
