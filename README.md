@@ -24,15 +24,16 @@
 
 ![Mixer screenshot](docs/img/home_mixer.png)
 
-**Disclaimer**
->**This tool is currently supported for LTS version of Blender 2.93 and up to Blender 3.0**
+## Disclaimer
+>**This tool is NOT SUPPORTED ANYMORE**
 >
->Although designed to be used in a production context it is still an experimental tool.
-In spite of all our efforts to make it reliable, it may in some circumstances corrupt your Blender scenes data.
+>Up to December 2021 this tool was supported for LTS version of Blender 2.93 and for Blender 3.0.
+>
+>It was designed in a production context and was used as an experimental tool. With the end of the project developing it Mixer is not maintained anymore.
+>
+>You can use is as is. In spite of all our efforts to make it reliable, it may in some circumstances corrupt your Blender scenes data.
 Be aware that neither Ubisoft nor Ubisoft employees can be taken as responsible in such cases. Use it at your own risks.
 >
->**This said, we will do our best to improve Mixer thanks to your feedback in order to provide a memorable creative collaborative experience.
-Have fun !**
 
 ## Features
 
