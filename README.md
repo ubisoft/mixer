@@ -54,7 +54,8 @@ Updates are announced in the [mixer-addon Blender Chat](https://blender.chat/cha
 
 ## Support
 
-The active support repository is on the [Mixer Github repository](https://github.com/ubisoft/mixer) which is part of the [Ubisoft open source](https://github.com/ubisoft) projects group.
+The support repository is on the [Mixer Github repository](https://github.com/ubisoft/mixer) which is part of the [Ubisoft open source](https://github.com/ubisoft) projects group.
+Since the project is not maintained anymore submitted issues may not receive answers. We do appologize for the end of support.
 
 ## Community
 
