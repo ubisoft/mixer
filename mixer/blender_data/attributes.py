@@ -197,7 +197,9 @@ def write_attribute(
                 # Don't log this, too many messages
                 # f"Attempt to write to non-existent attribute {bl_instance}.{key} : skipped"
                 return
-
+            # HACK TO avoid Blender crash.
+            if prop.name == "Active Paint Texture Index":
+                return
             if not prop.is_readonly:
                 try:
                     setattr(parent, key, value)
