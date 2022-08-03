@@ -23,6 +23,7 @@ It updates the addon state according to this connection.
 import logging
 
 import bpy
+import sys
 import mixer
 from mixer.bl_utils import get_mixer_prefs
 from mixer.share_data import share_data
@@ -120,7 +121,7 @@ def start_local_server():
         args = {}
 
     share_data.local_server_process = subprocess.Popen(
-        [bpy.app.binary_path_python, "-m", "mixer.broadcaster.apps.server", "--port", str(get_mixer_prefs().port)],
+        [Path(sys.executable), "-m", "mixer.broadcaster.apps.server", "--port", str(get_mixer_prefs().port)],
         cwd=dir_path,
         shell=False,
         **args,
